@@ -45,12 +45,19 @@ def test_memory_guard_raises_memory_error(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_no_nfl_data_py_imports() -> None:
-    """No nfl_data_py references in any ingestion module."""
-    import subprocess
-    result = subprocess.run(
-        ["grep", "-r", "nfl_data_py", "src/"],
-        capture_output=True,
-        text=True,
-        cwd="/c/Users/rahul/ucla/pp/sportsbet",
-    )
-    assert result.stdout == "", f"Found nfl_data_py import: {result.stdout}"
+    """No `import nfl_data_py` statements in any ingestion module.
+
+    Comments mentioning nfl_data_py (e.g. '# NOT nfl_data_py') are allowed.
+    Only actual import statements are checked.
+    """
+    import pathlib
+    import re
+    src_dir = pathlib.Path(__file__).parent.parent / "src"
+    # Match actual import statements, not comments referencing the old package name
+    import_pattern = re.compile(r"^(?:import|from)\s+nfl_data_py", re.MULTILINE)
+    found: list[str] = []
+    for py_file in src_dir.rglob("*.py"):
+        text = py_file.read_text(encoding="utf-8", errors="ignore")
+        if import_pattern.search(text):
+            found.append(str(py_file))
+    assert not found, f"Found nfl_data_py import statement in: {found}"
