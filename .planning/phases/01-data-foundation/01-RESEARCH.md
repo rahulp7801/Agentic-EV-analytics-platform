@@ -351,14 +351,15 @@ LIMIT 1;
 
 ```python
 # src/sportsbet/config.py
+# Pydantic v2 ONLY — do NOT use class Config: (pydantic v1 pattern)
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
+
     database_url: str = "postgresql+psycopg://localhost/sportsbet"
     database_url_async: str = "postgresql+asyncpg://localhost/sportsbet"
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()
 ```
