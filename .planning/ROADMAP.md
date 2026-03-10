@@ -12,7 +12,7 @@ Build a dependency-ordered NFL quant analytics backend: PostgreSQL data foundati
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Data Foundation** - PostgreSQL schema, Alembic migrations, and memory-safe NFL data ingestion
+- [x] **Phase 1: Data Foundation** - PostgreSQL schema, Alembic migrations, and memory-safe NFL data ingestion (completed 2026-03-10)
 - [ ] **Phase 2: Agent Infrastructure** - LangGraph graph skeleton, GraphState schema, and all Pydantic I/O models
 - [ ] **Phase 3: Quant Engine** - Two-stage SQL validation gate, probability estimation, and backtesting module
 - [ ] **Phase 4: Context and Odds Ingestion** - Live odds pipeline, staleness guards, and qualitative signal scraping
@@ -98,7 +98,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 2/3 | In Progress|  |
+| 1. Data Foundation | 3/3 | Complete   | 2026-03-10 |
 | 2. Agent Infrastructure | 0/TBD | Not started | - |
 | 3. Quant Engine | 0/TBD | Not started | - |
 | 4. Context and Odds Ingestion | 0/TBD | Not started | - |

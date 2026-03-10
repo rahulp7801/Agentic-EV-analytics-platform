@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-data-foundation/01-02-PLAN.md
-last_updated: "2026-03-10T19:45:00.000Z"
+stopped_at: Completed 01-data-foundation/01-03-PLAN.md
+last_updated: "2026-03-10T20:03:32.583Z"
 last_activity: 2026-03-10 — Roadmap created, all 23 v1 requirements mapped to 6 phases
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 67
 ---
 
@@ -52,6 +52,7 @@ Progress: [██████░░░░] 67%
 *Updated after each plan completion*
 | Phase 01-data-foundation P01 | 16min | 2 tasks | 10 files |
 | Phase 01-data-foundation P02 | 18min | 2 tasks | 11 files |
+| Phase 01-data-foundation P03 | 9min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,9 @@ Recent decisions affecting current work:
 - [Phase 01-data-foundation P02]: SET enable_seqscan=off in EXPLAIN test — reliable at any row count including empty table
 - [Phase 01-data-foundation P02]: press_man_rate nullable in ngs_stats — forward-compatible for Phase 6 per RESEARCH.md open question
 - [Phase 01-data-foundation P02]: asyncpg pool for hot-path agent queries; psycopg engine for bulk ingestion/migrations
+- [Phase 01-data-foundation]: nflreadpy over nfl_data_py: archived Sep 2025; all ingestion uses import nflreadpy as nfl — no import nfl_data_py in src/
+- [Phase 01-data-foundation]: Polars-first write path: nflreadpy returns Polars; .to_pandas() called only before to_sql() — minimizes pandas memory footprint per season
+- [Phase 01-data-foundation]: site-packages in pytest pythonpath: Windows pip --target workaround; pythonpath = ['src', 'site-packages'] in pyproject.toml
 
 ### Pending Todos
 
@@ -85,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T19:45:00Z
-Stopped at: Completed 01-data-foundation/01-02-PLAN.md
+Last session: 2026-03-10T20:03:32.579Z
+Stopped at: Completed 01-data-foundation/01-03-PLAN.md
 Resume file: None

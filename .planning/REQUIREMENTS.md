@@ -8,7 +8,7 @@
 ### Data Foundation
 
 - [x] **DATA-01**: System stores NFL game, player, and play-by-play data in a PostgreSQL schema with composite indexes on season, week, player_id, and game_id
-- [ ] **DATA-02**: System ingests multi-season NFL PBP data via nfl_data_py using a year-by-year loading loop with column whitelist and gc.collect() to prevent OOM
+- [x] **DATA-02**: System ingests multi-season NFL PBP data via nfl_data_py using a year-by-year loading loop with column whitelist and gc.collect() to prevent OOM
 - [x] **DATA-03**: System stores timestamped odds snapshots to PostgreSQL for CLV (closing line value) calculation from day one
 - [x] **DATA-04**: System manages schema versioning and migrations via Alembic
 
@@ -89,8 +89,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
-| DATA-03 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Complete |
+| DATA-03 | Phase 1 | Complete |
 | DATA-04 | Phase 1 | Complete |
 | INFRA-01 | Phase 2 | Pending |
 | INFRA-02 | Phase 2 | Pending |
