@@ -30,7 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Alembic migration `upgrade head` runs cleanly on a fresh PostgreSQL instance and creates all tables with composite indexes
   3. The ingestion script loads 5+ seasons of NFL PBP data without OOM crash, with gc.collect() called between each season
   4. Odds snapshot rows can be written to and queried from `odds_snapshots` with a timestamped CLV-ready schema
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Project scaffold, settings, utils, and test infrastructure stubs (Wave 0)
+- [ ] 01-02-PLAN.md — SQLAlchemy ORM models, Alembic migration with all composite indexes, migration tests green
+- [ ] 01-03-PLAN.md — nflreadpy PBP/NGS/player-stats ingestion, odds snapshot writer, CLI entry point
 
 ### Phase 2: Agent Infrastructure
 **Goal**: The LangGraph graph skeleton compiles and routes, all agent I/O contracts are defined, and checkpointing is active before any agent logic is written
@@ -93,7 +98,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 0/TBD | Not started | - |
+| 1. Data Foundation | 0/3 | Planning complete | - |
 | 2. Agent Infrastructure | 0/TBD | Not started | - |
 | 3. Quant Engine | 0/TBD | Not started | - |
 | 4. Context and Odds Ingestion | 0/TBD | Not started | - |
