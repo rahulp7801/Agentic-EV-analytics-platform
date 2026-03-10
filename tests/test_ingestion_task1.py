@@ -1,0 +1,56 @@
+"""TDD RED tests for Task 1 ingestion modules.
+
+These tests are written BEFORE the implementation and must fail until
+the ingestion modules are created.
+"""
+from __future__ import annotations
+
+import pytest
+
+
+def test_pbp_columns_count() -> None:
+    """PBP_COLUMNS must have exactly 18 entries."""
+    from sportsbet.ingestion.pbp import PBP_COLUMNS
+    assert len(PBP_COLUMNS) == 18, f"Expected 18 columns, got {len(PBP_COLUMNS)}"
+
+
+def test_ngs_min_season() -> None:
+    """NGS_MIN_SEASON must equal 2016."""
+    from sportsbet.ingestion.ngs import NGS_MIN_SEASON
+    assert NGS_MIN_SEASON == 2016
+
+
+def test_ngs_season_guard_raises_value_error() -> None:
+    """ingest_ngs_seasons must raise ValueError for season < 2016."""
+    from sportsbet.ingestion.ngs import ingest_ngs_seasons
+    with pytest.raises(ValueError, match="2016"):
+        ingest_ngs_seasons([2015], engine=None)
+
+
+def test_memory_guard_raises_memory_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ingest_pbp_seasons raises MemoryError when memory > 80%."""
+    import psutil
+    import types
+
+    mock_vm = types.SimpleNamespace(percent=85.0)
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: mock_vm)
+
+    from sportsbet.ingestion import pbp as pbp_mod
+    # Reload to pick up monkeypatch (psutil already imported at module level)
+    import importlib
+    importlib.reload(pbp_mod)
+
+    with pytest.raises(MemoryError):
+        pbp_mod.ingest_pbp_seasons([2023], engine=object())  # type: ignore[arg-type]
+
+
+def test_no_nfl_data_py_imports() -> None:
+    """No nfl_data_py references in any ingestion module."""
+    import subprocess
+    result = subprocess.run(
+        ["grep", "-r", "nfl_data_py", "src/"],
+        capture_output=True,
+        text=True,
+        cwd="/c/Users/rahul/ucla/pp/sportsbet",
+    )
+    assert result.stdout == "", f"Found nfl_data_py import: {result.stdout}"
