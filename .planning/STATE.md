@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-data-foundation/01-01-PLAN.md
-last_updated: "2026-03-10T19:42:55.301Z"
+stopped_at: Completed 01-data-foundation/01-02-PLAN.md
+last_updated: "2026-03-10T19:45:00.000Z"
 last_activity: 2026-03-10 — Roadmap created, all 23 v1 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Plan: 0 of TBD in current phase
 Status: Ready to plan
 Last activity: 2026-03-10 — Roadmap created, all 23 v1 requirements mapped to 6 phases
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████░░░░] 67%
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [███░░░░░░░] 33%
 
 *Updated after each plan completion*
 | Phase 01-data-foundation P01 | 16min | 2 tasks | 10 files |
+| Phase 01-data-foundation P02 | 18min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,11 @@ Recent decisions affecting current work:
 - [Phase 01-data-foundation]: Pydantic v2 BaseSettings with ConfigDict — v1 class Config pattern forbidden
 - [Phase 01-data-foundation]: src layout with pythonpath=['src'] in pytest config — no editable install required
 - [Phase 01-data-foundation]: current_nfl_season() uses date.today() (not datetime.now()) per RESEARCH.md Pitfall 14
+- [Phase 01-data-foundation P02]: Hand-written Alembic migration — autogenerate omits composite indexes (Pitfall 4)
+- [Phase 01-data-foundation P02]: SPORTSBET_TEST_DATABASE_URL gates DB tests with skipif — not xfail — for real assertions
+- [Phase 01-data-foundation P02]: SET enable_seqscan=off in EXPLAIN test — reliable at any row count including empty table
+- [Phase 01-data-foundation P02]: press_man_rate nullable in ngs_stats — forward-compatible for Phase 6 per RESEARCH.md open question
+- [Phase 01-data-foundation P02]: asyncpg pool for hot-path agent queries; psycopg engine for bulk ingestion/migrations
 
 ### Pending Todos
 
@@ -79,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T19:42:55.295Z
-Stopped at: Completed 01-data-foundation/01-01-PLAN.md
+Last session: 2026-03-10T19:45:00Z
+Stopped at: Completed 01-data-foundation/01-02-PLAN.md
 Resume file: None

@@ -7,9 +7,9 @@
 
 ### Data Foundation
 
-- [ ] **DATA-01**: System stores NFL game, player, and play-by-play data in a PostgreSQL schema with composite indexes on season, week, player_id, and game_id
+- [x] **DATA-01**: System stores NFL game, player, and play-by-play data in a PostgreSQL schema with composite indexes on season, week, player_id, and game_id
 - [ ] **DATA-02**: System ingests multi-season NFL PBP data via nfl_data_py using a year-by-year loading loop with column whitelist and gc.collect() to prevent OOM
-- [ ] **DATA-03**: System stores timestamped odds snapshots to PostgreSQL for CLV (closing line value) calculation from day one
+- [x] **DATA-03**: System stores timestamped odds snapshots to PostgreSQL for CLV (closing line value) calculation from day one
 - [x] **DATA-04**: System manages schema versioning and migrations via Alembic
 
 ### Agent Infrastructure
