@@ -40,6 +40,9 @@ packages = ["src/sportsbet"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "serial: tests that must not run concurrently (share DB state)",
+]
 
 [tool.mypy]
 strict = true
