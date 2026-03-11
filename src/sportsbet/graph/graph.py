@@ -7,11 +7,17 @@ create_graph() builds and compiles the full directed graph:
                                                -> context_agent   -> END
                                                -> END  (on error or unknown type)
 
-No checkpointer is attached in Phase 2 — Plan 02-03 adds AsyncPostgresSaver.
+create_graph_with_sqlite() is the runtime factory — writes checkpoints to disk
+at .checkpoints/sportsbet.sqlite using sync SqliteSaver.
+
+All tests use create_graph(checkpointer=MemorySaver()) for full isolation (no disk I/O).
 Downstream phases (3, 4, 5, 6) import create_graph() and replace stub agent
 nodes with real implementations.
 """
 from __future__ import annotations
+
+import os
+from typing import Any
 
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -21,7 +27,7 @@ from sportsbet.graph.router import master_router, route_from_master
 from sportsbet.graph.state import GraphState
 
 
-def create_graph() -> CompiledStateGraph:
+def create_graph(checkpointer: Any = None) -> CompiledStateGraph:
     """Build and compile the LangGraph StateGraph for the sportsbet agent pipeline.
 
     Graph topology (Phase 2 stub wiring):
@@ -29,11 +35,18 @@ def create_graph() -> CompiledStateGraph:
     - Conditional edges from master_router dispatch to specialist stubs
     - Each specialist stub terminates at END after setting its output on state
 
+    Parameters
+    ----------
+    checkpointer:
+        Optional LangGraph checkpointer (e.g. MemorySaver for tests,
+        SqliteSaver for runtime). If None, compiles without checkpointing
+        (backward-compatible with Plan 02-02 tests).
+
     Returns
     -------
     CompiledStateGraph
-        Ready for ainvoke(initial_state) calls. Thread-safe: each ainvoke
-        gets its own isolated state copy.
+        Ready for ainvoke(initial_state, config={"configurable": {"thread_id": ...}}) calls.
+        Thread-safe: each ainvoke gets its own isolated state copy.
     """
     builder: StateGraph = StateGraph(GraphState)
 
@@ -63,5 +76,35 @@ def create_graph() -> CompiledStateGraph:
     builder.add_edge("arbitrage_agent", END)
     builder.add_edge("context_agent", END)
 
-    # Compile without checkpointer — Plan 02-03 adds AsyncPostgresSaver
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
+
+
+def create_graph_with_sqlite(
+    db_path: str = ".checkpoints/sportsbet.sqlite",
+) -> CompiledStateGraph:
+    """Build and compile the graph with a SqliteSaver checkpointer for runtime use.
+
+    Creates the .checkpoints/ directory if it does not exist, then instantiates
+    a sync SqliteSaver and passes it to create_graph().
+
+    Do NOT use in tests — use create_graph(checkpointer=MemorySaver()) instead
+    to avoid disk I/O and cleanup overhead.
+
+    Parameters
+    ----------
+    db_path:
+        Path to the SQLite database file for checkpoint storage.
+        Defaults to .checkpoints/sportsbet.sqlite (relative to cwd).
+
+    Returns
+    -------
+    CompiledStateGraph
+        Graph compiled with SqliteSaver. Pass thread_id via
+        config={"configurable": {"thread_id": "..."}} on ainvoke to enable
+        checkpoint persistence and replay.
+    """
+    from langgraph.checkpoint.sqlite import SqliteSaver
+
+    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+    saver = SqliteSaver.from_conn_string(db_path)
+    return create_graph(checkpointer=saver)

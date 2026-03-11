@@ -14,5 +14,9 @@ class Settings(BaseSettings):
     postgres_db: str = "sportsbet"
     log_level: str = "INFO"
 
+    # Risk management — Kelly Criterion configuration (Phase 5 agents read these)
+    bankroll_usd: float = 10000.0
+    max_kelly_fraction: float = 0.25
+
 
 settings = Settings()
