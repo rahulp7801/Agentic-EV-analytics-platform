@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-10T20:21:45.197Z"
-last_activity: 2026-03-10 — Roadmap created, all 23 v1 requirements mapped to 6 phases
+status: in-progress
+stopped_at: "Completed 02-01-PLAN.md"
+last_updated: "2026-03-11T00:45:20Z"
+last_activity: 2026-03-11 — Phase 2 Plan 01 complete — Pydantic v2 agent I/O models
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 67
+  total_plans: 6
+  completed_plans: 4
+  percent: 40
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** The Quant Agent must produce statistically grounded +EV flags backed entirely by database-sourced data — zero LLM hallucination, zero flat bet sizing, strict Kelly Criterion outputs.
-**Current focus:** Phase 1 - Data Foundation
+**Current focus:** Phase 2 - Agent Infrastructure
 
 ## Current Position
 
-Phase: 1 of 6 (Data Foundation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-10 — Roadmap created, all 23 v1 requirements mapped to 6 phases
+Phase: 2 of 6 (Agent Infrastructure)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-03-11 — Phase 2 Plan 01 complete — Pydantic v2 agent I/O models
 
-Progress: [██████░░░░] 67%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -76,6 +76,10 @@ Recent decisions affecting current work:
 - [Phase 01-data-foundation]: nflreadpy over nfl_data_py: archived Sep 2025; all ingestion uses import nflreadpy as nfl — no import nfl_data_py in src/
 - [Phase 01-data-foundation]: Polars-first write path: nflreadpy returns Polars; .to_pandas() called only before to_sql() — minimizes pandas memory footprint per season
 - [Phase 01-data-foundation]: site-packages in pytest pythonpath: Windows pip --target workaround; pythonpath = ['src', 'site-packages'] in pyproject.toml
+- [Phase 02-agent-infrastructure P01]: Annotated + Field constraints (ge/le/gt/max_length) preferred over @field_validator for simple range guards — less boilerplate, same enforcement
+- [Phase 02-agent-infrastructure P01]: QuantResult all-nullable stub design — Phase 2 stub nodes return QuantResult() without DB access; Phase 3 populates real values
+- [Phase 02-agent-infrastructure P01]: AgentOddsSnapshot.implied_probability is Decimal not int — conversion from American odds happens at ingestion time to prevent unit-mismatch bugs
+- [Phase 02-agent-infrastructure P01]: EVSignal.kelly_fraction hard cap 0.25 enforced at model level (Decimal Field constraint) — matches CLAUDE.md fractional Kelly prop firm rule
 
 ### Pending Todos
 
@@ -89,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T20:21:45.190Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-agent-infrastructure/02-CONTEXT.md
+Last session: 2026-03-11T00:45:20Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: .planning/phases/02-agent-infrastructure/02-02-PLAN.md

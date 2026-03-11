@@ -16,7 +16,7 @@
 
 - [ ] **INFRA-01**: System defines a GraphState TypedDict with explicit Annotated reducers for all fields written by multiple agents — no last-write-wins collisions
 - [ ] **INFRA-02**: System routes queries through a LangGraph Master Router (supervisor) with conditional edges to specialist sub-agents based on request_type
-- [ ] **INFRA-03**: System defines all Pydantic I/O models (QuantParams, QuantResult, OddsSnapshot, EVSignal, GameState) before any agent logic is written
+- [x] **INFRA-03**: System defines all Pydantic I/O models (QuantParams, QuantResult, OddsSnapshot, EVSignal, GameState) before any agent logic is written
 - [ ] **INFRA-04**: System persists LangGraph graph state via SqliteSaver checkpointing from Phase 1, enabling replay on failure
 
 ### Quant Engine
@@ -94,7 +94,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-04 | Phase 1 | Complete |
 | INFRA-01 | Phase 2 | Pending |
 | INFRA-02 | Phase 2 | Pending |
-| INFRA-03 | Phase 2 | Pending |
+| INFRA-03 | Phase 2 | Complete |
 | INFRA-04 | Phase 2 | Pending |
 | QUANT-01 | Phase 3 | Pending |
 | QUANT-02 | Phase 3 | Pending |
