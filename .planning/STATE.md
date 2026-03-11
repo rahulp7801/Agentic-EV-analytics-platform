@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in-progress
-stopped_at: "Completed 02-01-PLAN.md"
-last_updated: "2026-03-11T00:45:20Z"
-last_activity: 2026-03-11 — Phase 2 Plan 01 complete — Pydantic v2 agent I/O models
+status: executing
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-03-11T00:53:57.469Z"
+last_activity: 2026-03-11 — Phase 2 Plan 02 complete — LangGraph graph skeleton with stub agents
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
-  percent: 40
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 ## Current Position
 
 Phase: 2 of 6 (Agent Infrastructure)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-03-11 — Phase 2 Plan 01 complete — Pydantic v2 agent I/O models
+Last activity: 2026-03-11 — Phase 2 Plan 02 complete — LangGraph graph skeleton with stub agents
 
-Progress: [████░░░░░░] 40%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [████░░░░░░] 40%
 | Phase 01-data-foundation P01 | 16min | 2 tasks | 10 files |
 | Phase 01-data-foundation P02 | 18min | 2 tasks | 11 files |
 | Phase 01-data-foundation P03 | 9min | 2 tasks | 9 files |
+| Phase 02-agent-infrastructure P02 | 20 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [Phase 02-agent-infrastructure P01]: QuantResult all-nullable stub design — Phase 2 stub nodes return QuantResult() without DB access; Phase 3 populates real values
 - [Phase 02-agent-infrastructure P01]: AgentOddsSnapshot.implied_probability is Decimal not int — conversion from American odds happens at ingestion time to prevent unit-mismatch bugs
 - [Phase 02-agent-infrastructure P01]: EVSignal.kelly_fraction hard cap 0.25 enforced at model level (Decimal Field constraint) — matches CLAUDE.md fractional Kelly prop firm rule
+- [Phase 02-agent-infrastructure]: Stub agents return partial dicts (not full GraphState) — LangGraph merges via reducers; correct LangGraph partial state update pattern
+- [Phase 02-agent-infrastructure]: route_from_master (conditional edge fn) handles routing; master_router node is pure passthrough — matches LangGraph API separation of concerns
+- [Phase 02-agent-infrastructure]: No checkpointer in Plan 02-02 — Plan 02-03 adds AsyncPostgresSaver after graph skeleton validated
 
 ### Pending Todos
 
@@ -87,12 +91,12 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 2]: Verify current LangGraph version (may be 0.3.x by implementation) — confirm AsyncPostgresSaver import path and Send API for parallel fan-out before coding graph infrastructure
+- [Phase 2]: LangGraph 1.1.0 confirmed in site-packages. Still need to verify AsyncPostgresSaver import path (langgraph-checkpoint) before Plan 02-03 coding
 - [Phase 4]: Verify current Odds API sport key naming and rate limits against live API documentation before implementing polling loop
 - [Phase 6]: Verify nfl_data_py NGS field availability for current seasons before designing Kinematic Agent queries
 
 ## Session Continuity
 
-Last session: 2026-03-11T00:45:20Z
-Stopped at: Completed 02-01-PLAN.md
-Resume file: .planning/phases/02-agent-infrastructure/02-02-PLAN.md
+Last session: 2026-03-11T00:53:57.465Z
+Stopped at: Completed 02-02-PLAN.md
+Resume file: None
