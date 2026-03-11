@@ -1,9 +1,9 @@
 ---
 phase: 2
 slug: agent-infrastructure
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-10
 ---
 
@@ -38,24 +38,27 @@ created: 2026-03-10
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 02-01-01 | 01 | 1 | INFRA-01 | unit | `pytest tests/test_graph.py::test_graphstate_reducer -q` | ❌ W0 | ⬜ pending |
-| 02-01-02 | 01 | 1 | INFRA-02 | unit | `pytest tests/test_graph.py::test_router_dispatch -q` | ❌ W0 | ⬜ pending |
-| 02-02-01 | 02 | 1 | INFRA-03 | unit | `pytest tests/test_models.py -q` | ❌ W0 | ⬜ pending |
-| 02-02-02 | 02 | 1 | INFRA-03 | unit | `pytest tests/test_models.py::test_ev_signal_validation -q` | ❌ W0 | ⬜ pending |
-| 02-03-01 | 03 | 2 | INFRA-04 | unit | `pytest tests/test_graph.py::test_checkpoint_persist -q` | ❌ W0 | ⬜ pending |
-| 02-03-02 | 03 | 2 | INFRA-04 | unit | `pytest tests/test_graph.py::test_checkpoint_replay -q` | ❌ W0 | ⬜ pending |
+| 02-01-01 | 01 | 1 | INFRA-03 | unit | `pytest tests/test_models.py -q` | created in TDD RED step | ⬜ pending |
+| 02-01-02 | 01 | 1 | INFRA-03 | unit | `pytest tests/test_models.py::test_ev_signal_validation -q` | created in TDD RED step | ⬜ pending |
+| 02-02-01 | 02 | 2 | INFRA-01 | unit | `pytest tests/test_graph.py::test_graphstate_reducer -q` | created in TDD RED step | ⬜ pending |
+| 02-02-02 | 02 | 2 | INFRA-02 | unit | `pytest tests/test_graph.py::test_router_dispatch_quant -q` | created in TDD RED step | ⬜ pending |
+| 02-03-01 | 03 | 3 | INFRA-04 | unit | `pytest tests/test_graph.py::test_checkpoint_persist -q` | created in TDD RED step | ⬜ pending |
+| 02-03-02 | 03 | 3 | INFRA-04 | unit | `pytest tests/test_graph.py::test_checkpoint_replay -q` | created in TDD RED step | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
-## Wave 0 Requirements
+## Wave 0 — Test Scaffold
 
-- [ ] `tests/test_graph.py` — stubs for INFRA-01, INFRA-02, INFRA-04
-- [ ] `tests/test_models.py` — stubs for INFRA-03
-- [ ] `tests/conftest.py` — add `graph_fixture` with `InMemorySaver` and fresh `thread_id` per test
+Test files are created as part of the TDD RED phase at the start of each plan's first task. There are no separate Wave 0 tasks required:
 
-*Existing `tests/conftest.py` from Phase 1 covers DB fixtures — graph fixtures are additive.*
+- **Plan 01 (Wave 1, TDD):** `tests/test_models.py` is written in the RED step of Task 1 before any production code exists. 10 failing tests expected on first run.
+- **Plan 02 (Wave 2, TDD):** `tests/test_graph.py` is written in the RED step of Task 1 before `state.py` is implemented. 9 failing tests expected on first run.
+- **Plan 03 (Wave 3, TDD Task 2):** Checkpoint tests are added to `tests/test_graph.py` in the RED step of Task 2. 4 failing tests expected on first run.
+- **`tests/conftest.py`:** `graph_fixture` (MemorySaver + fresh thread_id) added in Plan 03 Task 2.
+
+All test creation is embedded in the RED phase of each plan's TDD task — no separate scaffolding step needed.
 
 ---
 
@@ -63,17 +66,17 @@ created: 2026-03-10
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| AsyncSqliteSaver `.sqlite` file written to disk | INFRA-04 | Requires filesystem inspection after `ainvoke` | Run `python -c "import asyncio; from sportsbet.graph import create_graph; asyncio.run(create_graph().ainvoke(...))"` and verify `.checkpoints/sportsbet.sqlite` exists |
+| SqliteSaver `.sqlite` file written to disk | INFRA-04 | Requires filesystem inspection after `ainvoke` | Run `python -c "import asyncio; from sportsbet.graph import create_graph_with_sqlite; ..."` and verify `.checkpoints/sportsbet.sqlite` exists |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify — test files created in TDD RED steps (embedded in plans)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covered by TDD RED steps in each plan — no outstanding MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved
