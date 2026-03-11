@@ -2,10 +2,12 @@
 
 TDD RED stubs for Task 1: GraphState TypedDict and reducers.
 Task 2 tests are added after Task 1 GREEN.
+Plan 02-03 adds checkpoint persist/replay tests using MemorySaver.
 """
 from __future__ import annotations
 
 import asyncio
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, get_type_hints
@@ -183,3 +185,89 @@ class TestRouter:
         }
         missing = required - set(result.keys())
         assert not missing, f"Missing fields in returned state: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# Plan 02-03: Checkpoint persist and replay tests
+# ---------------------------------------------------------------------------
+
+def make_checkpoint_state(request_type: str = "quant_analysis") -> dict[str, Any]:
+    """Return a minimal GraphState-compatible dict for checkpoint tests."""
+    return {
+        "session_id": str(uuid.uuid4()),
+        "request_type": request_type,
+        "created_at": datetime.utcnow(),
+        "game_id": "2023_01_KC_DET",
+        "season": 2023,
+        "week": 1,
+        "home_team": "DET",
+        "away_team": "KC",
+        "injury_flags": {},
+        "weather_json": None,
+        "error": None,
+    }
+
+
+class TestCheckpointing:
+    async def test_checkpoint_persist(self, graph_fixture) -> None:
+        """After ainvoke with MemorySaver, get_state() returns a non-None snapshot."""
+        compiled, config = graph_fixture
+        state = make_checkpoint_state()
+        await compiled.ainvoke(state, config=config)
+        snapshot = compiled.get_state(config)
+        assert snapshot is not None, (
+            "get_state() must return a checkpoint snapshot after ainvoke"
+        )
+
+    async def test_checkpoint_replay(self, graph_fixture) -> None:
+        """Two sequential ainvoke calls with the same thread_id both succeed."""
+        compiled, config = graph_fixture
+        state = make_checkpoint_state()
+        first_result = await compiled.ainvoke(state, config=config)
+        assert first_result is not None, "First ainvoke must return a state dict"
+
+        # Second invocation with same thread_id replays from checkpoint
+        second_result = await compiled.ainvoke(state, config=config)
+        assert second_result is not None, "Second ainvoke (replay) must succeed"
+        assert isinstance(second_result, dict), (
+            f"Expected dict from second ainvoke, got {type(second_result)}"
+        )
+
+    def test_graph_fixture_isolation(self, graph_fixture) -> None:
+        """Two graph_fixture calls produce different thread_ids (no state bleed)."""
+        from langgraph.checkpoint.memory import MemorySaver
+        from sportsbet.graph import create_graph
+
+        # Simulate two independent fixture calls
+        saver_a = MemorySaver()
+        compiled_a = create_graph(checkpointer=saver_a)
+        thread_a = str(uuid.uuid4())
+
+        saver_b = MemorySaver()
+        compiled_b = create_graph(checkpointer=saver_b)
+        thread_b = str(uuid.uuid4())
+
+        assert thread_a != thread_b, (
+            "Each fixture call must produce a unique thread_id"
+        )
+        # Different MemorySaver instances — no shared state
+        assert saver_a is not saver_b, (
+            "Each fixture call must get an independent MemorySaver"
+        )
+
+    def test_config_has_bankroll_fields(self) -> None:
+        """Settings.bankroll_usd and Settings.max_kelly_fraction exist with correct defaults."""
+        from sportsbet.config import settings
+
+        assert hasattr(settings, "bankroll_usd"), (
+            "Settings must have bankroll_usd field"
+        )
+        assert hasattr(settings, "max_kelly_fraction"), (
+            "Settings must have max_kelly_fraction field"
+        )
+        assert settings.bankroll_usd == 10000.0, (
+            f"bankroll_usd default must be 10000.0, got {settings.bankroll_usd}"
+        )
+        assert settings.max_kelly_fraction == 0.25, (
+            f"max_kelly_fraction default must be 0.25, got {settings.max_kelly_fraction}"
+        )

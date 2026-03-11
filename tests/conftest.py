@@ -3,6 +3,7 @@
 Fixtures:
 - alembic_cfg: Alembic Config object for migration tests
 - pg_engine: SQLAlchemy sync engine (skips if DB not reachable)
+- graph_fixture: compiled graph with MemorySaver + fresh thread_id per test
 
 Tests requiring a live DB use SPORTSBET_TEST_DATABASE_URL env var.
 If not set, they are skipped automatically (no hard CI failure without DB).
@@ -11,13 +12,16 @@ If not set, they are skipped automatically (no hard CI failure without DB).
 from __future__ import annotations
 
 import os
+import uuid
 
 import pytest
 import sqlalchemy
 from alembic.config import Config
+from langgraph.checkpoint.memory import MemorySaver
 from sqlalchemy.engine import Engine
 
 from sportsbet.config import settings
+from sportsbet.graph import create_graph
 
 
 @pytest.fixture(scope="session")
@@ -50,3 +54,17 @@ def pg_engine() -> Engine:  # type: ignore[return]
         return engine
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"PostgreSQL not reachable: {exc}")
+
+
+@pytest.fixture
+def graph_fixture():
+    """Compiled graph with MemorySaver + fresh thread_id per test. No disk I/O.
+
+    Returns a (compiled_graph, config) tuple where config carries a unique
+    thread_id. Each test invocation gets an independent MemorySaver instance
+    so there is no shared checkpoint state between tests.
+    """
+    saver = MemorySaver()
+    compiled = create_graph(checkpointer=saver)
+    thread_id = str(uuid.uuid4())
+    return compiled, {"configurable": {"thread_id": thread_id}}

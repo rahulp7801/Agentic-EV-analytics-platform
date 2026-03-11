@@ -79,14 +79,15 @@ def create_graph(checkpointer: Any = None) -> CompiledStateGraph:
     return builder.compile(checkpointer=checkpointer)
 
 
-def create_graph_with_sqlite(
+async def create_graph_with_sqlite(
     db_path: str = ".checkpoints/sportsbet.sqlite",
 ) -> CompiledStateGraph:
-    """Build and compile the graph with a SqliteSaver checkpointer for runtime use.
+    """Build and compile the graph with an AsyncSqliteSaver checkpointer for runtime use.
 
     Creates the .checkpoints/ directory if it does not exist, then instantiates
-    a sync SqliteSaver and passes it to create_graph().
+    an AsyncSqliteSaver and passes it to create_graph().
 
+    Must be called from within an async context (use asyncio.run() from sync code).
     Do NOT use in tests — use create_graph(checkpointer=MemorySaver()) instead
     to avoid disk I/O and cleanup overhead.
 
@@ -99,12 +100,21 @@ def create_graph_with_sqlite(
     Returns
     -------
     CompiledStateGraph
-        Graph compiled with SqliteSaver. Pass thread_id via
+        Graph compiled with AsyncSqliteSaver. Pass thread_id via
         config={"configurable": {"thread_id": "..."}} on ainvoke to enable
         checkpoint persistence and replay.
+
+    Notes
+    -----
+    The returned graph holds an open aiosqlite connection. The connection
+    remains open for the lifetime of the graph; for production use wrap in
+    an async context manager or ensure the process lifecycle closes it.
     """
-    from langgraph.checkpoint.sqlite import SqliteSaver
+    import aiosqlite
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
-    saver = SqliteSaver.from_conn_string(db_path)
+    # Open a persistent aiosqlite connection for the graph's lifetime.
+    conn = await aiosqlite.connect(db_path)
+    saver = AsyncSqliteSaver(conn)
     return create_graph(checkpointer=saver)
