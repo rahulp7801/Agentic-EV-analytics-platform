@@ -46,7 +46,12 @@ Plans:
   2. All Pydantic I/O models (QuantParams, QuantResult, OddsSnapshot, EVSignal, GameState) instantiate, validate, and reject malformed inputs with ValidationError
   3. GraphState fields written by multiple agents use Annotated reducers — a concurrent-write test confirms no silent data loss
   4. SqliteSaver checkpointing persists a graph run to disk and the run can be replayed from the saved checkpoint
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Pydantic v2 I/O models: QuantParams, QuantResult, EVSignal, AgentOddsSnapshot, GameState with validation (Wave 1, TDD)
+- [ ] 02-02-PLAN.md — GraphState TypedDict, Master Router, 3 stub agents, compiled StateGraph (Wave 2)
+- [ ] 02-03-PLAN.md — SqliteSaver checkpointing integration, bankroll config fields, MemorySaver test fixtures (Wave 3)
 
 ### Phase 3: Quant Engine
 **Goal**: The system can produce a statistically grounded true probability estimate from PostgreSQL data, validated through a two-stage SQL gate with no raw SQL ever leaving the LLM
@@ -99,7 +104,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-10 |
-| 2. Agent Infrastructure | 0/TBD | Not started | - |
+| 2. Agent Infrastructure | 0/3 | Not started | - |
 | 3. Quant Engine | 0/TBD | Not started | - |
 | 4. Context and Odds Ingestion | 0/TBD | Not started | - |
 | 5. Arbitrage, Kelly, and Risk Controls | 0/TBD | Not started | - |
