@@ -8,11 +8,14 @@ create_graph() builds and compiles the full directed graph:
                                                -> END  (on error or unknown type)
 
 create_graph_with_sqlite() is the runtime factory — writes checkpoints to disk
-at .checkpoints/sportsbet.sqlite using sync SqliteSaver.
+at .checkpoints/sportsbet.sqlite using AsyncSqliteSaver.
+
+Phase 3 Plan 01 update: create_graph() accepts an optional quant_node parameter.
+- If quant_node is None (default): uses the sync stub quant_agent (Phase 2 backward-compat).
+- If quant_node is provided: uses the real async closure from make_quant_agent(pool).
 
 All tests use create_graph(checkpointer=MemorySaver()) for full isolation (no disk I/O).
-Downstream phases (3, 4, 5, 6) import create_graph() and replace stub agent
-nodes with real implementations.
+Tests requiring a real quant agent pass quant_node=make_quant_agent(pool) explicitly.
 """
 from __future__ import annotations
 
@@ -27,20 +30,26 @@ from sportsbet.graph.router import master_router, route_from_master
 from sportsbet.graph.state import GraphState
 
 
-def create_graph(checkpointer: Any = None) -> CompiledStateGraph:
+def create_graph(
+    checkpointer: Any = None,
+    quant_node: Any = None,
+) -> CompiledStateGraph:
     """Build and compile the LangGraph StateGraph for the sportsbet agent pipeline.
 
-    Graph topology (Phase 2 stub wiring):
+    Graph topology:
     - Entry point: master_router
-    - Conditional edges from master_router dispatch to specialist stubs
-    - Each specialist stub terminates at END after setting its output on state
+    - Conditional edges from master_router dispatch to specialist agents
+    - Each specialist agent terminates at END after setting its output on state
 
     Parameters
     ----------
     checkpointer:
         Optional LangGraph checkpointer (e.g. MemorySaver for tests,
-        SqliteSaver for runtime). If None, compiles without checkpointing
+        AsyncSqliteSaver for runtime). If None, compiles without checkpointing
         (backward-compatible with Plan 02-02 tests).
+    quant_node:
+        Optional async quant agent node. If None, uses the sync stub quant_agent
+        (Phase 2 backward-compat). Pass make_quant_agent(pool) for real SQL execution.
 
     Returns
     -------
@@ -50,9 +59,12 @@ def create_graph(checkpointer: Any = None) -> CompiledStateGraph:
     """
     builder: StateGraph = StateGraph(GraphState)
 
+    # quant_node: real async closure (Phase 3+) or sync stub (Phase 2 backward-compat)
+    active_quant_node = quant_node if quant_node is not None else quant_agent
+
     # Register all nodes
     builder.add_node("master_router", master_router)
-    builder.add_node("quant_agent", quant_agent)
+    builder.add_node("quant_agent", active_quant_node)
     builder.add_node("arbitrage_agent", arbitrage_agent)
     builder.add_node("context_agent", context_agent)
 
@@ -71,7 +83,7 @@ def create_graph(checkpointer: Any = None) -> CompiledStateGraph:
         },
     )
 
-    # All specialist stubs terminate immediately after running
+    # All specialist agents terminate immediately after running
     builder.add_edge("quant_agent", END)
     builder.add_edge("arbitrage_agent", END)
     builder.add_edge("context_agent", END)
@@ -81,11 +93,15 @@ def create_graph(checkpointer: Any = None) -> CompiledStateGraph:
 
 async def create_graph_with_sqlite(
     db_path: str = ".checkpoints/sportsbet.sqlite",
+    pool: Any = None,
 ) -> CompiledStateGraph:
     """Build and compile the graph with an AsyncSqliteSaver checkpointer for runtime use.
 
     Creates the .checkpoints/ directory if it does not exist, then instantiates
     an AsyncSqliteSaver and passes it to create_graph().
+
+    Phase 3 Plan 01 update: accepts an optional asyncpg pool. If provided,
+    wires in make_quant_agent(pool) for real SQL execution.
 
     Must be called from within an async context (use asyncio.run() from sync code).
     Do NOT use in tests — use create_graph(checkpointer=MemorySaver()) instead
@@ -96,6 +112,9 @@ async def create_graph_with_sqlite(
     db_path:
         Path to the SQLite database file for checkpoint storage.
         Defaults to .checkpoints/sportsbet.sqlite (relative to cwd).
+    pool:
+        Optional asyncpg.Pool. If provided, wires real quant agent into graph.
+        If None, uses sync stub (backward-compat).
 
     Returns
     -------
@@ -113,8 +132,13 @@ async def create_graph_with_sqlite(
     import aiosqlite
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
+    quant_node = None
+    if pool is not None:
+        from sportsbet.graph.agents import make_quant_agent
+        quant_node = make_quant_agent(pool)
+
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
     # Open a persistent aiosqlite connection for the graph's lifetime.
     conn = await aiosqlite.connect(db_path)
     saver = AsyncSqliteSaver(conn)
-    return create_graph(checkpointer=saver)
+    return create_graph(checkpointer=saver, quant_node=quant_node)
