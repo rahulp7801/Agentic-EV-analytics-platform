@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-03-11T01:13:22.064Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-03-13T19:24:40.687Z"
 last_activity: 2026-03-11 — Phase 2 Plan 03 complete — AsyncSqliteSaver checkpointing + bankroll config
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 9
+  completed_plans: 7
   percent: 100
 ---
 
@@ -55,6 +55,7 @@ Progress: [██████████] 100%
 | Phase 01-data-foundation P03 | 9min | 2 tasks | 9 files |
 | Phase 02-agent-infrastructure P02 | 20 | 2 tasks | 6 files |
 | Phase 02-agent-infrastructure P03 | 6 | 2 tasks | 5 files |
+| Phase 03-quant-engine P02 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Recent decisions affecting current work:
 - [Phase 02-agent-infrastructure]: No checkpointer in Plan 02-02 — Plan 02-03 adds AsyncPostgresSaver after graph skeleton validated
 - [Phase 02-agent-infrastructure]: AsyncSqliteSaver required for async graph.ainvoke() — sync SqliteSaver raises NotImplementedError on aget_tuple()
 - [Phase 02-agent-infrastructure]: create_graph_with_sqlite() is async — must be awaited; bankroll_usd and max_kelly_fraction live in Settings not GraphState
+- [Phase 03-quant-engine]: Power devig binary search range is [1, 20] not (0, 1] — for p in (0,1), p^k < p when k>1, so overround normalization requires k>1
+- [Phase 03-quant-engine]: Multiplicative sum-to-one achieved via residual correction on last element — eliminates Decimal division remainder
 
 ### Pending Todos
 
@@ -100,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T01:09:55.409Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-03-13T19:24:40.681Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
