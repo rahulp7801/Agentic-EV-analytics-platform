@@ -24,7 +24,7 @@
 - [x] **QUANT-01**: System enforces a two-stage SQL validation gate — LLM produces a QuantParams Pydantic model, query builder constructs parameterized SQL, LLM never produces raw SQL
 - [x] **QUANT-02**: System converts raw sportsbook odds to implied probabilities with configurable vig removal method (multiplicative or Pinnacle sharp)
 - [x] **QUANT-03**: System executes dynamic historical win-rate SQL queries parameterized by game context (weather, opponent, down/distance, situation)
-- [ ] **QUANT-04**: System simulates historical signal performance via a backtesting module that replays past QuantResult signals against closing lines
+- [x] **QUANT-04**: System simulates historical signal performance via a backtesting module that replays past QuantResult signals against closing lines
 
 ### Context & Odds Ingestion
 
@@ -99,7 +99,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUANT-01 | Phase 3 | Complete |
 | QUANT-02 | Phase 3 | Complete |
 | QUANT-03 | Phase 3 | Complete |
-| QUANT-04 | Phase 3 | Pending |
+| QUANT-04 | Phase 3 | Complete |
 | CTXT-01 | Phase 4 | Pending |
 | CTXT-02 | Phase 4 | Pending |
 | CTXT-03 | Phase 4 | Pending |

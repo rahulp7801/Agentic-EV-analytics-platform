@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-03-13T19:27:47.276Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-03-13T19:33:53.261Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
   percent: 100
 ---
 
@@ -57,6 +57,7 @@ Progress: [██████████] 100%
 | Phase 02-agent-infrastructure P03 | 6 | 2 tasks | 5 files |
 | Phase 03-quant-engine P02 | 5 | 2 tasks | 3 files |
 | Phase 03-quant-engine P01 | 7 | 3 tasks | 7 files |
+| Phase 03-quant-engine P03 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Recent decisions affecting current work:
 - [Phase 03-quant-engine]: Decimal(str(round(x,6))) wrapping for Wilson CI bounds — statsmodels float rejected by QuantResult strict=True; never assign float to Decimal field
 - [Phase 03-quant-engine]: MIN_SAMPLE_SIZE=30 gate returns QuantResult(data_source='insufficient_sample', true_probability=None) — callers must handle None probability before Kelly sizing
 - [Phase 03-quant-engine]: make_quant_agent(pool) closure factory pattern — pool injected at construction time; sync stub quant_agent preserved for Phase 2 backward-compat when quant_node=None
+- [Phase 03-quant-engine]: BacktestEngine standalone offline module — never imported from graph.py or any agent node; isolation documented in module docstring and enforced by plan must_have
+- [Phase 03-quant-engine]: closing_line_note as BacktestReport field — makes pre-game snapshot constraint (snapshot_time < game_start_time is caller's responsibility) machine-readable to callers, not just docstring
 
 ### Pending Todos
 
@@ -108,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T19:27:47.271Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-03-13T19:33:53.257Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
