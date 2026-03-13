@@ -62,7 +62,12 @@ Plans:
   2. A live Quant Agent call against Phase 1 data returns a QuantResult with true_probability, sample_size, confidence_interval, and data_source fields all populated from the database
   3. Raw sportsbook moneyline odds correctly convert to implied probabilities with vig removed (multiplicative and Pinnacle sharp methods both available)
   4. The backtesting module replays a set of historical QuantResult signals against known closing lines and outputs ROI and hit-rate metrics
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — quant subpackage scaffold, QueryBuilder two-stage gate, asyncpg executor, real quant_agent closure (Wave 1, TDD)
+- [ ] 03-02-PLAN.md — vig removal module: american_to_raw_prob, multiplicative devig, power devig (Wave 1, TDD, parallel with 03-01)
+- [ ] 03-03-PLAN.md — backtesting module: BacktestSignal, BacktestReport, BacktestEngine with CLV replay (Wave 2, TDD)
 
 ### Phase 4: Context and Odds Ingestion
 **Goal**: The system ingests live sportsbook odds and qualitative signals asynchronously, rejects stale data, and propagates structured context through GraphState
@@ -105,7 +110,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-10 |
 | 2. Agent Infrastructure | 2/3 | In Progress|  |
-| 3. Quant Engine | 0/TBD | Not started | - |
+| 3. Quant Engine | 0/3 | Not started | - |
 | 4. Context and Odds Ingestion | 0/TBD | Not started | - |
 | 5. Arbitrage, Kelly, and Risk Controls | 0/TBD | Not started | - |
 | 6. Kinematic Agent | 0/TBD | Not started | - |
