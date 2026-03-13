@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-13T19:24:40.687Z"
-last_activity: 2026-03-11 — Phase 2 Plan 03 complete — AsyncSqliteSaver checkpointing + bankroll config
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-13T19:27:47.276Z"
+last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 100
 ---
 
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 2 of 6 (Agent Infrastructure)
-Plan: 3 of 3 in current phase (phase complete)
+Phase: 3 of 6 (Quant Engine)
+Plan: 1 of 3 in current phase
 Status: In progress
-Last activity: 2026-03-11 — Phase 2 Plan 03 complete — AsyncSqliteSaver checkpointing + bankroll config
+Last activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 
 Progress: [██████████] 100%
 
@@ -56,6 +56,7 @@ Progress: [██████████] 100%
 | Phase 02-agent-infrastructure P02 | 20 | 2 tasks | 6 files |
 | Phase 02-agent-infrastructure P03 | 6 | 2 tasks | 5 files |
 | Phase 03-quant-engine P02 | 5 | 2 tasks | 3 files |
+| Phase 03-quant-engine P01 | 7 | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,10 @@ Recent decisions affecting current work:
 - [Phase 02-agent-infrastructure]: create_graph_with_sqlite() is async — must be awaited; bankroll_usd and max_kelly_fraction live in Settings not GraphState
 - [Phase 03-quant-engine]: Power devig binary search range is [1, 20] not (0, 1] — for p in (0,1), p^k < p when k>1, so overround normalization requires k>1
 - [Phase 03-quant-engine]: Multiplicative sum-to-one achieved via residual correction on last element — eliminates Decimal division remainder
+- [Phase 03-quant-engine]: ALLOWED_FILTER_KEYS frozenset is structural SQL injection prevention — column names never user-supplied; values always in asyncpg $N positional params
+- [Phase 03-quant-engine]: Decimal(str(round(x,6))) wrapping for Wilson CI bounds — statsmodels float rejected by QuantResult strict=True; never assign float to Decimal field
+- [Phase 03-quant-engine]: MIN_SAMPLE_SIZE=30 gate returns QuantResult(data_source='insufficient_sample', true_probability=None) — callers must handle None probability before Kelly sizing
+- [Phase 03-quant-engine]: make_quant_agent(pool) closure factory pattern — pool injected at construction time; sync stub quant_agent preserved for Phase 2 backward-compat when quant_node=None
 
 ### Pending Todos
 
@@ -103,6 +108,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T19:24:40.681Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-03-13T19:27:47.271Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
