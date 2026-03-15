@@ -193,9 +193,10 @@ async def test_scraper_writes_injury_report() -> None:
     and the correct positional parameters including source='espn_core_api'.
     """
     import httpx
+    from unittest.mock import MagicMock
 
-    mock_pool = AsyncMock()
     mock_conn = AsyncMock()
+    mock_pool = MagicMock()
     mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
     mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
 
