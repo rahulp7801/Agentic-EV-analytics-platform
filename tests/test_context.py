@@ -2,10 +2,11 @@
 
 CTXT-01: OddsAPIPoller — budget guard and HTTP fetch
 CTXT-02: Staleness guard (is_stale)
-CTXT-03: Context agent RSS/scraper integration (stub — Phase 4 Plan 03)
-CTXT-04: Full pipeline integration (stub — Phase 4 Plan 03)
+CTXT-03: InjuryWeatherScraper — ESPN Core API parsing and DB write
+CTXT-04: Full pipeline integration (stub — Phase 4 Plan 04)
 
 All Odds API HTTP calls are mocked — no live API credits consumed.
+All ESPN API calls are mocked — no live network calls in CTXT-03 tests.
 """
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,6 +18,12 @@ from sportsbet.ingestion.odds_poller import (
     OddsAPIPoller,
     is_stale,
 )
+# Scraper imports for CTXT-03 are added in Plan 03 when scraper.py is created.
+# from sportsbet.ingestion.scraper import (
+#     TEAM_ABBR_TO_ESPN_ID,
+#     InjuryWeatherScraper,
+#     parse_espn_injury_item,
+# )
 
 # ---------------------------------------------------------------------------
 # Shared fixture data
@@ -124,30 +131,109 @@ def test_staleness_guard_passes_fresh() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CTXT-03 stubs — Phase 4 Plan 03 (Context Agent RSS/scraper)
+# CTXT-03: InjuryWeatherScraper — ESPN Core API (Plan 04-03 TDD)
+# ---------------------------------------------------------------------------
+
+ESPN_FIXTURE = {
+    "items": [
+        {
+            "athlete": {
+                "displayName": "Patrick Mahomes",
+                "position": {"abbreviation": "QB"},
+            },
+            "status": "Questionable",
+        },
+        {
+            "athlete": {
+                "displayName": "Travis Kelce",
+                "position": {"abbreviation": "TE"},
+            },
+            "status": "Out",
+        },
+    ]
+}
+
+
+@pytest.mark.asyncio
+async def test_espn_injury_parsing() -> None:
+    """ESPN Core API JSON fixture is parsed into InjuryReport-compatible dicts.
+
+    Given a mocked ESPN Core API JSON response with 2 players (one "Out", one
+    "Questionable"), parse_espn_injury_item() on each item returns a dict with
+    keys: player_name, status, position.
+    Fields absent from the fixture must fall back to "Unknown" (not raise KeyError).
+    """
+    items = ESPN_FIXTURE["items"]
+    assert len(items) == 2
+
+    result_0 = parse_espn_injury_item(items[0])
+    assert result_0["player_name"] == "Patrick Mahomes"
+    assert result_0["status"] == "Questionable"
+    assert result_0["position"] == "QB"
+
+    result_1 = parse_espn_injury_item(items[1])
+    assert result_1["player_name"] == "Travis Kelce"
+    assert result_1["status"] == "Out"
+    assert result_1["position"] == "TE"
+
+    # Missing fields must fall back to "Unknown"
+    empty_item: dict[str, object] = {}
+    fallback = parse_espn_injury_item(empty_item)
+    assert fallback["player_name"] == "Unknown"
+    assert fallback["status"] == "Unknown"
+    assert fallback["position"] == "Unknown"
+
+
+@pytest.mark.asyncio
+async def test_scraper_writes_injury_report() -> None:
+    """Scraper writes a structured InjuryReport row to the injury_reports table.
+
+    Given a mocked asyncpg pool and 1 parsed injury dict,
+    when write_injury_reports(pool, injuries, team_abbr="KC") is called,
+    then conn.execute is called once with an INSERT INTO injury_reports statement
+    and the correct positional parameters including source='espn_core_api'.
+    """
+    import httpx
+
+    mock_pool = AsyncMock()
+    mock_conn = AsyncMock()
+    mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    injuries = [
+        {"player_name": "Patrick Mahomes", "status": "Questionable", "position": "QB"},
+    ]
+
+    async with httpx.AsyncClient() as client:
+        scraper = InjuryWeatherScraper(client)
+        count = await scraper.write_injury_reports(
+            pool=mock_pool,
+            injuries=injuries,
+            team_abbr="KC",
+        )
+
+    assert count == 1
+    assert mock_conn.execute.call_count == 1
+    call_args = mock_conn.execute.call_args
+    sql_str: str = call_args[0][0]
+    assert "INSERT INTO injury_reports" in sql_str
+    # positional params appended after the SQL string (no f-string injection)
+    params = call_args[0][1:]
+    assert "espn_core_api" in params, "source must be 'espn_core_api'"
+
+
+# ---------------------------------------------------------------------------
+# CTXT-04 stubs — Phase 4 Plan 04 (Context Agent GraphState propagation)
 # ---------------------------------------------------------------------------
 
 
-def test_context_agent_parses_injury_report() -> None:
-    """CTXT-03 stub: Context agent extracts binary injury state from RSS feed."""
-    pytest.fail("CTXT-03 not yet implemented — stub for Phase 4 Plan 03")
+@pytest.mark.asyncio
+async def test_context_agent_updates_graphstate() -> None:
+    """make_context_agent returns ContextSignals in GraphState partial dict."""
+    pytest.fail("not implemented — Plan 04-04 will implement make_context_agent")
 
 
-def test_context_agent_updates_game_state() -> None:
-    """CTXT-03 stub: Context agent writes parsed injury state to GraphState."""
-    pytest.fail("CTXT-03 not yet implemented — stub for Phase 4 Plan 03")
-
-
-# ---------------------------------------------------------------------------
-# CTXT-04 stubs — Phase 4 Plan 03 (Full pipeline integration)
-# ---------------------------------------------------------------------------
-
-
-def test_full_pipeline_odds_to_ev_signal() -> None:
-    """CTXT-04 stub: Full pipeline — odds -> arbitrage agent -> EVSignal."""
-    pytest.fail("CTXT-04 not yet implemented — stub for Phase 4 Plan 03")
-
-
-def test_full_pipeline_stale_odds_rejected() -> None:
-    """CTXT-04 stub: Full pipeline rejects stale odds before Arbitrage Agent."""
-    pytest.fail("CTXT-04 not yet implemented — stub for Phase 4 Plan 03")
+@pytest.mark.asyncio
+async def test_downstream_reads_state() -> None:
+    """Downstream agent reads context_signals from GraphState, not from API."""
+    pytest.fail("not implemented — Plan 04-04 will verify state propagation")
