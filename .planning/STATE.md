@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-15T04:21:58.220Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-15T04:26:57.633Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
   percent: 100
 ---
 
@@ -63,6 +63,7 @@ Progress: [██████████] 100%
 | Phase 04-context-and-odds-ingestion P03 | 15 | 2 tasks | 3 files |
 | Phase 04-context-and-odds-ingestion P04 | 3 | 2 tasks | 3 files |
 | Phase 05-arbitrage-kelly-and-risk-controls P01 | 4 | 2 tasks | 6 files |
+| Phase 05-arbitrage-kelly-and-risk-controls PP02 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,9 @@ Recent decisions affecting current work:
 - [Phase 05-arbitrage-kelly-and-risk-controls]: make_arbitrage_agent takes optional settings_override (not pool) — arbitrage math is stateless; no DB access needed
 - [Phase 05-arbitrage-kelly-and-risk-controls]: compute_ev_percentage = true_prob - implied_prob, floored at 0 — simplest correct positive-edge definition before devig
 - [Phase 05-arbitrage-kelly-and-risk-controls]: asyncio.run() replaces deprecated asyncio.get_event_loop().run_until_complete() in test_quant.py — prevents event loop conflict on Python 3.12
+- [Phase 05-arbitrage-kelly-and-risk-controls]: CONFLICT_PAIRS hardcoded at module level as frozenset[frozenset[str]] — immutable, O(1) membership test, extensible without touching CorrelationGuard class
+- [Phase 05-arbitrage-kelly-and-risk-controls]: Aggregator gate-on-limit: triggering signal blocked and NOT counted in cumulative — conservative prop-firm daily hard stop interpretation
+- [Phase 05-arbitrage-kelly-and-risk-controls]: No LangGraph coupling in Plan 02 risk controls — CorrelationGuard and Aggregator are pure Python; graph wiring deferred to Plan 03
 
 ### Pending Todos
 
@@ -130,6 +134,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T04:21:58.215Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-03-15T04:26:57.629Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None

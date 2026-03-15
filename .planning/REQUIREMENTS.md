@@ -37,8 +37,8 @@
 
 - [x] **ARBT-01**: Arbitrage Agent flags +EV discrepancies by comparing QuantResult true probability against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis
 - [x] **ARBT-02**: System calculates fractional Kelly Criterion bet sizing based on edge and bankroll parameters — no flat bet sizes are ever output
-- [ ] **ARBT-03**: CorrelationGuard node enforces hardcoded stops on conflicting market exposures (e.g., Over passing yards + Under total points) before any signal is output
-- [ ] **ARBT-04**: Aggregator node enforces a daily drawdown gate — if cumulative recommended exposure exceeds the configured limit, no further signals are produced that day
+- [x] **ARBT-03**: CorrelationGuard node enforces hardcoded stops on conflicting market exposures (e.g., Over passing yards + Under total points) before any signal is output
+- [x] **ARBT-04**: Aggregator node enforces a daily drawdown gate — if cumulative recommended exposure exceeds the configured limit, no further signals are produced that day
 
 ### Kinematic Agent (NFL Alpha)
 
@@ -106,8 +106,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CTXT-04 | Phase 4 | Complete |
 | ARBT-01 | Phase 5 | Complete |
 | ARBT-02 | Phase 5 | Complete |
-| ARBT-03 | Phase 5 | Pending |
-| ARBT-04 | Phase 5 | Pending |
+| ARBT-03 | Phase 5 | Complete |
+| ARBT-04 | Phase 5 | Complete |
 | KINE-01 | Phase 6 | Pending |
 | KINE-02 | Phase 6 | Pending |
 | KINE-03 | Phase 6 | Pending |
