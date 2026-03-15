@@ -14,8 +14,13 @@ Phase 3 Plan 01 update: create_graph() accepts an optional quant_node parameter.
 - If quant_node is None (default): uses the sync stub quant_agent (Phase 2 backward-compat).
 - If quant_node is provided: uses the real async closure from make_quant_agent(pool).
 
+Phase 4 Plan 04 update: create_graph() accepts an optional context_node parameter.
+- If context_node is None (default): uses the sync stub context_agent (Phase 2 backward-compat).
+- If context_node is provided: uses the real async closure from make_context_agent(pool, api_key, cap).
+
 All tests use create_graph(checkpointer=MemorySaver()) for full isolation (no disk I/O).
 Tests requiring a real quant agent pass quant_node=make_quant_agent(pool) explicitly.
+Tests requiring a real context agent pass context_node=make_context_agent(pool, key, cap) explicitly.
 """
 from __future__ import annotations
 
@@ -33,6 +38,7 @@ from sportsbet.graph.state import GraphState
 def create_graph(
     checkpointer: Any = None,
     quant_node: Any = None,
+    context_node: Any = None,
 ) -> CompiledStateGraph:
     """Build and compile the LangGraph StateGraph for the sportsbet agent pipeline.
 
@@ -50,6 +56,10 @@ def create_graph(
     quant_node:
         Optional async quant agent node. If None, uses the sync stub quant_agent
         (Phase 2 backward-compat). Pass make_quant_agent(pool) for real SQL execution.
+    context_node:
+        Optional async context agent node. If None, uses the sync stub context_agent
+        (Phase 2 backward-compat). Pass make_context_agent(pool, api_key, cap) for
+        real odds + injury pipeline execution.
 
     Returns
     -------
@@ -62,11 +72,14 @@ def create_graph(
     # quant_node: real async closure (Phase 3+) or sync stub (Phase 2 backward-compat)
     active_quant_node = quant_node if quant_node is not None else quant_agent
 
+    # context_node: real async closure (Phase 4+) or sync stub (Phase 2 backward-compat)
+    active_context_node = context_node if context_node is not None else context_agent
+
     # Register all nodes
     builder.add_node("master_router", master_router)
     builder.add_node("quant_agent", active_quant_node)
     builder.add_node("arbitrage_agent", arbitrage_agent)
-    builder.add_node("context_agent", context_agent)
+    builder.add_node("context_agent", active_context_node)
 
     # Entry point: all requests pass through master_router first
     builder.set_entry_point("master_router")
@@ -94,6 +107,8 @@ def create_graph(
 async def create_graph_with_sqlite(
     db_path: str = ".checkpoints/sportsbet.sqlite",
     pool: Any = None,
+    api_key: str | None = None,
+    daily_credit_cap: int = 500,
 ) -> CompiledStateGraph:
     """Build and compile the graph with an AsyncSqliteSaver checkpointer for runtime use.
 
@@ -102,6 +117,10 @@ async def create_graph_with_sqlite(
 
     Phase 3 Plan 01 update: accepts an optional asyncpg pool. If provided,
     wires in make_quant_agent(pool) for real SQL execution.
+
+    Phase 4 Plan 04 update: accepts optional api_key and daily_credit_cap.
+    If pool is provided AND api_key is provided, wires in make_context_agent(pool,
+    api_key, daily_credit_cap) for real odds + injury pipeline execution.
 
     Must be called from within an async context (use asyncio.run() from sync code).
     Do NOT use in tests — use create_graph(checkpointer=MemorySaver()) instead
@@ -115,6 +134,12 @@ async def create_graph_with_sqlite(
     pool:
         Optional asyncpg.Pool. If provided, wires real quant agent into graph.
         If None, uses sync stub (backward-compat).
+    api_key:
+        Optional Odds API key. If provided alongside pool, wires real context
+        agent into graph. If None, uses sync stub (backward-compat).
+    daily_credit_cap:
+        Maximum Odds API credits allowed per day. Passed to make_context_agent.
+        Defaults to 500.
 
     Returns
     -------
@@ -137,8 +162,13 @@ async def create_graph_with_sqlite(
         from sportsbet.graph.agents import make_quant_agent
         quant_node = make_quant_agent(pool)
 
+    context_node = None
+    if pool is not None and api_key is not None:
+        from sportsbet.graph.agents import make_context_agent
+        context_node = make_context_agent(pool, api_key, daily_credit_cap)
+
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
     # Open a persistent aiosqlite connection for the graph's lifetime.
     conn = await aiosqlite.connect(db_path)
     saver = AsyncSqliteSaver(conn)
-    return create_graph(checkpointer=saver, quant_node=quant_node)
+    return create_graph(checkpointer=saver, quant_node=quant_node, context_node=context_node)

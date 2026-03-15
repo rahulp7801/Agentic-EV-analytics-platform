@@ -5,10 +5,16 @@ replaces the sync stub quant_agent with a real QuantParams -> SQL -> QuantResult
 pipeline. The sync stub is preserved for backward-compat with tests that don't
 pass a pool to create_graph().
 
+Phase 4 Plan 04 adds make_context_agent(pool, api_key, daily_credit_cap) — an
+async closure factory that replaces the sync stub context_agent. The real agent
+fetches live NFL odds via OddsAPIPoller and injury reports via InjuryWeatherScraper,
+assembles a ContextSignals object, and returns a partial GraphState dict. Downstream
+agents read context_signals from state — never re-fetch the API.
+
 Phase replacement schedule:
-- quant_agent (stub)  -> make_quant_agent(pool) closure (Phase 3, this plan)
+- quant_agent (stub)  -> make_quant_agent(pool) closure (Phase 3)
+- context_agent (stub) -> make_context_agent(pool, api_key, cap) closure (Phase 4, this plan)
 - arbitrage_agent     -> Phase 5: real odds comparison against Odds API
-- context_agent       -> Phase 4: real context stream processing (X/Twitter, Reddit, RSS)
 
 Design: agents return dicts (partial state updates), not full GraphState.
 LangGraph merges the returned dict into the current state using registered reducers.
@@ -106,6 +112,148 @@ def make_quant_agent(
         return {"quant_result": result}
 
     return quant_agent
+
+
+# ---------------------------------------------------------------------------
+# Real context agent — closure factory (Phase 4)
+# ---------------------------------------------------------------------------
+
+def make_context_agent(
+    pool: asyncpg.Pool,
+    api_key: str,
+    daily_credit_cap: int,
+) -> Callable[[GraphState], Coroutine[Any, Any, dict[str, Any]]]:
+    """Return an async context agent node bound to pool, api_key, and credit cap.
+
+    Pipeline per invocation:
+    1. Fetch live NFL odds via OddsAPIPoller — catches BudgetExhaustedError gracefully
+    2. Build odds_snapshot (first bookmaker h2h market) or None on budget exhaustion
+    3. Fetch injury reports for home + away teams via InjuryWeatherScraper
+    4. Write injury rows to injury_reports table via pool
+    5. Build injury_flags dict: {"P. Mahomes": "Out"} (status="Out"|"Questionable" only)
+    6. Construct ContextSignals and return partial state dict
+
+    On any sub-error (BudgetExhaustedError, httpx.HTTPError, ESPN schema error):
+    - Log the error via structlog
+    - Return ContextSignals with empty/None fields rather than propagating exception
+    - Set state["error"] only for unrecoverable failures
+    """
+    from datetime import datetime, timezone
+
+    import httpx
+
+    from sportsbet.graph.models import AgentOddsSnapshot, ContextSignals
+    from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
+    from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
+
+    async def context_agent(state: GraphState) -> dict[str, Any]:  # type: ignore[type-arg]
+        session_id = state["session_id"]
+        game_id = state["game_id"]
+        home_team = state["home_team"]
+        away_team = state["away_team"]
+        log.info("context_agent_invoked", session_id=session_id, game_id=game_id)
+
+        # --- Step 1: Fetch odds ---
+        odds_snapshot: AgentOddsSnapshot | None = None
+        try:
+            async with OddsAPIPoller(api_key=api_key, daily_credit_cap=daily_credit_cap) as poller:
+                raw_odds = await poller.fetch_nfl_odds()
+            # Extract first bookmaker h2h market for the matching game
+            odds_snapshot = _extract_odds_snapshot(raw_odds, game_id)
+        except BudgetExhaustedError as exc:
+            log.warning("context_agent_budget_exhausted", session_id=session_id, error=str(exc))
+        except Exception as exc:
+            log.error("context_agent_odds_error", session_id=session_id, error=str(exc))
+
+        # --- Step 2: Fetch injury reports ---
+        injury_flags: dict[str, str] = {}
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                scraper = InjuryWeatherScraper(client)
+                for team_abbr in (home_team, away_team):
+                    team_id = TEAM_ABBR_TO_ESPN_ID.get(team_abbr)
+                    if team_id is None:
+                        log.warning("context_agent_unknown_team", team_abbr=team_abbr)
+                        continue
+                    injuries = await scraper.fetch_team_injuries(team_id)
+                    await scraper.write_injury_reports(pool, injuries, team_abbr, game_id)
+                    # Only flag Out and Questionable — skip Probable/Doubtful for signal clarity
+                    for inj in injuries:
+                        if inj.get("status") in ("Out", "Questionable"):
+                            injury_flags[inj.get("player_name", "Unknown")] = inj["status"]
+        except Exception as exc:
+            log.error("context_agent_scraper_error", session_id=session_id, error=str(exc))
+
+        # --- Step 3: Build ContextSignals and return ---
+        signals = ContextSignals(
+            game_id=game_id,
+            injury_flags=injury_flags,
+            weather_json=None,  # NFLWeather scraping deferred to v2
+            odds_snapshot=odds_snapshot,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        log.info(
+            "context_agent_complete",
+            session_id=session_id,
+            injury_count=len(injury_flags),
+            has_odds=odds_snapshot is not None,
+        )
+        return {"context_signals": signals}
+
+    return context_agent
+
+
+def _extract_odds_snapshot(
+    raw_odds: list[dict],
+    game_id: str,
+) -> "AgentOddsSnapshot | None":
+    """Extract first bookmaker h2h market from Odds API response as AgentOddsSnapshot.
+
+    Converts American odds integer to Decimal implied_probability at ingestion time
+    per Phase 2 decision (AgentOddsSnapshot.implied_probability is Decimal not int).
+
+    Returns None if raw_odds is empty or no h2h market found.
+    """
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from sportsbet.graph.models import AgentOddsSnapshot
+
+    if not raw_odds:
+        return None
+
+    event = raw_odds[0]  # Use first event; caller may filter by game_id in future
+    bookmakers = event.get("bookmakers", [])
+    if not bookmakers:
+        return None
+
+    bookmaker = bookmakers[0]
+    markets = bookmaker.get("markets", [])
+    h2h = next((m for m in markets if m.get("key") == "h2h"), None)
+    if h2h is None:
+        return None
+
+    outcomes = h2h.get("outcomes", [])
+    if not outcomes:
+        return None
+
+    price: int = outcomes[0].get("price", 0)
+    if price == 0:
+        return None
+
+    # American odds -> implied probability (includes vig; devig in Phase 5)
+    if price < 0:
+        raw_prob = abs(price) / (abs(price) + 100)
+    else:
+        raw_prob = 100 / (price + 100)
+
+    return AgentOddsSnapshot(
+        game_id=game_id,
+        sportsbook=bookmaker.get("key", "unknown"),
+        market_type="h2h",
+        implied_probability=Decimal(str(round(raw_prob, 6))),
+        snapped_at=datetime.now(timezone.utc),
+    )
 
 
 # ---------------------------------------------------------------------------
