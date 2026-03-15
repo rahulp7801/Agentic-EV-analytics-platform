@@ -18,12 +18,11 @@ from sportsbet.ingestion.odds_poller import (
     OddsAPIPoller,
     is_stale,
 )
-# Scraper imports for CTXT-03 are added in Plan 03 when scraper.py is created.
-# from sportsbet.ingestion.scraper import (
-#     TEAM_ABBR_TO_ESPN_ID,
-#     InjuryWeatherScraper,
-#     parse_espn_injury_item,
-# )
+from sportsbet.ingestion.scraper import (
+    TEAM_ABBR_TO_ESPN_ID,
+    InjuryWeatherScraper,
+    parse_espn_injury_item,
+)
 
 # ---------------------------------------------------------------------------
 # Shared fixture data
