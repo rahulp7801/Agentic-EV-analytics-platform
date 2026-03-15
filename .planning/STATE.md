@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-03-15T03:38:09.326Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-03-15T03:44:21.457Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
   percent: 100
 ---
 
@@ -61,6 +61,7 @@ Progress: [██████████] 100%
 | Phase 04-context-and-odds-ingestion P02 | 12 | 2 tasks | 2 files |
 | Phase 04-context-and-odds-ingestion P01 | 15 | 3 tasks | 5 files |
 | Phase 04-context-and-odds-ingestion P03 | 15 | 2 tasks | 3 files |
+| Phase 04-context-and-odds-ingestion P04 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,9 @@ Recent decisions affecting current work:
 - [Phase 04-context-and-odds-ingestion]: MagicMock (not AsyncMock) for pool.acquire in test — AsyncMock makes acquire() return a coroutine which breaks async with pool.acquire() as conn pattern
 - [Phase 04-context-and-odds-ingestion]: ContextSignals imported at runtime in state.py (not TYPE_CHECKING) — LangGraph calls get_type_hints(GraphState) which cannot resolve forward refs for TYPE_CHECKING-only imports
 - [Phase 04-context-and-odds-ingestion]: Weather scraping (Playwright/NFLWeather.com) deferred to v2 — Context Agent accepts weather_json=None in v1; keeps scraper.py focused and testable
+- [Phase 04-context-and-odds-ingestion]: make_context_agent closure factory: pool, api_key, daily_credit_cap injected at construction; sync stub context_agent preserved as fallback when context_node=None
+- [Phase 04-context-and-odds-ingestion]: BudgetExhaustedError caught inside make_context_agent closure returning ContextSignals(odds_snapshot=None) — never propagates exception to LangGraph
+- [Phase 04-context-and-odds-ingestion]: _extract_odds_snapshot uses Decimal(str(round(raw_prob, 6))) for American odds conversion — prevents float assigned to strict Pydantic Decimal field
 
 ### Pending Todos
 
@@ -122,6 +126,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T03:38:09.322Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-03-15T03:44:21.453Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
