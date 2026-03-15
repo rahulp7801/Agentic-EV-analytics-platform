@@ -95,7 +95,12 @@ Plans:
   2. A CorrelationGuard test with two conflicting props (e.g., Over passing yards + Under total points) blocks both signals from reaching the output — the guard node runs before any recommendation is emitted
   3. After cumulative recommended exposure exceeds the configured daily drawdown limit, the Aggregator produces no further signals for the remainder of the simulated day
   4. An integration test running the full Context → Quant → Arbitrage → Aggregator chain passes end-to-end with real Phase 1 database data
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — arbitrage subpackage (kelly.py, ev.py), make_arbitrage_agent closure, Wave 0 test stubs + TDD (Wave 1)
+- [ ] 05-02-PLAN.md — CorrelationGuard conflict detection and Aggregator drawdown gate modules, TDD (Wave 2)
+- [ ] 05-03-PLAN.md — graph.py wiring (arbitrage_node, correlation_guard, aggregator), route_from_master extension, end-to-end integration test (Wave 3)
 
 ### Phase 6: Kinematic Agent
 **Goal**: The system queries NGS tracking data to produce geometric matchup exploit signals independent of box score history, with graceful handling of seasons with partial NGS coverage
@@ -118,5 +123,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Agent Infrastructure | 2/3 | In Progress|  |
 | 3. Quant Engine | 3/3 | Complete   | 2026-03-13 |
 | 4. Context and Odds Ingestion | 4/4 | Complete   | 2026-03-15 |
-| 5. Arbitrage, Kelly, and Risk Controls | 0/TBD | Not started | - |
+| 5. Arbitrage, Kelly, and Risk Controls | 0/3 | Not started | - |
 | 6. Kinematic Agent | 0/TBD | Not started | - |
