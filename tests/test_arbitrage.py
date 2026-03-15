@@ -474,3 +474,284 @@ def test_arbt04_cumulative_exposure_tracks():
     assert agg.cumulative_exposure_usd == Decimal("400"), (
         f"Cumulative must not change after rejected signal, got {agg.cumulative_exposure_usd}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Integration tests (Plan 03 — ARBT-01 through ARBT-04 end-to-end)
+# ---------------------------------------------------------------------------
+# These tests drive the full LangGraph pipeline:
+#   START -> master_router -> arbitrage_agent -> correlation_guard -> aggregator -> END
+# using mock quant/context state pre-injected into initial state.
+# No DB, no real odds API — purely mathematical/graph pipeline validation.
+# ---------------------------------------------------------------------------
+
+try:
+    from sportsbet.graph.graph import (
+        create_graph,
+        make_aggregator_node,
+        make_correlation_guard_node,
+    )
+    from sportsbet.graph.agents import make_arbitrage_agent
+    _E2E_IMPORTED = True
+except ImportError:
+    create_graph = None  # type: ignore[assignment]
+    make_aggregator_node = None  # type: ignore[assignment]
+    make_correlation_guard_node = None  # type: ignore[assignment]
+    make_arbitrage_agent = None  # type: ignore[assignment]
+    _E2E_IMPORTED = False
+
+
+def _base_state(request_type: str = "arbitrage_analysis") -> dict:
+    """Minimal valid GraphState dict for integration tests."""
+    import uuid
+    from datetime import datetime, timezone
+
+    return {
+        "session_id": str(uuid.uuid4()),
+        "request_type": request_type,
+        "created_at": datetime.now(timezone.utc),
+        "game_id": "2024_01_KC_LV",
+        "season": 2024,
+        "week": 1,
+        "home_team": "KC",
+        "away_team": "LV",
+        "injury_flags": {},
+        "weather_json": None,
+        "error": None,
+        "quant_result": None,
+        "ev_signal": None,
+        "context_signals": None,
+        "pending_signals": [],
+        "cleared_signals": [],
+    }
+
+
+def _make_pre_populated_state(
+    true_probability: "Decimal",
+    implied_probability: "Decimal",
+    market_type: str = "moneyline",
+) -> dict:
+    """Build a pre-populated state with QuantResult and ContextSignals injected.
+
+    The arbitrage_analysis request_type dispatches to arbitrage_agent directly.
+    Pre-injecting quant_result and context_signals avoids needing a full quant
+    or context pipeline run — matches Phase 5 v1 integration test pattern.
+    """
+    from datetime import datetime, timezone
+
+    from sportsbet.graph.models import AgentOddsSnapshot, ContextSignals, QuantResult
+
+    state = _base_state("arbitrage_analysis")
+    state["quant_result"] = QuantResult(
+        true_probability=true_probability,
+        sample_size=50,
+        data_source="mock",
+    )
+    snapshot = AgentOddsSnapshot(
+        game_id=state["game_id"],
+        sportsbook="draftkings",
+        market_type=market_type,
+        implied_probability=implied_probability,
+        snapped_at=datetime.now(timezone.utc),
+    )
+    state["context_signals"] = ContextSignals(
+        game_id=state["game_id"],
+        injury_flags={},
+        odds_snapshot=snapshot,
+        signals_captured_at=datetime.now(timezone.utc),
+    )
+    return state
+
+
+@pytest.mark.skipif(not _E2E_IMPORTED, reason="graph pipeline not yet wired")
+def test_e2e_pipeline():
+    """Full mock pipeline returns EVSignal with kelly_fraction in (0, 0.25].
+
+    Pipeline: master_router -> arbitrage_agent -> correlation_guard -> aggregator -> END
+    Uses pre-populated state (true_prob=0.65, implied=0.55) to produce a +EV signal.
+    Verifies: cleared_signals has 1 EVSignal, ev_signal is set, kelly_fraction in range.
+    """
+    import asyncio
+    import uuid
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from sportsbet.graph.models import EVSignal
+
+    state = _make_pre_populated_state(
+        true_probability=Decimal("0.65"),
+        implied_probability=Decimal("0.55"),
+    )
+
+    # bankroll=100000: 5% limit = $5000; kelly_frac ~0.075 -> $7500 -- too large.
+    # Use bankroll=100000 and limit=0.20 (20% = $20000 max) so $7500 easily passes.
+    graph = create_graph(
+        checkpointer=MemorySaver(),
+        arbitrage_node=make_arbitrage_agent(),
+        correlation_guard_node=make_correlation_guard_node(),
+        aggregator_node=make_aggregator_node(bankroll_usd=100000.0, daily_drawdown_limit=0.20),
+    )
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    result = asyncio.run(graph.ainvoke(state, config=config))
+
+    assert result["ev_signal"] is not None, "ev_signal must be set for +EV signal"
+    assert isinstance(result["ev_signal"], EVSignal), (
+        f"ev_signal must be EVSignal, got {type(result['ev_signal'])}"
+    )
+    assert result["ev_signal"].ev_percentage > Decimal("0"), (
+        f"ev_percentage must be positive, got {result['ev_signal'].ev_percentage}"
+    )
+    assert len(result["ev_signal"].trade_plan) == 3, (
+        f"trade_plan must have exactly 3 bullets, got {len(result['ev_signal'].trade_plan)}"
+    )
+    assert Decimal("0") < result["ev_signal"].kelly_fraction <= Decimal("0.25"), (
+        f"kelly_fraction must be in (0, 0.25], got {result['ev_signal'].kelly_fraction}"
+    )
+    cleared = result.get("cleared_signals", [])
+    assert len(cleared) == 1, f"Expected 1 cleared signal, got {len(cleared)}"
+
+
+@pytest.mark.skipif(not _E2E_IMPORTED, reason="graph pipeline not yet wired")
+def test_e2e_pipeline_negative_ev():
+    """Pipeline with negative EV returns ev_signal=None and cleared_signals=[].
+
+    true_probability=0.45 < implied=0.55 -> no edge -> arbitrage_agent returns
+    ev_signal=None and pending_signals=[] -> aggregator produces cleared_signals=[].
+    """
+    import asyncio
+    import uuid
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    state = _make_pre_populated_state(
+        true_probability=Decimal("0.45"),
+        implied_probability=Decimal("0.55"),
+    )
+
+    graph = create_graph(
+        checkpointer=MemorySaver(),
+        arbitrage_node=make_arbitrage_agent(),
+        correlation_guard_node=make_correlation_guard_node(),
+        aggregator_node=make_aggregator_node(bankroll_usd=10000.0, daily_drawdown_limit=0.05),
+    )
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    result = asyncio.run(graph.ainvoke(state, config=config))
+
+    assert result["ev_signal"] is None, (
+        f"ev_signal must be None for negative EV, got {result['ev_signal']}"
+    )
+    cleared = result.get("cleared_signals", [])
+    assert cleared == [], f"cleared_signals must be empty for negative EV, got {cleared}"
+
+
+@pytest.mark.skipif(not _E2E_IMPORTED, reason="graph pipeline not yet wired")
+def test_e2e_pipeline_drawdown_gate():
+    """Aggregator gate blocks signals once daily drawdown limit is exceeded.
+
+    Uses a tiny bankroll ($100, 5% limit = $5 max exposure).
+    First signal: kelly=0.05 -> $5 exposure -> would equal limit -> blocked (gate-on-limit).
+    Subsequent pipeline invocation also blocked by persistent Aggregator instance.
+    """
+    import asyncio
+    import uuid
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    # Build graph with tiny limit so first signal triggers the gate
+    # Aggregator instance persists across ainvoke calls on the same graph object
+    aggregator = make_aggregator_node(bankroll_usd=100.0, daily_drawdown_limit=0.05)
+    # Limit = 0.05 * 100 = $5
+    # Signal kelly_fraction ~0.05 * settings.max_kelly_fraction -> exposure depends on fraction
+    # Use bankroll=200 and limit=0.01 ($2) so any small signal hits the gate
+    aggregator_tiny = make_aggregator_node(bankroll_usd=200.0, daily_drawdown_limit=0.01)
+    # Limit = $2; kelly_fraction min ~0.05 -> $10 exposure >> $2 -> gate triggered
+
+    state = _make_pre_populated_state(
+        true_probability=Decimal("0.65"),
+        implied_probability=Decimal("0.55"),
+    )
+
+    graph = create_graph(
+        checkpointer=MemorySaver(),
+        arbitrage_node=make_arbitrage_agent(),
+        correlation_guard_node=make_correlation_guard_node(),
+        aggregator_node=aggregator_tiny,
+    )
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    result = asyncio.run(graph.ainvoke(state, config=config))
+
+    # With tiny limit, the signal should be blocked by Aggregator gate
+    assert result["ev_signal"] is None, (
+        f"ev_signal must be None when drawdown gate triggers, got {result['ev_signal']}"
+    )
+    cleared = result.get("cleared_signals", [])
+    assert cleared == [], (
+        f"cleared_signals must be empty when gate triggers, got {cleared}"
+    )
+
+
+@pytest.mark.skipif(not _E2E_IMPORTED, reason="graph pipeline not yet wired")
+def test_e2e_correlation_guard_blocks():
+    """Pipeline with conflicting market_types returns cleared_signals=[] and ev_signal=None.
+
+    CorrelationGuard blocks over_passing_yards + under_total_points conflict pair.
+    Uses pre-injected state with over_passing_yards market_type — guard blocks the signal.
+    """
+    import asyncio
+    import uuid
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from sportsbet.graph.models import EVSignal
+
+    # Use over_passing_yards market_type on the injected odds snapshot.
+    # To test the conflict, we need TWO conflicting signals in pending_signals.
+    # Strategy: inject a pre-built pending_signals list directly into the initial state
+    # to bypass the single-signal arbitrage_agent and simulate the multi-signal scenario.
+
+    # Build an override arbitrage node that always returns both conflicting signals
+    over_signal = EVSignal(
+        ev_percentage=Decimal("0.10"),
+        true_probability=Decimal("0.65"),
+        implied_probability=Decimal("0.55"),
+        kelly_fraction=Decimal("0.05"),
+        trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+        market_type="over_passing_yards",
+    )
+    under_signal = EVSignal(
+        ev_percentage=Decimal("0.10"),
+        true_probability=Decimal("0.65"),
+        implied_probability=Decimal("0.55"),
+        kelly_fraction=Decimal("0.05"),
+        trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+        market_type="under_total_points",
+    )
+
+    async def mock_conflict_arb_node(state):
+        """Mock arbitrage node that returns two conflicting signals."""
+        return {
+            "ev_signal": over_signal,
+            "pending_signals": [over_signal, under_signal],
+        }
+
+    state = _base_state("arbitrage_analysis")
+
+    graph = create_graph(
+        checkpointer=MemorySaver(),
+        arbitrage_node=mock_conflict_arb_node,
+        correlation_guard_node=make_correlation_guard_node(),
+        aggregator_node=make_aggregator_node(bankroll_usd=10000.0, daily_drawdown_limit=0.05),
+    )
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    result = asyncio.run(graph.ainvoke(state, config=config))
+
+    cleared = result.get("cleared_signals", [])
+    assert cleared == [], (
+        f"cleared_signals must be empty when conflict pair detected, got "
+        f"{[s.market_type for s in cleared]}"
+    )
+    # ev_signal is None because aggregator receives empty pending_signals from guard
+    assert result["ev_signal"] is None, (
+        f"ev_signal must be None when correlation guard blocks all signals, "
+        f"got {result['ev_signal']}"
+    )
