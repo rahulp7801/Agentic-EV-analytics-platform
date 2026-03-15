@@ -223,17 +223,147 @@ async def test_scraper_writes_injury_report() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CTXT-04 stubs — Phase 4 Plan 04 (Context Agent GraphState propagation)
+# CTXT-04: Context Agent GraphState propagation (Plan 04-04)
 # ---------------------------------------------------------------------------
+
+import uuid
+from datetime import datetime, timezone
+
+from langgraph.checkpoint.memory import MemorySaver
+
+from sportsbet.graph.agents import make_context_agent
+from sportsbet.graph.graph import create_graph
+from sportsbet.graph.models import ContextSignals
+from sportsbet.graph.state import GraphState
+
+
+def _make_full_state(
+    game_id: str = "2025_01_KC_LAC",
+    home_team: str = "KC",
+    away_team: str = "LAC",
+    request_type: str = "context_update",
+) -> dict:
+    """Build a minimal but complete GraphState fixture for CTXT-04 tests."""
+    return {
+        "session_id": str(uuid.uuid4()),
+        "request_type": request_type,
+        "created_at": datetime.now(timezone.utc),
+        "game_id": game_id,
+        "season": 2025,
+        "week": 1,
+        "home_team": home_team,
+        "away_team": away_team,
+        "injury_flags": {},
+        "weather_json": None,
+        "error": None,
+        "quant_result": None,
+        "ev_signal": None,
+        "context_signals": None,
+    }
 
 
 @pytest.mark.asyncio
 async def test_context_agent_updates_graphstate() -> None:
-    """make_context_agent returns ContextSignals in GraphState partial dict."""
-    pytest.fail("not implemented — Plan 04-04 will implement make_context_agent")
+    """make_context_agent returns ContextSignals in GraphState partial dict.
+
+    Given make_context_agent(mock_pool, api_key="test_key", daily_credit_cap=500),
+    when the returned async node is called with a GraphState fixture,
+    then the return value is a dict with key "context_signals",
+    and context_signals is a ContextSignals instance with the correct game_id.
+
+    OddsAPIPoller.fetch_nfl_odds is mocked to return ODDS_FIXTURE.
+    InjuryWeatherScraper.fetch_team_injuries is mocked to return [].
+    No live HTTP or API calls are made.
+    """
+    mock_pool = MagicMock()
+
+    with (
+        patch("sportsbet.ingestion.odds_poller.httpx.AsyncClient") as mock_client_cls,
+        patch.object(
+            __import__(
+                "sportsbet.ingestion.odds_poller",
+                fromlist=["OddsAPIPoller"],
+            ).OddsAPIPoller,
+            "fetch_nfl_odds",
+            new_callable=AsyncMock,
+            return_value=ODDS_FIXTURE,
+        ),
+        patch(
+            "sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "sportsbet.ingestion.scraper.InjuryWeatherScraper.write_injury_reports",
+            new_callable=AsyncMock,
+            return_value=0,
+        ),
+    ):
+        mock_client_instance = AsyncMock()
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        agent = make_context_agent(mock_pool, api_key="test_key", daily_credit_cap=500)
+        state = _make_full_state()
+        result = await agent(state)
+
+    assert isinstance(result, dict), "Agent must return a dict"
+    assert "context_signals" in result, "Return dict must contain 'context_signals' key"
+    assert isinstance(result["context_signals"], ContextSignals), (
+        "context_signals must be a ContextSignals instance"
+    )
+    assert result["context_signals"].game_id == "2025_01_KC_LAC"
 
 
 @pytest.mark.asyncio
 async def test_downstream_reads_state() -> None:
-    """Downstream agent reads context_signals from GraphState, not from API."""
-    pytest.fail("not implemented — Plan 04-04 will verify state propagation")
+    """Downstream agent reads context_signals from GraphState, not from API.
+
+    Given a compiled graph with make_context_agent wired as context_node,
+    when graph.ainvoke() is called with request_type="context_update",
+    then the resulting state["context_signals"] is a ContextSignals instance
+    (not None), and no real HTTP calls are made to the Odds API.
+    """
+    mock_pool = MagicMock()
+
+    with (
+        patch("sportsbet.ingestion.odds_poller.httpx.AsyncClient") as mock_client_cls,
+        patch.object(
+            __import__(
+                "sportsbet.ingestion.odds_poller",
+                fromlist=["OddsAPIPoller"],
+            ).OddsAPIPoller,
+            "fetch_nfl_odds",
+            new_callable=AsyncMock,
+            return_value=ODDS_FIXTURE,
+        ),
+        patch(
+            "sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "sportsbet.ingestion.scraper.InjuryWeatherScraper.write_injury_reports",
+            new_callable=AsyncMock,
+            return_value=0,
+        ),
+    ):
+        mock_client_instance = AsyncMock()
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        context_node = make_context_agent(mock_pool, api_key="test_key", daily_credit_cap=500)
+        graph = create_graph(checkpointer=MemorySaver(), context_node=context_node)
+
+        state = _make_full_state()
+        result = await graph.ainvoke(
+            state,
+            config={"configurable": {"thread_id": str(uuid.uuid4())}},
+        )
+
+    assert result["context_signals"] is not None, "context_signals must not be None after context_update"
+    assert isinstance(result["context_signals"], ContextSignals), (
+        "context_signals must be a ContextSignals instance"
+    )
+    # Verify no real HTTP was dispatched (mock_client_instance.get never called)
+    mock_client_instance.get.assert_not_called()
