@@ -2,8 +2,8 @@
 
 create_graph() builds and compiles the full directed graph:
 
-  START -> master_router -> [conditional edge] -> quant_agent   -> END
-                                               -> arbitrage_agent -> END
+  START -> master_router -> [conditional edge] -> quant_agent    -> END
+                                               -> arbitrage_agent -> [correlation_guard -> aggregator ->] END
                                                -> context_agent   -> END
                                                -> END  (on error or unknown type)
 
@@ -18,14 +18,23 @@ Phase 4 Plan 04 update: create_graph() accepts an optional context_node paramete
 - If context_node is None (default): uses the sync stub context_agent (Phase 2 backward-compat).
 - If context_node is provided: uses the real async closure from make_context_agent(pool, api_key, cap).
 
+Phase 5 Plan 03 update: create_graph() accepts optional arbitrage_node, correlation_guard_node,
+and aggregator_node parameters.
+- arbitrage_node: real async closure from make_arbitrage_agent(); None uses sync stub.
+- correlation_guard_node: from make_correlation_guard_node(); None skips guard.
+- aggregator_node: from make_aggregator_node(bankroll, limit); None skips gate.
+When correlation_guard_node and aggregator_node are both provided, the arbitrage pipeline
+is extended: arbitrage_agent -> correlation_guard -> aggregator -> END.
+
 All tests use create_graph(checkpointer=MemorySaver()) for full isolation (no disk I/O).
 Tests requiring a real quant agent pass quant_node=make_quant_agent(pool) explicitly.
 Tests requiring a real context agent pass context_node=make_context_agent(pool, key, cap) explicitly.
+Tests requiring full arbitrage pipeline pass all three new node parameters explicitly.
 """
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Callable
 
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -35,17 +44,86 @@ from sportsbet.graph.router import master_router, route_from_master
 from sportsbet.graph.state import GraphState
 
 
+# ---------------------------------------------------------------------------
+# Graph-layer node factories for Phase 5 risk controls
+# ---------------------------------------------------------------------------
+
+
+def make_correlation_guard_node() -> Callable[[GraphState], dict]:  # type: ignore[type-arg]
+    """Return a sync LangGraph node that applies CorrelationGuard.check().
+
+    Reads pending_signals from state, filters conflicting pairs, writes
+    result back to pending_signals (overwrite — cleared signals ready for Aggregator).
+
+    The CorrelationGuard instance is stateless — safe to share across invocations.
+    """
+    from sportsbet.arbitrage.correlation_guard import CorrelationGuard
+    guard = CorrelationGuard()
+
+    def correlation_guard_node(state: GraphState) -> dict:  # type: ignore[type-arg]
+        raw = state.get("pending_signals") or []  # type: ignore[attr-defined]
+        cleared = guard.check(raw)
+        return {"pending_signals": cleared}
+
+    return correlation_guard_node
+
+
+def make_aggregator_node(
+    bankroll_usd: float,
+    daily_drawdown_limit: float = 0.05,
+) -> Callable[[GraphState], dict]:  # type: ignore[type-arg]
+    """Return a sync LangGraph node that applies the Aggregator daily drawdown gate.
+
+    The Aggregator instance is created once at graph construction time —
+    it persists cumulative_exposure_usd across multiple graph invocations
+    within the same process lifetime. This simulates the daily gate.
+
+    Reads pending_signals (already CorrelationGuard-filtered), calls
+    record_signal() for each, writes accepted signals to cleared_signals.
+    Sets ev_signal to the first cleared signal (or None if none pass).
+
+    Parameters
+    ----------
+    bankroll_usd:
+        Total bankroll in USD used to calculate daily exposure limit.
+    daily_drawdown_limit:
+        Fraction of bankroll as maximum daily exposure (default 0.05 = 5%).
+    """
+    from sportsbet.arbitrage.aggregator import Aggregator
+    agg = Aggregator(bankroll_usd=bankroll_usd, daily_drawdown_limit=daily_drawdown_limit)
+
+    def aggregator_node(state: GraphState) -> dict:  # type: ignore[type-arg]
+        candidates = state.get("pending_signals") or []  # type: ignore[attr-defined]
+        cleared = []
+        for sig in candidates:
+            if agg.record_signal(sig):
+                cleared.append(sig)
+        return {
+            "cleared_signals": cleared,
+            "ev_signal": cleared[0] if cleared else None,
+        }
+
+    return aggregator_node
+
+
 def create_graph(
     checkpointer: Any = None,
     quant_node: Any = None,
     context_node: Any = None,
+    arbitrage_node: Any = None,
+    correlation_guard_node: Any = None,
+    aggregator_node: Any = None,
 ) -> CompiledStateGraph:
     """Build and compile the LangGraph StateGraph for the sportsbet agent pipeline.
 
-    Graph topology:
+    Graph topology (base):
     - Entry point: master_router
     - Conditional edges from master_router dispatch to specialist agents
     - Each specialist agent terminates at END after setting its output on state
+
+    Graph topology (with full arbitrage pipeline):
+    - arbitrage_agent -> correlation_guard -> aggregator -> END
+      (only when correlation_guard_node and aggregator_node are both provided)
 
     Parameters
     ----------
@@ -60,6 +138,17 @@ def create_graph(
         Optional async context agent node. If None, uses the sync stub context_agent
         (Phase 2 backward-compat). Pass make_context_agent(pool, api_key, cap) for
         real odds + injury pipeline execution.
+    arbitrage_node:
+        Optional async arbitrage agent node. If None, uses the sync stub arbitrage_agent
+        (Phase 2 backward-compat). Pass make_arbitrage_agent() for real EV computation.
+    correlation_guard_node:
+        Optional sync node from make_correlation_guard_node(). When provided alongside
+        aggregator_node, extends the arbitrage pipeline with CorrelationGuard filtering.
+        If None, arbitrage_agent routes directly to END (backward-compat).
+    aggregator_node:
+        Optional sync node from make_aggregator_node(bankroll, limit). When provided
+        alongside correlation_guard_node, gates signals through the daily drawdown limit.
+        If None, arbitrage_agent routes directly to END (backward-compat).
 
     Returns
     -------
@@ -67,6 +156,8 @@ def create_graph(
         Ready for ainvoke(initial_state, config={"configurable": {"thread_id": ...}}) calls.
         Thread-safe: each ainvoke gets its own isolated state copy.
     """
+    from sportsbet.graph.router import route_from_master
+
     builder: StateGraph = StateGraph(GraphState)
 
     # quant_node: real async closure (Phase 3+) or sync stub (Phase 2 backward-compat)
@@ -75,10 +166,13 @@ def create_graph(
     # context_node: real async closure (Phase 4+) or sync stub (Phase 2 backward-compat)
     active_context_node = context_node if context_node is not None else context_agent
 
-    # Register all nodes
+    # arbitrage_node: real async closure (Phase 5+) or sync stub (Phase 2 backward-compat)
+    active_arbitrage_node = arbitrage_node if arbitrage_node is not None else arbitrage_agent
+
+    # Register all base nodes
     builder.add_node("master_router", master_router)
     builder.add_node("quant_agent", active_quant_node)
-    builder.add_node("arbitrage_agent", arbitrage_agent)
+    builder.add_node("arbitrage_agent", active_arbitrage_node)
     builder.add_node("context_agent", active_context_node)
 
     # Entry point: all requests pass through master_router first
@@ -91,15 +185,26 @@ def create_graph(
         {
             "quant_agent": "quant_agent",
             "arbitrage_agent": "arbitrage_agent",
+            "arbitrage_analysis": "arbitrage_agent",
             "context_agent": "context_agent",
             "end": END,
         },
     )
 
-    # All specialist agents terminate immediately after running
+    # quant_agent and context_agent always terminate at END
     builder.add_edge("quant_agent", END)
-    builder.add_edge("arbitrage_agent", END)
     builder.add_edge("context_agent", END)
+
+    # arbitrage pipeline: extend with guard/gate when both are provided
+    if correlation_guard_node is not None and aggregator_node is not None:
+        builder.add_node("correlation_guard", correlation_guard_node)
+        builder.add_node("aggregator", aggregator_node)
+        builder.add_edge("arbitrage_agent", "correlation_guard")
+        builder.add_edge("correlation_guard", "aggregator")
+        builder.add_edge("aggregator", END)
+    else:
+        # Backward-compat: no risk controls, arbitrage_agent -> END
+        builder.add_edge("arbitrage_agent", END)
 
     return builder.compile(checkpointer=checkpointer)
 

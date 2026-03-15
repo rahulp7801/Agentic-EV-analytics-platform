@@ -355,7 +355,9 @@ def make_arbitrage_agent(
             ev_pct=str(ev_pct),
             kelly_frac=str(kelly_frac),
         )
-        return {"ev_signal": signal}
+        # pending_signals: used by correlation_guard_node and aggregator_node when
+        # the full arbitrage pipeline is wired (Phase 5 Plan 03).
+        return {"ev_signal": signal, "pending_signals": [signal]}
 
     return arbitrage_agent_real
 

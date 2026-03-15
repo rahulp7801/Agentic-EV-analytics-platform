@@ -66,6 +66,12 @@ class GraphState(TypedDict):
         ContextSignals instance set by context_agent. None until Context Agent runs.
         Downstream agents must read odds and injury data from this field — never
         re-fetch from the API inside the Quant or Arbitrage agents.
+    pending_signals : list[Any]
+        EVSignal candidates produced by arbitrage_agent, before CorrelationGuard
+        and Aggregator gate filtering. Overwritten each pipeline run (not appended).
+    cleared_signals : list[Any]
+        EVSignals that passed both CorrelationGuard.check() and Aggregator.record_signal().
+        Populated by aggregator_node; empty list if no signals survive risk controls.
     """
 
     session_id: str
@@ -82,3 +88,5 @@ class GraphState(TypedDict):
     quant_result: Any | None  # type: ignore[misc]
     ev_signal: Any | None  # type: ignore[misc]
     context_signals: Optional[ContextSignals]  # type: ignore[misc]
+    pending_signals: list[Any]  # type: ignore[misc]  # EVSignal candidates before CorrelationGuard check
+    cleared_signals: list[Any]  # type: ignore[misc]  # Signals that passed CorrelationGuard AND Aggregator gate

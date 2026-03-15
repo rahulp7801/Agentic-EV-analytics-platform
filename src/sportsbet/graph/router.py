@@ -4,11 +4,12 @@ The Master Router is the entry point for every request. It reads the `error` fie
 first — if set, routes immediately to END without calling any agent (fail-fast design).
 Otherwise it dispatches based on `request_type` to the correct specialist agent.
 
-Routing table (locked in CONTEXT.md):
-  "quant_analysis"  -> quant_agent
-  "odds_check"      -> arbitrage_agent
-  "context_update"  -> context_agent
-  anything else     -> sets error and routes to END
+Routing table:
+  "quant_analysis"    -> quant_agent
+  "odds_check"        -> arbitrage_agent
+  "arbitrage_analysis"-> arbitrage_agent  (Phase 5: full arbitrage pipeline route)
+  "context_update"    -> context_agent
+  anything else       -> sets error and routes to END
 """
 from __future__ import annotations
 
@@ -60,7 +61,7 @@ def route_from_master(state: GraphState) -> str:
 
     if request_type == "quant_analysis":
         return "quant_agent"
-    elif request_type == "odds_check":
+    elif request_type in ("odds_check", "arbitrage_analysis"):
         return "arbitrage_agent"
     elif request_type == "context_update":
         return "context_agent"
