@@ -110,7 +110,11 @@ Plans:
   1. A Kinematic Agent query for a specific WR-CB matchup returns separation_at_catch, time_to_throw, and press_man_coverage_rate fields sourced from PostgreSQL NGS tables
   2. The agent produces a KinematicAnalysis object flagging a geometric mismatch (e.g., high-separation slot WR vs. high-press-rate CB) with a signal independent of the Quant Agent's box score probability
   3. Querying a season with partial NGS coverage returns None for unavailable fields instead of raising an exception or returning zero
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — kinematic subpackage (models, availability guard, matchup executor) with TDD (Wave 1)
+- [ ] 06-02-PLAN.md — make_kinematic_agent closure, GraphState extension, graph wiring, end-to-end integration test (Wave 2)
 
 ## Progress
 
@@ -124,4 +128,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Quant Engine | 3/3 | Complete   | 2026-03-13 |
 | 4. Context and Odds Ingestion | 4/4 | Complete   | 2026-03-15 |
 | 5. Arbitrage, Kelly, and Risk Controls | 3/3 | Complete   | 2026-03-15 |
-| 6. Kinematic Agent | 0/TBD | Not started | - |
+| 6. Kinematic Agent | 0/2 | Not started | - |
