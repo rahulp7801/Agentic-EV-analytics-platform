@@ -117,6 +117,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-10 |
 | 2. Agent Infrastructure | 2/3 | In Progress|  |
 | 3. Quant Engine | 3/3 | Complete   | 2026-03-13 |
-| 4. Context and Odds Ingestion | 1/4 | In Progress|  |
+| 4. Context and Odds Ingestion | 2/4 | In Progress|  |
 | 5. Arbitrage, Kelly, and Risk Controls | 0/TBD | Not started | - |
 | 6. Kinematic Agent | 0/TBD | Not started | - |

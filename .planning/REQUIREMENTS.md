@@ -30,8 +30,8 @@
 
 - [x] **CTXT-01**: System ingests live odds asynchronously from The Odds API with a budget manager that tracks per-request cost and enforces a configurable daily API spend cap
 - [x] **CTXT-02**: System rejects any odds payload older than a configurable staleness threshold (default: 5 minutes) before passing to the Arbitrage Agent
-- [ ] **CTXT-03**: System scrapes qualitative signals (injury reports, weather forecasts) via async Playwright/BeautifulSoup and stores structured binary state changes
-- [ ] **CTXT-04**: Context Agent updates a global game state JSON on binary state changes (e.g., "Starting QB ruled Out") and propagates the updated state through GraphState
+- [x] **CTXT-03**: System scrapes qualitative signals (injury reports, weather forecasts) via async Playwright/BeautifulSoup and stores structured binary state changes
+- [x] **CTXT-04**: Context Agent updates a global game state JSON on binary state changes (e.g., "Starting QB ruled Out") and propagates the updated state through GraphState
 
 ### Risk & Arbitrage Output
 
@@ -102,8 +102,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUANT-04 | Phase 3 | Complete |
 | CTXT-01 | Phase 4 | Complete |
 | CTXT-02 | Phase 4 | Complete |
-| CTXT-03 | Phase 4 | Pending |
-| CTXT-04 | Phase 4 | Pending |
+| CTXT-03 | Phase 4 | Complete |
+| CTXT-04 | Phase 4 | Complete |
 | ARBT-01 | Phase 5 | Pending |
 | ARBT-02 | Phase 5 | Pending |
 | ARBT-03 | Phase 5 | Pending |
