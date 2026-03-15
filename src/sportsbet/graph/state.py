@@ -12,10 +12,9 @@ Design notes (locked decisions from CONTEXT.md):
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, TypedDict
+from typing import Annotated, Any, Optional, TypedDict
 
-if TYPE_CHECKING:
-    from sportsbet.graph.models import ContextSignals
+from sportsbet.graph.models import ContextSignals
 
 
 def _last_write_wins(a: Any, b: Any) -> Any:  # noqa: ANN401
@@ -82,4 +81,4 @@ class GraphState(TypedDict):
     error: Annotated[str | None, _last_write_wins]
     quant_result: Any | None  # type: ignore[misc]
     ev_signal: Any | None  # type: ignore[misc]
-    context_signals: "ContextSignals | None"  # type: ignore[misc]
+    context_signals: Optional[ContextSignals]  # type: ignore[misc]
