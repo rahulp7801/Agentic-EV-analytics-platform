@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-03-15T04:26:57.633Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-03-15T04:33:56.960Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 16
-  completed_plans: 15
+  completed_plans: 16
   percent: 100
 ---
 
@@ -64,6 +64,7 @@ Progress: [██████████] 100%
 | Phase 04-context-and-odds-ingestion P04 | 3 | 2 tasks | 3 files |
 | Phase 05-arbitrage-kelly-and-risk-controls P01 | 4 | 2 tasks | 6 files |
 | Phase 05-arbitrage-kelly-and-risk-controls PP02 | 2 | 2 tasks | 3 files |
+| Phase 05-arbitrage-kelly-and-risk-controls PP03 | 15 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,9 @@ Recent decisions affecting current work:
 - [Phase 05-arbitrage-kelly-and-risk-controls]: CONFLICT_PAIRS hardcoded at module level as frozenset[frozenset[str]] — immutable, O(1) membership test, extensible without touching CorrelationGuard class
 - [Phase 05-arbitrage-kelly-and-risk-controls]: Aggregator gate-on-limit: triggering signal blocked and NOT counted in cumulative — conservative prop-firm daily hard stop interpretation
 - [Phase 05-arbitrage-kelly-and-risk-controls]: No LangGraph coupling in Plan 02 risk controls — CorrelationGuard and Aggregator are pure Python; graph wiring deferred to Plan 03
+- [Phase 05-arbitrage-kelly-and-risk-controls]: make_correlation_guard_node and make_aggregator_node in graph.py (not agents.py) — graph-layer orchestration wrapping stateful risk objects
+- [Phase 05-arbitrage-kelly-and-risk-controls]: Aggregator instance created at graph construction time — persists cumulative exposure across ainvoke calls within same process, models daily gate correctly
+- [Phase 05-arbitrage-kelly-and-risk-controls]: arbitrage_analysis request_type routes to arbitrage_agent alongside odds_check — cleaner semantic for direct Phase 5 pipeline invocation
 
 ### Pending Todos
 
@@ -134,6 +138,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T04:26:57.629Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-03-15T04:33:56.956Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
