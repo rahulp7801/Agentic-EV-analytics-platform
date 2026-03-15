@@ -1,9 +1,10 @@
-"""Tests for Phase 5 Plan 01: Arbitrage subpackage — Kelly, EV, make_arbitrage_agent.
+"""Tests for Phase 5 Plans 01 and 02: Arbitrage subpackage — Kelly, EV, make_arbitrage_agent,
+CorrelationGuard, and Aggregator.
 
 RED phase: tests are written before implementation — ImportError / AssertionError expected.
-GREEN phase: all 8 tests pass after kelly.py, ev.py, and make_arbitrage_agent are implemented.
+GREEN phase: all tests pass after implementation.
 
-Test inventory:
+Test inventory (Plan 01 — ARBT-01, ARBT-02):
 1. test_fractional_kelly_standard         — fractional_kelly standard case, no cap
 2. test_fractional_kelly_cap              — raw f*=0.80 hard-capped at Decimal("0.25")
 3. test_fractional_kelly_negative_ev      — p=0.40 → negative raw f* clipped to Decimal("0")
@@ -12,6 +13,18 @@ Test inventory:
 6. test_build_trade_plan_length           — build_trade_plan returns exactly 3 non-empty strings
 7. test_arbt01_ev_signal_produced         — make_arbitrage_agent returns EVSignal when edge > 0
 8. test_arbt02_kelly_fraction_non_flat    — EVSignal.kelly_fraction > 0 and <= Decimal("0.25")
+
+Test inventory (Plan 02 — ARBT-03: CorrelationGuard):
+9.  test_arbt03_conflict_blocked          — both signals blocked when market_types form a CONFLICT_PAIR
+10. test_arbt03_no_conflict_passes        — non-conflicting single signal passes through unchanged
+11. test_arbt03_conflict_pairs_defined    — CONFLICT_PAIRS contains over_passing_yards/under_total_points pair
+12. test_arbt03_partial_conflict          — only conflicting pair blocked; unrelated signal passes through
+
+Test inventory (Plan 02 — ARBT-04: Aggregator):
+13. test_arbt04_signals_pass_under_limit      — signal accepted when below daily drawdown limit
+14. test_arbt04_gate_triggers_at_limit        — gate triggers once cumulative exposure >= limit
+15. test_arbt04_no_further_signals_after_gate — subsequent record_signal() calls return False after gate
+16. test_arbt04_cumulative_exposure_tracks    — cumulative_exposure_usd reflects only accepted signals
 """
 from __future__ import annotations
 
@@ -41,6 +54,21 @@ try:
 except ImportError:
     make_arbitrage_agent = None  # type: ignore[assignment]
     _AGENT_IMPORTED = False
+
+try:
+    from sportsbet.arbitrage.correlation_guard import CONFLICT_PAIRS, CorrelationGuard
+    _GUARD_IMPORTED = True
+except ImportError:
+    CorrelationGuard = None  # type: ignore[assignment]
+    CONFLICT_PAIRS = None  # type: ignore[assignment]
+    _GUARD_IMPORTED = False
+
+try:
+    from sportsbet.arbitrage.aggregator import Aggregator
+    _AGGREGATOR_IMPORTED = True
+except ImportError:
+    Aggregator = None  # type: ignore[assignment]
+    _AGGREGATOR_IMPORTED = False
 
 
 # ---------------------------------------------------------------------------
@@ -229,4 +257,220 @@ def test_arbt02_kelly_fraction_non_flat():
     )
     assert signal.kelly_fraction <= Decimal("0.25"), (
         f"kelly_fraction must be <= 0.25 (hard cap), got {signal.kelly_fraction}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Shared signal factory (Plan 02 — ARBT-03 and ARBT-04)
+# ---------------------------------------------------------------------------
+
+def _make_signal(market_type: str):
+    """Build a minimal valid EVSignal for use in ARBT-03 and ARBT-04 tests."""
+    from sportsbet.graph.models import EVSignal
+    return EVSignal(
+        ev_percentage=Decimal("0.05"),
+        true_probability=Decimal("0.60"),
+        implied_probability=Decimal("0.55"),
+        kelly_fraction=Decimal("0.05"),
+        trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+        market_type=market_type,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 9: CorrelationGuard blocks both signals in a conflict pair (ARBT-03)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not _GUARD_IMPORTED, reason="sportsbet.arbitrage.correlation_guard not yet implemented")
+def test_arbt03_conflict_blocked():
+    """CorrelationGuard blocks both signals when their market_types form a CONFLICT_PAIR."""
+    guard = CorrelationGuard()
+    signal_over_passing = _make_signal("over_passing_yards")
+    signal_under_total = _make_signal("under_total_points")
+    result = guard.check([signal_over_passing, signal_under_total])
+    assert result == [], (
+        f"Expected [] (both blocked), got {[s.market_type for s in result]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 10: CorrelationGuard passes non-conflicting signal unchanged (ARBT-03)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not _GUARD_IMPORTED, reason="sportsbet.arbitrage.correlation_guard not yet implemented")
+def test_arbt03_no_conflict_passes():
+    """A single non-conflicting signal passes through CorrelationGuard unchanged."""
+    guard = CorrelationGuard()
+    signal_moneyline = _make_signal("moneyline")
+    result = guard.check([signal_moneyline])
+    assert len(result) == 1, f"Expected 1 signal, got {len(result)}"
+    assert result[0].market_type == "moneyline"
+
+
+# ---------------------------------------------------------------------------
+# Test 11: CONFLICT_PAIRS contains required pair (ARBT-03)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not _GUARD_IMPORTED, reason="sportsbet.arbitrage.correlation_guard not yet implemented")
+def test_arbt03_conflict_pairs_defined():
+    """CONFLICT_PAIRS is a frozenset and contains over_passing_yards/under_total_points."""
+    assert isinstance(CONFLICT_PAIRS, frozenset), (
+        f"CONFLICT_PAIRS must be frozenset, got {type(CONFLICT_PAIRS)}"
+    )
+    required_pair = frozenset({"over_passing_yards", "under_total_points"})
+    assert required_pair in CONFLICT_PAIRS, (
+        f"CONFLICT_PAIRS must include {required_pair}, got {CONFLICT_PAIRS}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 12: CorrelationGuard blocks only the conflicting pair (ARBT-03)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not _GUARD_IMPORTED, reason="sportsbet.arbitrage.correlation_guard not yet implemented")
+def test_arbt03_partial_conflict():
+    """Only the conflicting pair is blocked; unrelated signals pass through."""
+    guard = CorrelationGuard()
+    signal_moneyline = _make_signal("moneyline")
+    signal_over_passing = _make_signal("over_passing_yards")
+    signal_under_total = _make_signal("under_total_points")
+    result = guard.check([signal_moneyline, signal_over_passing, signal_under_total])
+    assert len(result) == 1, (
+        f"Expected 1 signal (moneyline only), got {[s.market_type for s in result]}"
+    )
+    assert result[0].market_type == "moneyline"
+
+
+# ---------------------------------------------------------------------------
+# Test 13: Aggregator accepts signal under daily drawdown limit (ARBT-04)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not _AGGREGATOR_IMPORTED, reason="sportsbet.arbitrage.aggregator not yet implemented")
+def test_arbt04_signals_pass_under_limit():
+    """record_signal() returns True when cumulative exposure is below the daily limit."""
+    agg = Aggregator(bankroll_usd=10000.0, daily_drawdown_limit=0.05)
+    # kelly_fraction=0.02 → $200 exposure; limit = 0.05 * 10000 = $500
+    signal = _make_signal("moneyline")
+    # Override kelly_fraction to 0.02 for precise limit test
+    from sportsbet.graph.models import EVSignal
+    signal = EVSignal(
+        ev_percentage=Decimal("0.05"),
+        true_probability=Decimal("0.60"),
+        implied_probability=Decimal("0.55"),
+        kelly_fraction=Decimal("0.02"),
+        trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+        market_type="moneyline",
+    )
+    result = agg.record_signal(signal)
+    assert result is True, f"Expected True (signal under limit), got {result}"
+
+
+# ---------------------------------------------------------------------------
+# Test 14: Aggregator gate triggers when cumulative exposure reaches limit (ARBT-04)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not _AGGREGATOR_IMPORTED, reason="sportsbet.arbitrage.aggregator not yet implemented")
+def test_arbt04_gate_triggers_at_limit():
+    """Gate triggers once cumulative exposure >= daily_drawdown_limit * bankroll."""
+    from sportsbet.graph.models import EVSignal
+    # bankroll=10000, limit=0.05 -> $500 max
+    # Signal 1: kelly=0.03 -> $300 (accepted, cumulative=$300)
+    # Signal 2: kelly=0.03 -> $300 (cumulative would be $600 >= $500 -> rejected)
+    agg = Aggregator(bankroll_usd=10000.0, daily_drawdown_limit=0.05)
+    signal_a = EVSignal(
+        ev_percentage=Decimal("0.05"),
+        true_probability=Decimal("0.60"),
+        implied_probability=Decimal("0.55"),
+        kelly_fraction=Decimal("0.03"),
+        trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+        market_type="moneyline",
+    )
+    signal_b = EVSignal(
+        ev_percentage=Decimal("0.05"),
+        true_probability=Decimal("0.60"),
+        implied_probability=Decimal("0.55"),
+        kelly_fraction=Decimal("0.03"),
+        trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+        market_type="spread",
+    )
+    result_a = agg.record_signal(signal_a)
+    result_b = agg.record_signal(signal_b)
+    assert result_a is True, f"Expected first signal accepted, got {result_a}"
+    assert result_b is False, f"Expected second signal rejected (gate triggered), got {result_b}"
+
+
+# ---------------------------------------------------------------------------
+# Test 15: Aggregator gate stays closed after triggering (ARBT-04)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not _AGGREGATOR_IMPORTED, reason="sportsbet.arbitrage.aggregator not yet implemented")
+def test_arbt04_no_further_signals_after_gate():
+    """Once gate is triggered, all subsequent record_signal() calls return False."""
+    from sportsbet.graph.models import EVSignal
+    # Trigger gate immediately: single large signal >= limit
+    agg = Aggregator(bankroll_usd=10000.0, daily_drawdown_limit=0.05)
+    large_signal = EVSignal(
+        ev_percentage=Decimal("0.05"),
+        true_probability=Decimal("0.60"),
+        implied_probability=Decimal("0.55"),
+        kelly_fraction=Decimal("0.25"),  # $2500 >> $500 limit
+        trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+        market_type="total",
+    )
+    small_signal = EVSignal(
+        ev_percentage=Decimal("0.05"),
+        true_probability=Decimal("0.60"),
+        implied_probability=Decimal("0.55"),
+        kelly_fraction=Decimal("0.01"),
+        trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+        market_type="moneyline",
+    )
+    # Large signal triggers gate
+    first = agg.record_signal(large_signal)
+    assert first is False, f"Expected large signal to trigger gate (False), got {first}"
+    # All subsequent signals also rejected
+    second = agg.record_signal(small_signal)
+    third = agg.record_signal(small_signal)
+    assert second is False, f"Expected second signal rejected after gate, got {second}"
+    assert third is False, f"Expected third signal rejected after gate, got {third}"
+
+
+# ---------------------------------------------------------------------------
+# Test 16: Aggregator.cumulative_exposure_usd tracks accepted signals only (ARBT-04)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not _AGGREGATOR_IMPORTED, reason="sportsbet.arbitrage.aggregator not yet implemented")
+def test_arbt04_cumulative_exposure_tracks():
+    """cumulative_exposure_usd increases by kelly_fraction * bankroll for each accepted signal."""
+    from sportsbet.graph.models import EVSignal
+    # bankroll=10000, limit=0.05 ($500)
+    # Signal A: kelly=0.02 -> $200 accepted
+    # Signal B: kelly=0.02 -> $200 accepted; cumulative=$400
+    # Signal C: kelly=0.02 -> $200 would be $600 >= $500 -> rejected; cumulative stays $400
+    agg = Aggregator(bankroll_usd=10000.0, daily_drawdown_limit=0.05)
+
+    def _sig(kelly: str) -> EVSignal:
+        return EVSignal(
+            ev_percentage=Decimal("0.05"),
+            true_probability=Decimal("0.60"),
+            implied_probability=Decimal("0.55"),
+            kelly_fraction=Decimal(kelly),
+            trade_plan=["bullet 1", "bullet 2", "bullet 3"],
+            market_type="moneyline",
+        )
+
+    assert agg.cumulative_exposure_usd == Decimal("0")
+    agg.record_signal(_sig("0.02"))
+    assert agg.cumulative_exposure_usd == Decimal("200"), (
+        f"Expected $200 after first signal, got {agg.cumulative_exposure_usd}"
+    )
+    agg.record_signal(_sig("0.02"))
+    assert agg.cumulative_exposure_usd == Decimal("400"), (
+        f"Expected $400 after second signal, got {agg.cumulative_exposure_usd}"
+    )
+    # Third signal rejected — cumulative must NOT change
+    rejected = agg.record_signal(_sig("0.02"))
+    assert rejected is False
+    assert agg.cumulative_exposure_usd == Decimal("400"), (
+        f"Cumulative must not change after rejected signal, got {agg.cumulative_exposure_usd}"
     )
