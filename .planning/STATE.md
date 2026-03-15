@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-03-15T03:33:31.681Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-03-15T03:38:09.326Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 12
   percent: 100
 ---
 
@@ -60,6 +60,7 @@ Progress: [██████████] 100%
 | Phase 03-quant-engine P03 | 3 | 2 tasks | 2 files |
 | Phase 04-context-and-odds-ingestion P02 | 12 | 2 tasks | 2 files |
 | Phase 04-context-and-odds-ingestion P01 | 15 | 3 tasks | 5 files |
+| Phase 04-context-and-odds-ingestion P03 | 15 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,9 @@ Recent decisions affecting current work:
 - [Phase 04-context-and-odds-ingestion]: is_stale() raises TypeError on naive datetime — enforces UTC-awareness at API boundary
 - [Phase 04-context-and-odds-ingestion]: down_revision in 0002 must be '0001' (not '0001_initial_schema') — actual revision ID in migration file is the short form
 - [Phase 04-context-and-odds-ingestion]: ContextSignals imported directly in state.py (not TYPE_CHECKING guard) — no circular dependency exists between graph/models.py and graph/state.py
+- [Phase 04-context-and-odds-ingestion]: MagicMock (not AsyncMock) for pool.acquire in test — AsyncMock makes acquire() return a coroutine which breaks async with pool.acquire() as conn pattern
+- [Phase 04-context-and-odds-ingestion]: ContextSignals imported at runtime in state.py (not TYPE_CHECKING) — LangGraph calls get_type_hints(GraphState) which cannot resolve forward refs for TYPE_CHECKING-only imports
+- [Phase 04-context-and-odds-ingestion]: Weather scraping (Playwright/NFLWeather.com) deferred to v2 — Context Agent accepts weather_json=None in v1; keeps scraper.py focused and testable
 
 ### Pending Todos
 
@@ -118,6 +122,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T03:33:31.677Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-03-15T03:38:09.322Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
