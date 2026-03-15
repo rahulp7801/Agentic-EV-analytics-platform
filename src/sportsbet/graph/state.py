@@ -12,7 +12,10 @@ Design notes (locked decisions from CONTEXT.md):
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict
+
+if TYPE_CHECKING:
+    from sportsbet.graph.models import ContextSignals
 
 
 def _last_write_wins(a: Any, b: Any) -> Any:  # noqa: ANN401
@@ -60,6 +63,10 @@ class GraphState(TypedDict):
     ev_signal : Any | None
         EVSignal instance set by arbitrage_agent. Typed as Any in Phase 2;
         Phase 5 narrows to EVSignal after implementing real odds comparison.
+    context_signals : ContextSignals | None
+        ContextSignals instance set by context_agent. None until Context Agent runs.
+        Downstream agents must read odds and injury data from this field — never
+        re-fetch from the API inside the Quant or Arbitrage agents.
     """
 
     session_id: str
@@ -75,3 +82,4 @@ class GraphState(TypedDict):
     error: Annotated[str | None, _last_write_wins]
     quant_result: Any | None  # type: ignore[misc]
     ev_signal: Any | None  # type: ignore[misc]
+    context_signals: "ContextSignals | None"  # type: ignore[misc]

@@ -201,3 +201,36 @@ class OddsSnapshot(Base):
             postgresql_ops={"snapped_at": "DESC"},
         ),
     )
+
+
+class InjuryReport(Base):
+    """Structured binary state change from ESPN Core API or Playwright scraper.
+
+    Stores player injury status snapshots (Out/Questionable/Probable/Doubtful).
+    append-only table — never UPDATE. Query latest scraped_at per player for
+    current status.
+
+    source column identifies data origin: "espn_core_api" or "nflweather".
+    game_id FK is nullable — injury report may arrive before game_id is known.
+    """
+
+    __tablename__ = "injury_reports"
+
+    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
+    game_id: Mapped[Optional[str]] = mapped_column(
+        String(20), ForeignKey("games.game_id"), nullable=True
+    )
+    player_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # "Out"|"Questionable"|"Probable"|"Doubtful"
+    position: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    team_abbr: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    scraped_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=False, server_default=func.now()
+    )
+    source: Mapped[str] = mapped_column(String(50), nullable=False)  # "espn_core_api"
+
+    __table_args__ = (
+        Index("idx_injury_game_id", "game_id"),
+        Index("idx_injury_scraped_at", "scraped_at"),
+        Index("idx_injury_player_scraped", "player_name", "scraped_at"),
+    )

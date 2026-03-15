@@ -120,3 +120,24 @@ class GameState(BaseModel):
     away_team: str
     injury_flags: dict[str, str]
     weather_json: Optional[dict[str, object]] = None
+
+
+class ContextSignals(BaseModel):
+    """Structured game context produced by the Context Agent.
+
+    Propagated through GraphState.context_signals so all downstream agents
+    (Quant, Arbitrage) read from state rather than re-fetching live data.
+
+    injury_flags mirrors GraphState.injury_flags schema: {"P. Mahomes": "Out"}.
+    weather_json is None for indoor stadiums and non-weather-sensitive markets.
+    odds_snapshot is None when The Odds API budget is exhausted or call fails.
+    signals_captured_at is UTC; always use datetime.now(timezone.utc) to set it.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    game_id: str
+    injury_flags: dict[str, str]
+    weather_json: Optional[dict[str, object]] = None
+    odds_snapshot: Optional[AgentOddsSnapshot] = None
+    signals_captured_at: datetime
