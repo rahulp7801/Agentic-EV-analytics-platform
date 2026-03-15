@@ -11,10 +11,15 @@ fetches live NFL odds via OddsAPIPoller and injury reports via InjuryWeatherScra
 assembles a ContextSignals object, and returns a partial GraphState dict. Downstream
 agents read context_signals from state — never re-fetch the API.
 
+Phase 5 Plan 01 adds make_arbitrage_agent(settings_override) — an async closure
+factory that reads QuantResult and AgentOddsSnapshot from GraphState, computes
++EV percentage via fractional_kelly and compute_ev_percentage, and returns an
+EVSignal with a 3-bullet trade plan. Negative-EV signals are suppressed entirely.
+
 Phase replacement schedule:
 - quant_agent (stub)  -> make_quant_agent(pool) closure (Phase 3)
-- context_agent (stub) -> make_context_agent(pool, api_key, cap) closure (Phase 4, this plan)
-- arbitrage_agent     -> Phase 5: real odds comparison against Odds API
+- context_agent (stub) -> make_context_agent(pool, api_key, cap) closure (Phase 4)
+- arbitrage_agent (stub) -> make_arbitrage_agent() closure (Phase 5, this plan)
 
 Design: agents return dicts (partial state updates), not full GraphState.
 LangGraph merges the returned dict into the current state using registered reducers.
@@ -254,6 +259,105 @@ def _extract_odds_snapshot(
         implied_probability=Decimal(str(round(raw_prob, 6))),
         snapped_at=datetime.now(timezone.utc),
     )
+
+
+# ---------------------------------------------------------------------------
+# Real arbitrage agent — closure factory (Phase 5)
+# ---------------------------------------------------------------------------
+
+def make_arbitrage_agent(
+    settings_override: "Settings | None" = None,
+) -> Callable[[GraphState], Coroutine[Any, Any, dict[str, Any]]]:
+    """Return async arbitrage agent node with real Kelly/EV logic.
+
+    The returned coroutine is compatible with LangGraph's async node interface:
+    async def arbitrage_agent_real(state: GraphState) -> dict
+
+    Pipeline per invocation:
+    1. Read quant_result (QuantResult) and context_signals.odds_snapshot
+       (AgentOddsSnapshot) from state.
+    2. Guard: if quant_result is None or not QuantResult → return ev_signal=None
+    3. Guard: if quant_result.true_probability is None → return ev_signal=None
+    4. Guard: if odds_snapshot is None → return ev_signal=None (no odds to compare)
+    5. Compute ev_pct = compute_ev_percentage(true_probability, implied_probability)
+    6. If ev_pct == 0 (no positive edge) → return ev_signal=None
+    7. Compute kelly_frac = fractional_kelly(p, b=Decimal("1.0"), fraction=cfg.max_kelly_fraction)
+    8. Build trade_plan = build_trade_plan(ev_pct, kelly_frac, injury_flags, market_type)
+    9. Construct EVSignal — Pydantic validates all constraints at construction time
+
+    The sync arbitrage_agent stub is preserved below for backward-compat with
+    Phase 2 tests using create_graph() without an arbitrage_node parameter.
+    """
+    from sportsbet.arbitrage.ev import build_trade_plan, compute_ev_percentage
+    from sportsbet.arbitrage.kelly import fractional_kelly
+    from sportsbet.config import settings as _settings
+
+    cfg = settings_override if settings_override is not None else _settings
+
+    async def arbitrage_agent_real(state: GraphState) -> dict[str, Any]:  # type: ignore[type-arg]
+        session_id = state["session_id"]
+        log.info("arbitrage_agent_invoked", session_id=session_id)
+
+        quant_result = state.get("quant_result")  # type: ignore[attr-defined]
+        context_signals = state.get("context_signals")  # type: ignore[attr-defined]
+
+        # Guard: need real QuantResult with a probability
+        if quant_result is None or not isinstance(quant_result, QuantResult):
+            log.warning(
+                "arbitrage_agent_no_quant_result",
+                session_id=session_id,
+                quant_result_type=type(quant_result).__name__,
+            )
+            return {"ev_signal": None, "error": "quant_result missing or invalid"}
+        if quant_result.true_probability is None:
+            log.info("arbitrage_agent_no_probability", session_id=session_id)
+            return {"ev_signal": None}
+
+        # Guard: need live odds snapshot
+        if context_signals is None or context_signals.odds_snapshot is None:
+            log.warning("arbitrage_agent_no_odds", session_id=session_id)
+            return {"ev_signal": None}
+
+        snapshot = context_signals.odds_snapshot
+        true_prob: Decimal = quant_result.true_probability
+        implied_prob: Decimal = snapshot.implied_probability
+        injury_flags: dict[str, str] = context_signals.injury_flags
+
+        ev_pct = compute_ev_percentage(true_prob, implied_prob)
+        if ev_pct == Decimal("0"):
+            log.info(
+                "arbitrage_agent_no_edge",
+                session_id=session_id,
+                true_prob=str(true_prob),
+                implied_prob=str(implied_prob),
+            )
+            return {"ev_signal": None}
+
+        kelly_frac = fractional_kelly(
+            p=true_prob,
+            b=Decimal("1.0"),
+            fraction=Decimal(str(cfg.max_kelly_fraction)),
+        )
+
+        trade_plan = build_trade_plan(ev_pct, kelly_frac, injury_flags, snapshot.market_type)
+
+        signal = EVSignal(
+            ev_percentage=ev_pct,
+            true_probability=true_prob,
+            implied_probability=implied_prob,
+            kelly_fraction=kelly_frac,
+            trade_plan=trade_plan,
+            market_type=snapshot.market_type,
+        )
+        log.info(
+            "arbitrage_agent_complete",
+            session_id=session_id,
+            ev_pct=str(ev_pct),
+            kelly_frac=str(kelly_frac),
+        )
+        return {"ev_signal": signal}
+
+    return arbitrage_agent_real
 
 
 # ---------------------------------------------------------------------------

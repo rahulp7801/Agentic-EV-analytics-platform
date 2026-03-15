@@ -133,7 +133,7 @@ def test_insufficient_sample() -> None:
     params = _valid_params()
 
     import asyncio
-    result: QuantResult = asyncio.get_event_loop().run_until_complete(
+    result: QuantResult = asyncio.run(
         run_quant_query(mock_pool, params)  # type: ignore[arg-type]
     )
     assert result.data_source == "insufficient_sample"
@@ -157,7 +157,7 @@ def test_run_quant_query_mock_adequate_sample() -> None:
     params = _valid_params()
 
     import asyncio
-    result: QuantResult = asyncio.get_event_loop().run_until_complete(
+    result: QuantResult = asyncio.run(
         run_quant_query(mock_pool, params)  # type: ignore[arg-type]
     )
     assert result.data_source == "postgresql"
