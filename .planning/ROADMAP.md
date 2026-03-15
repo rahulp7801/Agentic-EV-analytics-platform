@@ -78,7 +78,13 @@ Plans:
   2. An odds payload older than the configured staleness threshold (default: 5 minutes) is rejected before reaching the Arbitrage Agent — a test with a stale fixture confirms the rejection
   3. The injury/weather scraper runs against a target page and writes a structured binary state change (e.g., "Starting QB: Out") to the injury_reports table
   4. Context Agent updates GraphState with a ContextSignals object reflecting the current game state, and all downstream agents read from GraphState rather than re-fetching
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Wave 0 foundation: InjuryReport ORM model, Alembic migration 0002, ContextSignals model, GraphState extension, 8 test stubs, dep installs (Wave 0)
+- [ ] 04-02-PLAN.md — OddsAPIPoller with budget manager and is_stale() staleness guard (Wave 1, TDD, parallel with 04-03)
+- [ ] 04-03-PLAN.md — InjuryWeatherScraper via ESPN Core API, write_injury_reports DB writer (Wave 1, TDD, parallel with 04-02)
+- [ ] 04-04-PLAN.md — make_context_agent closure factory, graph.py context_node wiring, all 8 tests green (Wave 2)
 
 ### Phase 5: Arbitrage, Kelly, and Risk Controls
 **Goal**: The full sequential pipeline (Context → Quant → Arbitrage → Aggregator) produces a +EV signal with fractional Kelly sizing, guarded by correlation stops and a daily drawdown gate
@@ -111,6 +117,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-10 |
 | 2. Agent Infrastructure | 2/3 | In Progress|  |
 | 3. Quant Engine | 3/3 | Complete   | 2026-03-13 |
-| 4. Context and Odds Ingestion | 0/TBD | Not started | - |
+| 4. Context and Odds Ingestion | 0/4 | Not started | - |
 | 5. Arbitrage, Kelly, and Risk Controls | 0/TBD | Not started | - |
 | 6. Kinematic Agent | 0/TBD | Not started | - |
