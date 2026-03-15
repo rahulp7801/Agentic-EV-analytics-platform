@@ -123,5 +123,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Agent Infrastructure | 2/3 | In Progress|  |
 | 3. Quant Engine | 3/3 | Complete   | 2026-03-13 |
 | 4. Context and Odds Ingestion | 4/4 | Complete   | 2026-03-15 |
-| 5. Arbitrage, Kelly, and Risk Controls | 0/3 | Not started | - |
+| 5. Arbitrage, Kelly, and Risk Controls | 1/3 | In Progress|  |
 | 6. Kinematic Agent | 0/TBD | Not started | - |

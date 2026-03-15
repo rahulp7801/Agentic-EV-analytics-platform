@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-03-15T03:50:09.453Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-15T04:21:58.220Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 16
+  completed_plans: 14
   percent: 100
 ---
 
@@ -62,6 +62,7 @@ Progress: [██████████] 100%
 | Phase 04-context-and-odds-ingestion P01 | 15 | 3 tasks | 5 files |
 | Phase 04-context-and-odds-ingestion P03 | 15 | 2 tasks | 3 files |
 | Phase 04-context-and-odds-ingestion P04 | 3 | 2 tasks | 3 files |
+| Phase 05-arbitrage-kelly-and-risk-controls P01 | 4 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,9 @@ Recent decisions affecting current work:
 - [Phase 04-context-and-odds-ingestion]: make_context_agent closure factory: pool, api_key, daily_credit_cap injected at construction; sync stub context_agent preserved as fallback when context_node=None
 - [Phase 04-context-and-odds-ingestion]: BudgetExhaustedError caught inside make_context_agent closure returning ContextSignals(odds_snapshot=None) — never propagates exception to LangGraph
 - [Phase 04-context-and-odds-ingestion]: _extract_odds_snapshot uses Decimal(str(round(raw_prob, 6))) for American odds conversion — prevents float assigned to strict Pydantic Decimal field
+- [Phase 05-arbitrage-kelly-and-risk-controls]: make_arbitrage_agent takes optional settings_override (not pool) — arbitrage math is stateless; no DB access needed
+- [Phase 05-arbitrage-kelly-and-risk-controls]: compute_ev_percentage = true_prob - implied_prob, floored at 0 — simplest correct positive-edge definition before devig
+- [Phase 05-arbitrage-kelly-and-risk-controls]: asyncio.run() replaces deprecated asyncio.get_event_loop().run_until_complete() in test_quant.py — prevents event loop conflict on Python 3.12
 
 ### Pending Todos
 
@@ -126,6 +130,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T03:44:21.453Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-03-15T04:21:58.215Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
