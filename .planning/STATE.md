@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-03-13T19:38:15.532Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-15T03:32:08.240Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 13
+  completed_plans: 10
   percent: 100
 ---
 
@@ -58,6 +58,7 @@ Progress: [██████████] 100%
 | Phase 03-quant-engine P02 | 5 | 2 tasks | 3 files |
 | Phase 03-quant-engine P01 | 7 | 3 tasks | 7 files |
 | Phase 03-quant-engine P03 | 3 | 2 tasks | 2 files |
+| Phase 04-context-and-odds-ingestion P02 | 12 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,9 @@ Recent decisions affecting current work:
 - [Phase 03-quant-engine]: make_quant_agent(pool) closure factory pattern — pool injected at construction time; sync stub quant_agent preserved for Phase 2 backward-compat when quant_node=None
 - [Phase 03-quant-engine]: BacktestEngine standalone offline module — never imported from graph.py or any agent node; isolation documented in module docstring and enforced by plan must_have
 - [Phase 03-quant-engine]: closing_line_note as BacktestReport field — makes pre-game snapshot constraint (snapshot_time < game_start_time is caller's responsibility) machine-readable to callers, not just docstring
+- [Phase 04-context-and-odds-ingestion]: httpx.AsyncClient entered via internal __aenter__() inside OddsAPIPoller so patch() correctly intercepts client instance for unittest.mock
+- [Phase 04-context-and-odds-ingestion]: _credits_remaining in-memory only in v1; WARNING logged on restart; persistent budget tracking deferred to Phase 5
+- [Phase 04-context-and-odds-ingestion]: is_stale() raises TypeError on naive datetime — enforces UTC-awareness at API boundary
 
 ### Pending Todos
 
@@ -111,6 +115,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T19:33:53.257Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-03-15T03:32:08.236Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
