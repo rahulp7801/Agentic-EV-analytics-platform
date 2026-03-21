@@ -1,8 +1,8 @@
-"""Tests for Phase 6 Plan 01: Kinematic subpackage — models, availability, matchup.
+"""Tests for Phase 6: Kinematic subpackage — models, availability, matchup, and graph wiring.
 
-Covers KINE-01 and KINE-03.
+Covers KINE-01, KINE-02, and KINE-03.
 
-Test inventory:
+Test inventory (Plan 01 — unit tests):
 1. test_kinematic_params_rejects_pre_ngs_season  — season=2015 raises ValidationError (KINE-03)
 2. test_kinematic_params_accepts_2016            — season=2016 validates without error (KINE-03)
 3. test_unavailable_season_returns_none_fields   — check_ngs_availability returns False for
@@ -14,6 +14,16 @@ Test inventory:
                                                    avg_separation >= SEPARATION_THRESHOLD
 6. test_kinematic_analysis_has_no_quant_fields   — KinematicAnalysis has no true_probability,
                                                    sample_size, or confidence_interval fields
+
+Test inventory (Plan 02 — integration tests):
+7. test_make_kinematic_agent_end_to_end          — graph.ainvoke with kinematic_node returns
+                                                   KinematicAnalysis with ngs_available=True
+8. test_kinematic_agent_unavailable_season       — graph.ainvoke with count=0 pool returns
+                                                   kinematic_result=None (not an exception)
+9. test_kinematic_agent_independence             — KinematicAnalysis has no true_probability,
+                                                   kelly_fraction, or sample_size fields
+10. test_route_kinematic_analysis               — create_graph stub routes kinematic_analysis
+                                                   without error
 
 All asyncpg pool calls are mocked — no live DB required.
 MagicMock (not AsyncMock) for pool.acquire() — matches Phase 4 decision.
@@ -277,3 +287,236 @@ def test_kinematic_analysis_has_no_quant_fields() -> None:
     # Confirm press_man_rate is present but always None
     assert "press_man_rate" in fields, "press_man_rate field must exist (forward-compat)"
     assert analysis.press_man_rate is None, "press_man_rate must be None by default"
+
+
+# ---------------------------------------------------------------------------
+# Integration Tests (Plan 02) — graph wiring, routing, end-to-end ainvoke
+# ---------------------------------------------------------------------------
+
+
+def _make_initial_state(request_type: str = "kinematic_analysis") -> dict:
+    """Build a minimal GraphState dict for integration tests."""
+    import uuid
+    from datetime import datetime, timezone
+
+    return {
+        "session_id": str(uuid.uuid4()),
+        "request_type": request_type,
+        "created_at": datetime.now(timezone.utc),
+        "game_id": "2023_05_KC_LAC",
+        "season": 2023,
+        "week": 5,
+        "home_team": "KC",
+        "away_team": "LAC",
+        "injury_flags": {},
+        "weather_json": None,
+        "error": None,
+        "quant_result": None,
+        "ev_signal": None,
+        "context_signals": None,
+        "pending_signals": [],
+        "cleared_signals": [],
+        "kinematic_result": None,
+    }
+
+
+def _make_two_call_pool(avail_row: dict, matchup_row: dict | None) -> MagicMock:
+    """Return a mock pool that serves avail_row on first acquire and matchup_row on second.
+
+    Availability check (COUNT query) uses fetchrow once.
+    Matchup query uses fetchrow once.
+    Each pool.acquire() call returns a fresh _async_cm wrapping a new conn.
+    """
+    conn_avail = AsyncMock()
+    conn_avail.fetchrow = AsyncMock(return_value=avail_row)
+
+    conn_matchup = AsyncMock()
+    conn_matchup.fetchrow = AsyncMock(return_value=matchup_row)
+
+    mock_pool = MagicMock()
+    mock_pool.acquire = MagicMock(
+        side_effect=[_async_cm(conn_avail), _async_cm(conn_matchup)]
+    )
+    return mock_pool
+
+
+# ---------------------------------------------------------------------------
+# Test 7: end-to-end graph.ainvoke with real kinematic_node (KINE-02)
+# ---------------------------------------------------------------------------
+
+
+def test_make_kinematic_agent_end_to_end() -> None:
+    """graph.ainvoke with request_type='kinematic_analysis' and real kinematic_node returns
+    KinematicAnalysis with ngs_available=True, avg_separation=Decimal('2.8'),
+    geometric_mismatch_flag=True (2.8 >= 2.5), press_man_rate=None.
+
+    Uses MemorySaver checkpointer for full isolation.
+    Mock pool: avail count=5 (available), separation=2.8 (above threshold).
+    """
+    import uuid
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from sportsbet.graph.agents import make_kinematic_agent
+    from sportsbet.graph.graph import create_graph
+
+    avail_row = {"n": 5}
+    matchup_row = {
+        "season_avg_separation": Decimal("2.8"),
+        "season_avg_cushion": Decimal("1.2"),
+        "avg_time_to_throw": None,
+        "weeks_sampled": 8,
+    }
+    mock_pool = _make_two_call_pool(avail_row, matchup_row)
+
+    graph = create_graph(
+        checkpointer=MemorySaver(),
+        kinematic_node=make_kinematic_agent(mock_pool),
+    )
+    initial_state = _make_initial_state("kinematic_analysis")
+    result = asyncio.run(
+        graph.ainvoke(
+            initial_state,
+            config={"configurable": {"thread_id": str(uuid.uuid4())}},
+        )
+    )
+
+    kinematic_result = result.get("kinematic_result")
+    assert kinematic_result is not None, (
+        "kinematic_result must be populated after kinematic_analysis request"
+    )
+    assert isinstance(kinematic_result, KinematicAnalysis), (
+        f"kinematic_result must be KinematicAnalysis, got {type(kinematic_result)}"
+    )
+    assert kinematic_result.ngs_available is True, "ngs_available must be True"
+    assert kinematic_result.avg_separation == Decimal("2.8"), (
+        f"avg_separation must be Decimal('2.8'), got {kinematic_result.avg_separation}"
+    )
+    assert kinematic_result.geometric_mismatch_flag is True, (
+        "2.8 >= 2.5 threshold must set geometric_mismatch_flag=True"
+    )
+    assert kinematic_result.press_man_rate is None, (
+        "press_man_rate must always be None"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 8: graph.ainvoke with unavailable NGS season returns kinematic_result=None (KINE-03)
+# ---------------------------------------------------------------------------
+
+
+def test_kinematic_agent_unavailable_season() -> None:
+    """graph.ainvoke with mock pool returning count=0 returns kinematic_result=None.
+
+    Confirms the availability guard fires correctly through the graph:
+    no exception is raised, result is clean None.
+    """
+    import uuid
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from sportsbet.graph.agents import make_kinematic_agent
+    from sportsbet.graph.graph import create_graph
+
+    # count=0 — NGS unavailable; no matchup row needed
+    avail_row = {"n": 0}
+    mock_conn_avail = AsyncMock()
+    mock_conn_avail.fetchrow = AsyncMock(return_value=avail_row)
+    mock_pool = MagicMock()
+    mock_pool.acquire = MagicMock(return_value=_async_cm(mock_conn_avail))
+
+    graph = create_graph(
+        checkpointer=MemorySaver(),
+        kinematic_node=make_kinematic_agent(mock_pool),
+    )
+    initial_state = _make_initial_state("kinematic_analysis")
+    result = asyncio.run(
+        graph.ainvoke(
+            initial_state,
+            config={"configurable": {"thread_id": str(uuid.uuid4())}},
+        )
+    )
+
+    kinematic_result = result.get("kinematic_result")
+    assert kinematic_result is None, (
+        f"kinematic_result must be None when NGS unavailable, got {kinematic_result}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 9: KinematicAnalysis independence from QuantResult fields
+# ---------------------------------------------------------------------------
+
+
+def test_kinematic_agent_independence() -> None:
+    """KinematicAnalysis does not have QuantResult-specific fields.
+
+    Confirms structural independence: true_probability, sample_size,
+    confidence_interval, and kelly_fraction must not be attributes on
+    KinematicAnalysis instances.
+    """
+    analysis = KinematicAnalysis(
+        season=2023,
+        week=5,
+        receiver_gsis_id="00-0034796",
+        avg_separation=Decimal("2.8"),
+        geometric_mismatch_flag=True,
+    )
+    assert not hasattr(analysis, "true_probability"), (
+        "KinematicAnalysis must not have true_probability"
+    )
+    assert not hasattr(analysis, "sample_size"), (
+        "KinematicAnalysis must not have sample_size"
+    )
+    assert not hasattr(analysis, "confidence_interval"), (
+        "KinematicAnalysis must not have confidence_interval"
+    )
+    assert not hasattr(analysis, "kelly_fraction"), (
+        "KinematicAnalysis must not have kelly_fraction"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 10: route_from_master returns 'kinematic_agent' for kinematic_analysis
+# ---------------------------------------------------------------------------
+
+
+def test_route_kinematic_analysis() -> None:
+    """create_graph(checkpointer=MemorySaver()) stub routes kinematic_analysis cleanly.
+
+    Invokes graph with request_type='kinematic_analysis' and no kinematic_node
+    (uses _kinematic_stub). Confirms no 'unknown_request_type' error is set
+    and the graph terminates cleanly.
+
+    Also tests route_from_master directly for the kinematic_analysis request_type.
+    """
+    import uuid
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from sportsbet.graph.graph import create_graph
+    from sportsbet.graph.router import route_from_master
+
+    # Direct router test
+    mock_state: dict = {
+        "request_type": "kinematic_analysis",
+        "session_id": "test-session",
+        "error": None,
+    }
+    route = route_from_master(mock_state)  # type: ignore[arg-type]
+    assert route == "kinematic_agent", (
+        f"route_from_master must return 'kinematic_agent' for kinematic_analysis, got {route!r}"
+    )
+
+    # End-to-end graph stub test
+    graph = create_graph(checkpointer=MemorySaver())  # no kinematic_node → stub
+    initial_state = _make_initial_state("kinematic_analysis")
+    result = asyncio.run(
+        graph.ainvoke(
+            initial_state,
+            config={"configurable": {"thread_id": str(uuid.uuid4())}},
+        )
+    )
+    assert result.get("error") is None, (
+        f"Stub route must not set error, got: {result.get('error')}"
+    )

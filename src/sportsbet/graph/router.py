@@ -9,6 +9,7 @@ Routing table:
   "odds_check"        -> arbitrage_agent
   "arbitrage_analysis"-> arbitrage_agent  (Phase 5: full arbitrage pipeline route)
   "context_update"    -> context_agent
+  "kinematic_analysis"-> kinematic_agent  (Phase 6: geometric matchup exploit signal)
   anything else       -> sets error and routes to END
 """
 from __future__ import annotations
@@ -65,6 +66,8 @@ def route_from_master(state: GraphState) -> str:
         return "arbitrage_agent"
     elif request_type == "context_update":
         return "context_agent"
+    elif request_type == "kinematic_analysis":
+        return "kinematic_agent"
     else:
         # Unknown request_type — set error in state via a state update mechanism.
         # Note: conditional edge functions cannot mutate state directly in LangGraph.

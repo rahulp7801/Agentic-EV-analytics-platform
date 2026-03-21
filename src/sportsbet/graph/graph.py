@@ -5,6 +5,7 @@ create_graph() builds and compiles the full directed graph:
   START -> master_router -> [conditional edge] -> quant_agent    -> END
                                                -> arbitrage_agent -> [correlation_guard -> aggregator ->] END
                                                -> context_agent   -> END
+                                               -> kinematic_agent -> END
                                                -> END  (on error or unknown type)
 
 create_graph_with_sqlite() is the runtime factory — writes checkpoints to disk
@@ -26,10 +27,15 @@ and aggregator_node parameters.
 When correlation_guard_node and aggregator_node are both provided, the arbitrage pipeline
 is extended: arbitrage_agent -> correlation_guard -> aggregator -> END.
 
+Phase 6 Plan 02 update: create_graph() accepts an optional kinematic_node parameter.
+- If kinematic_node is None (default): uses _kinematic_stub (returns kinematic_result=None).
+- If kinematic_node is provided: uses the real async closure from make_kinematic_agent(pool).
+
 All tests use create_graph(checkpointer=MemorySaver()) for full isolation (no disk I/O).
 Tests requiring a real quant agent pass quant_node=make_quant_agent(pool) explicitly.
 Tests requiring a real context agent pass context_node=make_context_agent(pool, key, cap) explicitly.
 Tests requiring full arbitrage pipeline pass all three new node parameters explicitly.
+Tests requiring real kinematic agent pass kinematic_node=make_kinematic_agent(pool) explicitly.
 """
 from __future__ import annotations
 
@@ -113,6 +119,7 @@ def create_graph(
     arbitrage_node: Any = None,
     correlation_guard_node: Any = None,
     aggregator_node: Any = None,
+    kinematic_node: Any = None,
 ) -> CompiledStateGraph:
     """Build and compile the LangGraph StateGraph for the sportsbet agent pipeline.
 
@@ -149,6 +156,10 @@ def create_graph(
         Optional sync node from make_aggregator_node(bankroll, limit). When provided
         alongside correlation_guard_node, gates signals through the daily drawdown limit.
         If None, arbitrage_agent routes directly to END (backward-compat).
+    kinematic_node:
+        Optional async kinematic agent node. If None, uses _kinematic_stub which returns
+        {"kinematic_result": None} (backward-compat). Pass make_kinematic_agent(pool) for
+        real NGS separation query execution.
 
     Returns
     -------
@@ -169,11 +180,19 @@ def create_graph(
     # arbitrage_node: real async closure (Phase 5+) or sync stub (Phase 2 backward-compat)
     active_arbitrage_node = arbitrage_node if arbitrage_node is not None else arbitrage_agent
 
+    # kinematic_node: real async closure (Phase 6+) or inline stub (backward-compat)
+    def _kinematic_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
+        """Inline stub: returns kinematic_result=None when no real kinematic node provided."""
+        return {"kinematic_result": None}
+
+    active_kinematic_node = kinematic_node if kinematic_node is not None else _kinematic_stub
+
     # Register all base nodes
     builder.add_node("master_router", master_router)
     builder.add_node("quant_agent", active_quant_node)
     builder.add_node("arbitrage_agent", active_arbitrage_node)
     builder.add_node("context_agent", active_context_node)
+    builder.add_node("kinematic_agent", active_kinematic_node)
 
     # Entry point: all requests pass through master_router first
     builder.set_entry_point("master_router")
@@ -187,6 +206,7 @@ def create_graph(
             "arbitrage_agent": "arbitrage_agent",
             "arbitrage_analysis": "arbitrage_agent",
             "context_agent": "context_agent",
+            "kinematic_agent": "kinematic_agent",
             "end": END,
         },
     )
@@ -194,6 +214,9 @@ def create_graph(
     # quant_agent and context_agent always terminate at END
     builder.add_edge("quant_agent", END)
     builder.add_edge("context_agent", END)
+
+    # kinematic_agent always terminates at END (independent pipeline)
+    builder.add_edge("kinematic_agent", END)
 
     # arbitrage pipeline: extend with guard/gate when both are provided
     if correlation_guard_node is not None and aggregator_node is not None:
