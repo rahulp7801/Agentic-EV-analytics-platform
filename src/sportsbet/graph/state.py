@@ -1,6 +1,6 @@
 """GraphState TypedDict for the LangGraph agent state machine.
 
-All 13 fields are defined here. The `error` field uses an Annotated last-write-wins
+All fields are defined here. The `error` field uses an Annotated last-write-wins
 reducer so LangGraph can handle concurrent writes without silent data loss.
 
 Design notes (locked decisions from CONTEXT.md):
@@ -8,6 +8,8 @@ Design notes (locked decisions from CONTEXT.md):
 - quant_result and ev_signal are typed as Any | None in Phase 2; Phase 3/5 narrow them.
 - Only one agent runs per request so no true concurrent conflict on `error`, but
   Annotated is required for INFRA-01 compliance with LangGraph's reducer protocol.
+- kinematic_result added in Phase 6: KinematicAnalysis | None, populated by
+  make_kinematic_agent when request_type="kinematic_analysis".
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ from datetime import datetime
 from typing import Annotated, Any, Optional, TypedDict
 
 from sportsbet.graph.models import ContextSignals
+from sportsbet.kinematic.models import KinematicAnalysis
 
 
 def _last_write_wins(a: Any, b: Any) -> Any:  # noqa: ANN401
@@ -90,3 +93,4 @@ class GraphState(TypedDict):
     context_signals: Optional[ContextSignals]  # type: ignore[misc]
     pending_signals: list[Any]  # type: ignore[misc]  # EVSignal candidates before CorrelationGuard check
     cleared_signals: list[Any]  # type: ignore[misc]  # Signals that passed CorrelationGuard AND Aggregator gate
+    kinematic_result: Optional[KinematicAnalysis]  # type: ignore[misc]  # Set by make_kinematic_agent (Phase 6)

@@ -425,3 +425,65 @@ def context_agent(state: GraphState) -> dict:  # type: ignore[type-arg]
         "stub_agent_called", agent="context_agent", session_id=state["session_id"]
     )
     return {}
+
+
+# ---------------------------------------------------------------------------
+# Real kinematic agent — closure factory (Phase 6)
+# ---------------------------------------------------------------------------
+
+def make_kinematic_agent(
+    pool: asyncpg.Pool,
+) -> Callable[[GraphState], Coroutine[Any, Any, dict[str, Any]]]:
+    """Return an async kinematic agent node bound to the given asyncpg pool.
+
+    The returned coroutine is compatible with LangGraph's async node interface:
+    async def kinematic_agent(state: GraphState) -> dict
+
+    Pipeline:
+    1. check_ngs_availability(pool, season) — if False, return {"kinematic_result": None}
+    2. Build KinematicParams from state (raises ValidationError if season < 2016)
+    3. Call run_matchup_query(pool, params) to execute parameterized NGS SQL
+    4. Return partial state dict with kinematic_result set to KinematicAnalysis
+
+    Isolation: imports from sportsbet.kinematic inside the closure.
+    No kinematic imports at module level — kinematic/ must not import from graph/.
+    """
+    from sportsbet.kinematic.availability import check_ngs_availability
+    from sportsbet.kinematic.matchup import run_matchup_query
+    from sportsbet.kinematic.models import KinematicParams
+
+    async def kinematic_agent(state: GraphState) -> dict[str, Any]:  # type: ignore[type-arg]
+        session_id = state["session_id"]
+        season = state["season"]
+        log.info("kinematic_agent_invoked", session_id=session_id, season=season)
+
+        available = await check_ngs_availability(pool, season)
+        if not available:
+            log.warning("kinematic_ngs_unavailable", season=season, session_id=session_id)
+            return {"kinematic_result": None}
+
+        try:
+            receiver_gsis_id: str = state.get("receiver_gsis_id", "")  # type: ignore[union-attr]
+            params = KinematicParams(
+                season=season,
+                week=state["week"],
+                receiver_gsis_id=receiver_gsis_id,
+            )
+            result = await run_matchup_query(pool, params)
+        except Exception as exc:
+            log.error(
+                "kinematic_agent_error",
+                session_id=session_id,
+                error=str(exc),
+                exc_info=True,
+            )
+            return {"kinematic_result": None, "error": str(exc)}
+
+        log.info(
+            "kinematic_agent_complete",
+            session_id=session_id,
+            geometric_mismatch_flag=result.geometric_mismatch_flag,
+        )
+        return {"kinematic_result": result}
+
+    return kinematic_agent
