@@ -42,9 +42,9 @@
 
 ### Kinematic Agent (NFL Alpha)
 
-- [ ] **KINE-01**: Kinematic Agent queries NGS tracking data fields (separation at catch point, time-to-throw, press-man coverage rate) from PostgreSQL for matchup-level geometric analysis
+- [x] **KINE-01**: Kinematic Agent queries NGS tracking data fields (separation at catch point, time-to-throw, press-man coverage rate) from PostgreSQL for matchup-level geometric analysis
 - [ ] **KINE-02**: Kinematic Agent produces matchup exploit signals based on geometric mismatches (e.g., fast slot WR vs high press-man CB) independent of box score history
-- [ ] **KINE-03**: System validates NGS field availability by season before Kinematic Agent queries to handle partial coverage years gracefully
+- [x] **KINE-03**: System validates NGS field availability by season before Kinematic Agent queries to handle partial coverage years gracefully
 
 ## v2 Requirements
 
@@ -108,9 +108,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ARBT-02 | Phase 5 | Complete |
 | ARBT-03 | Phase 5 | Complete |
 | ARBT-04 | Phase 5 | Complete |
-| KINE-01 | Phase 6 | Pending |
+| KINE-01 | Phase 6 | Complete |
 | KINE-02 | Phase 6 | Pending |
-| KINE-03 | Phase 6 | Pending |
+| KINE-03 | Phase 6 | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total

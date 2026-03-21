@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-03-15T04:38:18.699Z"
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-03-21T19:07:40.164Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 18
+  completed_plans: 17
   percent: 100
 ---
 
@@ -65,6 +65,7 @@ Progress: [██████████] 100%
 | Phase 05-arbitrage-kelly-and-risk-controls P01 | 4 | 2 tasks | 6 files |
 | Phase 05-arbitrage-kelly-and-risk-controls PP02 | 2 | 2 tasks | 3 files |
 | Phase 05-arbitrage-kelly-and-risk-controls PP03 | 15 | 2 tasks | 5 files |
+| Phase 06-kinematic-agent P01 | 5 | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,9 @@ Recent decisions affecting current work:
 - [Phase 05-arbitrage-kelly-and-risk-controls]: make_correlation_guard_node and make_aggregator_node in graph.py (not agents.py) — graph-layer orchestration wrapping stateful risk objects
 - [Phase 05-arbitrage-kelly-and-risk-controls]: Aggregator instance created at graph construction time — persists cumulative exposure across ainvoke calls within same process, models daily gate correctly
 - [Phase 05-arbitrage-kelly-and-risk-controls]: arbitrage_analysis request_type routes to arbitrage_agent alongside odds_check — cleaner semantic for direct Phase 5 pipeline invocation
+- [Phase 06-kinematic-agent]: KinematicParams.season uses Field(ge=2016) not ge=1999 — NGS data boundary enforced at Pydantic layer before any DB query
+- [Phase 06-kinematic-agent]: press_man_rate=None always on KinematicAnalysis — column is NULL in all current ngs_stats rows; forward-compat only; never queried
+- [Phase 06-kinematic-agent]: kinematic_result: Optional[KinematicAnalysis] added to GraphState at runtime import (not TYPE_CHECKING) — follows Phase 4 ContextSignals import pattern for LangGraph get_type_hints() compatibility
 
 ### Pending Todos
 
@@ -138,6 +142,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T04:33:56.956Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-03-21T19:07:40.159Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None
