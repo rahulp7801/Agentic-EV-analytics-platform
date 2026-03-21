@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Quant Engine** - Two-stage SQL validation gate, probability estimation, and backtesting module (completed 2026-03-13)
 - [x] **Phase 4: Context and Odds Ingestion** - Live odds pipeline, staleness guards, and qualitative signal scraping (completed 2026-03-15)
 - [x] **Phase 5: Arbitrage, Kelly, and Risk Controls** - EV calculation, fractional Kelly sizing, and correlation/drawdown gates (completed 2026-03-15)
-- [ ] **Phase 6: Kinematic Agent** - NGS tracking queries, geometric matchup signals, and season availability guards
+- [x] **Phase 6: Kinematic Agent** - NGS tracking queries, geometric matchup signals, and season availability guards (completed 2026-03-21)
 
 ## Phase Details
 
@@ -128,4 +128,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Quant Engine | 3/3 | Complete   | 2026-03-13 |
 | 4. Context and Odds Ingestion | 4/4 | Complete   | 2026-03-15 |
 | 5. Arbitrage, Kelly, and Risk Controls | 3/3 | Complete   | 2026-03-15 |
-| 6. Kinematic Agent | 1/2 | In Progress|  |
+| 6. Kinematic Agent | 2/2 | Complete   | 2026-03-21 |
