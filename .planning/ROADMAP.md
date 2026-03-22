@@ -18,6 +18,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Context and Odds Ingestion** - Live odds pipeline, staleness guards, and qualitative signal scraping (completed 2026-03-15)
 - [x] **Phase 5: Arbitrage, Kelly, and Risk Controls** - EV calculation, fractional Kelly sizing, and correlation/drawdown gates (completed 2026-03-15)
 - [x] **Phase 6: Kinematic Agent** - NGS tracking queries, geometric matchup signals, and season availability guards (completed 2026-03-21)
+- [ ] **Phase 7: Production Runtime Wiring** - Wire all Phase 5/6 nodes into create_graph_with_sqlite(), fix GraphState schema, and connect vig removal to EV pipeline
+- [ ] **Phase 8: Data Pipeline and Backtest Completion** - Persist live odds for CLV tracking, fix avg_time_to_throw query gap, and add BacktestEngine CLI entry point
 
 ## Phase Details
 
@@ -116,10 +118,36 @@ Plans:
 - [ ] 06-01-PLAN.md — kinematic subpackage (models, availability guard, matchup executor) with TDD (Wave 1)
 - [ ] 06-02-PLAN.md — make_kinematic_agent closure, GraphState extension, graph wiring, end-to-end integration test (Wave 2)
 
+### Phase 7: Production Runtime Wiring
+**Goal:** Wire all Phase 5/6 nodes into the production runtime factory, fix the GraphState schema gaps, and connect vig removal to the EV pipeline so every production invocation uses real risk controls and mathematically correct EV math
+**Depends on:** Phase 6
+**Requirements:** QUANT-02, ARBT-01, ARBT-03, ARBT-04, KINE-01, KINE-02
+**Gap Closure:** Closes gaps INT-01, INT-02, INT-04 from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `create_graph_with_sqlite()` accepts and wires `arbitrage_node`, `correlation_guard_node`, `aggregator_node`, and `kinematic_node` — a smoke test confirms all four nodes are reachable via conditional routing
+  2. `GraphState` TypedDict declares `receiver_gsis_id: str` — a kinematic agent invocation with a real GSIS ID produces a non-empty NGS query result instead of silently querying for `""`
+  3. `_extract_odds_snapshot()` calls `american_to_raw_prob` + a devig function before constructing `AgentOddsSnapshot.implied_probability` — a test confirms devigged probability differs from raw division result
+
+Plans:
+- [ ] 07-01-PLAN.md — Extend create_graph_with_sqlite() with Phase 5/6 nodes, add receiver_gsis_id to GraphState, wire vig removal in odds pipeline
+
+### Phase 8: Data Pipeline and Backtest Completion
+**Goal:** Persist live odds to the database for CLV tracking, fix the avg_time_to_throw SELECT gap in the kinematic query, and expose BacktestEngine via a CLI entry point so all v1 modules have a production caller
+**Depends on:** Phase 7
+**Requirements:** QUANT-04, DATA-03, KINE-01
+**Gap Closure:** Closes gaps INT-03, INT-05, and QUANT-04 partial from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `make_context_agent` calls `write_odds_snapshot()` after fetching and validating live odds — a test confirms at least one row appears in `odds_snapshots` after a context agent run
+  2. `_SEPARATION_QUERY` SELECT list includes `AVG(ngs_stats.avg_time_to_throw)` with the correct QB JOIN — a kinematic query for a QB with NGS data returns a non-None `avg_time_to_throw` field in `KinematicAnalysis`
+  3. A CLI entry point (e.g., `python -m sportsbet.quant.backtest`) runs `BacktestEngine` against a fixture dataset and prints ROI and hit-rate metrics without manual import
+
+Plans:
+- [ ] 08-01-PLAN.md — Call write_odds_snapshot() from context agent, add avg_time_to_throw to _SEPARATION_QUERY, add BacktestEngine CLI entry point
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -129,3 +157,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 4. Context and Odds Ingestion | 4/4 | Complete   | 2026-03-15 |
 | 5. Arbitrage, Kelly, and Risk Controls | 3/3 | Complete   | 2026-03-15 |
 | 6. Kinematic Agent | 2/2 | Complete   | 2026-03-21 |
+| 7. Production Runtime Wiring | 0/1 | Pending    |  |
+| 8. Data Pipeline and Backtest Completion | 0/1 | Pending    |  |
