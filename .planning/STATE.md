@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-03-22T20:27:10.775Z"
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-22T21:47:40.001Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 8
-  completed_phases: 7
-  total_plans: 19
-  completed_plans: 19
+  completed_phases: 8
+  total_plans: 20
+  completed_plans: 20
   percent: 100
 ---
 
@@ -68,6 +68,7 @@ Progress: [██████████] 100%
 | Phase 06-kinematic-agent P01 | 5 | 1 tasks | 7 files |
 | Phase 06-kinematic-agent P02 | 4 | 2 tasks | 3 files |
 | Phase 07-production-runtime-wiring P01 | 5 | 3 tasks | 5 files |
+| Phase 08-data-pipeline-and-backtest P01 | 30 | 4 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -136,6 +137,9 @@ Recent decisions affecting current work:
 - [Phase 07-production-runtime-wiring]: Decimal.quantize(10dp) on fair_probs[0] eliminates sub-ulp residual from remove_vig_multiplicative — last-element residual correction doesn't fix first element precision
 - [Phase 07-production-runtime-wiring]: arbitrage_node and kinematic_node pool-gated in create_graph_with_sqlite; correlation_guard and aggregator always wired (no DB dependency)
 - [Phase 07-production-runtime-wiring]: receiver_gsis_id: str added as last field in GraphState after kinematic_result — consistent with Phase 4 and 6 field addition patterns
+- [Phase 08-data-pipeline-and-backtest]: Module-level imports of get_sync_engine/write_odds_snapshot in agents.py for unittest.mock patchability — closure-scoped imports cannot be patched via sportsbet.graph.agents.name
+- [Phase 08-data-pipeline-and-backtest]: Lazy DB engine init with connect_timeout=5 in context agent persistence block — prevents indefinite hang in tests without PostgreSQL; _sync_engine_cache list used as mutable closure container
+- [Phase 08-data-pipeline-and-backtest]: sys.exit(0) in __main__ block only (not inside main()) — allows direct test call of main() without SystemExit propagation
 
 ### Pending Todos
 
@@ -149,6 +153,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T20:23:36.491Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-03-22T21:47:39.994Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None

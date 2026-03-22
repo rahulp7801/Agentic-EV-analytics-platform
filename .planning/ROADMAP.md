@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Arbitrage, Kelly, and Risk Controls** - EV calculation, fractional Kelly sizing, and correlation/drawdown gates (completed 2026-03-15)
 - [x] **Phase 6: Kinematic Agent** - NGS tracking queries, geometric matchup signals, and season availability guards (completed 2026-03-21)
 - [x] **Phase 7: Production Runtime Wiring** - Wire all Phase 5/6 nodes into create_graph_with_sqlite(), fix GraphState schema, and connect vig removal to EV pipeline (completed 2026-03-22)
-- [ ] **Phase 8: Data Pipeline and Backtest Completion** - Persist live odds for CLV tracking, fix avg_time_to_throw query gap, and add BacktestEngine CLI entry point
+- [x] **Phase 8: Data Pipeline and Backtest Completion** - Persist live odds for CLV tracking, fix avg_time_to_throw query gap, and add BacktestEngine CLI entry point (completed 2026-03-22)
 
 ## Phase Details
 
@@ -158,4 +158,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Arbitrage, Kelly, and Risk Controls | 3/3 | Complete   | 2026-03-15 |
 | 6. Kinematic Agent | 2/2 | Complete   | 2026-03-21 |
 | 7. Production Runtime Wiring | 1/1 | Complete   | 2026-03-22 |
-| 8. Data Pipeline and Backtest Completion | 0/1 | Pending    |  |
+| 8. Data Pipeline and Backtest Completion | 1/1 | Complete   | 2026-03-22 |
