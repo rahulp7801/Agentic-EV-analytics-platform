@@ -35,6 +35,7 @@ def make_minimal_state() -> dict[str, Any]:
         "error": None,
         "quant_result": None,
         "ev_signal": None,
+        "receiver_gsis_id": "",
     }
 
 
@@ -205,6 +206,7 @@ def make_checkpoint_state(request_type: str = "quant_analysis") -> dict[str, Any
         "injury_flags": {},
         "weather_json": None,
         "error": None,
+        "receiver_gsis_id": "",
     }
 
 
@@ -270,4 +272,86 @@ class TestCheckpointing:
         )
         assert settings.max_kelly_fraction == 0.25, (
             f"max_kelly_fraction default must be 0.25, got {settings.max_kelly_fraction}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: Production runtime wiring tests (07-01)
+# ---------------------------------------------------------------------------
+
+class TestPhase7Wiring:
+    def test_graphstate_has_receiver_gsis_id(self) -> None:
+        """GraphState must declare receiver_gsis_id: str (Phase 7 — INT-02 gap closure)."""
+        from sportsbet.graph.state import GraphState
+        hints = get_type_hints(GraphState, include_extras=True)
+        assert "receiver_gsis_id" in hints, (
+            "GraphState missing receiver_gsis_id field — make_kinematic_agent silently "
+            "queries for '' without this field declared"
+        )
+
+    def test_extract_odds_devigged(self) -> None:
+        """_extract_odds_snapshot must return devigged prob (0.5) for -110/-110, not raw (0.5238)."""
+        from sportsbet.graph.agents import _extract_odds_snapshot
+        raw_odds = [{
+            "bookmakers": [{
+                "key": "fanduel",
+                "markets": [{
+                    "key": "h2h",
+                    "outcomes": [
+                        {"name": "KC", "price": -110},
+                        {"name": "LV", "price": -110},
+                    ],
+                }],
+            }],
+        }]
+        result = _extract_odds_snapshot(raw_odds, "2024_01_KC_LV")
+        assert result is not None, "_extract_odds_snapshot returned None unexpectedly"
+        # Devigged -110/-110 = exactly 0.5; vig-inclusive raw = 0.523809...
+        assert result.implied_probability == Decimal("0.5"), (
+            f"Expected devigged Decimal('0.5'), got {result.implied_probability!r}. "
+            "Vig removal via remove_vig_multiplicative not wired."
+        )
+
+    async def test_create_graph_with_sqlite_nodes(self) -> None:
+        """create_graph() with all 7 params wires arbitrage pipeline and kinematic node."""
+        from langgraph.checkpoint.memory import MemorySaver
+        from sportsbet.graph.graph import (
+            create_graph,
+            make_aggregator_node,
+            make_correlation_guard_node,
+        )
+        from sportsbet.graph.agents import make_arbitrage_agent
+
+        def _kinematic_stub(state):  # type: ignore[no-untyped-def]
+            return {"kinematic_result": None}
+
+        graph = create_graph(
+            checkpointer=MemorySaver(),
+            arbitrage_node=make_arbitrage_agent(),
+            correlation_guard_node=make_correlation_guard_node(),
+            aggregator_node=make_aggregator_node(bankroll_usd=10000.0),
+            kinematic_node=_kinematic_stub,
+        )
+        config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+
+        # Arbitrage pipeline: cleared_signals key must be present after aggregator runs
+        arb_state = make_minimal_state()
+        arb_state["request_type"] = "arbitrage_analysis"
+        arb_state["pending_signals"] = []
+        arb_state["cleared_signals"] = []
+        arb_state["context_signals"] = None
+        result = await graph.ainvoke(arb_state, config=config)
+        assert "cleared_signals" in result, (
+            "cleared_signals key missing — aggregator_node not wired into graph"
+        )
+
+        # Kinematic pipeline: kinematic_result key must be present
+        kin_config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+        kin_state = make_minimal_state()
+        kin_state["request_type"] = "kinematic_analysis"
+        kin_state["pending_signals"] = []
+        kin_state["cleared_signals"] = []
+        kin_result = await graph.ainvoke(kin_state, config=kin_config)
+        assert "kinematic_result" in kin_result, (
+            "kinematic_result key missing — kinematic_node not wired into graph"
         )

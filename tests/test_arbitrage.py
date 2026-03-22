@@ -523,6 +523,7 @@ def _base_state(request_type: str = "arbitrage_analysis") -> dict:
         "context_signals": None,
         "pending_signals": [],
         "cleared_signals": [],
+        "receiver_gsis_id": "",
     }
 
 
