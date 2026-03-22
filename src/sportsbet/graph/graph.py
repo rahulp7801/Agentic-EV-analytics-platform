@@ -237,6 +237,8 @@ async def create_graph_with_sqlite(
     pool: Any = None,
     api_key: str | None = None,
     daily_credit_cap: int = 500,
+    bankroll_usd: float = 10000.0,
+    daily_drawdown_limit: float = 0.05,
 ) -> CompiledStateGraph:
     """Build and compile the graph with an AsyncSqliteSaver checkpointer for runtime use.
 
@@ -249,6 +251,11 @@ async def create_graph_with_sqlite(
     Phase 4 Plan 04 update: accepts optional api_key and daily_credit_cap.
     If pool is provided AND api_key is provided, wires in make_context_agent(pool,
     api_key, daily_credit_cap) for real odds + injury pipeline execution.
+
+    Phase 7 update: accepts bankroll_usd and daily_drawdown_limit. Wires
+    make_arbitrage_agent(), make_correlation_guard_node(), make_aggregator_node(),
+    and make_kinematic_agent(pool) into create_graph() — all Phase 5/6 nodes are
+    now reachable via the production factory (closes INT-01).
 
     Must be called from within an async context (use asyncio.run() from sync code).
     Do NOT use in tests — use create_graph(checkpointer=MemorySaver()) instead
@@ -268,6 +275,11 @@ async def create_graph_with_sqlite(
     daily_credit_cap:
         Maximum Odds API credits allowed per day. Passed to make_context_agent.
         Defaults to 500.
+    bankroll_usd:
+        Total bankroll in USD for Aggregator daily drawdown gate. Defaults to 10000.0.
+        Pass Settings().bankroll_usd for production use.
+    daily_drawdown_limit:
+        Fraction of bankroll as maximum daily exposure. Defaults to 0.05 (5%).
 
     Returns
     -------
@@ -295,8 +307,33 @@ async def create_graph_with_sqlite(
         from sportsbet.graph.agents import make_context_agent
         context_node = make_context_agent(pool, api_key, daily_credit_cap)
 
+    arbitrage_node = None
+    if pool is not None:
+        from sportsbet.graph.agents import make_arbitrage_agent
+        arbitrage_node = make_arbitrage_agent()
+
+    kinematic_node = None
+    if pool is not None:
+        from sportsbet.graph.agents import make_kinematic_agent
+        kinematic_node = make_kinematic_agent(pool)
+
+    # Risk control nodes have no pool dependency — always constructed
+    correlation_guard_node = make_correlation_guard_node()
+    aggregator_node = make_aggregator_node(
+        bankroll_usd=bankroll_usd,
+        daily_drawdown_limit=daily_drawdown_limit,
+    )
+
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
     # Open a persistent aiosqlite connection for the graph's lifetime.
     conn = await aiosqlite.connect(db_path)
     saver = AsyncSqliteSaver(conn)
-    return create_graph(checkpointer=saver, quant_node=quant_node, context_node=context_node)
+    return create_graph(
+        checkpointer=saver,
+        quant_node=quant_node,
+        context_node=context_node,
+        arbitrage_node=arbitrage_node,
+        correlation_guard_node=correlation_guard_node,
+        aggregator_node=aggregator_node,
+        kinematic_node=kinematic_node,
+    )
