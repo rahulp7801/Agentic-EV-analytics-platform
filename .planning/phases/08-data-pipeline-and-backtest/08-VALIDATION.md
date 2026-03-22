@@ -38,9 +38,9 @@ created: 2026-03-22
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 08-01-01 | 01 | 1 | DATA-03 | integration | `python -m pytest tests/test_odds_snapshot_persistence.py -x -q` | ❌ W0 | ⬜ pending |
-| 08-01-02 | 01 | 1 | KINE-01 | unit | `python -m pytest tests/test_kinematic_agent.py -x -q -k avg_time_to_throw` | ✅ | ⬜ pending |
-| 08-01-03 | 01 | 1 | QUANT-04 | integration | `python -m pytest tests/test_backtest_cli.py -x -q` | ❌ W0 | ⬜ pending |
+| 08-01-01 | 01 | 1 | DATA-03 | integration | `python -m pytest tests/test_context.py::test_context_agent_persists_odds_snapshot -x -q` | ❌ W0 | ⬜ pending |
+| 08-01-02 | 01 | 1 | KINE-01 | unit | `python -m pytest tests/test_kinematic.py::test_matchup_query_returns_avg_time_to_throw -x -q` | ❌ W0 | ⬜ pending |
+| 08-01-03 | 01 | 1 | QUANT-04 | integration | `python -m pytest tests/test_backtest.py::test_backtest_cli_main_prints_output -x -q` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,10 +48,10 @@ created: 2026-03-22
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_odds_snapshot_persistence.py` — stub asserting `write_odds_snapshot` is called after context agent run and a row appears in `odds_snapshots` (DATA-03)
-- [ ] `tests/test_backtest_cli.py` — stub asserting `python -m sportsbet.quant.backtest` exits 0 and stdout contains ROI and hit-rate (QUANT-04)
+- [ ] `tests/test_context.py` — append `test_context_agent_persists_odds_snapshot` stub asserting `write_odds_snapshot` is called after context agent run (DATA-03)
+- [ ] `tests/test_backtest.py` — append `test_backtest_cli_main_prints_output` stub asserting `main()` prints hit_rate and roi (QUANT-04)
 
-*Existing `tests/test_kinematic_agent.py` covers the KINE-01 avg_time_to_throw fixture — no new file needed.*
+- [ ] `tests/test_kinematic.py` — append `test_matchup_query_returns_avg_time_to_throw` stub (KINE-01)
 
 ---
 
