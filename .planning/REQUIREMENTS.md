@@ -9,7 +9,7 @@
 
 - [x] **DATA-01**: System stores NFL game, player, and play-by-play data in a PostgreSQL schema with composite indexes on season, week, player_id, and game_id
 - [x] **DATA-02**: System ingests multi-season NFL PBP data via nfl_data_py using a year-by-year loading loop with column whitelist and gc.collect() to prevent OOM
-- [x] **DATA-03**: System stores timestamped odds snapshots to PostgreSQL for CLV (closing line value) calculation from day one
+- [ ] **DATA-03**: System stores timestamped odds snapshots to PostgreSQL for CLV (closing line value) calculation from day one
 - [x] **DATA-04**: System manages schema versioning and migrations via Alembic
 
 ### Agent Infrastructure
@@ -21,21 +21,21 @@
 
 ### Quant Engine
 
-- [x] **QUANT-01**: System enforces a two-stage SQL validation gate — LLM produces a QuantParams Pydantic model, query builder constructs parameterized SQL, LLM never produces raw SQL
+- [ ] **QUANT-01**: System enforces a two-stage SQL validation gate — LLM produces a QuantParams Pydantic model, query builder constructs parameterized SQL, LLM never produces raw SQL
 - [x] **QUANT-02**: System converts raw sportsbook odds to implied probabilities with configurable vig removal method (multiplicative or Pinnacle sharp)
-- [x] **QUANT-03**: System executes dynamic historical win-rate SQL queries parameterized by game context (weather, opponent, down/distance, situation)
+- [ ] **QUANT-03**: System executes dynamic historical win-rate SQL queries parameterized by game context (weather, opponent, down/distance, situation)
 - [x] **QUANT-04**: System simulates historical signal performance via a backtesting module that replays past QuantResult signals against closing lines
 
 ### Context & Odds Ingestion
 
 - [x] **CTXT-01**: System ingests live odds asynchronously from The Odds API with a budget manager that tracks per-request cost and enforces a configurable daily API spend cap
-- [x] **CTXT-02**: System rejects any odds payload older than a configurable staleness threshold (default: 5 minutes) before passing to the Arbitrage Agent
+- [ ] **CTXT-02**: System rejects any odds payload older than a configurable staleness threshold (default: 5 minutes) before passing to the Arbitrage Agent
 - [x] **CTXT-03**: System scrapes qualitative signals (injury reports, weather forecasts) via async Playwright/BeautifulSoup and stores structured binary state changes
 - [x] **CTXT-04**: Context Agent updates a global game state JSON on binary state changes (e.g., "Starting QB ruled Out") and propagates the updated state through GraphState
 
 ### Risk & Arbitrage Output
 
-- [x] **ARBT-01**: Arbitrage Agent flags +EV discrepancies by comparing QuantResult true probability against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis
+- [ ] **ARBT-01**: Arbitrage Agent flags +EV discrepancies by comparing QuantResult true probability against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis
 - [x] **ARBT-02**: System calculates fractional Kelly Criterion bet sizing based on edge and bankroll parameters — no flat bet sizes are ever output
 - [x] **ARBT-03**: CorrelationGuard node enforces hardcoded stops on conflicting market exposures (e.g., Over passing yards + Under total points) before any signal is output
 - [x] **ARBT-04**: Aggregator node enforces a daily drawdown gate — if cumulative recommended exposure exceeds the configured limit, no further signals are produced that day
@@ -46,6 +46,21 @@
 - [x] **KINE-02**: Kinematic Agent produces matchup exploit signals based on geometric mismatches (e.g., fast slot WR vs high press-man CB) independent of box score history
 - [x] **KINE-03**: System validates NGS field availability by season before Kinematic Agent queries to handle partial coverage years gracefully
 
+### Player Prop Engine (NFL + NBA)
+
+- [ ] **PROP-01**: System ingests live NFL and NBA player prop odds (passing/rushing/receiving for NFL; points/rebounds/assists/3PM/PRA for NBA) from The Odds API and writes timestamped `PlayerPropSnapshot` rows to PostgreSQL
+- [ ] **PROP-02**: System defines `PropParams` and `PropResult` Pydantic models with a two-stage validation gate — LLM produces `PropParams`, `PropQueryBuilder` constructs parameterized SQL, LLM never produces raw SQL or hallucinated stats
+- [ ] **PROP-03**: System calculates true probability for NFL player props (passing yards/TDs/completions, rushing yards/attempts/TDs, receiving yards/receptions/targets) from historical PostgreSQL distributions with sample size and confidence interval
+- [ ] **PROP-04**: System incorporates Kinematic Agent signals (separation, press-man coverage rate) into NFL receiving prop probability estimates where NGS data is available
+- [ ] **PROP-05**: System calculates true probability for NBA player props (points, rebounds, assists, 3PM, steals, blocks, PRA, double-double) using pace-adjusted historical distributions with opponent defensive rating, rest days, and home/away context
+- [ ] **PROP-06**: `PropArbitrageAgent` flags mispriced player props by comparing `PropResult.true_probability` against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis with fractional Kelly sizing — no flat bet sizes
+- [ ] **PROP-07**: `CorrelationGuard` is extended with a prop conflict matrix that blocks simultaneous correlated prop exposures (e.g., Over passing yards + Under receiving yards on primary target in same game)
+
+### NBA Data Foundation
+
+- [ ] **NBA-01**: System ingests NBA player box scores (points, rebounds, assists, 3PM, steals, blocks, minutes) via `nba_api` with a year-by-year loading loop and composite index on season/game/player_id
+- [ ] **NBA-02**: System applies pace adjustment, back-to-back rest penalty, and opponent defensive rating weighting to NBA player prop probability distributions
+
 ## v2 Requirements
 
 ### Synthetic Parlay Builder
@@ -53,11 +68,6 @@
 - **PARL-01**: System identifies correlated game events (weather + rushing volume + total points) and constructs mathematically sound multi-leg bets
 - **PARL-02**: System enforces a minimum N>200 historical sample gate before any correlation coefficient is used in parlay construction
 - **PARL-03**: System outputs correlation-adjusted Kelly sizing for multi-leg bets, not naive single-leg Kelly product
-
-### NBA Pipeline
-
-- **NBA-01**: System ingests NBA play-by-play data and extends the agent graph to handle NBA game context
-- **NBA-02**: System applies existing Quant/Arbitrage/Context agents to NBA odds with sport-specific vig removal calibration
 
 ### SaaS Frontend
 
@@ -76,7 +86,7 @@
 | LLM as stats source | Non-negotiable anti-feature — all numbers must be DB or API sourced |
 | Flat bet size recommendations | Non-negotiable — Kelly only |
 | Naive parlays without correlation analysis | Financial risk — deferred to v2 with correlation gate |
-| NBA pipeline | Validate NFL first, expand after |
+| NBA game spreads/totals pipeline | Game-level NBA markets deferred; player props addressed in v1 |
 | Next.js SaaS terminal | Backend-first; frontend deferred to v2 |
 | Cloud deployment / billing | Local dev only for v1 |
 | OAuth / user authentication | Single-user local setup for v1 |
@@ -90,33 +100,42 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | DATA-01 | Phase 1 | Pending |
 | DATA-02 | Phase 1 | Complete |
-| DATA-03 | Phase 1 | Complete |
+| DATA-03 | Phase 9 | Pending |
 | DATA-04 | Phase 1 | Complete |
 | INFRA-01 | Phase 2 | Complete |
 | INFRA-02 | Phase 2 | Complete |
 | INFRA-03 | Phase 2 | Complete |
 | INFRA-04 | Phase 2 | Complete |
-| QUANT-01 | Phase 3 | Complete |
+| QUANT-01 | Phase 9 | Pending |
 | QUANT-02 | Phase 7 | Complete |
-| QUANT-03 | Phase 3 | Complete |
+| QUANT-03 | Phase 9 | Pending |
 | QUANT-04 | Phase 8 | Complete |
 | CTXT-01 | Phase 4 | Complete |
-| CTXT-02 | Phase 4 | Complete |
+| CTXT-02 | Phase 9 | Pending |
 | CTXT-03 | Phase 4 | Complete |
 | CTXT-04 | Phase 4 | Complete |
-| ARBT-01 | Phase 5 | Complete |
+| ARBT-01 | Phase 9 | Pending |
 | ARBT-02 | Phase 5 | Complete |
 | ARBT-03 | Phase 5 | Complete |
 | ARBT-04 | Phase 5 | Complete |
 | KINE-01 | Phase 6 | Complete |
 | KINE-02 | Phase 6 | Complete |
 | KINE-03 | Phase 6 | Complete |
+| PROP-01 | Phase 10 | Pending |
+| PROP-02 | Phase 10 | Pending |
+| PROP-03 | Phase 11 | Pending |
+| PROP-04 | Phase 11 | Pending |
+| PROP-05 | Phase 12 | Pending |
+| PROP-06 | Phase 13 | Pending |
+| PROP-07 | Phase 13 | Pending |
+| NBA-01 | Phase 10 | Pending |
+| NBA-02 | Phase 12 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total
-- Mapped to phases: 23
+- v1 requirements: 32 total (23 original + 9 new: PROP-01–PROP-07, NBA-01, NBA-02)
+- Mapped to phases: 32
 - Unmapped: 0 ✓
-- Pending (gap closure): 2 (QUANT-02 → Phase 7, QUANT-04 → Phase 8)
+- Pending (gap closure phases 9–13): 10 (QUANT-03, QUANT-01, CTXT-02, DATA-03, ARBT-01, PROP-01–PROP-07, NBA-01, NBA-02)
 
 ---
 *Requirements defined: 2026-03-10*

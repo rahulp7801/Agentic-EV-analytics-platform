@@ -144,10 +144,80 @@ Plans:
 Plans:
 - [ ] 08-01-PLAN.md — Call write_odds_snapshot() from context agent, add avg_time_to_throw to _SEPARATION_QUERY, add BacktestEngine CLI entry point
 
+### Phase 9: Critical Pipeline Gap Closure
+**Goal:** Fix the three production-blocking gaps found by the v1.0 milestone audit — missing play_by_play columns that break all quant queries, unwired staleness gate that passes stale odds unconditionally, and null price written to odds snapshots that voids CLV tracking
+**Depends on:** Phase 8
+**Requirements:** QUANT-03, QUANT-01, CTXT-02, DATA-03, ARBT-01
+**Gap Closure:** Closes gaps GAP-1, GAP-2, GAP-3 from v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. A live `run_quant_query` call against PostgreSQL returns a `QuantResult` with a non-None `true_probability` — no `column "air_yards" does not exist` error
+  2. An odds payload with `snapped_at` older than 5 minutes is rejected by `make_context_agent` — `ContextSignals.odds_snapshot` is set to None for stale inputs
+  3. `write_odds_snapshot()` writes a row with a non-null `price` field — CLV comparison has a usable numeric reference
+
+Plans:
+- [ ] 09-01-PLAN.md — Add air_yards/two_point_attempt/complete_pass to ORM + migration + PBP_COLUMNS; wire is_stale() in make_context_agent; fix write_odds_snapshot price
+
+### Phase 10: Player Prop and NBA Data Layer
+**Goal:** Extend the odds pipeline to ingest NFL and NBA player prop lines, add NBA player box score ingestion via nba_api, and define all Pydantic models and ORM tables needed for the prop quant engine
+**Depends on:** Phase 9
+**Requirements:** PROP-01, PROP-02, NBA-01
+
+**Success Criteria** (what must be TRUE):
+  1. `OddsAPIPoller` fetches player prop markets (passing/rushing/receiving for NFL; points/rebounds/assists/3PM for NBA) and writes `PlayerPropSnapshot` rows to PostgreSQL with non-null implied probability
+  2. `PropParams` and `PropResult` Pydantic models validate a full prop query request and reject malformed inputs with `ValidationError`
+  3. `nba_api` ingestion loads at least 2 seasons of NBA player box scores (points, rebounds, assists, 3PM, steals, blocks, minutes) into a PostgreSQL `nba_player_stats` table with season/game/player composite index
+
+Plans:
+- [ ] 10-01-PLAN.md — PlayerPropSnapshot ORM + Alembic migration; extend OddsAPIPoller with NFL + NBA prop endpoints; PropParams/PropResult Pydantic models
+- [ ] 10-02-PLAN.md — nba_api ingestion: NBAPlayerStats ORM + migration, year-by-year loader with gc.collect(), CLI entry point
+
+### Phase 11: NFL Player Prop Quant Engine
+**Goal:** Produce statistically grounded true probability estimates for NFL player props using historical distributions from PostgreSQL data, with kinematic signal integration for receiving props
+**Depends on:** Phase 10
+**Requirements:** PROP-03, PROP-04
+
+**Success Criteria** (what must be TRUE):
+  1. A `PropQuantAgent` query for a passing yards prop returns a `PropResult` with `true_probability`, `sample_size`, and `confidence_interval` sourced entirely from PostgreSQL — no LLM-hallucinated stats
+  2. The two-stage Pydantic gate (`PropParams` → `PropQueryBuilder` → parameterized SQL) rejects malformed prop queries before any SQL executes
+  3. A receiving yards prop query for a WR with NGS data incorporates the kinematic agent's `separation_at_catch` and `press_man_coverage_rate` signals into the probability estimate
+
+Plans:
+- [ ] 11-01-PLAN.md — NFL prop distribution calculator: passing/rushing/receiving historical distributions, PropQueryBuilder two-stage gate, PropQuantAgent closure (TDD)
+- [ ] 11-02-PLAN.md — Kinematic signal integration for receiving props: read KinematicAnalysis from GraphState and adjust PropResult probability
+
+### Phase 12: NBA Player Prop Quant Engine
+**Goal:** Produce probability estimates for NBA player props using pace-adjusted historical distributions, factoring in opponent defensive rating, rest days, and home/away context
+**Depends on:** Phase 10
+**Requirements:** PROP-05, NBA-02
+
+**Success Criteria** (what must be TRUE):
+  1. An `NBAQuantAgent` query for a points O/U prop returns a `PropResult` with `true_probability` sourced from PostgreSQL NBA stats — pace-adjusted and opponent-defensive-rating-weighted
+  2. A back-to-back rest penalty is applied to player distributions — a query with `rest_days=0` returns a meaningfully different `true_probability` than the same query with `rest_days=2`
+  3. Double-double and PRA combo props are supported — `PropParams` accepts `prop_type` values of `double_double` and `pra` and returns statistically valid probability estimates
+
+Plans:
+- [ ] 12-01-PLAN.md — NBA prop distribution calculator: points/rebounds/assists/3PM/PRA/double-double, pace adjustment, rest penalty, defensive rating factor (TDD)
+- [ ] 12-02-PLAN.md — NBAQuantAgent closure, GraphState extension for NBA context (pace, rest, home_away), NBAContextSignals Pydantic model
+
+### Phase 13: Player Prop Arbitrage and Full Pipeline Wiring
+**Goal:** Wire NFL and NBA prop quant signals into a PropArbitrageAgent that produces EV% and 3-bullet Trade Plans with fractional Kelly sizing, extended CorrelationGuard for correlated props, and full LangGraph integration
+**Depends on:** Phase 11, Phase 12
+**Requirements:** PROP-06, PROP-07
+
+**Success Criteria** (what must be TRUE):
+  1. A `PropArbitrageAgent` call for a mispriced passing yards prop returns an `ArbitrageSignal` with raw EV percentage, a 3-bullet Trade Plan thesis, and a fractional Kelly fraction — never a flat bet size
+  2. `CorrelationGuard` blocks simultaneous Over passing yards + Under receiving yards signals on the same game — extended conflict matrix covers prop-to-prop and prop-to-game-total correlations
+  3. An end-to-end pipeline run (Context → PropQuant → PropArbitrage → Aggregator) for an NFL prop and an NBA prop both complete with non-None EV signals against real database data
+
+Plans:
+- [ ] 13-01-PLAN.md — PropArbitrageAgent: EV% calculation, 3-bullet Trade Plan, fractional Kelly sizing for props; extended CorrelationGuard prop conflict matrix
+- [ ] 13-02-PLAN.md — LangGraph wiring: prop_quant_node, nba_quant_node, prop_arbitrage_node added to create_graph_with_sqlite(); route_from_master extended; end-to-end integration test
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -159,3 +229,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. Kinematic Agent | 2/2 | Complete   | 2026-03-21 |
 | 7. Production Runtime Wiring | 1/1 | Complete   | 2026-03-22 |
 | 8. Data Pipeline and Backtest Completion | 1/1 | Complete   | 2026-03-22 |
+| 9. Critical Pipeline Gap Closure | 0/1 | Pending    |  |
+| 10. Player Prop and NBA Data Layer | 0/2 | Pending    |  |
+| 11. NFL Player Prop Quant Engine | 0/2 | Pending    |  |
+| 12. NBA Player Prop Quant Engine | 0/2 | Pending    |  |
+| 13. Player Prop Arbitrage and Pipeline Wiring | 0/2 | Pending    |  |
