@@ -32,8 +32,10 @@ from typing import TYPE_CHECKING, Any, Callable, Coroutine
 import asyncpg
 import structlog
 
+from sportsbet.db.connection import get_sync_engine
 from sportsbet.graph.models import EVSignal, QuantParams, QuantResult
 from sportsbet.graph.state import GraphState
+from sportsbet.ingestion.odds import OddsSnapshotCreate, write_odds_snapshot
 
 if TYPE_CHECKING:
     pass
@@ -133,10 +135,11 @@ def make_context_agent(
     Pipeline per invocation:
     1. Fetch live NFL odds via OddsAPIPoller — catches BudgetExhaustedError gracefully
     2. Build odds_snapshot (first bookmaker h2h market) or None on budget exhaustion
-    3. Fetch injury reports for home + away teams via InjuryWeatherScraper
-    4. Write injury rows to injury_reports table via pool
-    5. Build injury_flags dict: {"P. Mahomes": "Out"} (status="Out"|"Questionable" only)
-    6. Construct ContextSignals and return partial state dict
+    3. Persist odds snapshot to odds_snapshots table via write_odds_snapshot (DATA-03)
+    4. Fetch injury reports for home + away teams via InjuryWeatherScraper
+    5. Write injury rows to injury_reports table via pool
+    6. Build injury_flags dict: {"P. Mahomes": "Out"} (status="Out"|"Questionable" only)
+    7. Construct ContextSignals and return partial state dict
 
     On any sub-error (BudgetExhaustedError, httpx.HTTPError, ESPN schema error):
     - Log the error via structlog
@@ -150,6 +153,11 @@ def make_context_agent(
     from sportsbet.graph.models import AgentOddsSnapshot, ContextSignals
     from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
     from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
+
+    # Lazily resolved on first agent invocation — avoids DB connection at construction
+    # time. Stored in a mutable container so the closure can reassign it.
+    # get_sync_engine and write_odds_snapshot are module-level names for patchability (DATA-03)
+    _sync_engine_cache: list = []  # [engine] once initialized
 
     async def context_agent(state: GraphState) -> dict[str, Any]:  # type: ignore[type-arg]
         session_id = state["session_id"]
@@ -169,6 +177,32 @@ def make_context_agent(
             log.warning("context_agent_budget_exhausted", session_id=session_id, error=str(exc))
         except Exception as exc:
             log.error("context_agent_odds_error", session_id=session_id, error=str(exc))
+
+        # --- Step 1b: Persist odds snapshot for CLV tracking (DATA-03) ---
+        if odds_snapshot is not None:
+            try:
+                # Lazily initialize sync engine — avoids DB connection at closure construction time.
+                # connect_args connect_timeout=5 prevents indefinite hang when DB is unavailable.
+                if not _sync_engine_cache:
+                    import sqlalchemy as _sa
+                    from sportsbet.config import settings as _settings
+                    _engine = _sa.create_engine(
+                        _settings.database_url,
+                        echo=False,
+                        pool_pre_ping=True,
+                        connect_args={"connect_timeout": 5},
+                    )
+                    _sync_engine_cache.append(_engine)
+                snap_create = OddsSnapshotCreate(
+                    game_id=odds_snapshot.game_id,
+                    sportsbook=odds_snapshot.sportsbook,
+                    market_type=odds_snapshot.market_type,
+                    price=None,  # AgentOddsSnapshot stores Decimal probability, not int American odds
+                )
+                write_odds_snapshot(snap_create, engine=_sync_engine_cache[0])
+                log.info("context_agent_odds_persisted", game_id=game_id)
+            except Exception as exc:
+                log.warning("context_agent_odds_persist_error", error=str(exc))
 
         # --- Step 2: Fetch injury reports ---
         injury_flags: dict[str, str] = {}
