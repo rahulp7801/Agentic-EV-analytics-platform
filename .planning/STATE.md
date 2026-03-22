@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-03-21T19:18:05.226Z"
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-03-22T20:23:36.496Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 18
-  completed_plans: 18
+  total_phases: 8
+  completed_phases: 7
+  total_plans: 19
+  completed_plans: 19
   percent: 100
 ---
 
@@ -67,6 +67,7 @@ Progress: [██████████] 100%
 | Phase 05-arbitrage-kelly-and-risk-controls PP03 | 15 | 2 tasks | 5 files |
 | Phase 06-kinematic-agent P01 | 5 | 1 tasks | 7 files |
 | Phase 06-kinematic-agent P02 | 4 | 2 tasks | 3 files |
+| Phase 07-production-runtime-wiring P01 | 5 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -132,6 +133,9 @@ Recent decisions affecting current work:
 - [Phase 06-kinematic-agent]: kinematic_result: Optional[KinematicAnalysis] added to GraphState at runtime import (not TYPE_CHECKING) — follows Phase 4 ContextSignals import pattern for LangGraph get_type_hints() compatibility
 - [Phase 06-kinematic-agent]: _kinematic_stub defined inline in create_graph() body — co-located with usage, avoids module namespace pollution
 - [Phase 06-kinematic-agent]: kinematic_agent -> END edge: independent pipeline, no coupling to arbitrage/quant nodes
+- [Phase 07-production-runtime-wiring]: Decimal.quantize(10dp) on fair_probs[0] eliminates sub-ulp residual from remove_vig_multiplicative — last-element residual correction doesn't fix first element precision
+- [Phase 07-production-runtime-wiring]: arbitrage_node and kinematic_node pool-gated in create_graph_with_sqlite; correlation_guard and aggregator always wired (no DB dependency)
+- [Phase 07-production-runtime-wiring]: receiver_gsis_id: str added as last field in GraphState after kinematic_result — consistent with Phase 4 and 6 field addition patterns
 
 ### Pending Todos
 
@@ -145,6 +149,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T19:14:31.515Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-03-22T20:23:36.491Z
+Stopped at: Completed 07-01-PLAN.md
 Resume file: None
