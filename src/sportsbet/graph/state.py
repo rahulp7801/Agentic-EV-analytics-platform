@@ -38,7 +38,7 @@ class GraphState(TypedDict):
     session_id : str
         UUID string identifying the request session, set by the caller.
     request_type : str
-        One of "quant_analysis" | "odds_check" | "context_update".
+        One of "quant_analysis" | "odds_check" | "context_update" | "arbitrage_analysis" | "kinematic_analysis".
         Master Router reads this to dispatch to the correct specialist agent.
     created_at : datetime
         UTC timestamp when the request was initiated.
@@ -75,6 +75,10 @@ class GraphState(TypedDict):
     cleared_signals : list[Any]
         EVSignals that passed both CorrelationGuard.check() and Aggregator.record_signal().
         Populated by aggregator_node; empty list if no signals survive risk controls.
+    receiver_gsis_id : str
+        GSIS player ID passed to the Kinematic Agent for WR-CB matchup queries.
+        Set by caller in initial state. Empty string ("") skips the kinematic query
+        (make_kinematic_agent returns kinematic_result=None for zero NGS rows).
     """
 
     session_id: str
@@ -94,3 +98,4 @@ class GraphState(TypedDict):
     pending_signals: list[Any]  # type: ignore[misc]  # EVSignal candidates before CorrelationGuard check
     cleared_signals: list[Any]  # type: ignore[misc]  # Signals that passed CorrelationGuard AND Aggregator gate
     kinematic_result: Optional[KinematicAnalysis]  # type: ignore[misc]  # Set by make_kinematic_agent (Phase 6)
+    receiver_gsis_id: str  # GSIS player ID for Kinematic Agent matchup queries (Phase 7 — INT-02)

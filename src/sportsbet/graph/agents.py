@@ -214,15 +214,16 @@ def _extract_odds_snapshot(
 ) -> "AgentOddsSnapshot | None":
     """Extract first bookmaker h2h market from Odds API response as AgentOddsSnapshot.
 
-    Converts American odds integer to Decimal implied_probability at ingestion time
-    per Phase 2 decision (AgentOddsSnapshot.implied_probability is Decimal not int).
+    Converts American odds to fair (devigged) Decimal implied_probability using
+    remove_vig_multiplicative from sportsbet.quant.vig (Phase 7 — INT-04 gap closure).
+    Both-positive-odds markets fall back to raw_probs to avoid ValueError propagation.
 
-    Returns None if raw_odds is empty or no h2h market found.
+    Returns None if raw_odds is empty, no h2h market found, or fewer than 2 outcomes.
     """
     from datetime import datetime, timezone
-    from decimal import Decimal
 
     from sportsbet.graph.models import AgentOddsSnapshot
+    from sportsbet.quant.vig import american_to_raw_prob, remove_vig_multiplicative
 
     if not raw_odds:
         return None
@@ -239,24 +240,32 @@ def _extract_odds_snapshot(
         return None
 
     outcomes = h2h.get("outcomes", [])
-    if not outcomes:
+    if len(outcomes) < 2:
+        # Need at least 2 outcomes for multiplicative devig overround calculation
         return None
 
-    price: int = outcomes[0].get("price", 0)
-    if price == 0:
+    prices = [o.get("price", 0) for o in outcomes]
+    if any(p == 0 for p in prices):
         return None
 
-    # American odds -> implied probability (includes vig; devig in Phase 5)
-    if price < 0:
-        raw_prob = abs(price) / (abs(price) + 100)
-    else:
-        raw_prob = 100 / (price + 100)
+    raw_probs = [american_to_raw_prob(p) for p in prices]
+
+    try:
+        fair_probs = remove_vig_multiplicative(raw_probs)
+    except ValueError:
+        # Both-positive-odds market (overround <= 1) — fall back to raw prob for first outcome
+        fair_probs = raw_probs
+
+    # Round to 10 decimal places to eliminate sub-ulp residual from Decimal division.
+    # Preserves precision well beyond Kelly Criterion requirements (6 dp sufficient).
+    from decimal import ROUND_HALF_EVEN
+    fair_prob = fair_probs[0].quantize(Decimal("0.0000000001"), rounding=ROUND_HALF_EVEN)
 
     return AgentOddsSnapshot(
         game_id=game_id,
         sportsbook=bookmaker.get("key", "unknown"),
         market_type="h2h",
-        implied_probability=Decimal(str(round(raw_prob, 6))),
+        implied_probability=fair_prob,
         snapped_at=datetime.now(timezone.utc),
     )
 
