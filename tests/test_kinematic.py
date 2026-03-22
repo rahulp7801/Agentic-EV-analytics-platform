@@ -520,3 +520,43 @@ def test_route_kinematic_analysis() -> None:
     assert result.get("error") is None, (
         f"Stub route must not set error, got: {result.get('error')}"
     )
+
+
+# ---------------------------------------------------------------------------
+# KINE-01: _SEPARATION_QUERY includes avg_time_to_throw via QB LEFT JOIN (08-01)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_matchup_query_returns_avg_time_to_throw() -> None:
+    """run_matchup_query returns KinematicAnalysis with avg_time_to_throw=Decimal('2.8').
+
+    Mock pool returns a row dict with avg_time_to_throw set (non-None).
+    Asserts:
+    - result.avg_time_to_throw == Decimal("2.8") (not None)
+    - result.avg_separation == Decimal("3.1")
+    """
+    from sportsbet.kinematic.matchup import run_matchup_query
+
+    mock_row = {
+        "player_gsis_id": "00-0036900",
+        "season": 2023,
+        "season_avg_separation": Decimal("3.1"),
+        "season_avg_cushion": Decimal("1.2"),
+        "weeks_sampled": 5,
+        "avg_time_to_throw": Decimal("2.8"),
+    }
+    mock_conn = AsyncMock()
+    mock_conn.fetchrow = AsyncMock(return_value=mock_row)
+    mock_pool = MagicMock()
+    mock_pool.acquire = MagicMock(return_value=_async_cm(mock_conn))
+
+    params = KinematicParams(season=2023, week=10, receiver_gsis_id="00-0036900")
+    result = await run_matchup_query(mock_pool, params)
+
+    assert result.avg_time_to_throw == Decimal("2.8"), (
+        f"avg_time_to_throw must be Decimal('2.8'), got {result.avg_time_to_throw}"
+    )
+    assert result.avg_separation == Decimal("3.1"), (
+        f"avg_separation must be Decimal('3.1'), got {result.avg_separation}"
+    )

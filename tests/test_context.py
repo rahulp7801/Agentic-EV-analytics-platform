@@ -367,3 +367,59 @@ async def test_downstream_reads_state() -> None:
     )
     # Verify no real HTTP was dispatched (mock_client_instance.get never called)
     mock_client_instance.get.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# DATA-03: Context agent persists odds snapshot to PostgreSQL (08-01)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_context_agent_persists_odds_snapshot() -> None:
+    """make_context_agent calls write_odds_snapshot exactly once when valid odds exist.
+
+    Asserts:
+    - write_odds_snapshot.call_count == 1 after context_agent(state) completes
+    - Call kwargs include sportsbook and market_type; price is None
+    - write_odds_snapshot is NOT called on the BudgetExhaustedError path
+    """
+    from unittest.mock import call
+
+    mock_pool = MagicMock()
+
+    with (
+        patch("sportsbet.graph.agents.get_sync_engine", return_value=MagicMock()),
+        patch("sportsbet.graph.agents.write_odds_snapshot") as mock_write,
+        patch.object(
+            __import__(
+                "sportsbet.ingestion.odds_poller",
+                fromlist=["OddsAPIPoller"],
+            ).OddsAPIPoller,
+            "fetch_nfl_odds",
+            new_callable=AsyncMock,
+            return_value=ODDS_FIXTURE,
+        ),
+        patch(
+            "sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "sportsbet.ingestion.scraper.InjuryWeatherScraper.write_injury_reports",
+            new_callable=AsyncMock,
+            return_value=0,
+        ),
+    ):
+        agent = make_context_agent(mock_pool, api_key="test_key", daily_credit_cap=500)
+        state = _make_full_state()
+        await agent(state)
+
+    assert mock_write.call_count == 1, (
+        f"write_odds_snapshot must be called exactly once, got {mock_write.call_count}"
+    )
+    call_kwargs = mock_write.call_args
+    # First positional arg is the OddsSnapshotCreate instance
+    snap_create = call_kwargs[0][0]
+    assert snap_create.sportsbook == "draftkings"
+    assert snap_create.market_type == "h2h"
+    assert snap_create.price is None, "price must be None (AgentOddsSnapshot stores Decimal, not int)"
