@@ -33,19 +33,35 @@ log = structlog.get_logger()
 SEPARATION_THRESHOLD: Decimal = Decimal("2.5")
 
 # Parameterized NGS receiving query — column names are hardcoded, values are $N params.
+# QB LEFT JOIN brings avg_time_to_throw (passing-specific field) into SELECT.
+# Column alias "avg_time_to_throw" matches the existing row.get("avg_time_to_throw") call.
 _SEPARATION_QUERY = """
     SELECT
-        player_gsis_id,
-        season,
-        AVG(avg_separation) AS season_avg_separation,
-        AVG(avg_cushion)    AS season_avg_cushion,
-        COUNT(*)            AS weeks_sampled
-    FROM ngs_stats
-    WHERE player_gsis_id = $1
-      AND season = $2
-      AND stat_type = 'receiving'
-      AND avg_separation IS NOT NULL
-    GROUP BY player_gsis_id, season
+        r.player_gsis_id,
+        r.season,
+        AVG(r.avg_separation)             AS season_avg_separation,
+        AVG(r.avg_cushion)                AS season_avg_cushion,
+        COUNT(*)                          AS weeks_sampled,
+        qb.season_avg_time_to_throw       AS avg_time_to_throw
+    FROM ngs_stats r
+    LEFT JOIN (
+        SELECT
+            team_abbr,
+            season,
+            AVG(avg_time_to_throw)        AS season_avg_time_to_throw
+        FROM ngs_stats
+        WHERE stat_type = 'passing'
+          AND season = $2
+          AND avg_time_to_throw IS NOT NULL
+        GROUP BY team_abbr, season
+    ) qb
+        ON  qb.team_abbr = r.team_abbr
+        AND qb.season    = r.season
+    WHERE r.player_gsis_id = $1
+      AND r.season          = $2
+      AND r.stat_type       = 'receiving'
+      AND r.avg_separation IS NOT NULL
+    GROUP BY r.player_gsis_id, r.season, qb.season_avg_time_to_throw
 """
 
 
