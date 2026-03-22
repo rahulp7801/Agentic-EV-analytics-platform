@@ -191,3 +191,47 @@ class BacktestEngine:
             sample_size=len(df),
             signals_df=df,
         )
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point — python -m sportsbet.quant.backtest
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    """Run BacktestEngine against a fixture dataset and print ROI, hit-rate, CLV.
+
+    Fixture: 3 wins + 2 losses at -110 (-0.1 payout ratio per loss, +0.909 per win).
+    Use as a smoke test that BacktestEngine is importable and functional.
+    """
+    from datetime import datetime, timezone
+
+    _GAME_START = datetime(2024, 1, 14, 18, 0, 0, tzinfo=timezone.utc)
+    _SNAPSHOT = datetime(2024, 1, 14, 12, 0, 0, tzinfo=timezone.utc)
+
+    fixture_signals: list[BacktestSignal] = [
+        BacktestSignal(
+            quant_result=QuantResult(true_probability=Decimal("0.55")),
+            closing_implied_prob=Decimal("0.60"),
+            actual_outcome=won,
+            stake=Decimal("100"),
+            payout_multiplier=Decimal("1.909"),
+            game_start_time=_GAME_START,
+            snapshot_time=_SNAPSHOT,
+        )
+        for won in [True, True, True, False, False]
+    ]
+
+    report = BacktestEngine().run(fixture_signals)
+    print(f"sample_size : {report.sample_size}")
+    if report.roi is not None:
+        print(f"hit_rate    : {report.hit_rate:.4f}")
+        print(f"roi         : {report.roi:.4f}")
+        print(f"clv_mean    : {report.clv_mean:.4f}")
+    else:
+        print("No valid signals to report.")
+
+
+if __name__ == "__main__":
+    import sys
+    main()
+    sys.exit(0)
