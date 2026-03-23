@@ -94,6 +94,7 @@ def _make_base_state(**overrides) -> dict:  # type: ignore[type-arg]
         "prop_type": "pass_yds",
         "prop_line": "250.5",
         "nba_context_signals": None,
+        "prop_filters": None,
     }
     base.update(overrides)
     return base
