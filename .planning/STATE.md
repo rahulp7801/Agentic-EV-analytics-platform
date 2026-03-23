@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-03-23T20:46:25.132Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-03-23T22:31:55.176Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
-  total_phases: 13
-  completed_phases: 13
-  total_plans: 29
-  completed_plans: 29
+  total_phases: 15
+  completed_phases: 14
+  total_plans: 30
+  completed_plans: 30
   percent: 100
 ---
 
@@ -78,6 +78,7 @@ Progress: [██████████] 100%
 | Phase 12-nba-player-prop-quant-engine P02 | 8 | 2 tasks | 5 files |
 | Phase 13-player-prop-arbitrage-and-pipeline-wiring P01 | 4 | 2 tasks | 4 files |
 | Phase 13-player-prop-arbitrage-and-pipeline-wiring P02 | 5 | 2 tasks | 3 files |
+| Phase 14-prop-integration-gap-closure P01 | 7 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -177,6 +178,9 @@ Recent decisions affecting current work:
 - [Phase 13-player-prop-arbitrage-and-pipeline-wiring]: prop_arbitrage_agent reuses correlation_guard->aggregator chain from arbitrage pipeline — no new nodes registered; add_edge routes through existing risk controls
 - [Phase 13-player-prop-arbitrage-and-pipeline-wiring]: Two prop quant agents (NFL and NBA) chain to same prop_arbitrage_agent via separate add_edge calls — LangGraph multi-predecessor topology
 - [Phase 13-player-prop-arbitrage-and-pipeline-wiring]: e2e wiring tests use bankroll=100_000 (not 10_000) so Kelly fraction stays under Aggregator daily limit — pipeline wiring tests must not be blocked by risk sizing
+- [Phase 14-prop-integration-gap-closure]: Module-level imports of OddsAPIPoller, BudgetExhaustedError, InjuryWeatherScraper, httpx in agents.py — closure-scoped imports cannot be patched via sportsbet.graph.agents.name (extends Phase 8 DATA-03 decision)
+- [Phase 14-prop-integration-gap-closure]: sport=None auto-detect resolves state key at runtime inside closure — single prop_arbitrage_node handles both NFL and NBA routes in create_graph_with_sqlite
+- [Phase 14-prop-integration-gap-closure]: prop_filters: dict[str, Any] | None as last field in GraphState — access via state.get() for non-prop routes; INFRA-01 compliance
 
 ### Pending Todos
 
@@ -190,6 +194,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T20:42:04.458Z
-Stopped at: Completed 13-02-PLAN.md
+Last session: 2026-03-23T22:31:55.172Z
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None

@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 11: NFL Player Prop Quant Engine** - PropQueryBuilder, NFL prop probability from historical distributions, kinematic integration (completed 2026-03-23)
 - [x] **Phase 12: NBA Player Prop Quant Engine** - NBAQueryBuilder, NormalDist CDF probability, pace/rest/defensive rating adjustments (completed 2026-03-23)
 - [x] **Phase 13: Player Prop Arbitrage and Pipeline Wiring** - PropArbitrageAgent, extended CorrelationGuard, full LangGraph prop pipeline wiring (completed 2026-03-23)
-- [ ] **Phase 14: Prop Integration Gap Closure** - Wire live prop odds persistence, fix NBA prop arbitrage sport key mismatch in production factory, declare prop_filters in GraphState
+- [x] **Phase 14: Prop Integration Gap Closure** - Wire live prop odds persistence, fix NBA prop arbitrage sport key mismatch in production factory, declare prop_filters in GraphState (completed 2026-03-23)
 - [ ] **Phase 15: Context and Vig Completion** - Add NBA game-level odds ingestion to OddsAPIPoller and context agent; wire Pinnacle sharp devig as selectable config option
 
 ## Phase Details
@@ -269,5 +269,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 11. NFL Player Prop Quant Engine | 2/2 | Complete    | 2026-03-23 |
 | 12. NBA Player Prop Quant Engine | 2/2 | Complete    | 2026-03-23 |
 | 13. Player Prop Arbitrage and Pipeline Wiring | 2/2 | Complete    | 2026-03-23 |
-| 14. Prop Integration Gap Closure | 0/1 | Pending    |  |
+| 14. Prop Integration Gap Closure | 1/1 | Complete   | 2026-03-23 |
 | 15. Context and Vig Completion | 0/1 | Pending    |  |
