@@ -25,7 +25,7 @@ State key contract (GraphState fields read by this agent):
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Optional
+from typing import Any, Callable, Coroutine, Optional
 
 import asyncpg
 import structlog
@@ -33,28 +33,38 @@ from pydantic import ValidationError
 
 from sportsbet.graph.models import PropParams, PropResult
 from sportsbet.graph.state import GraphState
+from sportsbet.kinematic.models import KinematicAnalysis
 from sportsbet.prop.executor import run_prop_query
-
-if TYPE_CHECKING:
-    from sportsbet.kinematic.models import KinematicAnalysis
 
 log = structlog.get_logger()
 
+# ---------------------------------------------------------------------------
+# Kinematic adjustment constants (Plan 02)
+# ---------------------------------------------------------------------------
+
+KINEMATIC_BOOST: Decimal = Decimal("0.05")
+RECEIVING_PROPS: frozenset[str] = frozenset({"rec_yds", "rec_tds", "receptions"})
+
 
 # ---------------------------------------------------------------------------
-# Kinematic adjustment stub — Plan 02 implements full logic
+# Kinematic adjustment — full implementation (Plan 02)
 # ---------------------------------------------------------------------------
 
 def _apply_kinematic_adjustment(
     result: PropResult,
-    kinematic: Optional["KinematicAnalysis"],
+    kinematic: Optional[KinematicAnalysis],
     prop_type: str,
 ) -> PropResult:
     """Apply kinematic geometric mismatch adjustment to prop probability.
 
-    Plan 01: Stub implementation — returns result unchanged when kinematic is None.
-    Plan 02: Implements delta calculation and [0.01, 0.99] clamping when kinematic
-             is a real KinematicAnalysis with geometric_mismatch_flag=True.
+    Applies an additive KINEMATIC_BOOST (0.05) to true_probability when:
+    - kinematic is not None
+    - prop_type is in RECEIVING_PROPS (rec_yds, rec_tds, receptions)
+    - result.true_probability is not None
+    - kinematic.geometric_mismatch_flag is True
+
+    Output is clamped to [0.01, 0.99] — never exceeds 1.0 or drops below 0.0.
+    press_man_rate is NEVER read (always None per Phase 6 decision).
 
     Parameters
     ----------
@@ -65,19 +75,27 @@ def _apply_kinematic_adjustment(
         data is unavailable (NGS not available for season, or kinematic node
         not wired in graph for this request type).
     prop_type:
-        PropParams.prop_type — used by Plan 02 to determine which props are
-        eligible for kinematic adjustment (receiving props only).
+        PropParams.prop_type — determines which props are eligible for
+        kinematic adjustment (receiving props only).
 
     Returns
     -------
     PropResult
-        Adjusted PropResult (same object when kinematic is None).
+        Adjusted PropResult with boosted true_probability and updated
+        data_source, or original result when conditions are not met.
     """
     if kinematic is None:
-        # No kinematic data available — return base result unchanged
         return result
-    # Plan 02 fills in: parse geometric_mismatch_flag, compute delta, clamp [0.01, 0.99]
-    return result
+    if prop_type not in RECEIVING_PROPS:
+        return result
+    if result.true_probability is None:
+        return result
+    if not kinematic.geometric_mismatch_flag:
+        return result
+
+    adjusted = result.true_probability + KINEMATIC_BOOST
+    adjusted = max(Decimal("0.01"), min(Decimal("0.99"), adjusted))
+    return result.model_copy(update={"true_probability": adjusted, "data_source": "postgresql+kinematic"})
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +114,7 @@ def make_prop_quant_agent(
     1. Extract PropParams fields from GraphState
     2. Validate with Pydantic PropParams (raises ValidationError if invalid)
     3. Call run_prop_query(pool, params) -> base PropResult
-    4. Call _apply_kinematic_adjustment(result, None, prop_type) — Plan 01 no-op
+    4. Call _apply_kinematic_adjustment(result, state["kinematic_result"], prop_type) — Plan 02 real boost
     5. Return partial state dict: {"prop_result": result}
 
     On ValidationError: return {"error": str(e)} — does not propagate to graph.
@@ -157,8 +175,9 @@ def make_prop_quant_agent(
                 "error": str(exc),
             }
 
-        # Apply kinematic adjustment (Plan 01: no-op stub; Plan 02: real delta/clamping)
-        result = _apply_kinematic_adjustment(result, None, params.prop_type)
+        # Apply kinematic adjustment — reads kinematic_result from GraphState (Plan 02)
+        kinematic_result: Optional[KinematicAnalysis] = state.get("kinematic_result")  # type: ignore[union-attr]
+        result = _apply_kinematic_adjustment(result, kinematic_result, params.prop_type)
 
         log.info(
             "prop_quant_agent_complete",

@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Optional, TypedDict
 
-from sportsbet.graph.models import ContextSignals
+from sportsbet.graph.models import ContextSignals, PropResult
 from sportsbet.kinematic.models import KinematicAnalysis
 
 
@@ -79,6 +79,10 @@ class GraphState(TypedDict):
         GSIS player ID passed to the Kinematic Agent for WR-CB matchup queries.
         Set by caller in initial state. Empty string ("") skips the kinematic query
         (make_kinematic_agent returns kinematic_result=None for zero NGS rows).
+    prop_result : PropResult | None
+        PropResult instance set by make_prop_quant_agent. None until Prop Quant Agent
+        runs. Incorporates kinematic boost when kinematic_result is available and
+        geometric_mismatch_flag=True for receiving props.
     """
 
     session_id: str
@@ -99,3 +103,4 @@ class GraphState(TypedDict):
     cleared_signals: list[Any]  # type: ignore[misc]  # Signals that passed CorrelationGuard AND Aggregator gate
     kinematic_result: Optional[KinematicAnalysis]  # type: ignore[misc]  # Set by make_kinematic_agent (Phase 6)
     receiver_gsis_id: str  # GSIS player ID for Kinematic Agent matchup queries (Phase 7 — INT-02)
+    prop_result: Optional[PropResult]  # type: ignore[misc]  # Set by make_prop_quant_agent (Phase 11)
