@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-03-23T20:34:00.947Z"
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-03-23T20:42:04.466Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 13
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 29
-  completed_plans: 28
+  completed_plans: 29
   percent: 100
 ---
 
@@ -77,6 +77,7 @@ Progress: [██████████] 100%
 | Phase 12-nba-player-prop-quant-engine P01 | 5 | 3 tasks | 6 files |
 | Phase 12-nba-player-prop-quant-engine P02 | 8 | 2 tasks | 5 files |
 | Phase 13-player-prop-arbitrage-and-pipeline-wiring P01 | 4 | 2 tasks | 4 files |
+| Phase 13-player-prop-arbitrage-and-pipeline-wiring P02 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -173,6 +174,9 @@ Recent decisions affecting current work:
 - [Phase Phase 13-01]: EVSignal reused for prop markets — no new Pydantic model (RESEARCH.md anti-pattern note honored)
 - [Phase Phase 13-01]: CONFLICT_PAIRS extended to 10 entries (4 Phase 5 + 6 Phase 13); CorrelationGuard class body unchanged — open/closed principle
 - [Phase Phase 13-01]: prop_type and prop_line added as required GraphState fields — resolves Pitfall 5 open question from RESEARCH.md
+- [Phase 13-player-prop-arbitrage-and-pipeline-wiring]: prop_arbitrage_agent reuses correlation_guard->aggregator chain from arbitrage pipeline — no new nodes registered; add_edge routes through existing risk controls
+- [Phase 13-player-prop-arbitrage-and-pipeline-wiring]: Two prop quant agents (NFL and NBA) chain to same prop_arbitrage_agent via separate add_edge calls — LangGraph multi-predecessor topology
+- [Phase 13-player-prop-arbitrage-and-pipeline-wiring]: e2e wiring tests use bankroll=100_000 (not 10_000) so Kelly fraction stays under Aggregator daily limit — pipeline wiring tests must not be blocked by risk sizing
 
 ### Pending Todos
 
@@ -186,6 +190,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T20:34:00.941Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-03-23T20:42:04.458Z
+Stopped at: Completed 13-02-PLAN.md
 Resume file: None
