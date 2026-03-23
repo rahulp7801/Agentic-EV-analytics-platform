@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-03-22T21:51:50.292Z"
-last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-03-22T22:15:00.000Z"
+last_activity: 2026-03-22 — Phase 9 Plan 01 complete — GAP-1/2/3 closed: air_yards schema, is_stale gate, CLV price fix
 progress:
   total_phases: 8
   completed_phases: 8
@@ -69,6 +69,7 @@ Progress: [██████████] 100%
 | Phase 06-kinematic-agent P02 | 4 | 2 tasks | 3 files |
 | Phase 07-production-runtime-wiring P01 | 5 | 3 tasks | 5 files |
 | Phase 08-data-pipeline-and-backtest P01 | 30 | 4 tasks | 6 files |
+| Phase 09-critical-pipeline-gap-closure P01 | 15 | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -140,6 +141,10 @@ Recent decisions affecting current work:
 - [Phase 08-data-pipeline-and-backtest]: Module-level imports of get_sync_engine/write_odds_snapshot in agents.py for unittest.mock patchability — closure-scoped imports cannot be patched via sportsbet.graph.agents.name
 - [Phase 08-data-pipeline-and-backtest]: Lazy DB engine init with connect_timeout=5 in context agent persistence block — prevents indefinite hang in tests without PostgreSQL; _sync_engine_cache list used as mutable closure container
 - [Phase 08-data-pipeline-and-backtest]: sys.exit(0) in __main__ block only (not inside main()) — allows direct test call of main() without SystemExit propagation
+- [Phase 09-critical-pipeline-gap-closure]: down_revision = "0002_add_injury_reports" (full string) — matches exact revision ID in 0002 migration file, not the short-form alias
+- [Phase 09-critical-pipeline-gap-closure]: is_stale() deferred import inside make_context_agent closure (consistent with existing closure import pattern)
+- [Phase 09-critical-pipeline-gap-closure]: AgentOddsSnapshot.american_odds: Optional[int] = None satisfies ConfigDict(strict=True); Optional with default accepted
+- [Phase 09-critical-pipeline-gap-closure]: test_pbp_columns_count updated 18→21 — original TDD test written before GAP-1 fix; must be kept in sync with PBP_COLUMNS whitelist
 
 ### Pending Todos
 

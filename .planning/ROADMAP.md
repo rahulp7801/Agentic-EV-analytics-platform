@@ -156,7 +156,7 @@ Plans:
   3. `write_odds_snapshot()` writes a row with a non-null `price` field — CLV comparison has a usable numeric reference
 
 Plans:
-- [ ] 09-01-PLAN.md — Add air_yards/two_point_attempt/complete_pass to ORM + migration + PBP_COLUMNS; wire is_stale() in make_context_agent; fix write_odds_snapshot price
+- [x] 09-01-PLAN.md — Add air_yards/two_point_attempt/complete_pass to ORM + migration + PBP_COLUMNS; wire is_stale() in make_context_agent; fix write_odds_snapshot price
 
 ### Phase 10: Player Prop and NBA Data Layer
 **Goal:** Extend the odds pipeline to ingest NFL and NBA player prop lines, add NBA player box score ingestion via nba_api, and define all Pydantic models and ORM tables needed for the prop quant engine
@@ -229,7 +229,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 6. Kinematic Agent | 2/2 | Complete   | 2026-03-21 |
 | 7. Production Runtime Wiring | 1/1 | Complete   | 2026-03-22 |
 | 8. Data Pipeline and Backtest Completion | 1/1 | Complete   | 2026-03-22 |
-| 9. Critical Pipeline Gap Closure | 0/1 | Pending    |  |
+| 9. Critical Pipeline Gap Closure | 1/1 | Complete   | 2026-03-22 |
 | 10. Player Prop and NBA Data Layer | 0/2 | Pending    |  |
 | 11. NFL Player Prop Quant Engine | 0/2 | Pending    |  |
 | 12. NBA Player Prop Quant Engine | 0/2 | Pending    |  |
