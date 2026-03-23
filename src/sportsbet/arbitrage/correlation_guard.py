@@ -17,10 +17,18 @@ from __future__ import annotations
 from sportsbet.graph.models import EVSignal
 
 CONFLICT_PAIRS: frozenset[frozenset[str]] = frozenset({
+    # --- Phase 5: Game-total and directional game-market pairs ---
     frozenset({"over_passing_yards", "under_total_points"}),
     frozenset({"over_rushing_yards", "over_total_points"}),
     frozenset({"over_passing_yards", "under_passing_yards"}),
     frozenset({"over_total_points", "under_total_points"}),
+    # --- Phase 13 (PROP-07): Player prop-to-prop and prop-to-game-total pairs ---
+    frozenset({"over_pass_yds", "under_rec_yds"}),    # PROP-07 explicit: passing volume vs receiving volume
+    frozenset({"under_pass_yds", "over_rec_yds"}),    # inverse of above
+    frozenset({"over_pass_tds", "under_rec_tds"}),    # TD correlation: passer TDs = receiver TDs
+    frozenset({"under_pass_tds", "over_rec_tds"}),    # inverse of above
+    frozenset({"over_pass_yds", "under_total_points"}),  # high passing volume contradicts low scoring
+    frozenset({"over_rush_yds", "under_total_points"}),  # high rushing volume contradicts low scoring
 })
 
 

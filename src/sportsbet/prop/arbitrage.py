@@ -1,0 +1,199 @@
+"""PropArbitrageAgent closure factory for player prop markets.
+
+Mirrors the structure of make_arbitrage_agent (Phase 5) but reads prop-specific
+state keys (prop_result / nba_prop_result) and generates a prop-aware trade plan
+via _build_prop_trade_plan.
+
+Exports
+-------
+make_prop_arbitrage_agent
+    Closure factory accepting sport="nfl"|"nba". Returns an async LangGraph node
+    function that computes EV%, Kelly sizing, and a 3-bullet Trade Plan for the
+    player prop market indicated by context_signals.odds_snapshot.market_type.
+
+Design rules (locked from CLAUDE.md and Phase decisions):
+- All Decimal arithmetic uses Decimal — never float, never int cast
+- max_kelly_fraction from Settings (Decimal(str(cfg.max_kelly_fraction))) — locked Phase 2 pattern
+- EVSignal reused — no new Pydantic model (RESEARCH.md anti-pattern note)
+- structlog used for all structured logging
+- All guards return {"ev_signal": None} (not raise) — LangGraph continuity
+"""
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Any
+
+import structlog
+
+from sportsbet.arbitrage.ev import build_trade_plan, compute_ev_percentage
+from sportsbet.arbitrage.kelly import fractional_kelly
+from sportsbet.config import settings as _settings
+from sportsbet.graph.models import EVSignal, PropResult
+from sportsbet.graph.state import GraphState
+
+log = structlog.get_logger()
+
+_NO_SIGNAL: dict[str, Any] = {"ev_signal": None}
+
+
+def _build_prop_trade_plan(
+    ev_pct: Decimal,
+    kelly_frac: Decimal,
+    injury_flags: dict[str, str],
+    market_type: str,
+    prop_result: PropResult,
+) -> list[str]:
+    """Build a 3-bullet prop-specific trade plan thesis.
+
+    Bullet 1: EV edge on the specific prop market.
+    Bullet 2: Kelly sizing with sample_size and mean_stat from PropResult.
+    Bullet 3: injury flags or clean bill of health.
+
+    Parameters
+    ----------
+    ev_pct : Decimal
+        Positive EV percentage from compute_ev_percentage.
+    kelly_frac : Decimal
+        Fractional Kelly stake as bankroll fraction from fractional_kelly.
+    injury_flags : dict[str, str]
+        Player-to-status mapping from ContextSignals.injury_flags.
+    market_type : str
+        Market identifier from AgentOddsSnapshot (e.g. "over_pass_yds").
+    prop_result : PropResult
+        Carries sample_size and mean_stat for bullet 2 context.
+
+    Returns
+    -------
+    list[str]
+        Exactly 3 non-empty strings describing edge, sizing, and context.
+    """
+    # Bullet 1: quantitative EV edge on the specific prop market
+    bullet_1 = f"+{float(ev_pct):.1%} EV edge on {market_type} prop market"
+
+    # Bullet 2: Kelly sizing rationale with prop-specific sample and mean
+    sample = prop_result.sample_size if prop_result.sample_size is not None else "N/A"
+    mean = (
+        f"{float(prop_result.mean_stat):.1f}"
+        if prop_result.mean_stat is not None
+        else "N/A"
+    )
+    bullet_2 = (
+        f"Kelly sizing: {float(kelly_frac):.1%} fractional stake "
+        f"(n={sample}, historical mean={mean}, bankroll-relative)"
+    )
+
+    # Bullet 3: injury/weather context
+    if injury_flags:
+        flagged = ", ".join(
+            f"{player} ({status})" for player, status in injury_flags.items()
+        )
+        bullet_3 = f"Material injury flags: {flagged}"
+    else:
+        bullet_3 = "No material injury flags for this game"
+
+    return [bullet_1, bullet_2, bullet_3]
+
+
+def make_prop_arbitrage_agent(
+    settings_override: Any = None,
+    sport: str = "nfl",
+) -> Any:
+    """Closure factory for the PropArbitrageAgent LangGraph node.
+
+    Parameters
+    ----------
+    settings_override : object, optional
+        If provided, used as cfg instead of global settings.
+        Useful for tests that need custom max_kelly_fraction values.
+    sport : str
+        "nfl" reads state["prop_result"]; "nba" reads state["nba_prop_result"].
+        Default is "nfl".
+
+    Returns
+    -------
+    Callable[[GraphState], Awaitable[dict]]
+        Async LangGraph node function. Returns dict with:
+        - {"ev_signal": None} when guards fire (no data, -EV, missing snapshot)
+        - {"ev_signal": EVSignal, "pending_signals": [EVSignal]} for +EV props
+    """
+    cfg = settings_override if settings_override is not None else _settings
+    _state_key = "nba_prop_result" if sport == "nba" else "prop_result"
+
+    async def prop_arbitrage_agent(state: GraphState) -> dict:  # type: ignore[type-arg]
+        """Compute EV% and Kelly fraction for a player prop market.
+
+        Reads PropResult from state[_state_key] and ContextSignals.odds_snapshot
+        to produce an EVSignal with 3-bullet trade plan and fractional Kelly size.
+        Returns {"ev_signal": None} for any guard condition (missing data, -EV).
+        """
+        log.info("prop_arbitrage_agent.enter", sport=sport, state_key=_state_key)
+
+        # Guard 1: prop_result must exist with a real probability
+        prop_result: PropResult | None = state.get(_state_key)  # type: ignore[assignment]
+        if prop_result is None or prop_result.true_probability is None:
+            log.info(
+                "prop_arbitrage_agent.no_prop_result",
+                sport=sport,
+                reason="prop_result is None or true_probability is None",
+            )
+            return _NO_SIGNAL
+
+        # Guard 2: context_signals and odds_snapshot must exist
+        context_signals = state.get("context_signals")
+        if context_signals is None or context_signals.odds_snapshot is None:
+            log.info(
+                "prop_arbitrage_agent.no_odds_snapshot",
+                sport=sport,
+                reason="context_signals or odds_snapshot is None",
+            )
+            return _NO_SIGNAL
+
+        snapshot = context_signals.odds_snapshot
+        true_prob: Decimal = prop_result.true_probability
+        implied_prob: Decimal = snapshot.implied_probability
+        injury_flags: dict[str, str] = context_signals.injury_flags
+        market_type: str = snapshot.market_type
+
+        # EV computation — floored at 0
+        ev_pct = compute_ev_percentage(true_prob, implied_prob)
+        if ev_pct == Decimal("0"):
+            log.info(
+                "prop_arbitrage_agent.no_ev",
+                sport=sport,
+                market_type=market_type,
+                true_prob=str(true_prob),
+                implied_prob=str(implied_prob),
+            )
+            return _NO_SIGNAL
+
+        # Kelly sizing — Decimal(str(...)) pattern locked in Phase 2
+        kelly_frac = fractional_kelly(
+            p=true_prob,
+            b=Decimal("1.0"),
+            fraction=Decimal(str(cfg.max_kelly_fraction)),
+        )
+
+        # 3-bullet prop-aware trade plan
+        trade_plan = _build_prop_trade_plan(
+            ev_pct, kelly_frac, injury_flags, market_type, prop_result
+        )
+
+        signal = EVSignal(
+            ev_percentage=ev_pct,
+            true_probability=true_prob,
+            implied_probability=implied_prob,
+            kelly_fraction=kelly_frac,
+            trade_plan=trade_plan,
+            market_type=market_type,
+        )
+
+        log.info(
+            "prop_arbitrage_agent.signal_produced",
+            sport=sport,
+            market_type=market_type,
+            ev_pct=str(ev_pct),
+            kelly_frac=str(kelly_frac),
+        )
+        return {"ev_signal": signal, "pending_signals": [signal]}
+
+    return prop_arbitrage_agent

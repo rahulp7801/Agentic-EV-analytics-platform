@@ -92,6 +92,16 @@ class GraphState(TypedDict):
         PropResult instance set by make_nba_quant_agent. None until NBA Quant Agent
         runs. Incorporates four-stage contextual adjustment when nba_context_signals
         is present: pace -> def_rating -> rest_penalty -> home_boost (Phase 12).
+    prop_type : str
+        Prop market type identifier passed to PropArbitrageAgent (Phase 13).
+        Examples: "pass_yds", "rec_yds", "rush_yds", "pass_tds", "points", "pra".
+        Always set by caller for prop_analysis routes; non-prop routes may omit
+        (access via state.get("prop_type") to avoid KeyError).
+    prop_line : Any
+        Numeric or string line value for the prop bet (Phase 13).
+        Examples: "250.5" (passing yards), 22.5 (points). Typed as Any to match
+        the flex-typed contract of PropParams.line and NBA prop queries.
+        Access via state.get("prop_line") — not required for non-prop routes.
     """
 
     session_id: str
@@ -115,3 +125,5 @@ class GraphState(TypedDict):
     prop_result: Optional[PropResult]  # type: ignore[misc]  # Set by make_prop_quant_agent (Phase 11)
     nba_context_signals: Optional[NBAContextSignals]  # type: ignore[misc]  # Set by caller for NBA prop queries (Phase 12)
     nba_prop_result: Optional[PropResult]  # type: ignore[misc]  # Set by make_nba_quant_agent (Phase 12)
+    prop_type: str  # Prop market type identifier for PropArbitrageAgent (Phase 13 — PROP-06)
+    prop_line: Any  # type: ignore[misc]  # Numeric/string prop line value (Phase 13 — PROP-06)
