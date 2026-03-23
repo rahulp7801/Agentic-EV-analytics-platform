@@ -35,7 +35,7 @@
 
 ### Risk & Arbitrage Output
 
-- [ ] **ARBT-01**: Arbitrage Agent flags +EV discrepancies by comparing QuantResult true probability against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis
+- [x] **ARBT-01**: Arbitrage Agent flags +EV discrepancies by comparing QuantResult true probability against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis
 - [x] **ARBT-02**: System calculates fractional Kelly Criterion bet sizing based on edge and bankroll parameters — no flat bet sizes are ever output
 - [x] **ARBT-03**: CorrelationGuard node enforces hardcoded stops on conflicting market exposures (e.g., Over passing yards + Under total points) before any signal is output
 - [x] **ARBT-04**: Aggregator node enforces a daily drawdown gate — if cumulative recommended exposure exceeds the configured limit, no further signals are produced that day
@@ -107,14 +107,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-03 | Phase 2 | Complete |
 | INFRA-04 | Phase 2 | Complete |
 | QUANT-01 | Phase 9 | Pending |
-| QUANT-02 | Phase 15 | Pending |
+| QUANT-02 | Phase 15 | Complete |
 | QUANT-03 | Phase 9 | Pending |
 | QUANT-04 | Phase 8 | Complete |
 | CTXT-01 | Phase 4 | Complete |
 | CTXT-02 | Phase 9 | Pending |
 | CTXT-03 | Phase 4 | Complete |
 | CTXT-04 | Phase 15 | Pending |
-| ARBT-01 | Phase 9 | Pending |
+| ARBT-01 | Phase 9 | Complete |
 | ARBT-02 | Phase 5 | Complete |
 | ARBT-03 | Phase 5 | Complete |
 | ARBT-04 | Phase 5 | Complete |
