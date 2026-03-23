@@ -237,3 +237,76 @@ class InjuryReport(Base):
         Index("idx_injury_scraped_at", "scraped_at"),
         Index("idx_injury_player_scraped", "player_name", "scraped_at"),
     )
+
+
+class PlayerPropSnapshot(Base):
+    """Point-in-time player prop odds snapshot from The Odds API.
+
+    Append-only table — never UPDATE or UPSERT.
+    implied_probability is stored as Decimal(str(round(raw_prob, 6))) — never
+    float assigned directly to prevent precision loss.
+
+    Three composite indexes support the Phase 11 prop quant engine query patterns:
+    - idx_props_player_prop_snapped: player-prop timeline queries
+    - idx_props_sport_snapped: sport-level scan with time filter
+    - idx_props_game_prop: game-level prop lookup
+    """
+
+    __tablename__ = "player_prop_snapshots"
+
+    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
+    sport: Mapped[str] = mapped_column(String(5), nullable=False)
+    game_id: Mapped[Optional[str]] = mapped_column(String(30))
+    player_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    sportsbook: Mapped[str] = mapped_column(String(50), nullable=False)
+    prop_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    line: Mapped[Optional[Decimal]] = mapped_column(Numeric(7, 2))
+    price: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    implied_probability: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
+    snapped_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("idx_props_player_prop_snapped", "player_name", "prop_type", "snapped_at"),
+        Index("idx_props_sport_snapped", "sport", "snapped_at"),
+        Index("idx_props_game_prop", "game_id", "prop_type"),
+    )
+
+
+class NBAPlayerStats(Base):
+    """NBA player season-level statistics sourced from nba_api.
+
+    Stores per-season aggregates for Phase 10+ NBA prop quant engine.
+    UniqueConstraint on (player_id, season) prevents duplicate ingest.
+    All counting stats are nullable — not all players have all stat types.
+
+    Four indexes support the Phase 11 NBA query patterns:
+    - idx_nba_player_season: player timeline queries
+    - idx_nba_season: full-season scans
+    - idx_nba_team_season: team roster queries
+    """
+
+    __tablename__ = "nba_player_stats"
+
+    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
+    player_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    player_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    season: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    team_id: Mapped[Optional[int]] = mapped_column(Integer)
+    team_abbreviation: Mapped[Optional[str]] = mapped_column(String(5))
+    games_played: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    minutes: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 1))
+    points: Mapped[Optional[int]] = mapped_column(Integer)
+    rebounds: Mapped[Optional[int]] = mapped_column(Integer)
+    assists: Mapped[Optional[int]] = mapped_column(Integer)
+    threes_made: Mapped[Optional[int]] = mapped_column(Integer)
+    steals: Mapped[Optional[int]] = mapped_column(Integer)
+    blocks: Mapped[Optional[int]] = mapped_column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint("player_id", "season", name="uq_nba_player_season"),
+        Index("idx_nba_player_season", "player_id", "season"),
+        Index("idx_nba_season", "season"),
+        Index("idx_nba_team_season", "team_id", "season"),
+    )

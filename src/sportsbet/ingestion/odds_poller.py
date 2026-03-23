@@ -1,8 +1,9 @@
 """Odds API poller with budget manager and staleness guard.
 
-Implements OddsAPIPoller (async context manager) for fetching NFL odds from
-The Odds API, BudgetExhaustedError for credit-cap enforcement, and is_stale()
-for staleness checking before odds reach the Arbitrage Agent.
+Implements OddsAPIPoller (async context manager) for fetching NFL and NBA odds
+and player prop odds from The Odds API, BudgetExhaustedError for credit-cap
+enforcement, and is_stale() for staleness checking before odds reach the
+Arbitrage Agent.
 
 Budget persistence: _credits_remaining is in-memory only in v1. Counter resets
 on process restart — a WARNING is logged on first __aenter__ so operators are
@@ -12,7 +13,7 @@ question #3.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 import structlog
@@ -28,7 +29,22 @@ log = structlog.get_logger()
 
 ODDS_API_BASE = "https://api.the-odds-api.com"
 NFL_SPORT_KEY = "americanfootball_nfl"
+NBA_SPORT_KEY = "basketball_nba"
 DEFAULT_STALENESS_MINUTES = 5
+
+# Player prop market keys for NFL (7 markets)
+NFL_PROP_MARKETS = (
+    "player_pass_yds,player_pass_tds,player_rush_yds,"
+    "player_rush_tds,player_reception_yds,player_reception_tds,"
+    "player_receptions"
+)
+
+# Player prop market keys for NBA (7 markets)
+NBA_PROP_MARKETS = (
+    "player_points,player_rebounds,player_assists,"
+    "player_threes,player_steals,player_blocks,"
+    "player_points_rebounds_assists"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -161,3 +177,84 @@ class OddsAPIPoller:
         )
 
         return response.json()  # type: ignore[no-any-return]
+
+    async def fetch_player_props(
+        self,
+        sport: Literal["nfl", "nba"],
+    ) -> list[dict]:  # type: ignore[type-arg]
+        """Fetch current player prop odds via two-step event-list + per-event call.
+
+        Step 1: GET /v4/sports/{sport_key}/events — retrieve list of live events.
+        Step 2: For each event, GET /v4/sports/{sport_key}/events/{id}/odds with
+                prop markets. Budget guard fires before each per-event call.
+
+        Args:
+            sport: "nfl" or "nba" — determines sport_key and prop market set.
+
+        Raises:
+            BudgetExhaustedError: If _credits_remaining < 10 before any per-event
+                call. Threshold of 10 (not 1) ensures we always have headroom
+                for the events list call itself.
+            httpx.HTTPStatusError: If any API call returns a non-2xx status.
+
+        Returns:
+            List of raw per-event prop response dicts (one dict per event).
+        """
+        assert self._client is not None, (
+            "fetch_player_props called outside async context manager"
+        )
+
+        sport_key = NFL_SPORT_KEY if sport == "nfl" else NBA_SPORT_KEY
+        prop_markets = NFL_PROP_MARKETS if sport == "nfl" else NBA_PROP_MARKETS
+
+        # Step 1: fetch event list
+        events_response = await self._client.get(
+            f"/v4/sports/{sport_key}/events",
+            params={"apiKey": self._api_key},
+        )
+        events_response.raise_for_status()
+        self._credits_remaining = int(
+            events_response.headers.get("x-requests-remaining", "0")
+        )
+        events: list[dict] = events_response.json()  # type: ignore[assignment]
+
+        log.info(
+            "prop_events_fetched",
+            sport=sport,
+            event_count=len(events),
+            credits_remaining=self._credits_remaining,
+        )
+
+        # Step 2: per-event prop odds
+        results: list[dict] = []  # type: ignore[type-arg]
+        for event in events:
+            # Budget guard before each per-event call
+            if self._credits_remaining is not None and self._credits_remaining < 10:
+                raise BudgetExhaustedError(
+                    f"Odds API daily credit cap approaching. "
+                    f"credits_remaining={self._credits_remaining}, "
+                    f"daily_credit_cap={self._daily_credit_cap}"
+                )
+
+            event_id = event["id"]
+            props_response = await self._client.get(
+                f"/v4/sports/{sport_key}/events/{event_id}/odds",
+                params={
+                    "apiKey": self._api_key,
+                    "markets": prop_markets,
+                },
+            )
+            props_response.raise_for_status()
+            self._credits_remaining = int(
+                props_response.headers.get("x-requests-remaining", "0")
+            )
+            results.append(props_response.json())
+
+        log.info(
+            "player_props_fetched",
+            sport=sport,
+            results_count=len(results),
+            credits_remaining=self._credits_remaining,
+        )
+
+        return results

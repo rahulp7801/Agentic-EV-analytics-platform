@@ -142,3 +142,60 @@ class ContextSignals(BaseModel):
     weather_json: Optional[dict[str, object]] = None
     odds_snapshot: Optional[AgentOddsSnapshot] = None
     signals_captured_at: datetime
+
+
+class PropParams(BaseModel):
+    """Input parameters for the Phase 11 Prop Quant Agent SQL query builder.
+
+    Validated before any SQL executes — enforces prop domain, sport, and season
+    range. prop_type is a Literal union to prevent open-ended string injection
+    into queries. season constrained to [2000, 2030]: NBA/NFL data boundary.
+
+    ConfigDict(strict=True) — no coercion, no v1 class Config patterns.
+    LLM produces PropParams; Phase 11 PropQueryBuilder constructs SQL from it.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    game_id: str
+    player_id: str
+    season: Annotated[int, Field(ge=2000, le=2030)]
+    sport: Literal["nfl", "nba"]
+    prop_type: Literal[
+        "pass_yds",
+        "pass_tds",
+        "rush_yds",
+        "rush_tds",
+        "rec_yds",
+        "rec_tds",
+        "receptions",
+        "points",
+        "rebounds",
+        "assists",
+        "threes",
+        "steals",
+        "blocks",
+        "pra",
+    ]
+    line: Decimal
+    filters: dict[str, object]
+
+
+class PropResult(BaseModel):
+    """Output model for the Phase 11 Prop Quant Agent.
+
+    All fields are Optional with None defaults — Phase 11 populates real values
+    from PostgreSQL query results. Keeping all fields nullable allows stub nodes
+    to return PropResult() without DB access during development.
+
+    mean_stat is the historical mean of the queried stat (e.g. average passing
+    yards per game) — used alongside true_probability for trade plan generation.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    true_probability: Optional[Decimal] = None
+    sample_size: Optional[int] = None
+    confidence_interval: Optional[tuple[Decimal, Decimal]] = None
+    data_source: Optional[str] = None
+    mean_stat: Optional[Decimal] = None
