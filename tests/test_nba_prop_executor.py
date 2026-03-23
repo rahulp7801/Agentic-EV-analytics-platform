@@ -10,6 +10,12 @@ Key invariants tested:
 - All Decimal fields wrapped with Decimal(str(round(x, 6))) — no raw float
 - std floor of 0.5 prevents StatisticsError when avg_per_game = 0.0
 - double_double uses inclusion-exclusion probability formula
+
+Phase 12 Plan 02 tests (Task 2):
+- _apply_nba_context_adjustments pipeline: pace, def_rating, rest, home boost
+- Pace adjustment only applied to PACE_ADJUSTED_PROPS (not threes, steals, blocks)
+- Rest penalty of 0.03 applied only when rest_days == 0
+- Context None returns unchanged result
 """
 import asyncio
 from decimal import Decimal
@@ -19,7 +25,7 @@ import pytest
 
 # These imports will fail until Task 3 creates the module (RED phase)
 from sportsbet.prop.nba_executor import run_nba_prop_query, MIN_SAMPLE_GAMES
-from sportsbet.graph.models import PropParams, PropResult
+from sportsbet.graph.models import NBAContextSignals, PropParams, PropResult
 
 
 def _make_nba_params(**kwargs):
@@ -154,3 +160,106 @@ def test_games_played_zero_gate():
 
     assert result.true_probability is None
     assert result.data_source == "insufficient_sample"
+
+
+# ---------------------------------------------------------------------------
+# Phase 12 Plan 02: _apply_nba_context_adjustments pipeline tests
+# ---------------------------------------------------------------------------
+
+
+def _make_context_signals(
+    opponent_def_rating: str = "115.0",
+    pace_factor: str = "100.0",
+    rest_days: int = 1,
+    is_home: bool = False,
+) -> NBAContextSignals:
+    """Helper to create NBAContextSignals with Decimal fields."""
+    return NBAContextSignals(
+        opponent_def_rating=Decimal(opponent_def_rating),
+        pace_factor=Decimal(pace_factor),
+        rest_days=rest_days,
+        is_home=is_home,
+    )
+
+
+def test_rest_penalty_applied():
+    """rest_days=0 (back-to-back) reduces probability by REST_PENALTY (0.03)
+    compared to rest_days=2. All other signals identical."""
+    from sportsbet.prop.nba_agents import _apply_nba_context_adjustments
+
+    base_result = PropResult(
+        true_probability=Decimal("0.60"),
+        sample_size=60,
+        data_source="postgresql",
+    )
+
+    context_b2b = _make_context_signals(rest_days=0)
+    context_rested = _make_context_signals(rest_days=2)
+
+    result_b2b = _apply_nba_context_adjustments(base_result, context_b2b, "points")
+    result_rested = _apply_nba_context_adjustments(base_result, context_rested, "points")
+
+    assert result_b2b.true_probability is not None
+    assert result_rested.true_probability is not None
+    assert result_b2b.true_probability < result_rested.true_probability
+
+
+def test_pace_adjustment_up():
+    """prop_type='points' with pace_factor=110.0 (faster than league avg 100.0)
+    produces higher probability than league-average pace_factor=100.0."""
+    from sportsbet.prop.nba_agents import _apply_nba_context_adjustments
+
+    base_result = PropResult(
+        true_probability=Decimal("0.55"),
+        sample_size=60,
+        data_source="postgresql",
+    )
+
+    context_fast = _make_context_signals(pace_factor="110.0")
+    context_avg = _make_context_signals(pace_factor="100.0")
+
+    result_fast = _apply_nba_context_adjustments(base_result, context_fast, "points")
+    result_avg = _apply_nba_context_adjustments(base_result, context_avg, "points")
+
+    assert result_fast.true_probability is not None
+    assert result_avg.true_probability is not None
+    assert result_fast.true_probability > result_avg.true_probability
+
+
+def test_pace_not_applied_to_threes():
+    """prop_type='threes' is NOT in PACE_ADJUSTED_PROPS — pace_factor must NOT
+    change the probability. Two contexts with different pace produce same result."""
+    from sportsbet.prop.nba_agents import _apply_nba_context_adjustments
+
+    base_result = PropResult(
+        true_probability=Decimal("0.45"),
+        sample_size=60,
+        data_source="postgresql",
+    )
+
+    context_fast = _make_context_signals(pace_factor="120.0")
+    context_slow = _make_context_signals(pace_factor="85.0")
+
+    result_fast = _apply_nba_context_adjustments(base_result, context_fast, "threes")
+    result_slow = _apply_nba_context_adjustments(base_result, context_slow, "threes")
+
+    # Pace changes must NOT affect 'threes' — only def_rating, rest, home matter
+    assert result_fast.true_probability == result_slow.true_probability
+
+
+def test_context_none_returns_unchanged():
+    """When context is None (no NBAContextSignals in GraphState), the result
+    is returned without modification — no adjustment pipeline applied."""
+    from sportsbet.prop.nba_agents import _apply_nba_context_adjustments
+
+    base_result = PropResult(
+        true_probability=Decimal("0.50"),
+        sample_size=40,
+        data_source="postgresql",
+    )
+
+    result = _apply_nba_context_adjustments(base_result, None, "points")
+
+    assert result.true_probability == Decimal("0.50")
+    assert result.data_source == "postgresql"
+    assert result is base_result  # same object returned unchanged
