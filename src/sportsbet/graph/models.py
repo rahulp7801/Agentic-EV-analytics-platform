@@ -100,6 +100,7 @@ class AgentOddsSnapshot(BaseModel):
     market_type: str
     implied_probability: Decimal
     snapped_at: datetime
+    american_odds: Optional[int] = None  # Raw American odds integer for CLV persistence (e.g. -110)
 
 
 class GameState(BaseModel):

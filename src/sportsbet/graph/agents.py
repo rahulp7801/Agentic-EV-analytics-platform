@@ -178,6 +178,17 @@ def make_context_agent(
         except Exception as exc:
             log.error("context_agent_odds_error", session_id=session_id, error=str(exc))
 
+        # --- Step 1 (continued): Staleness gate (CTXT-02) ---
+        if odds_snapshot is not None:
+            from sportsbet.ingestion.odds_poller import is_stale as _is_stale
+            if _is_stale(odds_snapshot.snapped_at):
+                log.warning(
+                    "context_agent_stale_odds_rejected",
+                    session_id=session_id,
+                    snapped_at=str(odds_snapshot.snapped_at),
+                )
+                odds_snapshot = None
+
         # --- Step 1b: Persist odds snapshot for CLV tracking (DATA-03) ---
         if odds_snapshot is not None:
             try:
@@ -197,7 +208,7 @@ def make_context_agent(
                     game_id=odds_snapshot.game_id,
                     sportsbook=odds_snapshot.sportsbook,
                     market_type=odds_snapshot.market_type,
-                    price=None,  # AgentOddsSnapshot stores Decimal probability, not int American odds
+                    price=odds_snapshot.american_odds,  # non-null int for CLV tracking (GAP-3)
                 )
                 write_odds_snapshot(snap_create, engine=_sync_engine_cache[0])
                 log.info("context_agent_odds_persisted", game_id=game_id)
@@ -301,6 +312,7 @@ def _extract_odds_snapshot(
         market_type="h2h",
         implied_probability=fair_prob,
         snapped_at=datetime.now(timezone.utc),
+        american_odds=prices[0],  # raw int for CLV persistence (GAP-3)
     )
 
 
