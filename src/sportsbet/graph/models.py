@@ -205,3 +205,36 @@ class PropResult(BaseModel):
     confidence_interval: Optional[tuple[Decimal, Decimal]] = None
     data_source: Optional[str] = None
     mean_stat: Optional[Decimal] = None
+
+
+class NBAContextSignals(BaseModel):
+    """NBA-specific contextual signals for player prop probability adjustment.
+
+    Carries pace, defensive rating, rest days, and home/away context
+    through GraphState for consumption by make_nba_quant_agent.
+
+    All values are caller-supplied (from live data or fixture inputs) —
+    never inferred by LLM. ConfigDict(strict=True) enforces type safety:
+    no float coercion on Decimal fields.
+
+    Fields
+    ------
+    opponent_def_rating:
+        Opponent's defensive rating (points allowed per 100 possessions).
+        League average is ~115.0. Higher = worse defense = more scoring.
+    pace_factor:
+        Team's pace (possessions per 48 minutes). League avg ~100.0.
+        Higher pace = more opportunities for counting stats.
+    rest_days:
+        Days since last game. 0 = back-to-back (REST_PENALTY applied).
+        1 or 2+ = no penalty.
+    is_home:
+        True if player's team is the home team (HOME_BOOST applied).
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    opponent_def_rating: Decimal
+    pace_factor: Decimal
+    rest_days: int
+    is_home: bool

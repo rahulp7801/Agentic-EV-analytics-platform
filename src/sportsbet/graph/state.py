@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Optional, TypedDict
 
-from sportsbet.graph.models import ContextSignals, PropResult
+from sportsbet.graph.models import ContextSignals, NBAContextSignals, PropResult
 from sportsbet.kinematic.models import KinematicAnalysis
 
 
@@ -83,6 +83,15 @@ class GraphState(TypedDict):
         PropResult instance set by make_prop_quant_agent. None until Prop Quant Agent
         runs. Incorporates kinematic boost when kinematic_result is available and
         geometric_mismatch_flag=True for receiving props.
+    nba_context_signals : NBAContextSignals | None
+        NBA-specific contextual signals set by caller before NBA prop queries.
+        Carries pace_factor, opponent_def_rating, rest_days, and is_home through
+        GraphState for consumption by make_nba_quant_agent (Phase 12).
+        None when request is NFL (non-NBA) or NBA context not provided.
+    nba_prop_result : PropResult | None
+        PropResult instance set by make_nba_quant_agent. None until NBA Quant Agent
+        runs. Incorporates four-stage contextual adjustment when nba_context_signals
+        is present: pace -> def_rating -> rest_penalty -> home_boost (Phase 12).
     """
 
     session_id: str
@@ -104,3 +113,5 @@ class GraphState(TypedDict):
     kinematic_result: Optional[KinematicAnalysis]  # type: ignore[misc]  # Set by make_kinematic_agent (Phase 6)
     receiver_gsis_id: str  # GSIS player ID for Kinematic Agent matchup queries (Phase 7 — INT-02)
     prop_result: Optional[PropResult]  # type: ignore[misc]  # Set by make_prop_quant_agent (Phase 11)
+    nba_context_signals: Optional[NBAContextSignals]  # type: ignore[misc]  # Set by caller for NBA prop queries (Phase 12)
+    nba_prop_result: Optional[PropResult]  # type: ignore[misc]  # Set by make_nba_quant_agent (Phase 12)

@@ -22,6 +22,7 @@ from sportsbet.graph.models import (
     AgentOddsSnapshot,
     EVSignal,
     GameState,
+    NBAContextSignals,
     QuantParams,
     QuantResult,
 )
@@ -214,3 +215,49 @@ def test_quant_result_all_fields_nullable() -> None:
     assert result.sample_size is None
     assert result.confidence_interval is None
     assert result.data_source is None
+
+
+# ---------------------------------------------------------------------------
+# NBAContextSignals (Phase 12 Plan 02)
+# ---------------------------------------------------------------------------
+
+
+def test_nba_context_signals_valid_decimal_fields() -> None:
+    """Happy path: NBAContextSignals instantiates with Decimal fields without error."""
+    signals = NBAContextSignals(
+        opponent_def_rating=Decimal("115.0"),
+        pace_factor=Decimal("100.0"),
+        rest_days=1,
+        is_home=True,
+    )
+    assert signals.opponent_def_rating == Decimal("115.0")
+    assert signals.pace_factor == Decimal("100.0")
+    assert signals.rest_days == 1
+    assert signals.is_home is True
+
+
+def test_nba_context_signals_rejects_float_for_decimal() -> None:
+    """ConfigDict(strict=True) must reject raw float for Decimal fields.
+
+    strict=True means no coercion — passing 115.0 (float) for opponent_def_rating
+    (Decimal) must raise ValidationError, not silently coerce.
+    """
+    with pytest.raises(ValidationError):
+        NBAContextSignals(
+            opponent_def_rating=115.0,  # type: ignore[arg-type]  # float rejected by strict=True
+            pace_factor=Decimal("100.0"),
+            rest_days=1,
+            is_home=True,
+        )
+
+
+def test_nba_context_signals_back_to_back_rest() -> None:
+    """rest_days=0 (back-to-back) instantiates correctly — zero is a valid int value."""
+    signals = NBAContextSignals(
+        opponent_def_rating=Decimal("108.0"),
+        pace_factor=Decimal("102.5"),
+        rest_days=0,
+        is_home=False,
+    )
+    assert signals.rest_days == 0
+    assert signals.is_home is False
