@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-03-23T00:26:16.539Z"
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-03-23T00:51:49.817Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 13
   completed_phases: 9
-  total_plans: 21
-  completed_plans: 21
+  total_plans: 23
+  completed_plans: 22
   percent: 100
 ---
 
@@ -70,6 +70,7 @@ Progress: [██████████] 100%
 | Phase 07-production-runtime-wiring P01 | 5 | 3 tasks | 5 files |
 | Phase 08-data-pipeline-and-backtest P01 | 30 | 4 tasks | 6 files |
 | Phase 09-critical-pipeline-gap-closure P01 | 15 | 3 tasks | 7 files |
+| Phase 10-player-prop-and-nba-data-layer P01 | 4 | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,9 @@ Recent decisions affecting current work:
 - [Phase 09-critical-pipeline-gap-closure]: is_stale() deferred import inside make_context_agent closure (consistent with existing closure import pattern)
 - [Phase 09-critical-pipeline-gap-closure]: AgentOddsSnapshot.american_odds: Optional[int] = None satisfies ConfigDict(strict=True); Optional with default accepted
 - [Phase 09-critical-pipeline-gap-closure]: test_pbp_columns_count updated 18→21 — original TDD test written before GAP-1 fix; must be kept in sync with PBP_COLUMNS whitelist
+- [Phase 10-player-prop-and-nba-data-layer]: PropParams.season ge=2000 (not ge=1999): NBA data boundary — earliest reliable NBA stats start 2000 season
+- [Phase 10-player-prop-and-nba-data-layer]: BudgetExhaustedError threshold <10 in fetch_player_props(): two-step fetch consumes 2+ credits; 10-credit buffer prevents mid-batch exhaustion
+- [Phase 10-player-prop-and-nba-data-layer]: Migration 0004 adds both player_prop_snapshots and nba_player_stats in same file — single atomic upgrade/downgrade, no partial schema states
 
 ### Pending Todos
 
@@ -158,6 +162,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T21:47:39.994Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-03-23T00:51:49.812Z
+Stopped at: Completed 10-01-PLAN.md
 Resume file: None
