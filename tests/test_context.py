@@ -422,4 +422,68 @@ async def test_context_agent_persists_odds_snapshot() -> None:
     snap_create = call_kwargs[0][0]
     assert snap_create.sportsbook == "draftkings"
     assert snap_create.market_type == "h2h"
-    assert snap_create.price is None, "price must be None (AgentOddsSnapshot stores Decimal, not int)"
+    assert snap_create.price is not None
+    assert isinstance(snap_create.price, int)
+
+
+# ---------------------------------------------------------------------------
+# CTXT-02 (wiring): Context agent rejects stale odds snapshot (09-01)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_context_agent_rejects_stale_odds() -> None:
+    """make_context_agent sets odds_snapshot=None and skips persistence when stale.
+
+    Given a backdated AgentOddsSnapshot (snapped_at 10 minutes ago),
+    when make_context_agent's closure is called,
+    then:
+    - result["context_signals"].odds_snapshot is None (stale rejected)
+    - write_odds_snapshot is NOT called (no stale persistence)
+    """
+    from sportsbet.graph.models import AgentOddsSnapshot
+
+    mock_pool = MagicMock()
+    stale_snapshot = AgentOddsSnapshot(
+        game_id="2025_01_KC_LAC",
+        sportsbook="draftkings",
+        market_type="h2h",
+        implied_probability=__import__("decimal").Decimal("0.55"),
+        snapped_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        american_odds=-180,
+    )
+
+    with (
+        patch(
+            "sportsbet.graph.agents._extract_odds_snapshot",
+            return_value=stale_snapshot,
+        ),
+        patch("sportsbet.graph.agents.write_odds_snapshot") as mock_write,
+        patch.object(
+            __import__(
+                "sportsbet.ingestion.odds_poller",
+                fromlist=["OddsAPIPoller"],
+            ).OddsAPIPoller,
+            "fetch_nfl_odds",
+            new_callable=AsyncMock,
+            return_value=ODDS_FIXTURE,
+        ),
+        patch(
+            "sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "sportsbet.ingestion.scraper.InjuryWeatherScraper.write_injury_reports",
+            new_callable=AsyncMock,
+            return_value=0,
+        ),
+    ):
+        agent = make_context_agent(mock_pool, api_key="test_key", daily_credit_cap=500)
+        state = _make_full_state()
+        result = await agent(state)
+
+    assert result["context_signals"].odds_snapshot is None, (
+        "Stale odds snapshot must be rejected — odds_snapshot must be None"
+    )
+    mock_write.assert_not_called()

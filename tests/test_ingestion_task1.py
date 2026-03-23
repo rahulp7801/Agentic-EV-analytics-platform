@@ -9,9 +9,9 @@ import pytest
 
 
 def test_pbp_columns_count() -> None:
-    """PBP_COLUMNS must have exactly 18 entries."""
+    """PBP_COLUMNS must have exactly 21 entries (18 original + air_yards, two_point_attempt, complete_pass)."""
     from sportsbet.ingestion.pbp import PBP_COLUMNS
-    assert len(PBP_COLUMNS) == 18, f"Expected 18 columns, got {len(PBP_COLUMNS)}"
+    assert len(PBP_COLUMNS) == 21, f"Expected 21 columns, got {len(PBP_COLUMNS)}"
 
 
 def test_ngs_min_season() -> None:
