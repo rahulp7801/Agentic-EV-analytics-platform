@@ -53,6 +53,7 @@ PROP_COLUMN_MAP: dict[str, str] = {
     "steals": "stl",
     "blocks": "blk",
     "pra": "pra",
+    "double_double": "double_double",  # NBA composite prop — forwarded to NBAQueryBuilder path
 }
 
 # ---------------------------------------------------------------------------

@@ -180,6 +180,8 @@ class PropParams(BaseModel):
         "steals",
         "blocks",
         "pra",
+        # NBA composite prop (Phase 12): inclusion-exclusion probability model
+        "double_double",
     ]
     line: Decimal
     filters: dict[str, object]
