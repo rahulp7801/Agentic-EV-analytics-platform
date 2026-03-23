@@ -20,7 +20,7 @@ log = structlog.get_logger()
 
 # Column whitelist — only columns queried by downstream quant agents.
 # Source: RESEARCH.md Pattern 2, ARCHITECTURE.md schema.
-# Exactly 18 columns: verified by test_pbp_columns_count.
+# Exactly 21 columns: verified by test_pbp_columns_count.
 PBP_COLUMNS: list[str] = [
     "game_id",
     "play_id",
@@ -40,6 +40,9 @@ PBP_COLUMNS: list[str] = [
     "interception",
     "epa",
     "wp",
+    "air_yards",
+    "two_point_attempt",
+    "complete_pass",
 ]
 
 

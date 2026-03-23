@@ -82,6 +82,9 @@ class PlayByPlay(Base):
     pass_touchdown: Mapped[Optional[int]] = mapped_column(SmallInteger)
     rush_touchdown: Mapped[Optional[int]] = mapped_column(SmallInteger)
     interception: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    air_yards: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    two_point_attempt: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    complete_pass: Mapped[Optional[int]] = mapped_column(SmallInteger)
     epa: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 4))
     wp: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 4))
 
