@@ -96,7 +96,7 @@ def _build_prop_trade_plan(
 
 def make_prop_arbitrage_agent(
     settings_override: Any = None,
-    sport: str = "nfl",
+    sport: str | None = "nfl",
 ) -> Any:
     """Closure factory for the PropArbitrageAgent LangGraph node.
 
@@ -105,8 +105,10 @@ def make_prop_arbitrage_agent(
     settings_override : object, optional
         If provided, used as cfg instead of global settings.
         Useful for tests that need custom max_kelly_fraction values.
-    sport : str
+    sport : str | None
         "nfl" reads state["prop_result"]; "nba" reads state["nba_prop_result"].
+        None auto-detects: prefers nba_prop_result if present, else falls back to
+        prop_result. Resolved at runtime inside the closure (Phase 14 — PROP-06).
         Default is "nfl".
 
     Returns
@@ -117,23 +119,35 @@ def make_prop_arbitrage_agent(
         - {"ev_signal": EVSignal, "pending_signals": [EVSignal]} for +EV props
     """
     cfg = settings_override if settings_override is not None else _settings
-    _state_key = "nba_prop_result" if sport == "nba" else "prop_result"
 
     async def prop_arbitrage_agent(state: GraphState) -> dict:  # type: ignore[type-arg]
         """Compute EV% and Kelly fraction for a player prop market.
 
-        Reads PropResult from state[_state_key] and ContextSignals.odds_snapshot
+        Reads PropResult from the resolved state key and ContextSignals.odds_snapshot
         to produce an EVSignal with 3-bullet trade plan and fractional Kelly size.
         Returns {"ev_signal": None} for any guard condition (missing data, -EV).
+
+        When sport is None, auto-detects: prefers nba_prop_result if present,
+        else falls back to prop_result (Phase 14 — PROP-06).
         """
-        log.info("prop_arbitrage_agent.enter", sport=sport, state_key=_state_key)
+        # Resolve sport and state key at runtime (not factory construction time)
+        # so sport=None can inspect live state for auto-detection.
+        if sport is None:
+            _nba = state.get("nba_prop_result")  # type: ignore[attr-defined]
+            prop_result: PropResult | None = _nba or state.get("prop_result")  # type: ignore[assignment]
+            resolved_sport = "nba" if _nba is not None else "nfl"
+        else:
+            _state_key = "nba_prop_result" if sport == "nba" else "prop_result"
+            prop_result = state.get(_state_key)  # type: ignore[assignment]
+            resolved_sport = sport
+
+        log.info("prop_arbitrage_agent.enter", sport=resolved_sport)
 
         # Guard 1: prop_result must exist with a real probability
-        prop_result: PropResult | None = state.get(_state_key)  # type: ignore[assignment]
         if prop_result is None or prop_result.true_probability is None:
             log.info(
                 "prop_arbitrage_agent.no_prop_result",
-                sport=sport,
+                sport=resolved_sport,
                 reason="prop_result is None or true_probability is None",
             )
             return _NO_SIGNAL
@@ -143,7 +157,7 @@ def make_prop_arbitrage_agent(
         if context_signals is None or context_signals.odds_snapshot is None:
             log.info(
                 "prop_arbitrage_agent.no_odds_snapshot",
-                sport=sport,
+                sport=resolved_sport,
                 reason="context_signals or odds_snapshot is None",
             )
             return _NO_SIGNAL
@@ -159,7 +173,7 @@ def make_prop_arbitrage_agent(
         if ev_pct == Decimal("0"):
             log.info(
                 "prop_arbitrage_agent.no_ev",
-                sport=sport,
+                sport=resolved_sport,
                 market_type=market_type,
                 true_prob=str(true_prob),
                 implied_prob=str(implied_prob),
@@ -189,7 +203,7 @@ def make_prop_arbitrage_agent(
 
         log.info(
             "prop_arbitrage_agent.signal_produced",
-            sport=sport,
+            sport=resolved_sport,
             market_type=market_type,
             ev_pct=str(ev_pct),
             kelly_frac=str(kelly_frac),

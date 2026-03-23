@@ -30,12 +30,16 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
 import asyncpg
+import httpx
 import structlog
 
 from sportsbet.db.connection import get_sync_engine
 from sportsbet.graph.models import EVSignal, QuantParams, QuantResult
 from sportsbet.graph.state import GraphState
 from sportsbet.ingestion.odds import OddsSnapshotCreate, write_odds_snapshot
+from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
+from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot
+from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
 
 if TYPE_CHECKING:
     pass
@@ -148,11 +152,8 @@ def make_context_agent(
     """
     from datetime import datetime, timezone
 
-    import httpx
-
     from sportsbet.graph.models import AgentOddsSnapshot, ContextSignals
-    from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
-    from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
+    # OddsAPIPoller, BudgetExhaustedError, InjuryWeatherScraper imported at module level for patchability (Phase 14 — PROP-01)
 
     # Lazily resolved on first agent invocation — avoids DB connection at construction
     # time. Stored in a mutable container so the closure can reassign it.
@@ -214,6 +215,56 @@ def make_context_agent(
                 log.info("context_agent_odds_persisted", game_id=game_id)
             except Exception as exc:
                 log.warning("context_agent_odds_persist_error", error=str(exc))
+
+        # --- Step 1c: Fetch and persist NFL player prop snapshots (PROP-01) ---
+        # Scoped to NFL only in Phase 14; NBA prop ingestion is Phase 15 territory.
+        # Sync engine reuses _sync_engine_cache initialized in Step 1b.
+        # write_player_prop_snapshot uses sync SQLAlchemy (v1 accepted tradeoff — low concurrency).
+        try:
+            async with OddsAPIPoller(api_key=api_key, daily_credit_cap=daily_credit_cap) as poller:
+                raw_props = await poller.fetch_player_props("nfl")
+            if not _sync_engine_cache:
+                import sqlalchemy as _sa
+                from sportsbet.config import settings as _settings_inner
+                _sync_engine_cache.append(
+                    _sa.create_engine(
+                        _settings_inner.database_url,
+                        echo=False,
+                        pool_pre_ping=True,
+                        connect_args={"connect_timeout": 5},
+                    )
+                )
+            from sportsbet.quant.vig import american_to_raw_prob as _atrp
+            from decimal import Decimal as _Dec
+            for event_data in raw_props:
+                for bookmaker in event_data.get("bookmakers", []):
+                    for market in bookmaker.get("markets", []):
+                        for outcome in market.get("outcomes", []):
+                            price = outcome.get("price")
+                            if price is None:
+                                continue
+                            try:
+                                raw_prob = _atrp(int(price))
+                                implied_prob = _Dec(str(round(float(raw_prob), 6)))
+                                point = outcome.get("point")
+                                snap = PlayerPropSnapshotCreate(
+                                    sport="nfl",
+                                    game_id=event_data.get("id"),
+                                    player_name=outcome.get("name", "Unknown"),
+                                    sportsbook=bookmaker.get("key", "unknown"),
+                                    prop_type=market.get("key", "unknown"),
+                                    line=_Dec(str(point)) if point is not None else None,
+                                    price=int(price),
+                                    implied_probability=implied_prob,
+                                )
+                                write_player_prop_snapshot(snap, engine=_sync_engine_cache[0])
+                            except Exception as snap_exc:
+                                log.warning("prop_snapshot_write_error", error=str(snap_exc))
+            log.info("context_agent_props_persisted", game_id=game_id)
+        except BudgetExhaustedError as exc:
+            log.warning("context_agent_prop_budget_exhausted", error=str(exc))
+        except Exception as exc:
+            log.warning("context_agent_prop_fetch_error", error=str(exc))
 
         # --- Step 2: Fetch injury reports ---
         injury_flags: dict[str, str] = {}

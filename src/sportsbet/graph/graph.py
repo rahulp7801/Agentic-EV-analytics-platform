@@ -394,7 +394,7 @@ async def create_graph_with_sqlite(
         from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
         prop_quant_node = make_prop_quant_agent(pool)
         nba_quant_node = make_nba_quant_agent(pool)
-        prop_arbitrage_node = make_prop_arbitrage_agent(sport="nfl")
+        prop_arbitrage_node = make_prop_arbitrage_agent(sport=None)  # auto-detect NFL/NBA from state (Phase 14 — PROP-06)
 
     # Risk control nodes have no pool dependency — always constructed
     correlation_guard_node = make_correlation_guard_node()

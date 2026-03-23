@@ -288,6 +288,16 @@ async def test_context_agent_updates_graphstate() -> None:
             new_callable=AsyncMock,
             return_value=ODDS_FIXTURE,
         ),
+        patch.object(
+            __import__(
+                "sportsbet.ingestion.odds_poller",
+                fromlist=["OddsAPIPoller"],
+            ).OddsAPIPoller,
+            "fetch_player_props",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch("sportsbet.graph.agents.write_player_prop_snapshot"),
         patch(
             "sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries",
             new_callable=AsyncMock,
@@ -337,6 +347,16 @@ async def test_downstream_reads_state() -> None:
             new_callable=AsyncMock,
             return_value=ODDS_FIXTURE,
         ),
+        patch.object(
+            __import__(
+                "sportsbet.ingestion.odds_poller",
+                fromlist=["OddsAPIPoller"],
+            ).OddsAPIPoller,
+            "fetch_player_props",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch("sportsbet.graph.agents.write_player_prop_snapshot"),
         patch(
             "sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries",
             new_callable=AsyncMock,
@@ -365,7 +385,8 @@ async def test_downstream_reads_state() -> None:
     assert isinstance(result["context_signals"], ContextSignals), (
         "context_signals must be a ContextSignals instance"
     )
-    # Verify no real HTTP was dispatched (mock_client_instance.get never called)
+    # Verify no real HTTP was dispatched to the Odds API httpx client
+    # (fetch_nfl_odds and fetch_player_props are both mocked at the OddsAPIPoller level)
     mock_client_instance.get.assert_not_called()
 
 

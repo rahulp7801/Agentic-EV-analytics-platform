@@ -102,6 +102,10 @@ class GraphState(TypedDict):
         Examples: "250.5" (passing yards), 22.5 (points). Typed as Any to match
         the flex-typed contract of PropParams.line and NBA prop queries.
         Access via state.get("prop_line") — not required for non-prop routes.
+    prop_filters : dict[str, Any] | None
+        Optional prop filter context passed to PropQueryBuilder and NBAQueryBuilder.
+        None for non-prop routes. Access via state.get("prop_filters") or {} in agents.
+        Declared here per INFRA-01 — agents used state.get() workaround before Phase 14.
     """
 
     session_id: str
@@ -127,3 +131,4 @@ class GraphState(TypedDict):
     nba_prop_result: Optional[PropResult]  # type: ignore[misc]  # Set by make_nba_quant_agent (Phase 12)
     prop_type: str  # Prop market type identifier for PropArbitrageAgent (Phase 13 — PROP-06)
     prop_line: Any  # type: ignore[misc]  # Numeric/string prop line value (Phase 13 — PROP-06)
+    prop_filters: dict[str, Any] | None  # type: ignore[misc]  # Optional prop filter context; None for non-prop routes (Phase 14 — INFRA-01)
