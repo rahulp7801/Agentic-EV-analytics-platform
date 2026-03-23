@@ -5,13 +5,15 @@ first — if set, routes immediately to END without calling any agent (fail-fast
 Otherwise it dispatches based on `request_type` to the correct specialist agent.
 
 Routing table:
-  "quant_analysis"    -> quant_agent
-  "odds_check"        -> arbitrage_agent
-  "arbitrage_analysis"-> arbitrage_agent  (Phase 5: full arbitrage pipeline route)
-  "context_update"    -> context_agent
-  "kinematic_analysis"-> kinematic_agent  (Phase 6: geometric matchup exploit signal)
-  "prop_analysis"     -> prop_quant_agent (Phase 11: NFL player prop quant agent)
-  anything else       -> sets error and routes to END
+  "quant_analysis"        -> quant_agent
+  "odds_check"            -> arbitrage_agent
+  "arbitrage_analysis"    -> arbitrage_agent      (Phase 5: full arbitrage pipeline route)
+  "context_update"        -> context_agent
+  "kinematic_analysis"    -> kinematic_agent       (Phase 6: geometric matchup exploit signal)
+  "prop_analysis"         -> prop_quant_agent      (Phase 11: NFL player prop quant agent)
+  "nba_prop_analysis"     -> nba_quant_agent       (Phase 13: NBA player prop quant agent)
+  "prop_arbitrage_analysis" -> prop_arbitrage_agent (Phase 13: direct prop arbitrage route)
+  anything else           -> sets error and routes to END
 """
 from __future__ import annotations
 
@@ -71,6 +73,10 @@ def route_from_master(state: GraphState) -> str:
         return "kinematic_agent"
     elif request_type == "prop_analysis":
         return "prop_quant_agent"
+    elif request_type == "nba_prop_analysis":
+        return "nba_quant_agent"
+    elif request_type == "prop_arbitrage_analysis":
+        return "prop_arbitrage_agent"
     else:
         # Unknown request_type — set error in state via a state update mechanism.
         # Note: conditional edge functions cannot mutate state directly in LangGraph.

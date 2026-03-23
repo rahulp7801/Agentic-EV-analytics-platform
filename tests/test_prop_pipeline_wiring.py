@@ -208,7 +208,8 @@ class TestE2EPropPipelineWiring:
         """NFL prop pipeline: ainvoke produces non-None ev_signal in single ainvoke."""
         prop_arb_node = make_prop_arbitrage_agent(sport="nfl")
         guard_node = make_correlation_guard_node()
-        agg_node = make_aggregator_node(bankroll_usd=10000.0, daily_drawdown_limit=0.05)
+        # Use large bankroll so Kelly fraction (6% of bankroll) stays under drawdown limit
+        agg_node = make_aggregator_node(bankroll_usd=100_000.0, daily_drawdown_limit=0.10)
         graph = create_graph(
             checkpointer=MemorySaver(),
             prop_quant_node=_nfl_stub,
@@ -231,7 +232,7 @@ class TestE2EPropPipelineWiring:
         """NBA prop pipeline: ainvoke with nba_prop_analysis produces non-None ev_signal."""
         prop_arb_node = make_prop_arbitrage_agent(sport="nba")
         guard_node = make_correlation_guard_node()
-        agg_node = make_aggregator_node(bankroll_usd=10000.0, daily_drawdown_limit=0.05)
+        agg_node = make_aggregator_node(bankroll_usd=100_000.0, daily_drawdown_limit=0.10)
         graph = create_graph(
             checkpointer=MemorySaver(),
             prop_quant_node=_nfl_stub,
@@ -253,7 +254,7 @@ class TestE2EPropPipelineWiring:
         """Direct prop_arbitrage_analysis route bypasses quant, produces non-None ev_signal."""
         prop_arb_node = make_prop_arbitrage_agent(sport="nfl")
         guard_node = make_correlation_guard_node()
-        agg_node = make_aggregator_node(bankroll_usd=10000.0, daily_drawdown_limit=0.05)
+        agg_node = make_aggregator_node(bankroll_usd=100_000.0, daily_drawdown_limit=0.10)
         graph = create_graph(
             checkpointer=MemorySaver(),
             prop_quant_node=_nfl_stub,

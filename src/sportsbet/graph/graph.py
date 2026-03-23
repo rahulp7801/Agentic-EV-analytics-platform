@@ -2,10 +2,13 @@
 
 create_graph() builds and compiles the full directed graph:
 
-  START -> master_router -> [conditional edge] -> quant_agent    -> END
-                                               -> arbitrage_agent -> [correlation_guard -> aggregator ->] END
-                                               -> context_agent   -> END
-                                               -> kinematic_agent -> END
+  START -> master_router -> [conditional edge] -> quant_agent          -> END
+                                               -> arbitrage_agent       -> [correlation_guard -> aggregator ->] END
+                                               -> context_agent         -> END
+                                               -> kinematic_agent       -> END
+                                               -> prop_quant_agent      -> prop_arbitrage_agent -> [correlation_guard -> aggregator ->] END
+                                               -> nba_quant_agent       -> prop_arbitrage_agent -> [correlation_guard -> aggregator ->] END
+                                               -> prop_arbitrage_agent  -> [correlation_guard -> aggregator ->] END
                                                -> END  (on error or unknown type)
 
 create_graph_with_sqlite() is the runtime factory — writes checkpoints to disk
@@ -31,11 +34,21 @@ Phase 6 Plan 02 update: create_graph() accepts an optional kinematic_node parame
 - If kinematic_node is None (default): uses _kinematic_stub (returns kinematic_result=None).
 - If kinematic_node is provided: uses the real async closure from make_kinematic_agent(pool).
 
+Phase 13 Plan 02 update: create_graph() accepts optional prop_quant_node, nba_quant_node,
+and prop_arbitrage_node parameters.
+- prop_quant_node: real async closure from make_prop_quant_agent(pool); None uses _prop_quant_stub.
+- nba_quant_node: real async closure from make_nba_quant_agent(pool); None uses _nba_quant_stub.
+- prop_arbitrage_node: real async closure from make_prop_arbitrage_agent(sport); None uses _prop_arb_stub.
+Both prop_quant_agent and nba_quant_agent chain to the same prop_arbitrage_agent node.
+prop_arbitrage_agent chains to correlation_guard (if present) or directly to END.
+create_graph_with_sqlite() wires all three when pool is provided.
+
 All tests use create_graph(checkpointer=MemorySaver()) for full isolation (no disk I/O).
 Tests requiring a real quant agent pass quant_node=make_quant_agent(pool) explicitly.
 Tests requiring a real context agent pass context_node=make_context_agent(pool, key, cap) explicitly.
 Tests requiring full arbitrage pipeline pass all three new node parameters explicitly.
 Tests requiring real kinematic agent pass kinematic_node=make_kinematic_agent(pool) explicitly.
+Tests requiring real prop agents pass prop_quant_node, nba_quant_node, prop_arbitrage_node explicitly.
 """
 from __future__ import annotations
 
@@ -120,6 +133,9 @@ def create_graph(
     correlation_guard_node: Any = None,
     aggregator_node: Any = None,
     kinematic_node: Any = None,
+    prop_quant_node: Any = None,
+    nba_quant_node: Any = None,
+    prop_arbitrage_node: Any = None,
 ) -> CompiledStateGraph:
     """Build and compile the LangGraph StateGraph for the sportsbet agent pipeline.
 
@@ -160,6 +176,19 @@ def create_graph(
         Optional async kinematic agent node. If None, uses _kinematic_stub which returns
         {"kinematic_result": None} (backward-compat). Pass make_kinematic_agent(pool) for
         real NGS separation query execution.
+    prop_quant_node:
+        Optional async NFL prop quant agent node. If None, uses _prop_quant_stub which
+        returns {"prop_result": None}. Pass make_prop_quant_agent(pool) for real SQL.
+        Chains to prop_arbitrage_agent after execution.
+    nba_quant_node:
+        Optional async NBA prop quant agent node. If None, uses _nba_quant_stub which
+        returns {"nba_prop_result": None}. Pass make_nba_quant_agent(pool) for real SQL.
+        Chains to prop_arbitrage_agent after execution.
+    prop_arbitrage_node:
+        Optional async prop arbitrage agent node. If None, uses _prop_arb_stub which
+        returns {"ev_signal": None}. Pass make_prop_arbitrage_agent(sport) for real EV.
+        Receives output from prop_quant_agent, nba_quant_agent, or directly from router.
+        Chains to correlation_guard (if present) or END.
 
     Returns
     -------
@@ -187,12 +216,36 @@ def create_graph(
 
     active_kinematic_node = kinematic_node if kinematic_node is not None else _kinematic_stub
 
+    # prop_quant_node: real async closure (Phase 13+) or inline stub (backward-compat)
+    def _prop_quant_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
+        """Inline stub: returns prop_result=None when no real prop quant node provided."""
+        return {"prop_result": None}
+
+    # nba_quant_node: real async closure (Phase 13+) or inline stub (backward-compat)
+    def _nba_quant_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
+        """Inline stub: returns nba_prop_result=None when no real NBA quant node provided."""
+        return {"nba_prop_result": None}
+
+    # prop_arbitrage_node: real async closure (Phase 13+) or inline stub (backward-compat)
+    def _prop_arb_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
+        """Inline stub: returns ev_signal=None when no real prop arbitrage node provided."""
+        return {"ev_signal": None}
+
+    active_prop_quant_node = prop_quant_node if prop_quant_node is not None else _prop_quant_stub
+    active_nba_quant_node = nba_quant_node if nba_quant_node is not None else _nba_quant_stub
+    active_prop_arbitrage_node = prop_arbitrage_node if prop_arbitrage_node is not None else _prop_arb_stub
+
     # Register all base nodes
     builder.add_node("master_router", master_router)
     builder.add_node("quant_agent", active_quant_node)
     builder.add_node("arbitrage_agent", active_arbitrage_node)
     builder.add_node("context_agent", active_context_node)
     builder.add_node("kinematic_agent", active_kinematic_node)
+
+    # Register Phase 13 prop pipeline nodes
+    builder.add_node("prop_quant_agent", active_prop_quant_node)
+    builder.add_node("nba_quant_agent", active_nba_quant_node)
+    builder.add_node("prop_arbitrage_agent", active_prop_arbitrage_node)
 
     # Entry point: all requests pass through master_router first
     builder.set_entry_point("master_router")
@@ -207,6 +260,9 @@ def create_graph(
             "arbitrage_analysis": "arbitrage_agent",
             "context_agent": "context_agent",
             "kinematic_agent": "kinematic_agent",
+            "prop_quant_agent": "prop_quant_agent",
+            "nba_quant_agent": "nba_quant_agent",
+            "prop_arbitrage_agent": "prop_arbitrage_agent",
             "end": END,
         },
     )
@@ -218,6 +274,10 @@ def create_graph(
     # kinematic_agent always terminates at END (independent pipeline)
     builder.add_edge("kinematic_agent", END)
 
+    # Both prop quant agents chain to the same prop_arbitrage_agent (single ainvoke)
+    builder.add_edge("prop_quant_agent", "prop_arbitrage_agent")
+    builder.add_edge("nba_quant_agent", "prop_arbitrage_agent")
+
     # arbitrage pipeline: extend with guard/gate when both are provided
     if correlation_guard_node is not None and aggregator_node is not None:
         builder.add_node("correlation_guard", correlation_guard_node)
@@ -225,9 +285,12 @@ def create_graph(
         builder.add_edge("arbitrage_agent", "correlation_guard")
         builder.add_edge("correlation_guard", "aggregator")
         builder.add_edge("aggregator", END)
+        # prop_arbitrage_agent reuses the same correlation_guard -> aggregator chain
+        builder.add_edge("prop_arbitrage_agent", "correlation_guard")
     else:
-        # Backward-compat: no risk controls, arbitrage_agent -> END
+        # Backward-compat: no risk controls, agents route directly to END
         builder.add_edge("arbitrage_agent", END)
+        builder.add_edge("prop_arbitrage_agent", END)
 
     return builder.compile(checkpointer=checkpointer)
 
@@ -256,6 +319,10 @@ async def create_graph_with_sqlite(
     make_arbitrage_agent(), make_correlation_guard_node(), make_aggregator_node(),
     and make_kinematic_agent(pool) into create_graph() — all Phase 5/6 nodes are
     now reachable via the production factory (closes INT-01).
+
+    Phase 13 Plan 02 update: wires make_prop_quant_agent(pool), make_nba_quant_agent(pool),
+    and make_prop_arbitrage_agent(sport='nfl') when pool is provided. All three prop
+    pipeline nodes are gated on pool availability (same as quant/kinematic nodes).
 
     Must be called from within an async context (use asyncio.run() from sync code).
     Do NOT use in tests — use create_graph(checkpointer=MemorySaver()) instead
@@ -317,6 +384,18 @@ async def create_graph_with_sqlite(
         from sportsbet.graph.agents import make_kinematic_agent
         kinematic_node = make_kinematic_agent(pool)
 
+    # Phase 13 Plan 02: prop pipeline nodes — gated on pool availability
+    prop_quant_node = None
+    nba_quant_node = None
+    prop_arbitrage_node = None
+    if pool is not None:
+        from sportsbet.prop.agents import make_prop_quant_agent
+        from sportsbet.prop.nba_agents import make_nba_quant_agent
+        from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
+        prop_quant_node = make_prop_quant_agent(pool)
+        nba_quant_node = make_nba_quant_agent(pool)
+        prop_arbitrage_node = make_prop_arbitrage_agent(sport="nfl")
+
     # Risk control nodes have no pool dependency — always constructed
     correlation_guard_node = make_correlation_guard_node()
     aggregator_node = make_aggregator_node(
@@ -336,4 +415,7 @@ async def create_graph_with_sqlite(
         correlation_guard_node=correlation_guard_node,
         aggregator_node=aggregator_node,
         kinematic_node=kinematic_node,
+        prop_quant_node=prop_quant_node,
+        nba_quant_node=nba_quant_node,
+        prop_arbitrage_node=prop_arbitrage_node,
     )
