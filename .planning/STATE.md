@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-03-23T02:29:02.625Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-03-23T02:39:29.390Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 13
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 27
-  completed_plans: 26
+  completed_plans: 27
   percent: 100
 ---
 
@@ -75,6 +75,7 @@ Progress: [██████████] 100%
 | Phase 11-nfl-player-prop-quant-engine P01 | 4 | 2 tasks | 7 files |
 | Phase 11-nfl-player-prop-quant-engine P02 | 4 | 2 tasks | 4 files |
 | Phase 12-nba-player-prop-quant-engine P01 | 5 | 3 tasks | 6 files |
+| Phase 12-nba-player-prop-quant-engine P02 | 8 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,9 @@ Recent decisions affecting current work:
 - [Phase 12-nba-player-prop-quant-engine]: NBAQueryBuilder dispatches pra->_NBA_PRA_TEMPLATE, double_double->_NBA_DD_TEMPLATE, single->_NBA_SINGLE_STAT_TEMPLATE
 - [Phase 12-nba-player-prop-quant-engine]: NormalDist CDF probability model for NBA — season-aggregate data has no per-game binary outcomes; std floor 0.5 prevents StatisticsError; MIN_SAMPLE_GAMES=20
 - [Phase 12-nba-player-prop-quant-engine]: player_id cast to int() in NBAQueryBuilder.build() — nba_player_stats.player_id is INTEGER not VARCHAR; double_double uses independence assumption inclusion-exclusion as v1 heuristic
+- [Phase 12-nba-player-prop-quant-engine]: NBAContextSignals runtime import in state.py (not TYPE_CHECKING) — LangGraph get_type_hints() compatibility, matches Phase 4/6 locked pattern
+- [Phase 12-nba-player-prop-quant-engine]: PACE_ADJUSTED_PROPS frozenset restricts pace adjustment to volume props (points, rebounds, assists, pra) — efficiency props (threes, steals, blocks) not pace-sensitive
+- [Phase 12-nba-player-prop-quant-engine]: REST_PENALTY 0.03 applied only when rest_days == 0 (back-to-back); no penalty for rest_days >= 1; adjustment ratios clamped independently before multiplication
 
 ### Pending Todos
 
@@ -177,6 +181,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T02:29:02.614Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-03-23T02:39:29.378Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
