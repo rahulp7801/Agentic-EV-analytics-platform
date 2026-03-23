@@ -13,10 +13,11 @@ PROP-03:
 2. test_insufficient_sample      — 5-row mock → PropResult(data_source="insufficient_sample")
 3. test_live_db                  — live DB run (skipped if no SPORTSBET_TEST_DATABASE_URL)
 
-PROP-04 stubs (xfail — Plan 02):
-4. test_kinematic_adjustment_applied
-5. test_kinematic_no_adjust_pass_prop
-6. test_kinematic_probability_clamped
+PROP-04 (Plan 02):
+4. test_kinematic_adjustment_applied     — rec_yds + geometric_mismatch_flag=True → +0.05 boost
+5. test_kinematic_no_adjust_pass_prop   — pass_yds + flag=True → unchanged probability
+6. test_kinematic_probability_clamped   — probability 0.97 + boost → clamped at 0.99
+7. test_kinematic_none_returns_unchanged — kinematic=None → unchanged, no AttributeError
 """
 from __future__ import annotations
 
@@ -28,6 +29,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from sportsbet.graph.models import PropParams, PropResult
+from sportsbet.kinematic.models import KinematicAnalysis
+from sportsbet.prop.agents import _apply_kinematic_adjustment
 
 try:
     from sportsbet.prop.executor import MIN_PROP_SAMPLE_SIZE, run_prop_query
@@ -154,27 +157,76 @@ async def test_live_db() -> None:
 
 
 # ---------------------------------------------------------------------------
-# PROP-04 kinematic stub tests (xfail — Plan 02 implements kinematic integration)
+# PROP-04 kinematic integration tests (Plan 02)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="Plan 02 implements kinematic adjustment in make_prop_quant_agent")
+def _make_kinematic(geometric_mismatch_flag: bool = True) -> KinematicAnalysis:
+    """Return a minimal KinematicAnalysis for PROP-04 tests."""
+    return KinematicAnalysis(
+        season=2022,
+        week=5,
+        receiver_gsis_id="x",
+        avg_separation=Decimal("3.1"),
+        geometric_mismatch_flag=geometric_mismatch_flag,
+    )
+
+
 def test_kinematic_adjustment_applied() -> None:
-    """Kinematic-adjusted PropResult has probability different from base when geometric mismatch flagged."""
-    # Plan 02: make_prop_quant_agent passes real KinematicAnalysis to _apply_kinematic_adjustment.
-    # When geometric_mismatch_flag=True, probability is adjusted. This test verifies that behavior.
-    raise NotImplementedError("Plan 02 fills in kinematic adjustment — stub in Plan 01")
+    """rec_yds prop with geometric_mismatch_flag=True → true_probability boosted by 0.05."""
+    result = PropResult(
+        true_probability=Decimal("0.60"),
+        sample_size=50,
+        confidence_interval=(Decimal("0.50"), Decimal("0.70")),
+        data_source="postgresql",
+    )
+    kinematic = _make_kinematic(geometric_mismatch_flag=True)
+    adjusted = _apply_kinematic_adjustment(result, kinematic, "rec_yds")
+    assert adjusted.true_probability == Decimal("0.65"), (
+        f"Expected 0.65, got {adjusted.true_probability}"
+    )
+    assert adjusted.data_source == "postgresql+kinematic"
 
 
-@pytest.mark.xfail(reason="Plan 02 implements kinematic adjustment in make_prop_quant_agent")
 def test_kinematic_no_adjust_pass_prop() -> None:
-    """Kinematic does NOT adjust pass_yds props — adjustment only applies to receiving props."""
-    # Plan 02: _apply_kinematic_adjustment returns result unchanged when prop_type is pass-side.
-    raise NotImplementedError("Plan 02 fills in kinematic adjustment — stub in Plan 01")
+    """pass_yds prop with geometric_mismatch_flag=True → true_probability unchanged (not a receiving prop)."""
+    result = PropResult(
+        true_probability=Decimal("0.60"),
+        sample_size=50,
+        confidence_interval=(Decimal("0.50"), Decimal("0.70")),
+        data_source="postgresql",
+    )
+    kinematic = _make_kinematic(geometric_mismatch_flag=True)
+    unchanged = _apply_kinematic_adjustment(result, kinematic, "pass_yds")
+    assert unchanged.true_probability == Decimal("0.60"), (
+        f"Expected 0.60 (unchanged), got {unchanged.true_probability}"
+    )
 
 
-@pytest.mark.xfail(reason="Plan 02 implements kinematic adjustment in make_prop_quant_agent")
 def test_kinematic_probability_clamped() -> None:
-    """Kinematic-adjusted probability is clamped to [0.01, 0.99] — never exactly 0 or 1."""
-    # Plan 02: _apply_kinematic_adjustment applies a delta and clamps the result.
-    raise NotImplementedError("Plan 02 fills in kinematic adjustment — stub in Plan 01")
+    """rec_yds with probability 0.97 + 0.05 boost → clamped to 0.99, not 1.02."""
+    result = PropResult(
+        true_probability=Decimal("0.97"),
+        sample_size=50,
+        confidence_interval=(Decimal("0.90"), Decimal("0.99")),
+        data_source="postgresql",
+    )
+    kinematic = _make_kinematic(geometric_mismatch_flag=True)
+    adjusted = _apply_kinematic_adjustment(result, kinematic, "rec_yds")
+    assert adjusted.true_probability == Decimal("0.99"), (
+        f"Expected clamped 0.99, got {adjusted.true_probability}"
+    )
+
+
+def test_kinematic_none_returns_unchanged() -> None:
+    """kinematic=None → PropResult returned unchanged, no AttributeError raised."""
+    result = PropResult(
+        true_probability=Decimal("0.60"),
+        sample_size=50,
+        confidence_interval=(Decimal("0.50"), Decimal("0.70")),
+        data_source="postgresql",
+    )
+    unchanged = _apply_kinematic_adjustment(result, None, "rec_yds")
+    assert unchanged.true_probability == Decimal("0.60"), (
+        f"Expected 0.60 (unchanged), got {unchanged.true_probability}"
+    )
