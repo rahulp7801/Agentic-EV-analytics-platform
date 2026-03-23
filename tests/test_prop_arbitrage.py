@@ -1,0 +1,274 @@
+"""TDD test suite for PropArbitrageAgent (PROP-06) and CorrelationGuard extension (PROP-07).
+
+Phase 13, Plan 01 — tests written RED first before implementation exists.
+
+Tests:
+  PROP-06: PropArbitrageAgent closure factory — EV computation, Kelly sizing, Trade Plan, guard returns.
+  PROP-07: CorrelationGuard extended CONFLICT_PAIRS — prop-to-prop and prop-to-game-total pairs.
+"""
+from __future__ import annotations
+
+import asyncio
+from datetime import datetime, timezone
+from decimal import Decimal
+
+import pytest
+
+from sportsbet.graph.models import (
+    AgentOddsSnapshot,
+    ContextSignals,
+    EVSignal,
+    PropResult,
+)
+
+# Import guard: wrap make_prop_arbitrage_agent import so test file is importable
+# even before Task 2 creates the implementation. Tests will fail with a clear error.
+try:
+    from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
+    _IMPORT_OK = True
+except ImportError:
+    make_prop_arbitrage_agent = None  # type: ignore[assignment]
+    _IMPORT_OK = False
+
+try:
+    from sportsbet.arbitrage.correlation_guard import CONFLICT_PAIRS
+except ImportError:
+    CONFLICT_PAIRS = frozenset()  # type: ignore[assignment]
+
+
+# ---------------------------------------------------------------------------
+# Shared fixtures
+# ---------------------------------------------------------------------------
+
+def _make_nfl_state(
+    true_prob: Decimal = Decimal("0.62"),
+    implied_prob: Decimal = Decimal("0.50"),
+    market_type: str = "over_pass_yds",
+    prop_result: PropResult | None = ...,  # type: ignore[assignment]
+) -> dict:
+    """Return a minimal GraphState dict suitable for prop_arbitrage_agent unit tests."""
+    if prop_result is ...:  # type: ignore[comparison-overlap]
+        prop_result = PropResult(
+            true_probability=true_prob,
+            sample_size=45,
+            confidence_interval=(Decimal("0.54"), Decimal("0.70")),
+            data_source="postgresql",
+            mean_stat=Decimal("265.0"),
+        )
+    return {
+        "session_id": "test-session",
+        "request_type": "prop_analysis",
+        "prop_result": prop_result,
+        "nba_prop_result": None,
+        "context_signals": ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=AgentOddsSnapshot(
+                game_id="2024_01_KC_LV",
+                sportsbook="draftkings",
+                market_type=market_type,
+                implied_probability=implied_prob,
+                snapped_at=datetime.now(timezone.utc),
+            ),
+            signals_captured_at=datetime.now(timezone.utc),
+        ),
+        "pending_signals": [],
+        "cleared_signals": [],
+        "prop_type": "pass_yds",
+        "prop_line": "250.5",
+    }
+
+
+def _make_nba_state(
+    true_prob: Decimal = Decimal("0.62"),
+    implied_prob: Decimal = Decimal("0.50"),
+) -> dict:
+    """Return a minimal GraphState dict with nba_prop_result set (sport='nba' branch)."""
+    nba_prop_result = PropResult(
+        true_probability=true_prob,
+        sample_size=30,
+        confidence_interval=(Decimal("0.54"), Decimal("0.70")),
+        data_source="postgresql",
+        mean_stat=Decimal("22.5"),
+    )
+    return {
+        "session_id": "test-session-nba",
+        "request_type": "prop_analysis",
+        "prop_result": None,
+        "nba_prop_result": nba_prop_result,
+        "context_signals": ContextSignals(
+            game_id="2024_NBA_LAL_BOS",
+            injury_flags={},
+            odds_snapshot=AgentOddsSnapshot(
+                game_id="2024_NBA_LAL_BOS",
+                sportsbook="draftkings",
+                market_type="over_points",
+                implied_probability=implied_prob,
+                snapped_at=datetime.now(timezone.utc),
+            ),
+            signals_captured_at=datetime.now(timezone.utc),
+        ),
+        "pending_signals": [],
+        "cleared_signals": [],
+        "prop_type": "points",
+        "prop_line": "22.5",
+    }
+
+
+def _make_ev_signal(market_type: str, ev_pct: str = "0.05") -> EVSignal:
+    """Helper: create a minimal EVSignal for CorrelationGuard tests."""
+    return EVSignal(
+        ev_percentage=Decimal(ev_pct),
+        true_probability=Decimal("0.55"),
+        implied_probability=Decimal("0.50"),
+        kelly_fraction=Decimal("0.05"),
+        trade_plan=["Bullet 1", "Bullet 2", "Bullet 3"],
+        market_type=market_type,
+    )
+
+
+# ---------------------------------------------------------------------------
+# PROP-06 tests — PropArbitrageAgent
+# ---------------------------------------------------------------------------
+
+class TestProp06EVSignalProduced:
+    """PROP-06: +EV case returns EVSignal with ev_percentage > 0."""
+
+    def test_prop06_ev_signal_produced(self) -> None:
+        """Agent returns EVSignal with ev_percentage > 0 when true_prob > implied_prob."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        state = _make_nfl_state(true_prob=Decimal("0.62"), implied_prob=Decimal("0.50"))
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, "Expected EVSignal for +EV prop, got None"
+        assert ev_signal.ev_percentage > Decimal("0"), (
+            f"ev_percentage should be > 0, got {ev_signal.ev_percentage}"
+        )
+
+    def test_prop06_kelly_fraction_non_flat(self) -> None:
+        """kelly_fraction must be in (0, 0.25] — never flat, never zero."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        state = _make_nfl_state(true_prob=Decimal("0.62"), implied_prob=Decimal("0.50"))
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, "Expected EVSignal for +EV prop"
+        assert Decimal("0") < ev_signal.kelly_fraction <= Decimal("0.25"), (
+            f"kelly_fraction {ev_signal.kelly_fraction} not in (0, 0.25]"
+        )
+
+    def test_prop06_no_ev_suppressed(self) -> None:
+        """Negative EV (true_prob < implied_prob) returns ev_signal=None."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        state = _make_nfl_state(true_prob=Decimal("0.45"), implied_prob=Decimal("0.50"))
+        result = asyncio.run(agent(state))
+        assert result.get("ev_signal") is None, (
+            "Expected None ev_signal for -EV prop, got a signal"
+        )
+
+    def test_prop06_trade_plan_length(self) -> None:
+        """EVSignal.trade_plan must contain exactly 3 non-empty bullet strings."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        state = _make_nfl_state(true_prob=Decimal("0.62"), implied_prob=Decimal("0.50"))
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, "Expected EVSignal for +EV prop"
+        assert len(ev_signal.trade_plan) == 3, (
+            f"trade_plan must have 3 bullets, got {len(ev_signal.trade_plan)}"
+        )
+        for i, bullet in enumerate(ev_signal.trade_plan):
+            assert isinstance(bullet, str) and bullet.strip(), (
+                f"trade_plan[{i}] is empty or not a string: {bullet!r}"
+            )
+
+    def test_prop06_missing_prop_result(self) -> None:
+        """State with prop_result=None returns ev_signal=None."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        state = _make_nfl_state(prop_result=None)
+        result = asyncio.run(agent(state))
+        assert result.get("ev_signal") is None, (
+            "Expected None ev_signal when prop_result is None"
+        )
+
+
+# ---------------------------------------------------------------------------
+# PROP-07 tests — CorrelationGuard extension
+# ---------------------------------------------------------------------------
+
+class TestProp07CorrelationGuard:
+    """PROP-07: CorrelationGuard CONFLICT_PAIRS covers prop-to-prop pairs."""
+
+    def test_prop07_prop_conflict_blocked(self) -> None:
+        """Batch with over_pass_yds + under_rec_yds — CorrelationGuard removes both."""
+        from sportsbet.arbitrage.correlation_guard import CorrelationGuard
+        guard = CorrelationGuard()
+        signals = [
+            _make_ev_signal("over_pass_yds"),
+            _make_ev_signal("under_rec_yds"),
+            _make_ev_signal("over_rush_yds"),  # this one should survive
+        ]
+        cleared = guard.check(signals)
+        market_types = {s.market_type for s in cleared}
+        assert "over_pass_yds" not in market_types, "over_pass_yds should be blocked"
+        assert "under_rec_yds" not in market_types, "under_rec_yds should be blocked"
+        assert "over_rush_yds" in market_types, "over_rush_yds should pass (no conflict)"
+
+    def test_prop07_conflict_pairs_extended(self) -> None:
+        """CONFLICT_PAIRS contains frozenset({'over_pass_yds', 'under_rec_yds'})."""
+        expected_pair = frozenset({"over_pass_yds", "under_rec_yds"})
+        assert expected_pair in CONFLICT_PAIRS, (
+            f"Expected {expected_pair} in CONFLICT_PAIRS. "
+            f"Current CONFLICT_PAIRS: {CONFLICT_PAIRS}"
+        )
+
+    def test_prop07_no_conflict_passes(self) -> None:
+        """Single non-conflicting signal (over_pass_yds alone) passes guard unchanged."""
+        from sportsbet.arbitrage.correlation_guard import CorrelationGuard
+        guard = CorrelationGuard()
+        signals = [_make_ev_signal("over_pass_yds")]
+        cleared = guard.check(signals)
+        assert len(cleared) == 1, (
+            f"Single non-conflicting signal should pass, got {len(cleared)} signals"
+        )
+        assert cleared[0].market_type == "over_pass_yds"
+
+
+# ---------------------------------------------------------------------------
+# End-to-end pipeline tests
+# ---------------------------------------------------------------------------
+
+class TestE2EPropPipeline:
+    """End-to-end integration tests calling make_prop_arbitrage_agent directly."""
+
+    def test_e2e_nfl_prop_pipeline(self) -> None:
+        """NFL prop pipeline: PropResult + ContextSignals -> non-None EVSignal."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        state = _make_nfl_state(true_prob=Decimal("0.62"), implied_prob=Decimal("0.50"))
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, "E2E NFL: expected non-None EVSignal"
+        assert isinstance(ev_signal.ev_percentage, Decimal)
+        assert isinstance(ev_signal.kelly_fraction, Decimal)
+        assert isinstance(ev_signal.trade_plan, list)
+        pending = result.get("pending_signals", [])
+        assert len(pending) == 1, f"Expected 1 pending signal, got {len(pending)}"
+        assert pending[0] is ev_signal
+
+    def test_e2e_nba_prop_pipeline(self) -> None:
+        """NBA prop pipeline: reads nba_prop_result when sport='nba'."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nba")
+        state = _make_nba_state(true_prob=Decimal("0.62"), implied_prob=Decimal("0.50"))
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, (
+            "E2E NBA: expected non-None EVSignal from nba_prop_result"
+        )
+        assert isinstance(ev_signal.ev_percentage, Decimal)
+        pending = result.get("pending_signals", [])
+        assert len(pending) == 1
