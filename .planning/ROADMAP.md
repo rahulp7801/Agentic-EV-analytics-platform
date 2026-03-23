@@ -20,6 +20,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Kinematic Agent** - NGS tracking queries, geometric matchup signals, and season availability guards (completed 2026-03-21)
 - [x] **Phase 7: Production Runtime Wiring** - Wire all Phase 5/6 nodes into create_graph_with_sqlite(), fix GraphState schema, and connect vig removal to EV pipeline (completed 2026-03-22)
 - [x] **Phase 8: Data Pipeline and Backtest Completion** - Persist live odds for CLV tracking, fix avg_time_to_throw query gap, and add BacktestEngine CLI entry point (completed 2026-03-22)
+- [x] **Phase 9: Critical Pipeline Gap Closure** - Fix air_yards column error, wire staleness gate, and fix CLV price field (completed 2026-03-22)
+- [x] **Phase 10: Player Prop and NBA Data Layer** - PlayerPropSnapshot ORM, PropParams/PropResult models, and NBA player stats ingestion (completed 2026-03-23)
+- [x] **Phase 11: NFL Player Prop Quant Engine** - PropQueryBuilder, NFL prop probability from historical distributions, kinematic integration (completed 2026-03-23)
+- [x] **Phase 12: NBA Player Prop Quant Engine** - NBAQueryBuilder, NormalDist CDF probability, pace/rest/defensive rating adjustments (completed 2026-03-23)
+- [x] **Phase 13: Player Prop Arbitrage and Pipeline Wiring** - PropArbitrageAgent, extended CorrelationGuard, full LangGraph prop pipeline wiring (completed 2026-03-23)
+- [ ] **Phase 14: Prop Integration Gap Closure** - Wire live prop odds persistence, fix NBA prop arbitrage sport key mismatch in production factory, declare prop_filters in GraphState
+- [ ] **Phase 15: Context and Vig Completion** - Add NBA game-level odds ingestion to OddsAPIPoller and context agent; wire Pinnacle sharp devig as selectable config option
 
 ## Phase Details
 
@@ -211,13 +218,41 @@ Plans:
   3. An end-to-end pipeline run (Context → PropQuant → PropArbitrage → Aggregator) for an NFL prop and an NBA prop both complete with non-None EV signals against real database data
 
 Plans:
-- [ ] 13-01-PLAN.md — PropArbitrageAgent: EV% calculation, 3-bullet Trade Plan, fractional Kelly sizing for props; extended CorrelationGuard prop conflict matrix
-- [ ] 13-02-PLAN.md — LangGraph wiring: prop_quant_node, nba_quant_node, prop_arbitrage_node added to create_graph_with_sqlite(); route_from_master extended; end-to-end integration test
+- [x] 13-01-PLAN.md — PropArbitrageAgent: EV% calculation, 3-bullet Trade Plan, fractional Kelly sizing for props; extended CorrelationGuard prop conflict matrix
+- [x] 13-02-PLAN.md — LangGraph wiring: prop_quant_node, nba_quant_node, prop_arbitrage_node added to create_graph_with_sqlite(); route_from_master extended; end-to-end integration test
+
+### Phase 14: Prop Integration Gap Closure
+**Goal:** Close the three integration gaps identified by the v1.0 milestone audit — wire live prop odds persistence so player_prop_snapshots is populated, fix the NBA prop arbitrage sport key mismatch that silently returns ev_signal=None for all NBA prop requests, and declare prop_filters in GraphState TypedDict to restore contract integrity
+**Depends on:** Phase 13
+**Requirements:** PROP-01, PROP-06, NBA-02
+**Gap Closure:** Closes PROP-01 (prop persistence unwired), PROP-06 (NBA sport key mismatch), NBA-02 (downstream EVSignal failure), INFRA-01 (prop_filters TypedDict gap)
+
+**Success Criteria** (what must be TRUE):
+  1. After a context agent run, the `player_prop_snapshots` table contains at least one row with a non-null `implied_probability` — `fetch_player_props()` result is persisted via `write_player_prop_snapshot()`
+  2. An NBA prop pipeline invocation (`nba_quant_agent → prop_arbitrage_agent`) returns a non-None `EVSignal` — the sport mismatch in `create_graph_with_sqlite()` is resolved so `nba_prop_result` is read correctly
+  3. `GraphState` TypedDict declares `prop_filters: dict[str, object]` — `state.get("prop_filters", {})` in `prop/agents.py` and `nba_agents.py` is backed by an explicit TypedDict field
+
+Plans:
+- [ ] 14-01-PLAN.md — Wire fetch_player_props → write_player_prop_snapshot; fix NBA prop_arbitrage sport mismatch; add prop_filters to GraphState
+
+### Phase 15: Context and Vig Completion
+**Goal:** Complete the two deferred v1 capabilities — add NBA game-level odds ingestion to OddsAPIPoller and context agent so NBA market context flows through GraphState, and wire the Pinnacle sharp devig method as a config-selectable alternative to multiplicative devig so QUANT-02 is fully satisfied
+**Depends on:** Phase 14
+**Requirements:** QUANT-02, CTXT-01, CTXT-04
+**Gap Closure:** Closes QUANT-02 partial (Pinnacle method orphaned), CTXT-04 partial (NFL-only context agent), Flow 2 (NBA game context broken)
+
+**Success Criteria** (what must be TRUE):
+  1. `OddsAPIPoller` exposes a `fetch_nba_odds()` method and `make_context_agent` routes NBA sport requests to it — an NBA context agent run produces a `ContextSignals` object with a non-None `odds_snapshot`
+  2. A config flag (`vig_method: "multiplicative" | "pinnacle"`) controls which devig function `_extract_odds_snapshot` calls — setting `vig_method="pinnacle"` causes `remove_vig_power` to be used instead of `remove_vig_multiplicative`, with a test confirming the outputs differ
+  3. All existing NFL context agent tests continue to pass — the NBA routing addition is additive and does not break the NFL flow
+
+Plans:
+- [ ] 15-01-PLAN.md — Add fetch_nba_odds() to OddsAPIPoller; update make_context_agent for sport routing; wire remove_vig_power via config flag
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -234,3 +269,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 11. NFL Player Prop Quant Engine | 2/2 | Complete    | 2026-03-23 |
 | 12. NBA Player Prop Quant Engine | 2/2 | Complete    | 2026-03-23 |
 | 13. Player Prop Arbitrage and Pipeline Wiring | 2/2 | Complete    | 2026-03-23 |
+| 14. Prop Integration Gap Closure | 0/1 | Pending    |  |
+| 15. Context and Vig Completion | 0/1 | Pending    |  |
