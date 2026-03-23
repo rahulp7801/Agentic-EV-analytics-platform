@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-03-23T00:51:49.817Z"
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-03-23T00:57:10.170Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 13
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 23
-  completed_plans: 22
+  completed_plans: 23
   percent: 100
 ---
 
@@ -71,6 +71,7 @@ Progress: [██████████] 100%
 | Phase 08-data-pipeline-and-backtest P01 | 30 | 4 tasks | 6 files |
 | Phase 09-critical-pipeline-gap-closure P01 | 15 | 3 tasks | 7 files |
 | Phase 10-player-prop-and-nba-data-layer P01 | 4 | 3 tasks | 9 files |
+| Phase 10-player-prop-and-nba-data-layer P02 | 3 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,8 @@ Recent decisions affecting current work:
 - [Phase 10-player-prop-and-nba-data-layer]: PropParams.season ge=2000 (not ge=1999): NBA data boundary — earliest reliable NBA stats start 2000 season
 - [Phase 10-player-prop-and-nba-data-layer]: BudgetExhaustedError threshold <10 in fetch_player_props(): two-step fetch consumes 2+ credits; 10-credit buffer prevents mid-batch exhaustion
 - [Phase 10-player-prop-and-nba-data-layer]: Migration 0004 adds both player_prop_snapshots and nba_player_stats in same file — single atomic upgrade/downgrade, no partial schema states
+- [Phase 10-player-prop-and-nba-data-layer]: nba_api returns pandas DataFrames directly — no .to_pandas() call needed (unlike nflreadpy/Polars); documented in module docstring
+- [Phase 10-player-prop-and-nba-data-layer]: broad Exception catch in ingest_nba_seasons() covers ReadTimeout, httpx.ReadTimeout, and connection errors without hard dependency on requests/httpx
 
 ### Pending Todos
 
@@ -162,6 +165,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T00:51:49.812Z
-Stopped at: Completed 10-01-PLAN.md
+Last session: 2026-03-23T00:57:10.161Z
+Stopped at: Completed 10-02-PLAN.md
 Resume file: None

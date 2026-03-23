@@ -58,7 +58,7 @@
 
 ### NBA Data Foundation
 
-- [ ] **NBA-01**: System ingests NBA player box scores (points, rebounds, assists, 3PM, steals, blocks, minutes) via `nba_api` with a year-by-year loading loop and composite index on season/game/player_id
+- [x] **NBA-01**: System ingests NBA player box scores (points, rebounds, assists, 3PM, steals, blocks, minutes) via `nba_api` with a year-by-year loading loop and composite index on season/game/player_id
 - [ ] **NBA-02**: System applies pace adjustment, back-to-back rest penalty, and opponent defensive rating weighting to NBA player prop probability distributions
 
 ## v2 Requirements
@@ -128,7 +128,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROP-05 | Phase 12 | Pending |
 | PROP-06 | Phase 13 | Pending |
 | PROP-07 | Phase 13 | Pending |
-| NBA-01 | Phase 10 | Pending |
+| NBA-01 | Phase 10 | Complete |
 | NBA-02 | Phase 12 | Pending |
 
 **Coverage:**
