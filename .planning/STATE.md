@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 10-02-PLAN.md
-last_updated: "2026-03-23T01:00:27.495Z"
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-03-23T01:47:04.087Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 13
   completed_phases: 10
-  total_plans: 23
-  completed_plans: 23
+  total_plans: 25
+  completed_plans: 24
   percent: 100
 ---
 
@@ -72,6 +72,7 @@ Progress: [██████████] 100%
 | Phase 09-critical-pipeline-gap-closure P01 | 15 | 3 tasks | 7 files |
 | Phase 10-player-prop-and-nba-data-layer P01 | 4 | 3 tasks | 9 files |
 | Phase 10-player-prop-and-nba-data-layer P02 | 3 | 3 tasks | 2 files |
+| Phase 11-nfl-player-prop-quant-engine P01 | 4 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,9 @@ Recent decisions affecting current work:
 - [Phase 10-player-prop-and-nba-data-layer]: Migration 0004 adds both player_prop_snapshots and nba_player_stats in same file — single atomic upgrade/downgrade, no partial schema states
 - [Phase 10-player-prop-and-nba-data-layer]: nba_api returns pandas DataFrames directly — no .to_pandas() call needed (unlike nflreadpy/Polars); documented in module docstring
 - [Phase 10-player-prop-and-nba-data-layer]: broad Exception catch in ingest_nba_seasons() covers ReadTimeout, httpx.ReadTimeout, and connection errors without hard dependency on requests/httpx
+- [Phase 11-nfl-player-prop-quant-engine]: PROP_COLUMN_MAP keys are Python string literals keyed by prop_type Literal — allowlist substitution into SQL template; no user input reaches SQL string
+- [Phase 11-nfl-player-prop-quant-engine]: float(params.line) as args[2] in PropQueryBuilder.build() — avoids asyncpg NUMERIC/SMALLINT operator ambiguity
+- [Phase 11-nfl-player-prop-quant-engine]: _apply_kinematic_adjustment stub returns result unchanged when kinematic=None — Plan 02 fills in delta/clamping logic
 
 ### Pending Todos
 
@@ -165,6 +169,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T00:57:10.161Z
-Stopped at: Completed 10-02-PLAN.md
+Last session: 2026-03-23T01:47:04.082Z
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None
