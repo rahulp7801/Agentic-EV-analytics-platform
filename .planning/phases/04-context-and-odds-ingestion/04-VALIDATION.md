@@ -1,10 +1,11 @@
 ---
 phase: 4
 slug: context-and-odds-ingestion
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-13
+updated: 2026-03-24
 ---
 
 # Phase 4 — Validation Strategy
@@ -38,14 +39,14 @@ created: 2026-03-13
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 4-01-01 | 01 | 0 | CTXT-01 | unit | `pytest tests/test_context.py::test_odds_poller_writes_snapshot -x` | ❌ W0 | ⬜ pending |
-| 4-01-02 | 01 | 0 | CTXT-01 | unit | `pytest tests/test_context.py::test_budget_exhausted_raises -x` | ❌ W0 | ⬜ pending |
-| 4-01-03 | 01 | 0 | CTXT-02 | unit | `pytest tests/test_context.py::test_staleness_guard_rejects_stale -x` | ❌ W0 | ⬜ pending |
-| 4-01-04 | 01 | 0 | CTXT-02 | unit | `pytest tests/test_context.py::test_staleness_guard_passes_fresh -x` | ❌ W0 | ⬜ pending |
-| 4-02-01 | 02 | 0 | CTXT-03 | unit | `pytest tests/test_context.py::test_espn_injury_parsing -x` | ❌ W0 | ⬜ pending |
-| 4-02-02 | 02 | 0 | CTXT-03 | integration | `pytest tests/test_context.py::test_scraper_writes_injury_report -x` | ❌ W0 | ⬜ pending |
-| 4-03-01 | 03 | 0 | CTXT-04 | unit | `pytest tests/test_context.py::test_context_agent_updates_graphstate -x` | ❌ W0 | ⬜ pending |
-| 4-03-02 | 03 | 0 | CTXT-04 | integration | `pytest tests/test_context.py::test_downstream_reads_state -x` | ❌ W0 | ⬜ pending |
+| 4-01-01 | 01 | 0 | CTXT-01 | unit | `pytest tests/test_context.py::test_odds_poller_writes_snapshot -x` | ✅ | ✅ green |
+| 4-01-02 | 01 | 0 | CTXT-01 | unit | `pytest tests/test_context.py::test_budget_exhausted_raises -x` | ✅ | ✅ green |
+| 4-01-03 | 01 | 0 | CTXT-02 | unit | `pytest tests/test_context.py::test_staleness_guard_rejects_stale -x` | ✅ | ✅ green |
+| 4-01-04 | 01 | 0 | CTXT-02 | unit | `pytest tests/test_context.py::test_staleness_guard_passes_fresh -x` | ✅ | ✅ green |
+| 4-02-01 | 02 | 0 | CTXT-03 | unit | `pytest tests/test_context.py::test_espn_injury_parsing -x` | ✅ | ✅ green |
+| 4-02-02 | 02 | 0 | CTXT-03 | integration | `pytest tests/test_context.py::test_scraper_writes_injury_report -x` | ✅ | ✅ green |
+| 4-03-01 | 03 | 0 | CTXT-04 | unit | `pytest tests/test_context.py::test_context_agent_updates_graphstate -x` | ✅ | ✅ green |
+| 4-03-02 | 03 | 0 | CTXT-04 | integration | `pytest tests/test_context.py::test_downstream_reads_state -x` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -53,12 +54,12 @@ created: 2026-03-13
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_context.py` — stubs for CTXT-01 through CTXT-04 (8 test functions)
-- [ ] `alembic/versions/0002_add_injury_reports.py` — hand-written migration (no autogenerate per Phase 1 decision)
-- [ ] `src/sportsbet/db/models.py` — `InjuryReport` ORM model with composite indexes
-- [ ] `src/sportsbet/graph/models.py` — `ContextSignals` Pydantic model (strict=True)
-- [ ] `src/sportsbet/graph/state.py` — `context_signals: ContextSignals | None` field added to `GraphState`
-- [ ] Framework: `pip install httpx tenacity playwright beautifulsoup4 lxml && playwright install chromium`
+- [x] `tests/test_context.py` — stubs for CTXT-01 through CTXT-04 (8 test functions)
+- [x] `alembic/versions/0002_add_injury_reports.py` — hand-written migration (no autogenerate per Phase 1 decision)
+- [x] `src/sportsbet/db/models.py` — `InjuryReport` ORM model with composite indexes
+- [x] `src/sportsbet/graph/models.py` — `ContextSignals` Pydantic model (strict=True)
+- [x] `src/sportsbet/graph/state.py` — `context_signals: ContextSignals | None` field added to `GraphState`
+- [x] Framework: `pip install httpx tenacity playwright beautifulsoup4 lxml && playwright install chromium`
 
 ---
 
@@ -74,11 +75,11 @@ created: 2026-03-13
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** Retroactively approved 2026-03-24 — all wave_0 test files exist and pass in current test suite (163 passed, 11 skipped-DB, 0 failed).
