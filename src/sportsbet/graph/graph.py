@@ -274,6 +274,18 @@ def create_graph(
     # kinematic_agent always terminates at END (independent pipeline)
     builder.add_edge("kinematic_agent", END)
 
+    # PROP-04 kinematic boost: two-invocation checkpoint pattern (GAP-INT-2).
+    # To incorporate kinematic separation/press-man signals into NFL receiving prop estimates:
+    #   Invocation 1: ainvoke({"request_type": "kinematic_analysis", ...},
+    #                          config={"configurable": {"thread_id": tid}})
+    #                 -> kinematic_agent writes KinematicAnalysis to state["kinematic_result"]
+    #                 -> AsyncSqliteSaver persists it in the checkpoint under thread_id
+    #   Invocation 2: ainvoke({"request_type": "prop_analysis", ...},
+    #                          config={"configurable": {"thread_id": tid}})
+    #                 -> prop_quant_agent reads state.get("kinematic_result") from checkpoint
+    #                 -> _apply_kinematic_adjustment() boosts probability if RECEIVING_PROPS match
+    # Both invocations MUST use the same thread_id. Single-invocation path not supported.
+
     # Both prop quant agents chain to the same prop_arbitrage_agent (single ainvoke)
     builder.add_edge("prop_quant_agent", "prop_arbitrage_agent")
     builder.add_edge("nba_quant_agent", "prop_arbitrage_agent")
