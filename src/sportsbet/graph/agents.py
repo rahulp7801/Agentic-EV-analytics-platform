@@ -237,13 +237,13 @@ def make_context_agent(
             except Exception as exc:
                 log.warning("context_agent_odds_persist_error", error=str(exc))
 
-        # --- Step 1c: Fetch and persist NFL player prop snapshots (PROP-01) ---
-        # Scoped to NFL only in Phase 14; NBA prop ingestion is Phase 15 territory.
+        # --- Step 1c: Fetch and persist player prop snapshots (PROP-01, sport-routed) ---
+        # sport variable resolved at line 187; "nba" routes NBA prop markets, "nfl" routes NFL markets.
         # Sync engine reuses _sync_engine_cache initialized in Step 1b.
         # write_player_prop_snapshot uses sync SQLAlchemy (v1 accepted tradeoff — low concurrency).
         try:
             async with OddsAPIPoller(api_key=api_key, daily_credit_cap=daily_credit_cap) as poller:
-                raw_props = await poller.fetch_player_props("nfl")
+                raw_props = await poller.fetch_player_props(sport)
             if not _sync_engine_cache:
                 import sqlalchemy as _sa
                 from sportsbet.config import settings as _settings_inner
