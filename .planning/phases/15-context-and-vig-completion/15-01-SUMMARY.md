@@ -40,6 +40,7 @@ metrics:
   completed_date: "2026-03-24"
   tasks_completed: 2
   files_modified: 5
+requirements-completed: [QUANT-02, CTXT-01, CTXT-04]
 ---
 
 # Phase 15 Plan 01: Context and Vig Completion Summary

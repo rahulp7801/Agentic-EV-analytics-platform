@@ -60,9 +60,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Pydantic v2 I/O models: QuantParams, QuantResult, EVSignal, AgentOddsSnapshot, GameState with validation (Wave 1, TDD)
-- [ ] 02-02-PLAN.md — GraphState TypedDict, Master Router, 3 stub agents, compiled StateGraph (Wave 2)
-- [ ] 02-03-PLAN.md — SqliteSaver checkpointing integration, bankroll config fields, MemorySaver test fixtures (Wave 3)
+- [x] 02-01-PLAN.md — Pydantic v2 I/O models: QuantParams, QuantResult, EVSignal, AgentOddsSnapshot, GameState with validation (Wave 1, TDD)
+- [x] 02-02-PLAN.md — GraphState TypedDict, Master Router, 3 stub agents, compiled StateGraph (Wave 2)
+- [x] 02-03-PLAN.md — SqliteSaver checkpointing integration, bankroll config fields, MemorySaver test fixtures (Wave 3)
 
 ### Phase 3: Quant Engine
 **Goal**: The system can produce a statistically grounded true probability estimate from PostgreSQL data, validated through a two-stage SQL gate with no raw SQL ever leaving the LLM

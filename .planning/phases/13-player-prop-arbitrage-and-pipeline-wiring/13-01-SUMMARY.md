@@ -42,6 +42,7 @@ metrics:
   tasks_completed: 2
   files_created: 2
   files_modified: 2
+requirements-completed: [PROP-06, PROP-07]
 ---
 
 # Phase 13 Plan 01: PropArbitrageAgent and CorrelationGuard Extension Summary

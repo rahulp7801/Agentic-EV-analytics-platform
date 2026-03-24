@@ -53,6 +53,7 @@ metrics:
   completed: "2026-03-22"
   tasks_completed: 3
   files_modified: 9
+requirements-completed: [PROP-01, PROP-02]
 ---
 
 # Phase 10 Plan 01: Player Prop Data Layer Summary

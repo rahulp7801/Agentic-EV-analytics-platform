@@ -33,7 +33,7 @@ metrics:
   completed_date: "2026-03-23"
   tasks_completed: 2
   files_modified: 7
-requirements_closed: [PROP-01, PROP-06, INFRA-01]
+requirements-completed: [PROP-01, PROP-06, INFRA-01]
 ---
 
 # Phase 14 Plan 01: Prop Integration Gap Closure Summary

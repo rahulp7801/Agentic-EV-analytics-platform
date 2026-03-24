@@ -98,20 +98,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Complete |
-| DATA-03 | Phase 9 | Pending |
+| DATA-03 | Phase 9 | Complete |
 | DATA-04 | Phase 1 | Complete |
 | INFRA-01 | Phase 2 | Complete |
 | INFRA-02 | Phase 2 | Complete |
 | INFRA-03 | Phase 2 | Complete |
 | INFRA-04 | Phase 2 | Complete |
-| QUANT-01 | Phase 9 | Pending |
+| QUANT-01 | Phase 9 | Complete |
 | QUANT-02 | Phase 15 | Complete |
-| QUANT-03 | Phase 9 | Pending |
+| QUANT-03 | Phase 9 | Complete |
 | QUANT-04 | Phase 8 | Complete |
 | CTXT-01 | Phase 4 | Complete |
-| CTXT-02 | Phase 9 | Pending |
+| CTXT-02 | Phase 9 | Complete |
 | CTXT-03 | Phase 4 | Complete |
 | CTXT-04 | Phase 15 | Complete |
 | ARBT-01 | Phase 9 | Complete |
@@ -135,8 +135,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 - v1 requirements: 32 total (23 original + 9 new: PROP-01–PROP-07, NBA-01, NBA-02)
 - Mapped to phases: 32
 - Unmapped: 0 ✓
-- Pending (gap closure phases 14–15): 5 (PROP-01, PROP-06, NBA-02, QUANT-02, CTXT-04)
+- All v1 requirements satisfied — closed by Phase 16 (2026-03-24)
 
 ---
 *Requirements defined: 2026-03-10*
-*Last updated: 2026-03-23 — reset PROP-01, PROP-06, NBA-02 (integration gaps found by v1.0 audit); reassigned QUANT-02, CTXT-04 to Phase 15 gap closure*
+*Last updated: 2026-03-24 — all v1 requirements closed by Phase 16*
