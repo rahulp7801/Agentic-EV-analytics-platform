@@ -9,7 +9,7 @@
 
 - [x] **DATA-01**: System stores NFL game, player, and play-by-play data in a PostgreSQL schema with composite indexes on season, week, player_id, and game_id
 - [x] **DATA-02**: System ingests multi-season NFL PBP data via nfl_data_py using a year-by-year loading loop with column whitelist and gc.collect() to prevent OOM
-- [ ] **DATA-03**: System stores timestamped odds snapshots to PostgreSQL for CLV (closing line value) calculation from day one
+- [x] **DATA-03**: System stores timestamped odds snapshots to PostgreSQL for CLV (closing line value) calculation from day one
 - [x] **DATA-04**: System manages schema versioning and migrations via Alembic
 
 ### Agent Infrastructure
@@ -21,15 +21,15 @@
 
 ### Quant Engine
 
-- [ ] **QUANT-01**: System enforces a two-stage SQL validation gate — LLM produces a QuantParams Pydantic model, query builder constructs parameterized SQL, LLM never produces raw SQL
+- [x] **QUANT-01**: System enforces a two-stage SQL validation gate — LLM produces a QuantParams Pydantic model, query builder constructs parameterized SQL, LLM never produces raw SQL
 - [x] **QUANT-02**: System converts raw sportsbook odds to implied probabilities with configurable vig removal method (multiplicative or Pinnacle sharp)
-- [ ] **QUANT-03**: System executes dynamic historical win-rate SQL queries parameterized by game context (weather, opponent, down/distance, situation)
+- [x] **QUANT-03**: System executes dynamic historical win-rate SQL queries parameterized by game context (weather, opponent, down/distance, situation)
 - [x] **QUANT-04**: System simulates historical signal performance via a backtesting module that replays past QuantResult signals against closing lines
 
 ### Context & Odds Ingestion
 
 - [x] **CTXT-01**: System ingests live odds asynchronously from The Odds API with a budget manager that tracks per-request cost and enforces a configurable daily API spend cap
-- [ ] **CTXT-02**: System rejects any odds payload older than a configurable staleness threshold (default: 5 minutes) before passing to the Arbitrage Agent
+- [x] **CTXT-02**: System rejects any odds payload older than a configurable staleness threshold (default: 5 minutes) before passing to the Arbitrage Agent
 - [x] **CTXT-03**: System scrapes qualitative signals (injury reports, weather forecasts) via async Playwright/BeautifulSoup and stores structured binary state changes
 - [x] **CTXT-04**: Context Agent updates a global game state JSON on binary state changes (e.g., "Starting QB ruled Out") and propagates the updated state through GraphState
 

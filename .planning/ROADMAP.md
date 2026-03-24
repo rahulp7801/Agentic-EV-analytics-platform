@@ -13,7 +13,7 @@ Build a dependency-ordered NFL quant analytics backend: PostgreSQL data foundati
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Data Foundation** - PostgreSQL schema, Alembic migrations, and memory-safe NFL data ingestion (completed 2026-03-10)
-- [ ] **Phase 2: Agent Infrastructure** - LangGraph graph skeleton, GraphState schema, and all Pydantic I/O models
+- [x] **Phase 2: Agent Infrastructure** - LangGraph graph skeleton, GraphState schema, and all Pydantic I/O models (completed 2026-03-10)
 - [x] **Phase 3: Quant Engine** - Two-stage SQL validation gate, probability estimation, and backtesting module (completed 2026-03-13)
 - [x] **Phase 4: Context and Odds Ingestion** - Live odds pipeline, staleness guards, and qualitative signal scraping (completed 2026-03-15)
 - [x] **Phase 5: Arbitrage, Kelly, and Risk Controls** - EV calculation, fractional Kelly sizing, and correlation/drawdown gates (completed 2026-03-15)
@@ -27,6 +27,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 13: Player Prop Arbitrage and Pipeline Wiring** - PropArbitrageAgent, extended CorrelationGuard, full LangGraph prop pipeline wiring (completed 2026-03-23)
 - [x] **Phase 14: Prop Integration Gap Closure** - Wire live prop odds persistence, fix NBA prop arbitrage sport key mismatch in production factory, declare prop_filters in GraphState (completed 2026-03-23)
 - [x] **Phase 15: Context and Vig Completion** - Add NBA game-level odds ingestion to OddsAPIPoller and context agent; wire Pinnacle sharp devig as selectable config option (completed 2026-03-24)
+- [ ] **Phase 16: Integration Fix & Documentation Hygiene** - Fix NBA prop sport routing hardcode, document kinematic two-invocation pattern, repair stale REQUIREMENTS.md checkboxes, ROADMAP.md checkboxes, and 7 SUMMARY files with missing requirements_completed frontmatter
+- [ ] **Phase 17: Nyquist Compliance** - Run retroactive Nyquist validation for phases 3–15 to achieve nyquist_compliant: true and wave_0_complete: true across all 15 phases
 
 ## Phase Details
 
@@ -44,7 +46,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Project scaffold, settings, utils, and test infrastructure stubs (Wave 0)
 - [x] 01-02-PLAN.md — SQLAlchemy ORM models, Alembic migration with all composite indexes, migration tests green
-- [ ] 01-03-PLAN.md — nflreadpy PBP/NGS/player-stats ingestion, odds snapshot writer, CLI entry point
+- [x] 01-03-PLAN.md — nflreadpy PBP/NGS/player-stats ingestion, odds snapshot writer, CLI entry point
 
 ### Phase 2: Agent Infrastructure
 **Goal**: The LangGraph graph skeleton compiles and routes, all agent I/O contracts are defined, and checkpointing is active before any agent logic is written
@@ -249,15 +251,44 @@ Plans:
 Plans:
 - [ ] 15-01-PLAN.md — Add fetch_nba_odds() to OddsAPIPoller; update make_context_agent for sport routing; wire remove_vig_power via config flag
 
+### Phase 16: Integration Fix & Documentation Hygiene
+**Goal:** Close the two remaining integration findings from the v1.0 audit (NBA prop sport routing and kinematic two-invocation documentation), and repair all stale documentation debt — REQUIREMENTS.md checkboxes, ROADMAP.md plan checkboxes, and 7 SUMMARY files with empty requirements_completed fields
+**Depends on:** Phase 15
+**Requirements:** PROP-01, CTXT-04, PROP-04
+**Gap Closure:** Closes GAP-INT-1 (NBA prop snapshot sport hardcode), GAP-INT-2 (kinematic two-invocation pattern undocumented), documentation tech debt from v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. `fetch_player_props(sport)` is called with the dynamic sport value from GraphState in `make_context_agent` — `fetch_player_props("nfl")` is no longer hardcoded when `sport="nba"` is set in state
+  2. `graph.py` contains a comment documenting the two-invocation checkpoint pattern for kinematic prop enhancement (PROP-04)
+  3. REQUIREMENTS.md has all v1 requirement checkboxes set to `[x]` and no "Pending" entries in the traceability rows for satisfied requirements
+  4. All 7 SUMMARY files identified in the audit have non-empty `requirements_completed` frontmatter fields
+
+Plans:
+- [ ] 16-01-PLAN.md — Fix fetch_player_props sport routing; add kinematic two-invocation doc comment; repair all stale REQUIREMENTS.md/ROADMAP.md/SUMMARY documentation
+
+### Phase 17: Nyquist Compliance
+**Goal:** Achieve full Nyquist compliance across all 15 v1 phases by retroactively generating wave-based validation tests for phases 3–15, setting nyquist_compliant: true and wave_0_complete: true in each phase VALIDATION.md
+**Depends on:** Phase 16
+**Gap Closure:** Closes nyquist compliance debt for phases 03–15 identified in v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. All 15 phase VALIDATION.md files have `nyquist_compliant: true` and `wave_0_complete: true`
+  2. Each of phases 3–15 has at least one wave_0 test that validates the phase goal independently
+  3. `/gsd:validate-phase` reports pass for all 13 previously non-compliant phases
+
+Plans:
+- [ ] 17-01-PLAN.md — Retroactive Nyquist validation for phases 3–9 (wave_0 tests + VALIDATION.md updates)
+- [ ] 17-02-PLAN.md — Retroactive Nyquist validation for phases 10–15 (wave_0 tests + VALIDATION.md updates)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-10 |
-| 2. Agent Infrastructure | 2/3 | In Progress|  |
+| 2. Agent Infrastructure | 3/3 | Complete   | 2026-03-10 |
 | 3. Quant Engine | 3/3 | Complete   | 2026-03-13 |
 | 4. Context and Odds Ingestion | 4/4 | Complete   | 2026-03-15 |
 | 5. Arbitrage, Kelly, and Risk Controls | 3/3 | Complete   | 2026-03-15 |
@@ -271,3 +302,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 13. Player Prop Arbitrage and Pipeline Wiring | 2/2 | Complete    | 2026-03-23 |
 | 14. Prop Integration Gap Closure | 1/1 | Complete    | 2026-03-23 |
 | 15. Context and Vig Completion | 1/1 | Complete    | 2026-03-24 |
+| 16. Integration Fix & Documentation Hygiene | 0/1 | Pending     |  |
+| 17. Nyquist Compliance | 0/2 | Pending     |  |
