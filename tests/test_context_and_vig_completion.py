@@ -267,3 +267,60 @@ async def test_make_context_agent_reads_vig_method_from_settings() -> None:
     assert vig_passed == "pinnacle", (
         f"_extract_odds_snapshot should receive vig_method='pinnacle'; got {vig_passed!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# GAP-INT-1: fetch_player_props called with dynamic sport variable (not "nfl")
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_player_props_called_with_nba_when_sport_is_nba() -> None:
+    """make_context_agent with state["sport"]="nba" calls fetch_player_props("nba"), not fetch_player_props("nfl").
+
+    Verifies GAP-INT-1 fix: the sport variable (state.get("sport") or "nfl")
+    is passed into fetch_player_props instead of the hardcoded literal "nfl".
+    """
+    from unittest.mock import call
+
+    mock_pool = MagicMock()
+    state = _make_full_state(sport="nba")
+
+    with (
+        patch.object(OddsAPIPoller, "fetch_nba_odds", new_callable=AsyncMock, return_value=NBA_ODDS_FIXTURE),
+        patch.object(OddsAPIPoller, "fetch_nfl_odds", new_callable=AsyncMock, return_value=[]),
+        patch.object(OddsAPIPoller, "fetch_player_props", new_callable=AsyncMock, return_value=[]) as mock_props,
+        patch("sportsbet.graph.agents.write_player_prop_snapshot"),
+        patch("sportsbet.graph.agents.write_odds_snapshot"),
+        patch("sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries", new_callable=AsyncMock, return_value=[]),
+        patch("sportsbet.ingestion.scraper.InjuryWeatherScraper.write_injury_reports", new_callable=AsyncMock, return_value=0),
+    ):
+        agent = make_context_agent(mock_pool, api_key="test-key", daily_credit_cap=500)
+        await agent(state)  # type: ignore[arg-type]
+
+    mock_props.assert_called_once_with("nba")
+
+
+@pytest.mark.asyncio
+async def test_fetch_player_props_called_with_nfl_when_sport_absent() -> None:
+    """make_context_agent with no sport key calls fetch_player_props("nfl") — regression guard.
+
+    Verifies the default NFL path is not broken by the GAP-INT-1 fix.
+    """
+    mock_pool = MagicMock()
+    state = _make_full_state(sport=None)
+    state.pop("sport", None)
+
+    with (
+        patch.object(OddsAPIPoller, "fetch_nfl_odds", new_callable=AsyncMock, return_value=[]),
+        patch.object(OddsAPIPoller, "fetch_nba_odds", new_callable=AsyncMock, return_value=[]),
+        patch.object(OddsAPIPoller, "fetch_player_props", new_callable=AsyncMock, return_value=[]) as mock_props,
+        patch("sportsbet.graph.agents.write_player_prop_snapshot"),
+        patch("sportsbet.graph.agents.write_odds_snapshot"),
+        patch("sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries", new_callable=AsyncMock, return_value=[]),
+        patch("sportsbet.ingestion.scraper.InjuryWeatherScraper.write_injury_reports", new_callable=AsyncMock, return_value=0),
+    ):
+        agent = make_context_agent(mock_pool, api_key="test-key", daily_credit_cap=500)
+        await agent(state)  # type: ignore[arg-type]
+
+    mock_props.assert_called_once_with("nfl")
