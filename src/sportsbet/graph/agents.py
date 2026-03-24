@@ -133,17 +133,26 @@ def make_context_agent(
     pool: asyncpg.Pool,
     api_key: str,
     daily_credit_cap: int,
+    vig_method: str | None = None,
 ) -> Callable[[GraphState], Coroutine[Any, Any, dict[str, Any]]]:
     """Return an async context agent node bound to pool, api_key, and credit cap.
 
     Pipeline per invocation:
-    1. Fetch live NFL odds via OddsAPIPoller — catches BudgetExhaustedError gracefully
+    1. Detect sport from state["sport"] (defaults to "nfl"); route to fetch_nba_odds or fetch_nfl_odds (Phase 15 — CTXT-04)
     2. Build odds_snapshot (first bookmaker h2h market) or None on budget exhaustion
     3. Persist odds snapshot to odds_snapshots table via write_odds_snapshot (DATA-03)
     4. Fetch injury reports for home + away teams via InjuryWeatherScraper
     5. Write injury rows to injury_reports table via pool
     6. Build injury_flags dict: {"P. Mahomes": "Out"} (status="Out"|"Questionable" only)
     7. Construct ContextSignals and return partial state dict
+
+    Args:
+        pool: asyncpg connection pool for injury report writes.
+        api_key: The Odds API key.
+        daily_credit_cap: Maximum credits per day (budget guard).
+        vig_method: Devig method — "multiplicative" | "pinnacle" | None.
+            None reads the value from Settings.vig_method (default "multiplicative").
+            Passed to _extract_odds_snapshot on each invocation (Phase 15 — QUANT-02).
 
     On any sub-error (BudgetExhaustedError, httpx.HTTPError, ESPN schema error):
     - Log the error via structlog
@@ -152,8 +161,13 @@ def make_context_agent(
     """
     from datetime import datetime, timezone
 
+    from sportsbet.config import settings as _settings
     from sportsbet.graph.models import AgentOddsSnapshot, ContextSignals
     # OddsAPIPoller, BudgetExhaustedError, InjuryWeatherScraper imported at module level for patchability (Phase 14 — PROP-01)
+
+    # Resolve vig_method at construction time — reads from Settings when not explicitly passed.
+    # Stored in the closure so all invocations of context_agent() share the same resolved value.
+    _vig_method = vig_method if vig_method is not None else _settings.vig_method
 
     # Lazily resolved on first agent invocation — avoids DB connection at construction
     # time. Stored in a mutable container so the closure can reassign it.
@@ -167,13 +181,20 @@ def make_context_agent(
         away_team = state["away_team"]
         log.info("context_agent_invoked", session_id=session_id, game_id=game_id)
 
-        # --- Step 1: Fetch odds ---
+        # --- Step 1: Fetch odds (sport-routed) ---
+        # Detect sport from GraphState — None and "nfl" both route to fetch_nfl_odds.
+        # "nba" routes to fetch_nba_odds (Phase 15 — CTXT-04).
+        sport = state.get("sport") or "nfl"  # type: ignore[attr-defined]
+
         odds_snapshot: AgentOddsSnapshot | None = None
         try:
             async with OddsAPIPoller(api_key=api_key, daily_credit_cap=daily_credit_cap) as poller:
-                raw_odds = await poller.fetch_nfl_odds()
-            # Extract first bookmaker h2h market for the matching game
-            odds_snapshot = _extract_odds_snapshot(raw_odds, game_id)
+                if sport == "nba":
+                    raw_odds = await poller.fetch_nba_odds()
+                else:
+                    raw_odds = await poller.fetch_nfl_odds()
+            # Extract first bookmaker h2h market for the matching game; dispatch vig_method (QUANT-02)
+            odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method)
         except BudgetExhaustedError as exc:
             log.warning("context_agent_budget_exhausted", session_id=session_id, error=str(exc))
         except Exception as exc:
@@ -307,12 +328,15 @@ def make_context_agent(
 def _extract_odds_snapshot(
     raw_odds: list[dict],
     game_id: str,
+    vig_method: str = "multiplicative",
 ) -> "AgentOddsSnapshot | None":
     """Extract first bookmaker h2h market from Odds API response as AgentOddsSnapshot.
 
     Converts American odds to fair (devigged) Decimal implied_probability using
-    remove_vig_multiplicative from sportsbet.quant.vig (Phase 7 — INT-04 gap closure).
-    Both-positive-odds markets fall back to raw_probs to avoid ValueError propagation.
+    the selected devig method (Phase 15 — QUANT-02):
+    - "multiplicative" (default): remove_vig_multiplicative — proportional normalization.
+      Both-positive-odds markets fall back to raw_probs to avoid ValueError propagation.
+    - "pinnacle": remove_vig_power — power/binary-search devig correcting favorite-longshot bias.
 
     Returns None if raw_odds is empty, no h2h market found, or fewer than 2 outcomes.
     """
@@ -346,11 +370,15 @@ def _extract_odds_snapshot(
 
     raw_probs = [american_to_raw_prob(p) for p in prices]
 
-    try:
-        fair_probs = remove_vig_multiplicative(raw_probs)
-    except ValueError:
-        # Both-positive-odds market (overround <= 1) — fall back to raw prob for first outcome
-        fair_probs = raw_probs
+    if vig_method == "pinnacle":
+        from sportsbet.quant.vig import remove_vig_power
+        fair_probs = remove_vig_power(raw_probs)
+    else:
+        try:
+            fair_probs = remove_vig_multiplicative(raw_probs)
+        except ValueError:
+            # Both-positive-odds market (overround <= 1) — fall back to raw prob for first outcome
+            fair_probs = raw_probs
 
     # Round to 10 decimal places to eliminate sub-ulp residual from Decimal division.
     # Preserves precision well beyond Kelly Criterion requirements (6 dp sufficient).

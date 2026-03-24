@@ -106,6 +106,11 @@ class GraphState(TypedDict):
         Optional prop filter context passed to PropQueryBuilder and NBAQueryBuilder.
         None for non-prop routes. Access via state.get("prop_filters") or {} in agents.
         Declared here per INFRA-01 — agents used state.get() workaround before Phase 14.
+    sport : str | None
+        Sport context for the request: "nfl" | "nba" | None.
+        None and "nfl" are treated identically — context agent defaults to NFL odds.
+        Set to "nba" to route context agent to fetch_nba_odds() (Phase 15 — CTXT-04).
+        Access via state.get("sport") or "nfl" in agents — never require presence.
     """
 
     session_id: str
@@ -132,3 +137,4 @@ class GraphState(TypedDict):
     prop_type: str  # Prop market type identifier for PropArbitrageAgent (Phase 13 — PROP-06)
     prop_line: Any  # type: ignore[misc]  # Numeric/string prop line value (Phase 13 — PROP-06)
     prop_filters: dict[str, Any] | None  # type: ignore[misc]  # Optional prop filter context; None for non-prop routes (Phase 14 — INFRA-01)
+    sport: str | None  # type: ignore[misc]  # "nfl" | "nba" — None defaults to "nfl" in context agent (Phase 15 — CTXT-04)

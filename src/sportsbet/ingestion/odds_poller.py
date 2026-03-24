@@ -178,6 +178,52 @@ class OddsAPIPoller:
 
         return response.json()  # type: ignore[no-any-return]
 
+    async def fetch_nba_odds(
+        self,
+        regions: str = "us",
+        markets: str = "h2h,spreads,totals",
+    ) -> list[dict]:  # type: ignore[type-arg]
+        """Fetch current NBA game odds from The Odds API.
+
+        Raises:
+            BudgetExhaustedError: If _credits_remaining is not None and < 1.
+                No HTTP call is made in this case.
+            httpx.HTTPStatusError: If the API returns a non-2xx status.
+
+        Returns:
+            Parsed JSON list of event dicts from the Odds API.
+        """
+        if self._credits_remaining is not None and self._credits_remaining < 1:
+            raise BudgetExhaustedError(
+                f"Odds API daily credit cap reached. "
+                f"credits_remaining={self._credits_remaining}, "
+                f"daily_credit_cap={self._daily_credit_cap}"
+            )
+
+        assert self._client is not None, "fetch_nba_odds called outside async context manager"
+
+        response = await self._client.get(
+            f"/v4/sports/{NBA_SPORT_KEY}/odds",
+            params={
+                "apiKey": self._api_key,
+                "regions": regions,
+                "markets": markets,
+            },
+        )
+        response.raise_for_status()
+
+        self._credits_remaining = int(
+            response.headers.get("x-requests-remaining", "0")
+        )
+
+        log.info(
+            "odds_api_fetched",
+            credits_remaining=self._credits_remaining,
+            sport_key=NBA_SPORT_KEY,
+        )
+
+        return response.json()  # type: ignore[no-any-return]
+
     async def fetch_player_props(
         self,
         sport: Literal["nfl", "nba"],

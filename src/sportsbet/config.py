@@ -1,5 +1,7 @@
 """Pydantic v2 settings for Quant-Sports platform."""
 
+from typing import Literal
+
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
@@ -17,6 +19,11 @@ class Settings(BaseSettings):
     # Risk management — Kelly Criterion configuration (Phase 5 agents read these)
     bankroll_usd: float = 10000.0
     max_kelly_fraction: float = 0.25
+
+    # Vig removal method for devigging market odds (Phase 15 — QUANT-02)
+    # "multiplicative": proportional normalization (standard, default)
+    # "pinnacle": power/binary-search devig correcting favorite-longshot bias
+    vig_method: Literal["multiplicative", "pinnacle"] = "multiplicative"
 
 
 settings = Settings()
