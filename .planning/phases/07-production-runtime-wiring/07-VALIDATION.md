@@ -1,10 +1,11 @@
 ---
 phase: 7
 slug: production-runtime-wiring
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-22
+updated: 2026-03-24
 ---
 
 # Phase 7 — Validation Strategy
@@ -38,12 +39,12 @@ created: 2026-03-22
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 7-01-01 | 01 | 0 | KINE-02 | unit | `pytest tests/test_graph.py -k "test_graphstate_has_receiver_gsis_id" -x` | ❌ W0 | ⬜ pending |
-| 7-01-02 | 01 | 0 | QUANT-02 | unit | `pytest tests/test_graph.py -k "test_extract_odds_devigged" -x` | ❌ W0 | ⬜ pending |
-| 7-01-03 | 01 | 0 | ARBT-01,03,04,KINE-01 | smoke | `pytest tests/test_graph.py -k "test_create_graph_with_sqlite_nodes" -x` | ❌ W0 | ⬜ pending |
-| 7-01-04 | 01 | 1 | KINE-02 | unit | `pytest tests/test_graph.py -k "test_graphstate_has_receiver_gsis_id" -x` | ✅ | ⬜ pending |
-| 7-01-05 | 01 | 1 | ARBT-01,03,04,KINE-01 | smoke | `pytest tests/test_graph.py -k "test_create_graph_with_sqlite_nodes" -x` | ✅ | ⬜ pending |
-| 7-01-06 | 01 | 1 | QUANT-02 | unit | `pytest tests/test_graph.py -k "test_extract_odds_devigged" -x` | ✅ | ⬜ pending |
+| 7-01-01 | 01 | 0 | KINE-02 | unit | `pytest tests/test_graph.py -k "test_graphstate_has_receiver_gsis_id" -x` | ✅ | ✅ green |
+| 7-01-02 | 01 | 0 | QUANT-02 | unit | `pytest tests/test_graph.py -k "test_extract_odds_devigged" -x` | ✅ | ✅ green |
+| 7-01-03 | 01 | 0 | ARBT-01,03,04,KINE-01 | smoke | `pytest tests/test_graph.py -k "test_create_graph_with_sqlite_nodes" -x` | ✅ | ✅ green |
+| 7-01-04 | 01 | 1 | KINE-02 | unit | `pytest tests/test_graph.py -k "test_graphstate_has_receiver_gsis_id" -x` | ✅ | ✅ green |
+| 7-01-05 | 01 | 1 | ARBT-01,03,04,KINE-01 | smoke | `pytest tests/test_graph.py -k "test_create_graph_with_sqlite_nodes" -x` | ✅ | ✅ green |
+| 7-01-06 | 01 | 1 | QUANT-02 | unit | `pytest tests/test_graph.py -k "test_extract_odds_devigged" -x` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -51,10 +52,10 @@ created: 2026-03-22
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_graph.py` — add `test_graphstate_has_receiver_gsis_id` (asserts `"receiver_gsis_id"` in `get_type_hints(GraphState)`)
-- [ ] `tests/test_graph.py` — add `test_extract_odds_devigged` (asserts devigged prob != raw division result for -110 American odds)
-- [ ] `tests/test_graph.py` — add `test_create_graph_with_sqlite_nodes` (smoke: `create_graph()` with all 7 node params confirms arbitrage, guard, aggregator, kinematic nodes reachable via `request_type` dispatch; uses `MemorySaver()` not disk)
-- [ ] Update `make_minimal_state()`, `_base_state()`, and `make_checkpoint_state()` in existing test files to include `"receiver_gsis_id": ""`
+- [x] `tests/test_graph.py` — add `test_graphstate_has_receiver_gsis_id` (asserts `"receiver_gsis_id"` in `get_type_hints(GraphState)`)
+- [x] `tests/test_graph.py` — add `test_extract_odds_devigged` (asserts devigged prob != raw division result for -110 American odds)
+- [x] `tests/test_graph.py` — add `test_create_graph_with_sqlite_nodes` (smoke: `create_graph()` with all 7 node params confirms arbitrage, guard, aggregator, kinematic nodes reachable via `request_type` dispatch; uses `MemorySaver()` not disk)
+- [x] Update `make_minimal_state()`, `_base_state()`, and `make_checkpoint_state()` in existing test files to include `"receiver_gsis_id": ""`
 
 ---
 
@@ -68,11 +69,11 @@ created: 2026-03-22
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** Retroactively approved 2026-03-24 — all wave_0 test files exist and pass in current test suite (163 passed, 11 skipped-DB, 0 failed).
