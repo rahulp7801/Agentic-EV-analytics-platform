@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-03-23T22:35:30.550Z"
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-03-24T01:33:40.755Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 15
-  completed_phases: 14
-  total_plans: 30
-  completed_plans: 30
+  completed_phases: 15
+  total_plans: 31
+  completed_plans: 31
   percent: 100
 ---
 
@@ -79,6 +79,7 @@ Progress: [██████████] 100%
 | Phase 13-player-prop-arbitrage-and-pipeline-wiring P01 | 4 | 2 tasks | 4 files |
 | Phase 13-player-prop-arbitrage-and-pipeline-wiring P02 | 5 | 2 tasks | 3 files |
 | Phase 14-prop-integration-gap-closure P01 | 7 | 2 tasks | 7 files |
+| Phase 15-context-and-vig-completion P01 | 5 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -181,6 +182,8 @@ Recent decisions affecting current work:
 - [Phase 14-prop-integration-gap-closure]: Module-level imports of OddsAPIPoller, BudgetExhaustedError, InjuryWeatherScraper, httpx in agents.py — closure-scoped imports cannot be patched via sportsbet.graph.agents.name (extends Phase 8 DATA-03 decision)
 - [Phase 14-prop-integration-gap-closure]: sport=None auto-detect resolves state key at runtime inside closure — single prop_arbitrage_node handles both NFL and NBA routes in create_graph_with_sqlite
 - [Phase 14-prop-integration-gap-closure]: prop_filters: dict[str, Any] | None as last field in GraphState — access via state.get() for non-prop routes; INFRA-01 compliance
+- [Phase 15-context-and-vig-completion]: vig_method resolved at make_context_agent construction time (not invocation) — stored in _vig_method closure; sport detected at invocation time via state.get('sport') or 'nfl' to keep field optional
+- [Phase 15-context-and-vig-completion]: ValueError guard for both-positive-odds markets stays ONLY on multiplicative path — remove_vig_power has no ValueError path; fetch_nba_odds mirrors fetch_nfl_odds with NBA_SPORT_KEY substitution, no new abstractions
 
 ### Pending Todos
 
@@ -194,6 +197,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T22:31:55.172Z
-Stopped at: Completed 14-01-PLAN.md
+Last session: 2026-03-24T01:33:40.745Z
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None

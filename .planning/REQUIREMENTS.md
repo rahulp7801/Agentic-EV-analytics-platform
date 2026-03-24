@@ -113,7 +113,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CTXT-01 | Phase 4 | Complete |
 | CTXT-02 | Phase 9 | Pending |
 | CTXT-03 | Phase 4 | Complete |
-| CTXT-04 | Phase 15 | Pending |
+| CTXT-04 | Phase 15 | Complete |
 | ARBT-01 | Phase 9 | Complete |
 | ARBT-02 | Phase 5 | Complete |
 | ARBT-03 | Phase 5 | Complete |
