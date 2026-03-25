@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-03-24T18:36:19.349Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-03-25T05:51:23.008Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 17
-  completed_phases: 16
-  total_plans: 32
-  completed_plans: 32
+  completed_phases: 17
+  total_plans: 34
+  completed_plans: 34
   percent: 100
 ---
 
@@ -81,6 +81,8 @@ Progress: [██████████] 100%
 | Phase 14-prop-integration-gap-closure P01 | 7 | 2 tasks | 7 files |
 | Phase 15-context-and-vig-completion P01 | 5 | 2 tasks | 5 files |
 | Phase 16-integration-fix-and-doc-hygiene P01 | 6 | 3 tasks | 10 files |
+| Phase 17-nyquist-compliance P01 | 15 | 2 tasks | 7 files |
+| Phase 17-nyquist-compliance P02 | 212 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -187,6 +189,10 @@ Recent decisions affecting current work:
 - [Phase 15-context-and-vig-completion]: ValueError guard for both-positive-odds markets stays ONLY on multiplicative path — remove_vig_power has no ValueError path; fetch_nba_odds mirrors fetch_nfl_odds with NBA_SPORT_KEY substitution, no new abstractions
 - [Phase 16-integration-fix-and-doc-hygiene]: fetch_player_props(sport) uses sport variable already in scope at line 187 — one-line fix, no new parameters needed
 - [Phase 16-integration-fix-and-doc-hygiene]: PROP-04 two-invocation comment placed after kinematic_agent END edge — co-located with node for API consumer visibility; both ainvoke calls must use same thread_id
+- [Phase 17-nyquist-compliance]: Retroactive Nyquist sign-off valid when tests existed and passed before VALIDATION.md updated — documentation debt, not implementation debt
+- [Phase 17-nyquist-compliance]: DB-gated tests (skipif SPORTSBET_TEST_DATABASE_URL) satisfy wave_0 compliance but marked pending (skipif DB) not green for honesty
+- [Phase 17-nyquist-compliance]: Phase 5 Per-Task Map stub IDs corrected to actual collected names via pytest --co -q before any rows marked green
+- [Phase 17-nyquist-compliance]: Phase 13 stale test_correlation_guard.py reference corrected to test_prop_arbitrage.py::TestProp07CorrelationGuard — tests already existed there from Phase 13 execution
 
 ### Pending Todos
 
@@ -200,6 +206,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T18:32:23.759Z
-Stopped at: Completed 16-01-PLAN.md
+Last session: 2026-03-25T05:51:22.998Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None

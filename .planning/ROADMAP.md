@@ -28,7 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 14: Prop Integration Gap Closure** - Wire live prop odds persistence, fix NBA prop arbitrage sport key mismatch in production factory, declare prop_filters in GraphState (completed 2026-03-23)
 - [x] **Phase 15: Context and Vig Completion** - Add NBA game-level odds ingestion to OddsAPIPoller and context agent; wire Pinnacle sharp devig as selectable config option (completed 2026-03-24)
 - [x] **Phase 16: Integration Fix & Documentation Hygiene** - Fix NBA prop sport routing hardcode, document kinematic two-invocation pattern, repair stale REQUIREMENTS.md checkboxes, ROADMAP.md checkboxes, and 7 SUMMARY files with missing requirements_completed frontmatter (completed 2026-03-24)
-- [ ] **Phase 17: Nyquist Compliance** - Run retroactive Nyquist validation for phases 3–15 to achieve nyquist_compliant: true and wave_0_complete: true across all 15 phases
+- [x] **Phase 17: Nyquist Compliance** - Run retroactive Nyquist validation for phases 3–15 to achieve nyquist_compliant: true and wave_0_complete: true across all 15 phases (completed 2026-03-25)
 
 ## Phase Details
 
@@ -303,4 +303,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 14. Prop Integration Gap Closure | 1/1 | Complete    | 2026-03-23 |
 | 15. Context and Vig Completion | 1/1 | Complete    | 2026-03-24 |
 | 16. Integration Fix & Documentation Hygiene | 1/1 | Complete    | 2026-03-24 |
-| 17. Nyquist Compliance | 0/2 | Pending     |  |
+| 17. Nyquist Compliance | 2/2 | Complete   | 2026-03-25 |
