@@ -6,23 +6,33 @@ Data model note:
     must be derived via normal approximation using per-game averages computed
     from season totals divided by games_played.
 
+    For CONDITIONAL queries (opponent_team, home_away, last_n_games, teammate_out set),
+    NBAQueryBuilder dispatches to nba_player_gamelogs templates instead. Gamelogs
+    provide per-game binary outcome counts, enabling Wilson CI (frequency counting)
+    rather than NormalDist approximation.
+
 Security invariant (identical to prop/query_builder.py):
     User-supplied data (player_id, season) NEVER appears in the SQL string.
     All values are passed as positional asyncpg $N params.
-    Column names in SELECT come exclusively from NBA_PROP_COLUMN_MAP (a static dict)
-    keyed by prop_type Literal — prop_type is validated by Pydantic before build()
-    is ever called. No f-string SQL for user data. No string interpolation of user
-    values. Period.
+    Column names in SELECT come exclusively from NBA_PROP_COLUMN_MAP or
+    NBA_GAMELOG_COLUMN_MAP (static dicts) keyed by prop_type Literal — prop_type
+    is validated by Pydantic before build() is ever called.
+    No f-string SQL for user data. No string interpolation of user values. Period.
 
 player_id cast:
-    nba_player_stats.player_id is INTEGER (not VARCHAR). PropParams.player_id is str
-    for cross-sport compat. NBAQueryBuilder.build() always casts int(params.player_id)
-    for $1 — asyncpg would raise DataError on str vs INTEGER mismatch.
+    nba_player_stats.player_id and nba_player_gamelogs.player_id are INTEGER
+    (not VARCHAR). PropParams.player_id is str for cross-sport compat.
+    NBAQueryBuilder.build() always casts int(params.player_id) for $1.
 
-Dispatch logic:
-    - prop_type == "pra"          → _NBA_PRA_TEMPLATE (points + rebounds + assists composite)
-    - prop_type == "double_double" → _NBA_DD_TEMPLATE (per-component averages for inclusion-exclusion)
-    - else                         → _NBA_SINGLE_STAT_TEMPLATE (single column aggregate)
+Dispatch logic (Phase 18 updated):
+    Conditional = any of (last_n_games, teammate_out, opponent_team, home_away) set:
+        - prop_type == "double_double" → season-aggregate path (gamelog DD not modeled)
+        - prop_type == "pra"          → _NBA_GAMELOG_PRA_TEMPLATE + situational filters
+        - else                         → _NBA_GAMELOG_SINGLE_TEMPLATE + situational filters
+    Unconditional (all situational fields None):
+        - prop_type == "pra"          → _NBA_PRA_TEMPLATE
+        - prop_type == "double_double" → _NBA_DD_TEMPLATE
+        - else                         → _NBA_SINGLE_STAT_TEMPLATE
 """
 from __future__ import annotations
 
@@ -43,6 +53,22 @@ NBA_PROP_COLUMN_MAP: dict[str, str] = {
     "threes": "threes_made",
     "steals": "steals",
     "blocks": "blocks",
+}
+
+# ---------------------------------------------------------------------------
+# Phase 18: nba_player_gamelogs column map (per-game binary frequency path)
+# Used for conditional queries (opponent_team, home_away, last_n_games set).
+# nba_player_gamelogs columns may differ from nba_player_stats column names.
+# ---------------------------------------------------------------------------
+
+NBA_GAMELOG_COLUMN_MAP: dict[str, str] = {
+    "points": "points",
+    "rebounds": "rebounds",
+    "assists": "assists",
+    "threes": "threes_made",
+    "steals": "steals",
+    "blocks": "blocks",
+    "pra": None,  # composite — handled by _NBA_GAMELOG_PRA_TEMPLATE
 }
 
 # ---------------------------------------------------------------------------
@@ -119,6 +145,50 @@ WHERE player_id = $1
 """
 
 
+# ---------------------------------------------------------------------------
+# Phase 18: nba_player_gamelogs SQL templates (conditional path)
+# $1 = player_id (int)
+# $2 = season    (int)
+# $3 = line      (float)
+# Situational $N params appended dynamically in NBAQueryBuilder.build()
+# {col} substituted from NBA_GAMELOG_COLUMN_MAP — allowlist only, never user input
+# ---------------------------------------------------------------------------
+
+# Single-stat gamelog template: per-game binary frequency (COUNT/SUM CASE)
+_NBA_GAMELOG_SINGLE_TEMPLATE = """\
+SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN {col} >= $3 THEN 1 ELSE 0 END) AS successes,
+    AVG({col}::float) AS mean_val
+FROM nba_player_gamelogs
+WHERE player_id = $1
+  AND season >= $2
+  AND {col} IS NOT NULL
+"""
+
+# PRA composite gamelog template: points + rebounds + assists binary frequency
+_NBA_GAMELOG_PRA_TEMPLATE = """\
+SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN (points + rebounds + assists) >= $3 THEN 1 ELSE 0 END) AS successes,
+    AVG((points + rebounds + assists)::float) AS mean_val
+FROM nba_player_gamelogs
+WHERE player_id = $1
+  AND season >= $2
+  AND points IS NOT NULL AND rebounds IS NOT NULL AND assists IS NOT NULL
+"""
+
+
+def _is_conditional(params: "PropParams") -> bool:
+    """Return True if any Phase 18 situational filter field is set."""
+    return bool(
+        params.last_n_games is not None
+        or params.teammate_out
+        or params.opponent_team is not None
+        or params.home_away is not None
+    )
+
+
 class NBAQueryBuilder:
     """Builds parameterized asyncpg SQL queries for NBA player props.
 
@@ -147,25 +217,87 @@ class NBAQueryBuilder:
         -------
         tuple[str, tuple[object, ...]]
             (sql_string, args_tuple) where sql_string contains only $N placeholders
-            for user values and {col} substituted from the static NBA_PROP_COLUMN_MAP.
+            for user values and {col} substituted from the static NBA_PROP_COLUMN_MAP
+            or NBA_GAMELOG_COLUMN_MAP.
             Pass to asyncpg as: await conn.fetchrow(sql, *args).
 
         Notes
         -----
-        args[0] = int(params.player_id): nba_player_stats.player_id is INTEGER.
-        PropParams.player_id is str for cross-sport compat — cast required here.
+        args[0] = int(params.player_id): nba_player_stats.player_id and
+        nba_player_gamelogs.player_id are INTEGER. PropParams.player_id is str for
+        cross-sport compat — cast required here.
         asyncpg raises DataError on str vs INTEGER mismatch without explicit cast.
+
+        Phase 18 conditional dispatch:
+        When any situational filter is set (opponent_team, home_away, last_n_games,
+        teammate_out), dispatch to nba_player_gamelogs templates for per-game binary
+        frequency counting. double_double is excluded from gamelog path (no per-game
+        composite binary model in v1 — falls through to season-aggregate path).
+
+        Gamelog home_away: nba_player_gamelogs uses is_home BOOLEAN column (True/False),
+        not the "home"/"away" string used by player_stats. Conversion happens here:
+        "home" -> True, "away" -> False in the args tuple.
         """
         player_id_int: int = int(params.player_id)
-        args: tuple[object, ...] = (player_id_int, params.season)
+
+        # --- Phase 18: conditional gamelog path ---
+        # Dispatch to nba_player_gamelogs when any situational filter is set.
+        # double_double excluded: no per-game composite binary model in v1.
+        if _is_conditional(params) and params.prop_type != "double_double":
+            args: list[object] = [player_id_int, params.season, float(params.line)]
+            next_idx = 4
+
+            # Select gamelog template from static allowlist (not user input)
+            if params.prop_type == "pra":
+                sql: str = _NBA_GAMELOG_PRA_TEMPLATE
+            else:
+                col: str = NBA_GAMELOG_COLUMN_MAP[params.prop_type]  # type: ignore[index]
+                sql = _NBA_GAMELOG_SINGLE_TEMPLATE.format(col=col)
+
+            # Append situational filters — same security invariants as PropQueryBuilder:
+            # column names from static allowlist; values in positional $N args only.
+
+            # opponent_team filter
+            if params.opponent_team is not None:
+                sql = sql + f"  AND opponent_team = ${next_idx}\n"
+                args.append(params.opponent_team)
+                next_idx += 1
+
+            # home_away filter — nba_player_gamelogs uses is_home BOOLEAN (not string)
+            if params.home_away is not None:
+                sql = sql + f"  AND is_home = ${next_idx}\n"
+                args.append(params.home_away == "home")  # "home" -> True, "away" -> False
+                next_idx += 1
+
+            # last_n_games filter — game_id IN subquery (gamelogs have game_id)
+            if params.last_n_games is not None:
+                subq_conditions = "player_id = $1 AND season >= $2"
+                if params.opponent_team is not None:
+                    opp_arg_idx = args.index(params.opponent_team) + 1
+                    subq_conditions += f" AND opponent_team = ${opp_arg_idx}"
+                sql = sql + (
+                    f"  AND game_id IN (\n"
+                    f"      SELECT game_id FROM nba_player_gamelogs\n"
+                    f"      WHERE {subq_conditions}\n"
+                    f"      ORDER BY game_date DESC\n"
+                    f"      LIMIT ${next_idx}\n"
+                    f"  )\n"
+                )
+                args.append(params.last_n_games)
+                next_idx += 1
+
+            return sql, tuple(args)
+
+        # --- Season-aggregate path (unconditional, or double_double) ---
+        base_args: tuple[object, ...] = (player_id_int, params.season)
 
         if params.prop_type == "pra":
-            return _NBA_PRA_TEMPLATE, args
+            return _NBA_PRA_TEMPLATE, base_args
 
         if params.prop_type == "double_double":
-            return _NBA_DD_TEMPLATE, args
+            return _NBA_DD_TEMPLATE, base_args
 
         # Single-stat path: look up column from allowlist, never from user input
-        col: str = NBA_PROP_COLUMN_MAP[params.prop_type]
-        sql: str = _NBA_SINGLE_STAT_TEMPLATE.format(col=col)
-        return sql, args
+        agg_col: str = NBA_PROP_COLUMN_MAP[params.prop_type]
+        agg_sql: str = _NBA_SINGLE_STAT_TEMPLATE.format(col=agg_col)
+        return agg_sql, base_args

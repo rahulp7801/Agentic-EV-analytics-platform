@@ -19,6 +19,7 @@ Pitfall guards (mirroring quant/executor.py patterns):
 """
 from __future__ import annotations
 
+import math
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -80,7 +81,32 @@ async def run_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResult:
     total: int = int(row["total"]) if row and row["total"] is not None else 0
     successes: int = int(row["successes"]) if row and row["successes"] is not None else 0
 
-    if total < MIN_PROP_SAMPLE_SIZE:
+    # Phase 18 SC-5: conditional queries (situational filters set) get wide Wilson CI
+    # instead of an insufficient_sample rejection for small samples.
+    is_conditional: bool = bool(
+        params.last_n_games is not None
+        or params.teammate_out
+        or params.opponent_team is not None
+        or params.home_away is not None
+    )
+
+    # Guard zero — Wilson CI returns NaN for nobs=0 regardless of conditional status
+    if total == 0:
+        log.warning(
+            "prop_insufficient_sample",
+            total=total,
+            min_required=MIN_PROP_SAMPLE_SIZE,
+            prop_type=params.prop_type,
+            is_conditional=is_conditional,
+        )
+        return PropResult(
+            data_source="insufficient_sample",
+            sample_size=0,
+        )
+
+    # Hard gate: only apply for unconditional queries (preserves existing behavior).
+    # Conditional queries with small samples receive wide Wilson CI instead (SC-5).
+    if not is_conditional and total < MIN_PROP_SAMPLE_SIZE:
         log.warning(
             "prop_insufficient_sample",
             total=total,
@@ -98,6 +124,19 @@ async def run_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResult:
     hi: float
     lo, hi = proportion_confint(count=successes, nobs=total, alpha=0.05, method="wilson")
 
+    # Belt-and-suspenders NaN guard (nobs=1 edge case safety net)
+    if math.isnan(lo) or math.isnan(hi):
+        log.warning(
+            "prop_wilson_ci_nan",
+            total=total,
+            successes=successes,
+            prop_type=params.prop_type,
+        )
+        return PropResult(
+            data_source="insufficient_sample",
+            sample_size=total,
+        )
+
     true_prob = Decimal(str(round(successes / total, 6)))
     ci: tuple[Decimal, Decimal] = (
         Decimal(str(round(lo, 6))),
@@ -109,6 +148,13 @@ async def run_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResult:
     if row and row["mean_val"] is not None:
         mean_stat = Decimal(str(round(float(row["mean_val"]), 2)))
 
+    # Tag conditional small samples distinctly for downstream consumers (SC-5).
+    # Callers can inspect data_source to know the CI is wide and adjust confidence.
+    data_src: str = (
+        "conditional_small_sample" if (is_conditional and total < MIN_PROP_SAMPLE_SIZE)
+        else "postgresql"
+    )
+
     log.info(
         "prop_result_computed",
         true_probability=str(true_prob),
@@ -116,12 +162,13 @@ async def run_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResult:
         ci_lo=str(ci[0]),
         ci_hi=str(ci[1]),
         mean_stat=str(mean_stat) if mean_stat is not None else "None",
+        data_source=data_src,
     )
 
     return PropResult(
         true_probability=true_prob,
         sample_size=total,
         confidence_interval=ci,
-        data_source="postgresql",
+        data_source=data_src,
         mean_stat=mean_stat,
     )
