@@ -153,6 +153,12 @@ class PropParams(BaseModel):
 
     ConfigDict(strict=True) — no coercion, no v1 class Config patterns.
     LLM produces PropParams; Phase 11 PropQueryBuilder constructs SQL from it.
+
+    Phase 18 situational filter additions (SC-3):
+    last_n_games, teammate_out, opponent_team, home_away are Optional with None
+    defaults — fully backward-compatible; existing callers pass without those fields
+    and PropParams still validates. Plan 03 PropQueryBuilder consumes these to
+    apply conditional game-log filters at query time.
     """
 
     model_config = ConfigDict(strict=True)
@@ -185,6 +191,13 @@ class PropParams(BaseModel):
     ]
     line: Decimal
     filters: dict[str, object]
+    # Situational filter extensions (Phase 18 — SC-3)
+    # All Optional with None defaults — backward compatible; existing callers unchanged.
+    # ConfigDict(strict=True) accepts Optional[T] = None per Phase 9 locked decision.
+    last_n_games: Optional[int] = None
+    teammate_out: Optional[list[str]] = None
+    opponent_team: Optional[str] = None
+    home_away: Optional[Literal["home", "away"]] = None
 
 
 class PropResult(BaseModel):

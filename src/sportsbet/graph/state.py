@@ -111,6 +111,11 @@ class GraphState(TypedDict):
         None and "nfl" are treated identically — context agent defaults to NFL odds.
         Set to "nba" to route context agent to fetch_nba_odds() (Phase 15 — CTXT-04).
         Access via state.get("sport") or "nfl" in agents — never require presence.
+    situational_params : dict[str, Any] | None
+        Situational filter context injected by ContextAgent after news/injury parsing
+        (Phase 18 — SC-3). Non-None when injury_flags contains Out/Inactive players.
+        Contains "teammate_out_signals" list for use by PropQueryBuilder in Plan 03.
+        None for routes with no relevant injury context. Access via state.get().
     """
 
     session_id: str
@@ -138,3 +143,4 @@ class GraphState(TypedDict):
     prop_line: Any  # type: ignore[misc]  # Numeric/string prop line value (Phase 13 — PROP-06)
     prop_filters: dict[str, Any] | None  # type: ignore[misc]  # Optional prop filter context; None for non-prop routes (Phase 14 — INFRA-01)
     sport: str | None  # type: ignore[misc]  # "nfl" | "nba" — None defaults to "nfl" in context agent (Phase 15 — CTXT-04)
+    situational_params: dict[str, Any] | None  # type: ignore[misc]  # Injected by ContextAgent after news parsing (Phase 18 — SC-3)
