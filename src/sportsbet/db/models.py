@@ -12,6 +12,7 @@ from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Date,
     ForeignKey,
     Index,
@@ -123,6 +124,10 @@ class PlayerStat(Base):
     receiving_yards: Mapped[Optional[int]] = mapped_column(SmallInteger)
     receiving_tds: Mapped[Optional[int]] = mapped_column(SmallInteger)
     fantasy_points_ppr: Mapped[Optional[Decimal]] = mapped_column(Numeric(7, 2))
+    # Phase 18: opponent_team and home_away added for NFL conditional prop queries.
+    # nullable — existing rows do not have this data; populated on new ingest.
+    opponent_team: Mapped[Optional[str]] = mapped_column(String(3))
+    home_away: Mapped[Optional[str]] = mapped_column(String(4))  # "home" | "away"
 
     __table_args__ = (
         UniqueConstraint(
@@ -309,4 +314,47 @@ class NBAPlayerStats(Base):
         Index("idx_nba_player_season", "player_id", "season"),
         Index("idx_nba_season", "season"),
         Index("idx_nba_team_season", "team_id", "season"),
+    )
+
+
+class NBAPlayerGameLog(Base):
+    """NBA per-game log sourced from nba_api PlayerGameLogs bulk endpoint.
+
+    One row per player per game. Supports Phase 18 situational conditional
+    probability queries (last_n_games, opponent_team, home_away filters).
+
+    Three composite indexes power the conditional query patterns:
+    - idx_nba_gamelog_player_season: player timeline range scans
+    - idx_nba_gamelog_game_date: date+season window queries
+    - idx_nba_gamelog_opponent: opponent-filtered season aggregations
+
+    UniqueConstraint on (player_id, game_id) prevents duplicate ingest rows.
+    is_home and opponent_team are derived at ingest time from the MATCHUP column
+    via "@" detection (see sportsbet.ingestion.nba_gamelogs).
+    """
+
+    __tablename__ = "nba_player_gamelogs"
+
+    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
+    player_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    player_name: Mapped[Optional[str]] = mapped_column(String(100))
+    team_abbreviation: Mapped[Optional[str]] = mapped_column(String(3))
+    game_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    game_date: Mapped[Optional[date]] = mapped_column(Date)
+    season: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    is_home: Mapped[Optional[bool]] = mapped_column(Boolean)
+    opponent_team: Mapped[Optional[str]] = mapped_column(String(3))
+    minutes: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 1))
+    points: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    rebounds: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    assists: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    threes_made: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    steals: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    blocks: Mapped[Optional[int]] = mapped_column(SmallInteger)
+
+    __table_args__ = (
+        UniqueConstraint("player_id", "game_id", name="uq_nba_gamelog_player_game"),
+        Index("idx_nba_gamelog_player_season", "player_id", "season"),
+        Index("idx_nba_gamelog_game_date", "game_date", "season"),
+        Index("idx_nba_gamelog_opponent", "opponent_team", "season"),
     )
