@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 18-02-PLAN.md
-last_updated: "2026-03-25T18:23:41.855Z"
+stopped_at: Completed 18-03-PLAN.md
+last_updated: "2026-03-25T18:37:35.497Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 18
-  completed_phases: 17
+  completed_phases: 18
   total_plans: 37
-  completed_plans: 36
+  completed_plans: 37
   percent: 100
 ---
 
@@ -85,6 +85,7 @@ Progress: [██████████] 100%
 | Phase 17-nyquist-compliance P02 | 212 | 2 tasks | 7 files |
 | Phase 18-situational-game-log-prop-queries P01 | 7 | 3 tasks | 6 files |
 | Phase 18-situational-game-log-prop-queries P02 | 7 | 3 tasks | 5 files |
+| Phase 18-situational-game-log-prop-queries P03 | 11 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -205,6 +206,9 @@ Recent decisions affecting current work:
 - [Phase 18-situational-game-log-prop-queries]: PropParams.home_away: Optional[Literal['home', 'away']] — Literal union enforces strict validation at Pydantic layer before any SQL
 - [Phase 18-situational-game-log-prop-queries]: _extract_situational_params() returns None (not empty dict) when no Out/Inactive players — avoids injecting noise into state for non-injury scenarios
 - [Phase 18-situational-game-log-prop-queries]: situational_params key always present in context_agent return dict (value may be None) — Plan 03 accesses via state.get() for safety
+- [Phase 18-situational-game-log-prop-queries]: NFL last_n_games uses (season,week) IN subquery not game_id IN because existing player_stats rows have NULL game_id (migration 0005)
+- [Phase 18-situational-game-log-prop-queries]: teammate_out uses INTERVAL date-window on injury_reports.scraped_at; injury_reports.game_id is nullable in v1 so direct join unreliable
+- [Phase 18-situational-game-log-prop-queries]: conditional_small_sample data_source tag: executor tags total<30 conditional results so Kelly sizing can apply conservative multipliers
 
 ### Pending Todos
 
@@ -218,6 +222,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T18:23:41.850Z
-Stopped at: Completed 18-02-PLAN.md
+Last session: 2026-03-25T18:37:35.492Z
+Stopped at: Completed 18-03-PLAN.md
 Resume file: None
