@@ -129,6 +129,38 @@ def make_quant_agent(
 # Real context agent — closure factory (Phase 4)
 # ---------------------------------------------------------------------------
 
+def _extract_situational_params(
+    signals: "ContextSignals",
+) -> "dict[str, Any] | None":
+    """Extract situational parameters from ContextSignals for GraphState injection.
+
+    Reads injury_flags from the constructed ContextSignals object and returns a
+    structured dict when any players have Out or Inactive status. Returns None
+    when no relevant injury context exists — avoids noise in non-injury scenarios.
+
+    Called inside make_context_agent closure after ContextSignals is built.
+    Pure function: no async, no DB access. (Phase 18 — SC-3)
+
+    Args:
+        signals: ContextSignals object produced by the context agent.
+
+    Returns:
+        {"teammate_out_signals": [player_name, ...]} when Out/Inactive players exist,
+        None otherwise.
+    """
+    flags = signals.injury_flags
+    if not flags:
+        return None
+    out_players = [
+        player_name
+        for player_name, status in flags.items()
+        if status in ("Out", "Inactive")
+    ]
+    if not out_players:
+        return None
+    return {"teammate_out_signals": out_players}
+
+
 def make_context_agent(
     pool: asyncpg.Pool,
     api_key: str,
@@ -314,13 +346,16 @@ def make_context_agent(
             odds_snapshot=odds_snapshot,
             signals_captured_at=datetime.now(timezone.utc),
         )
+        # Extract situational params from injury signals (Phase 18 — SC-3).
+        # Non-None when Out/Inactive players exist; None otherwise (no noise).
+        situational_params = _extract_situational_params(signals)
         log.info(
             "context_agent_complete",
             session_id=session_id,
             injury_count=len(injury_flags),
             has_odds=odds_snapshot is not None,
         )
-        return {"context_signals": signals}
+        return {"context_signals": signals, "situational_params": situational_params}
 
     return context_agent
 
