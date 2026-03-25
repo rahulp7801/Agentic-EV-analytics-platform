@@ -86,6 +86,10 @@ Progress: [██████████] 100%
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 18 added: Situational Game-Log Prop Queries — conditional game-log analysis for NBA/NFL props (last_n_games, teammate_out, opponent_team, home_away filters); required for v1
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.

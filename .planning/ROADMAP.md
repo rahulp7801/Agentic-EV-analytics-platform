@@ -304,3 +304,21 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 15. Context and Vig Completion | 1/1 | Complete    | 2026-03-24 |
 | 16. Integration Fix & Documentation Hygiene | 1/1 | Complete    | 2026-03-24 |
 | 17. Nyquist Compliance | 2/2 | Complete    | 2026-03-25 |
+| 18. Situational Game-Log Prop Queries | 0/3 | Pending     |  |
+
+### Phase 18: Situational Game-Log Prop Queries
+
+**Goal:** Extend the prop query system to support conditional game-log analysis — querying player performance in highly specific situational contexts (e.g., last N games, teammate out, home/away, specific opponent) for both NBA and NFL, replacing season-aggregate true-probability with game-log-derived conditional probability.
+**Depends on:** Phase 17
+
+**Success Criteria** (what must be TRUE):
+  1. `nba_player_gamelogs` table exists and ingest pipeline populates individual game records (Date, Opponent, Home/Away, Minutes, Points, Rebounds, Assists, etc.)
+  2. Both NBA and NFL schemas can join player game performance against the injury/inactive list for a specific `game_id`
+  3. `PropParams` Pydantic model accepts `last_n_games`, `teammate_out`, `opponent_team`, `home_away` optional filters; `GraphState` allows `ContextAgent` to inject situational params after reading live news
+  4. NBA and NFL `PropQueryBuilder` dynamically construct `WHERE` clauses from `PropParams` filters, querying `nba_player_gamelogs` instead of season aggregates, using positional asyncpg `$N` params only
+  5. `prop/executor.py` and `prop/nba_executor.py` Wilson CI widens gracefully for small conditional samples; no hard `MIN_SAMPLE_SIZE` fail on conditional queries
+
+Plans:
+- [ ] 18-01-PLAN.md — `nba_player_gamelogs` schema + ingest pipeline; injury-join support for NBA and NFL
+- [ ] 18-02-PLAN.md — `PropParams` situational filter extensions + `GraphState` / `ContextAgent` injection
+- [ ] 18-03-PLAN.md — QueryBuilder dynamic WHERE clauses + Executor small-sample Wilson CI widening
