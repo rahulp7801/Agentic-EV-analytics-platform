@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-03-25T06:37:53.830Z"
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-03-25T18:16:50.750Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
-  total_phases: 17
+  total_phases: 18
   completed_phases: 17
-  total_plans: 34
-  completed_plans: 34
+  total_plans: 37
+  completed_plans: 35
   percent: 100
 ---
 
@@ -83,6 +83,7 @@ Progress: [██████████] 100%
 | Phase 16-integration-fix-and-doc-hygiene P01 | 6 | 3 tasks | 10 files |
 | Phase 17-nyquist-compliance P01 | 15 | 2 tasks | 7 files |
 | Phase 17-nyquist-compliance P02 | 212 | 2 tasks | 7 files |
+| Phase 18-situational-game-log-prop-queries P01 | 7 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -197,6 +198,9 @@ Recent decisions affecting current work:
 - [Phase 17-nyquist-compliance]: DB-gated tests (skipif SPORTSBET_TEST_DATABASE_URL) satisfy wave_0 compliance but marked pending (skipif DB) not green for honesty
 - [Phase 17-nyquist-compliance]: Phase 5 Per-Task Map stub IDs corrected to actual collected names via pytest --co -q before any rows marked green
 - [Phase 17-nyquist-compliance]: Phase 13 stale test_correlation_guard.py reference corrected to test_prop_arbitrage.py::TestProp07CorrelationGuard — tests already existed there from Phase 13 execution
+- [Phase 18-situational-game-log-prop-queries]: NBAPlayerGameLog.player_id Integer (not String) — nba_api IDs are integers, consistent with NBAPlayerStats
+- [Phase 18-situational-game-log-prop-queries]: MATCHUP '@' detection for is_home derivation at ingest time — eliminates JOIN on game metadata for every prop query
+- [Phase 18-situational-game-log-prop-queries]: PlayerGameLogs imported at module level (not closure) — patchable by unittest.mock per Phase 8 locked pattern
 
 ### Pending Todos
 
@@ -210,6 +214,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T05:51:22.998Z
-Stopped at: Completed 17-02-PLAN.md
+Last session: 2026-03-25T18:16:50.745Z
+Stopped at: Completed 18-01-PLAN.md
 Resume file: None
