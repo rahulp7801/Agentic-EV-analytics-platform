@@ -304,7 +304,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 15. Context and Vig Completion | 1/1 | Complete    | 2026-03-24 |
 | 16. Integration Fix & Documentation Hygiene | 1/1 | Complete    | 2026-03-24 |
 | 17. Nyquist Compliance | 2/2 | Complete    | 2026-03-25 |
-| 18. Situational Game-Log Prop Queries | 3/3 | Complete   | 2026-03-25 |
+| 18. Situational Game-Log Prop Queries | 3/3 | Complete    | 2026-03-25 |
 
 ### Phase 18: Situational Game-Log Prop Queries
 
