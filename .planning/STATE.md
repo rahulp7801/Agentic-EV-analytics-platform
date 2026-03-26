@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 22-02-PLAN.md
-last_updated: "2026-03-26T19:53:46.906Z"
+stopped_at: Completed 22-01-PLAN.md
+last_updated: "2026-03-26T19:54:05.639Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 22
@@ -93,6 +93,7 @@ Progress: [██████████] 100%
 | Phase 21-nyquist-validation-sign-off P01 | 2 | 1 tasks | 1 files |
 | Phase 21-nyquist-validation-sign-off P02 | 3 | 1 tasks | 1 files |
 | Phase 22-tech-debt-cleanup P02 | 6 | 2 tasks | 3 files |
+| Phase 22-tech-debt-cleanup P01 | 6 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -229,6 +230,9 @@ Recent decisions affecting current work:
 - [Phase 22-tech-debt-cleanup]: backtest_replay.py imports settings from sportsbet.config directly (not get_settings from db/connection — that function does not exist)
 - [Phase 22-tech-debt-cleanup]: CLV-only mode uses closing_implied_prob as QuantResult.true_probability — clv_mean reflects line movement from snapshot to game-time
 - [Phase 22-tech-debt-cleanup]: backtest_replay CLI uses asyncpg.connect() (not pool) for single-shot queries; asyncio.run(_async_main()) pattern per Phase 5 decision
+- [Phase 22-tech-debt-cleanup]: pg_insert(PlayByPlay).on_conflict_do_nothing — NULL game_id rows are v1 limitation (PostgreSQL NULL!=NULL in unique indexes)
+- [Phase 22-tech-debt-cleanup]: log.warning('prop_quant_agent_kinematic_missing') placed before _apply_kinematic_adjustment — observable signal for PROP-04 two-invocation contract violations
+- [Phase 22-tech-debt-cleanup]: datetime.now(timezone.utc) replaces datetime.utcnow() in test_graph.py — consistent with existing line 27 pattern, eliminates Python 3.12 DeprecationWarning
 
 ### Pending Todos
 
@@ -242,6 +246,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T19:53:39.969Z
-Stopped at: Completed 22-02-PLAN.md
+Last session: 2026-03-26T19:54:05.634Z
+Stopped at: Completed 22-01-PLAN.md
 Resume file: None
