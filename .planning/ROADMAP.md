@@ -315,7 +315,7 @@ Plans:
   4. `GraphState.nba_context_signals` is non-None in automated runs — `_apply_nba_context_adjustments` in `nba_agents.py` fires all four adjustment stages
   5. An integration test with a realistic game scenario confirms pace/rest/def_rating adjustments produce a different probability than the unadjusted baseline
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 - [ ] 20-01-PLAN.md — make_nba_context_signals_producer TDD: B2B detection, opponent def_rating proxy, is_home derivation, cold-DB defaults (Wave 1)
@@ -379,7 +379,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 17. Nyquist Compliance | 2/2 | Complete    | 2026-03-25 |
 | 18. Situational Game-Log Prop Queries | 3/3 | Complete    | 2026-03-25 |
 | 19. Critical Integration Fixes | 1/1 | Complete    | 2026-03-26 |
-| 20. NBA Context Signals Auto-Population | 0/3 | Pending | — |
+| 20. NBA Context Signals Auto-Population | 1/3 | In Progress|  |
 | 21. Nyquist Validation Sign-off (Phases 16 & 18) | 0/2 | Pending | — |
 | 22. Tech Debt Cleanup | 0/2 | Pending | — |
 
