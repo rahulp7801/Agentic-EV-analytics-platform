@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-03-26T14:53:43.740Z"
+stopped_at: Completed 20-03-PLAN.md
+last_updated: "2026-03-26T17:19:08.707Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 22
-  completed_phases: 19
+  completed_phases: 20
   total_plans: 41
-  completed_plans: 40
+  completed_plans: 41
   percent: 100
 ---
 
@@ -89,6 +89,7 @@ Progress: [██████████] 100%
 | Phase 19-critical-integration-fixes P01 | 5 | 2 tasks | 4 files |
 | Phase 20-nba-context-signals-auto-population P01 | 15 | 2 tasks | 2 files |
 | Phase 20-nba-context-signals-auto-population P02 | 4 | 1 tasks | 1 files |
+| Phase 20-nba-context-signals-auto-population P03 | 4 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -218,6 +219,7 @@ Recent decisions affecting current work:
 - [Phase Phase 20-02]: nba_context_producer inserted between router and nba_quant_agent — router 'nba_quant_agent' key maps to 'nba_context_producer' destination; nba_quant_agent node name unchanged
 - [Phase Phase 20-02]: _nba_context_stub defined inline in create_graph() body — co-located with usage, avoids module namespace pollution, follows Phase 6 _kinematic_stub pattern
 - [Phase Phase 20-02]: Lazy import of make_nba_context_signals_producer inside if pool is not None block — consistent with Phase 8/14 locked pattern for all pool-gated imports in create_graph_with_sqlite()
+- [Phase Phase Phase 20-03]: patch target is sportsbet.prop.nba_agents.run_nba_prop_query (consumer module, not origin) — Phase 8 patching pattern; target_date passed explicitly to producer for deterministic rest_days; Decimal BASE_PROB values required for PropResult strict=True
 
 ### Pending Todos
 
@@ -231,6 +233,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T14:53:43.729Z
-Stopped at: Completed 20-02-PLAN.md
+Last session: 2026-03-26T17:19:08.693Z
+Stopped at: Completed 20-03-PLAN.md
 Resume file: None
