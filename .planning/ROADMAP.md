@@ -380,7 +380,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 18. Situational Game-Log Prop Queries | 3/3 | Complete    | 2026-03-25 |
 | 19. Critical Integration Fixes | 1/1 | Complete    | 2026-03-26 |
 | 20. NBA Context Signals Auto-Population | 3/3 | Complete    | 2026-03-26 |
-| 21. Nyquist Validation Sign-off (Phases 16 & 18) | 2/2 | Complete   | 2026-03-26 |
+| 21. Nyquist Validation Sign-off (Phases 16 & 18) | 2/2 | Complete    | 2026-03-26 |
 | 22. Tech Debt Cleanup | 0/2 | Pending | — |
 
 ### Phase 18: Situational Game-Log Prop Queries
