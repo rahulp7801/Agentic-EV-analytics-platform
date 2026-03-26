@@ -1,11 +1,13 @@
-"""Prop quant agent: make_prop_quant_agent closure factory.
+"""NFL player prop quant agent: make_prop_quant_agent closure factory.
 
-Phase 11 Plan 01: Delivers the full production path for NFL player prop probability
-estimation: Pydantic gate -> PropQueryBuilder SQL -> Wilson CI -> PropResult.
+Delivers the full production path for NFL player prop probability estimation:
+Pydantic gate -> PropQueryBuilder SQL -> Wilson CI -> kinematic boost -> PropResult.
 
-Kinematic integration is a TODO placeholder for Plan 02:
-- _apply_kinematic_adjustment(result, None, prop_type) is called here as a no-op stub.
-- Plan 02 passes a real KinematicAnalysis object and implements the delta/clamping logic.
+Kinematic integration (PROP-04): For receiving props (rec_yds, rec_tds, receptions),
+the agent reads kinematic_result from GraphState and applies a separation-based
+probability boost. When kinematic_result is None for a receiving prop, a WARNING is
+logged — callers must use the PROP-04 two-invocation pattern (kinematic_agent first,
+then prop_quant_agent in the same thread_id) to provide kinematic context.
 
 Design mirrors make_quant_agent from sportsbet/graph/agents.py:
 - Closure factory binds pool at construction time.
@@ -180,6 +182,12 @@ def make_prop_quant_agent(
 
         # Apply kinematic adjustment — reads kinematic_result from GraphState (Plan 02)
         kinematic_result: Optional[KinematicAnalysis] = state.get("kinematic_result")  # type: ignore[union-attr]
+        if kinematic_result is None and params.prop_type in RECEIVING_PROPS:
+            log.warning(
+                "prop_quant_agent_kinematic_missing",
+                session_id=session_id,
+                prop_type=params.prop_type,
+            )
         result = _apply_kinematic_adjustment(result, kinematic_result, params.prop_type)
 
         log.info(
