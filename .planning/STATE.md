@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 21-02-PLAN.md
-last_updated: "2026-03-26T18:59:34.711Z"
+stopped_at: Completed 22-02-PLAN.md
+last_updated: "2026-03-26T19:53:46.906Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 22
-  completed_phases: 21
-  total_plans: 43
-  completed_plans: 43
+  completed_phases: 22
+  total_plans: 45
+  completed_plans: 45
   percent: 100
 ---
 
@@ -92,6 +92,7 @@ Progress: [██████████] 100%
 | Phase 20-nba-context-signals-auto-population P03 | 4 | 1 tasks | 1 files |
 | Phase 21-nyquist-validation-sign-off P01 | 2 | 1 tasks | 1 files |
 | Phase 21-nyquist-validation-sign-off P02 | 3 | 1 tasks | 1 files |
+| Phase 22-tech-debt-cleanup P02 | 6 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -225,6 +226,9 @@ Recent decisions affecting current work:
 - [Phase 21-nyquist-validation-sign-off]: Phase 16 Wave 0 section had no checklist — added 2 specific passing test names for self-evident verifiability
 - [Phase 21-nyquist-validation-sign-off]: Manual-only tasks (16-01-02,03,04) marked green — verified via grep and confirmed complete in 16-01-SUMMARY.md, consistent with Phase 17 precedent
 - [Phase 21-nyquist-validation-sign-off]: Phase 18 Nyquist sign-off: xfail stubs in test_gamelog_injury_join.py acceptable because SC-2 production behavior covered by GREEN tests in test_prop_query_builder_situational.py — consistent with Phase 17 xfail precedent
+- [Phase 22-tech-debt-cleanup]: backtest_replay.py imports settings from sportsbet.config directly (not get_settings from db/connection — that function does not exist)
+- [Phase 22-tech-debt-cleanup]: CLV-only mode uses closing_implied_prob as QuantResult.true_probability — clv_mean reflects line movement from snapshot to game-time
+- [Phase 22-tech-debt-cleanup]: backtest_replay CLI uses asyncpg.connect() (not pool) for single-shot queries; asyncio.run(_async_main()) pattern per Phase 5 decision
 
 ### Pending Todos
 
@@ -238,6 +242,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T18:53:30.812Z
-Stopped at: Completed 21-02-PLAN.md
+Last session: 2026-03-26T19:53:39.969Z
+Stopped at: Completed 22-02-PLAN.md
 Resume file: None
