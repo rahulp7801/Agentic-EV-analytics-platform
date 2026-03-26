@@ -5,6 +5,11 @@ Phase 13, Plan 01 — tests written RED first before implementation exists.
 Tests:
   PROP-06: PropArbitrageAgent closure factory — EV computation, Kelly sizing, Trade Plan, guard returns.
   PROP-07: CorrelationGuard extended CONFLICT_PAIRS — prop-to-prop and prop-to-game-total pairs.
+
+Phase 23, Plan 01 — adds snapshot match path tests (PROP-06 EV fix):
+  TestProp06PlayerPropSnapshot: snapshot match uses prop implied_prob, prop_type normalization
+  TestProp06NoSnapshotGuard: None/empty/no-match snapshot returns _NO_SIGNAL
+  TestProp06CommensurableEV: EV computed against prop-market probability (not h2h moneyline)
 """
 from __future__ import annotations
 
@@ -35,6 +40,14 @@ try:
 except ImportError:
     CONFLICT_PAIRS = frozenset()  # type: ignore[assignment]
 
+# Phase 23 — PROP-06 snapshot match path: import PlayerPropSnapshotCreate for fixture use
+try:
+    from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
+    _SNAPSHOT_IMPORT_OK = True
+except ImportError:
+    PlayerPropSnapshotCreate = None  # type: ignore[assignment, misc]
+    _SNAPSHOT_IMPORT_OK = False
+
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -45,8 +58,15 @@ def _make_nfl_state(
     implied_prob: Decimal = Decimal("0.50"),
     market_type: str = "over_pass_yds",
     prop_result: PropResult | None = ...,  # type: ignore[assignment]
+    player_prop_snapshots: list | None = ...,  # type: ignore[assignment]
 ) -> dict:
-    """Return a minimal GraphState dict suitable for prop_arbitrage_agent unit tests."""
+    """Return a minimal GraphState dict suitable for prop_arbitrage_agent unit tests.
+
+    Phase 23 update: adds player_prop_snapshots keyword arg. Defaults to a list
+    containing one PlayerPropSnapshotCreate for Patrick Mahomes passing yards,
+    matching prop_type="player_pass_yards" (Odds API format) and line=250.5.
+    Supply player_prop_snapshots=None or [] to test no-snapshot guard paths.
+    """
     if prop_result is ...:  # type: ignore[comparison-overlap]
         prop_result = PropResult(
             true_probability=true_prob,
@@ -55,6 +75,23 @@ def _make_nfl_state(
             data_source="postgresql",
             mean_stat=Decimal("265.0"),
         )
+    # Default player_prop_snapshots: one snap matching prop_type="pass_yds" alias and line=250.5
+    if player_prop_snapshots is ...:  # type: ignore[comparison-overlap]
+        if _SNAPSHOT_IMPORT_OK:
+            player_prop_snapshots = [
+                PlayerPropSnapshotCreate(
+                    sport="nfl",
+                    game_id="2024_01_KC_LV",
+                    player_name="Patrick Mahomes",
+                    sportsbook="draftkings",
+                    prop_type="player_pass_yards",  # Odds API market key format
+                    line=Decimal("250.5"),
+                    price=-115,
+                    implied_probability=implied_prob,
+                )
+            ]
+        else:
+            player_prop_snapshots = None
     return {
         "session_id": "test-session",
         "request_type": "prop_analysis",
@@ -76,14 +113,21 @@ def _make_nfl_state(
         "cleared_signals": [],
         "prop_type": "pass_yds",
         "prop_line": "250.5",
+        "player_prop_snapshots": player_prop_snapshots,
     }
 
 
 def _make_nba_state(
     true_prob: Decimal = Decimal("0.62"),
     implied_prob: Decimal = Decimal("0.50"),
+    player_prop_snapshots: list | None = ...,  # type: ignore[assignment]
 ) -> dict:
-    """Return a minimal GraphState dict with nba_prop_result set (sport='nba' branch)."""
+    """Return a minimal GraphState dict with nba_prop_result set (sport='nba' branch).
+
+    Phase 23 update: adds player_prop_snapshots keyword arg. Defaults to a list
+    containing one PlayerPropSnapshotCreate for LeBron James points,
+    matching prop_type="player_points" (Odds API format) and line=22.5.
+    """
     nba_prop_result = PropResult(
         true_probability=true_prob,
         sample_size=30,
@@ -91,6 +135,23 @@ def _make_nba_state(
         data_source="postgresql",
         mean_stat=Decimal("22.5"),
     )
+    # Default player_prop_snapshots: one snap matching prop_type="points" alias and line=22.5
+    if player_prop_snapshots is ...:  # type: ignore[comparison-overlap]
+        if _SNAPSHOT_IMPORT_OK:
+            player_prop_snapshots = [
+                PlayerPropSnapshotCreate(
+                    sport="nba",
+                    game_id="2024_NBA_LAL_BOS",
+                    player_name="LeBron James",
+                    sportsbook="draftkings",
+                    prop_type="player_points",  # Odds API market key format
+                    line=Decimal("22.5"),
+                    price=-115,
+                    implied_probability=implied_prob,
+                )
+            ]
+        else:
+            player_prop_snapshots = None
     return {
         "session_id": "test-session-nba",
         "request_type": "prop_analysis",
@@ -112,6 +173,7 @@ def _make_nba_state(
         "cleared_signals": [],
         "prop_type": "points",
         "prop_line": "22.5",
+        "player_prop_snapshots": player_prop_snapshots,
     }
 
 
@@ -272,3 +334,277 @@ class TestE2EPropPipeline:
         assert isinstance(ev_signal.ev_percentage, Decimal)
         pending = result.get("pending_signals", [])
         assert len(pending) == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 23 — PROP-06 snapshot match path tests
+# ---------------------------------------------------------------------------
+
+class TestProp06PlayerPropSnapshot:
+    """PROP-06 Phase 23: PropArbitrageAgent uses matched PlayerPropSnapshot implied_prob."""
+
+    def test_snapshot_match_uses_prop_implied_prob(self) -> None:
+        """When player_prop_snapshots is in state (no odds_snapshot), agent uses snapshot implied_prob.
+
+        State has player_prop_snapshots=[snap(prop_type="player_pass_yards", line=250.5,
+        implied_probability=0.50)] and context_signals.odds_snapshot=None.
+        Asserts ev_signal is not None and ev_signal.implied_probability == Decimal("0.50").
+        """
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        assert _SNAPSHOT_IMPORT_OK, "PlayerPropSnapshotCreate not importable"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        snap = PlayerPropSnapshotCreate(
+            sport="nfl",
+            game_id="2024_01_KC_LV",
+            player_name="Patrick Mahomes",
+            sportsbook="draftkings",
+            prop_type="player_pass_yards",
+            line=Decimal("250.5"),
+            price=-115,
+            implied_probability=Decimal("0.50"),
+        )
+        # Build state with prop snapshot but NO odds_snapshot (prop-specific path)
+        state = _make_nfl_state(
+            true_prob=Decimal("0.62"),
+            implied_prob=Decimal("0.50"),
+            player_prop_snapshots=[snap],
+        )
+        # Remove odds_snapshot from context_signals to force snapshot match path
+        from sportsbet.graph.models import ContextSignals
+        state["context_signals"] = ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=None,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, (
+            "Expected non-None EVSignal when player_prop_snapshots match exists"
+        )
+        assert ev_signal.implied_probability == Decimal("0.50"), (
+            f"implied_probability should be Decimal('0.50') from snapshot, "
+            f"got {ev_signal.implied_probability}"
+        )
+
+    def test_prop_type_normalization(self) -> None:
+        """prop_type='pass_yds' (PropParams format) matches snapshot prop_type='player_pass_yards' (Odds API format).
+
+        State has player_prop_snapshots with prop_type='player_pass_yards' and state
+        prop_type='pass_yds'. Asserts match succeeds (ev_signal is not None).
+        """
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        assert _SNAPSHOT_IMPORT_OK, "PlayerPropSnapshotCreate not importable"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        snap = PlayerPropSnapshotCreate(
+            sport="nfl",
+            game_id="2024_01_KC_LV",
+            player_name="Patrick Mahomes",
+            sportsbook="draftkings",
+            prop_type="player_pass_yards",  # Odds API format
+            line=Decimal("250.5"),
+            price=-115,
+            implied_probability=Decimal("0.50"),
+        )
+        state = _make_nfl_state(
+            true_prob=Decimal("0.62"),
+            implied_prob=Decimal("0.50"),
+            player_prop_snapshots=[snap],
+        )
+        # prop_type="pass_yds" is already set in _make_nfl_state — must normalize to "player_pass_yards"
+        state["context_signals"] = ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=None,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, (
+            "Expected non-None EVSignal: prop_type alias 'pass_yds'->'player_pass_yards' should match"
+        )
+
+
+class TestProp06NoSnapshotGuard:
+    """PROP-06 Phase 23: no-snapshot fallback guard returns _NO_SIGNAL."""
+
+    def test_none_snapshots_returns_no_signal(self) -> None:
+        """player_prop_snapshots=None and odds_snapshot=None returns ev_signal=None."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        state = _make_nfl_state(
+            true_prob=Decimal("0.62"),
+            implied_prob=Decimal("0.50"),
+            player_prop_snapshots=None,
+        )
+        state["context_signals"] = ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=None,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        result = asyncio.run(agent(state))
+        assert result.get("ev_signal") is None, (
+            "Expected None ev_signal when player_prop_snapshots=None and no odds_snapshot"
+        )
+
+    def test_empty_snapshots_returns_no_signal(self) -> None:
+        """player_prop_snapshots=[] and odds_snapshot=None returns ev_signal=None."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        state = _make_nfl_state(
+            true_prob=Decimal("0.62"),
+            implied_prob=Decimal("0.50"),
+            player_prop_snapshots=[],
+        )
+        state["context_signals"] = ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=None,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        result = asyncio.run(agent(state))
+        assert result.get("ev_signal") is None, (
+            "Expected None ev_signal when player_prop_snapshots=[] and no odds_snapshot"
+        )
+
+    def test_no_type_match_returns_no_signal(self) -> None:
+        """player_prop_snapshots has snap with wrong prop_type — no match, returns ev_signal=None."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        assert _SNAPSHOT_IMPORT_OK, "PlayerPropSnapshotCreate not importable"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        snap = PlayerPropSnapshotCreate(
+            sport="nfl",
+            game_id="2024_01_KC_LV",
+            player_name="Derrick Henry",
+            sportsbook="draftkings",
+            prop_type="player_rush_yards",  # different prop_type, no match for "pass_yds"
+            line=Decimal("80.5"),
+            price=-115,
+            implied_probability=Decimal("0.50"),
+        )
+        state = _make_nfl_state(
+            true_prob=Decimal("0.62"),
+            implied_prob=Decimal("0.50"),
+            player_prop_snapshots=[snap],
+        )
+        state["context_signals"] = ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=None,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        result = asyncio.run(agent(state))
+        assert result.get("ev_signal") is None, (
+            "Expected None ev_signal when no snapshot matches prop_type='pass_yds'"
+        )
+
+
+class TestProp06CommensurableEV:
+    """PROP-06 Phase 23: EV computed against prop-market probability, not h2h moneyline."""
+
+    def test_ev_uses_prop_implied_prob_not_h2h(self) -> None:
+        """EV computed against prop snapshot implied_prob=0.50, not h2h moneyline.
+
+        true_prob=0.55, matched snapshot implied_probability=0.50:
+        asserts ev_signal.ev_percentage > 0 and ev_signal.implied_probability == 0.50.
+        """
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        assert _SNAPSHOT_IMPORT_OK, "PlayerPropSnapshotCreate not importable"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        snap = PlayerPropSnapshotCreate(
+            sport="nfl",
+            game_id="2024_01_KC_LV",
+            player_name="Patrick Mahomes",
+            sportsbook="draftkings",
+            prop_type="player_pass_yards",
+            line=Decimal("250.5"),
+            price=-115,
+            implied_probability=Decimal("0.50"),
+        )
+        state = _make_nfl_state(
+            true_prob=Decimal("0.55"),
+            implied_prob=Decimal("0.55"),  # h2h moneyline would give 0 EV
+            player_prop_snapshots=[snap],
+        )
+        state["context_signals"] = ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=None,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, (
+            "Expected non-None EVSignal: prop snapshot implied=0.50 vs true=0.55 is +EV"
+        )
+        assert ev_signal.ev_percentage > Decimal("0"), (
+            f"ev_percentage should be > 0, got {ev_signal.ev_percentage}"
+        )
+        assert ev_signal.implied_probability == Decimal("0.50"), (
+            f"implied_probability should come from prop snapshot (0.50), not h2h"
+        )
+
+    def test_kelly_sizing_nonzero_with_positive_ev(self) -> None:
+        """Kelly fraction is in (0, 0.25] when EV > 0 from prop snapshot match."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        assert _SNAPSHOT_IMPORT_OK, "PlayerPropSnapshotCreate not importable"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        snap = PlayerPropSnapshotCreate(
+            sport="nfl",
+            game_id="2024_01_KC_LV",
+            player_name="Patrick Mahomes",
+            sportsbook="draftkings",
+            prop_type="player_pass_yards",
+            line=Decimal("250.5"),
+            price=-115,
+            implied_probability=Decimal("0.50"),
+        )
+        state = _make_nfl_state(
+            true_prob=Decimal("0.55"),
+            implied_prob=Decimal("0.55"),
+            player_prop_snapshots=[snap],
+        )
+        state["context_signals"] = ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=None,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        result = asyncio.run(agent(state))
+        ev_signal = result.get("ev_signal")
+        assert ev_signal is not None, "Expected non-None EVSignal for +EV prop snapshot"
+        assert Decimal("0") < ev_signal.kelly_fraction <= Decimal("0.25"), (
+            f"kelly_fraction {ev_signal.kelly_fraction} not in (0, 0.25]"
+        )
+
+    def test_ev_zero_when_true_prob_equals_implied(self) -> None:
+        """No edge when true_prob == snapshot implied_probability — ev_signal is None."""
+        assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
+        assert _SNAPSHOT_IMPORT_OK, "PlayerPropSnapshotCreate not importable"
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        snap = PlayerPropSnapshotCreate(
+            sport="nfl",
+            game_id="2024_01_KC_LV",
+            player_name="Patrick Mahomes",
+            sportsbook="draftkings",
+            prop_type="player_pass_yards",
+            line=Decimal("250.5"),
+            price=-115,
+            implied_probability=Decimal("0.50"),
+        )
+        state = _make_nfl_state(
+            true_prob=Decimal("0.50"),  # true_prob == snapshot implied_prob -> zero EV
+            implied_prob=Decimal("0.50"),
+            player_prop_snapshots=[snap],
+        )
+        state["context_signals"] = ContextSignals(
+            game_id="2024_01_KC_LV",
+            injury_flags={},
+            odds_snapshot=None,
+            signals_captured_at=datetime.now(timezone.utc),
+        )
+        result = asyncio.run(agent(state))
+        assert result.get("ev_signal") is None, (
+            "Expected None ev_signal when true_prob == snapshot implied_probability (no edge)"
+        )
