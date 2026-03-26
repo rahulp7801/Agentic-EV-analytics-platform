@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
  (completed 2026-03-26)
 - [x] **Phase 22: Tech Debt Cleanup** - Fix PBP idempotency, Python 3.12 deprecation warnings, stale docstrings, PROP-04 missing kinematic warning, QUANT-04 automated closing-line pipeline, and documentation text fixes (Tech Debt)
  (completed 2026-03-26)
-- [ ] **Phase 23: Fix PropArbitrageAgent EV — Player Prop Implied Probability** - Wire prop_arbitrage_agent to read player_prop_snapshots and derive implied probability from the matched player prop line instead of h2h moneyline odds (Gap Closure — PROP-06)
+- [x] **Phase 23: Fix PropArbitrageAgent EV — Player Prop Implied Probability** - Wire prop_arbitrage_agent to read player_prop_snapshots and derive implied probability from the matched player prop line instead of h2h moneyline odds (Gap Closure — PROP-06) (completed 2026-03-26)
 - [ ] **Phase 24: Integration Documentation and Backtest NULL Fix** - Document quant->arbitrage and context->prop multi-invocation patterns; fix load_snapshots LEFT JOIN to prevent silent row drops on null game_id (Gap Closure — ARBT-01, CTXT-04/PROP-04, QUANT-04)
 
 ## Phase Details
@@ -387,7 +387,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 20. NBA Context Signals Auto-Population | 3/3 | Complete    | 2026-03-26 |
 | 21. Nyquist Validation Sign-off (Phases 16 & 18) | 2/2 | Complete    | 2026-03-26 |
 | 22. Tech Debt Cleanup | 2/2 | Complete    | 2026-03-26 |
-| 23. Fix PropArbitrageAgent EV — Player Prop Implied Probability | 0/1 | Pending     | — |
+| 23. Fix PropArbitrageAgent EV — Player Prop Implied Probability | 1/1 | Complete   | 2026-03-26 |
 | 24. Integration Documentation and Backtest NULL Fix | 0/1 | Pending     | — |
 
 ### Phase 18: Situational Game-Log Prop Queries

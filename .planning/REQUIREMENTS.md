@@ -53,7 +53,7 @@
 - [x] **PROP-03**: System calculates true probability for NFL player props (passing yards/TDs/completions, rushing yards/attempts/TDs, receiving yards/receptions/targets) from historical PostgreSQL distributions with sample size and confidence interval
 - [x] **PROP-04**: System incorporates Kinematic Agent signals (separation, press-man coverage rate) into NFL receiving prop probability estimates where NGS data is available
 - [x] **PROP-05**: System calculates true probability for NBA player props (points, rebounds, assists, 3PM, steals, blocks, PRA, double-double) using pace-adjusted historical distributions with opponent defensive rating, rest days, and home/away context
-- [ ] **PROP-06**: `PropArbitrageAgent` flags mispriced player props by comparing `PropResult.true_probability` against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis with fractional Kelly sizing — no flat bet sizes
+- [x] **PROP-06**: `PropArbitrageAgent` flags mispriced player props by comparing `PropResult.true_probability` against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis with fractional Kelly sizing — no flat bet sizes
 - [x] **PROP-07**: `CorrelationGuard` is extended with a prop conflict matrix that blocks simultaneous correlated prop exposures (e.g., Over passing yards + Under receiving yards on primary target in same game)
 
 ### NBA Data Foundation
@@ -126,7 +126,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROP-03 | Phase 11 | Complete |
 | PROP-04 | Phase 11 | Complete |
 | PROP-05 | Phase 20 | Complete |
-| PROP-06 | Phase 23 | Pending |
+| PROP-06 | Phase 23 | Complete |
 | PROP-07 | Phase 13 | Complete |
 | NBA-01 | Phase 10 | Complete |
 | NBA-02 | Phase 20 | Complete |
