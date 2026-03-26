@@ -2,8 +2,8 @@
 phase: 22
 slug: tech-debt-cleanup
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-26
 ---
 
@@ -40,10 +40,10 @@ created: 2026-03-26
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 22-01-01 | 01 | 1 | SC-1 PBP idempotency | integration | `pytest tests/ -k "pbp" -q` | ❌ W0 | ⬜ pending |
 | 22-01-02 | 01 | 1 | SC-2 Python 3.12 deprecations | unit | `pytest tests/test_graph.py tests/test_quant.py -W error::DeprecationWarning -q` | ✅ | ⬜ pending |
-| 22-01-03 | 01 | 1 | SC-3 stale docstring | static | `grep -c "TODO placeholder" src/sportsbet/prop/agents.py` | ✅ | ⬜ pending |
+| 22-01-03 | 01 | 1 | SC-3 stale docstring | static | `python -c "import pathlib; text = pathlib.Path('src/sportsbet/prop/agents.py').read_text(); assert 'TODO placeholder' not in text; print('OK')"` | ✅ | ⬜ pending |
 | 22-01-04 | 01 | 1 | SC-4 PROP-04 None warning | unit | `pytest tests/ -k "prop_quant" -q` | ❌ W0 | ⬜ pending |
 | 22-02-01 | 02 | 1 | SC-6 QUANT-04 pipeline | integration | `pytest tests/ -k "backtest" -q` | ❌ W0 | ⬜ pending |
-| 22-02-02 | 02 | 1 | SC-5 DATA-02 text fix | static | `grep "nflreadpy" .planning/REQUIREMENTS.md` | ✅ | ⬜ pending |
+| 22-02-02 | 02 | 1 | SC-5 DATA-02 text fix | static | `python -c "import pathlib; text = pathlib.Path('.planning/REQUIREMENTS.md').read_text(); assert 'nflreadpy' in text; print('OK')"` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -61,17 +61,17 @@ created: 2026-03-26
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| QUANT-04 CLV output is sensible | SC-6 | Requires live DB with odds_snapshots rows | Run `python -m sportsbet.quant.backtest_pipeline --help` and verify output format |
+| QUANT-04 CLV output is sensible | SC-6 | Requires live DB with odds_snapshots rows | Run `python -m sportsbet.quant.backtest_replay --help` and verify output format |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** planning complete
