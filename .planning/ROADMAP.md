@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 16: Integration Fix & Documentation Hygiene** - Fix NBA prop sport routing hardcode, document kinematic two-invocation pattern, repair stale REQUIREMENTS.md checkboxes, ROADMAP.md checkboxes, and 7 SUMMARY files with missing requirements_completed frontmatter (completed 2026-03-24)
 - [x] **Phase 17: Nyquist Compliance** - Run retroactive Nyquist validation for phases 3–15 to achieve nyquist_compliant: true and wave_0_complete: true across all 15 phases (completed 2026-03-25)
 - [x] **Phase 18: Situational Game-Log Prop Queries** - nba_player_gamelogs schema + ingest, PropParams situational filters, dynamic WHERE clauses, Wilson CI widening for small samples (completed 2026-03-25)
-- [ ] **Phase 19: Critical Integration Fixes** - Fix INT-2 sport hardcode in PlayerPropSnapshotCreate and wire situational_params→PropParams bridge in prop_quant_agent (Gap Closure)
+- [x] **Phase 19: Critical Integration Fixes** - Fix INT-2 sport hardcode in PlayerPropSnapshotCreate and wire situational_params→PropParams bridge in prop_quant_agent (Gap Closure) (completed 2026-03-26)
 - [ ] **Phase 20: NBA Context Signals Auto-Population** - Build NBAContextSignals producer agent with B2B detection, opponent def_rating lookup, and home/away resolution wired into pipeline (Gap Closure)
 - [ ] **Phase 21: Nyquist Validation Sign-off for Phases 16 & 18** - Achieve nyquist_compliant: true for phases 16 and 18 via retroactive wave-based validation (Gap Closure)
 - [ ] **Phase 22: Tech Debt Cleanup** - Fix PBP idempotency, Python 3.12 deprecation warnings, stale docstrings, PROP-04 missing kinematic warning, QUANT-04 automated closing-line pipeline, and documentation text fixes (Tech Debt)
@@ -374,7 +374,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 16. Integration Fix & Documentation Hygiene | 1/1 | Complete    | 2026-03-24 |
 | 17. Nyquist Compliance | 2/2 | Complete    | 2026-03-25 |
 | 18. Situational Game-Log Prop Queries | 3/3 | Complete    | 2026-03-25 |
-| 19. Critical Integration Fixes | 0/1 | Pending | — |
+| 19. Critical Integration Fixes | 1/1 | Complete   | 2026-03-26 |
 | 20. NBA Context Signals Auto-Population | 0/1 | Pending | — |
 | 21. Nyquist Validation Sign-off (Phases 16 & 18) | 0/2 | Pending | — |
 | 22. Tech Debt Cleanup | 0/2 | Pending | — |

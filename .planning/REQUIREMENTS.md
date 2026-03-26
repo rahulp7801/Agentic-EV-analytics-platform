@@ -48,7 +48,7 @@
 
 ### Player Prop Engine (NFL + NBA)
 
-- [ ] **PROP-01**: System ingests live NFL and NBA player prop odds (passing/rushing/receiving for NFL; points/rebounds/assists/3PM/PRA for NBA) from The Odds API and writes timestamped `PlayerPropSnapshot` rows to PostgreSQL
+- [x] **PROP-01**: System ingests live NFL and NBA player prop odds (passing/rushing/receiving for NFL; points/rebounds/assists/3PM/PRA for NBA) from The Odds API and writes timestamped `PlayerPropSnapshot` rows to PostgreSQL
 - [x] **PROP-02**: System defines `PropParams` and `PropResult` Pydantic models with a two-stage validation gate — LLM produces `PropParams`, `PropQueryBuilder` constructs parameterized SQL, LLM never produces raw SQL or hallucinated stats
 - [x] **PROP-03**: System calculates true probability for NFL player props (passing yards/TDs/completions, rushing yards/attempts/TDs, receiving yards/receptions/targets) from historical PostgreSQL distributions with sample size and confidence interval
 - [x] **PROP-04**: System incorporates Kinematic Agent signals (separation, press-man coverage rate) into NFL receiving prop probability estimates where NGS data is available
@@ -121,7 +121,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KINE-01 | Phase 6 | Complete |
 | KINE-02 | Phase 6 | Complete |
 | KINE-03 | Phase 6 | Complete |
-| PROP-01 | Phase 19 | Pending |
+| PROP-01 | Phase 19 | Complete |
 | PROP-02 | Phase 10 | Complete |
 | PROP-03 | Phase 11 | Complete |
 | PROP-04 | Phase 11 | Complete |

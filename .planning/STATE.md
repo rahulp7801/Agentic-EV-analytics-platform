@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 18-03-PLAN.md
-last_updated: "2026-03-25T18:42:37.935Z"
+stopped_at: Completed 19-01-PLAN.md
+last_updated: "2026-03-26T04:33:03.329Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
-  total_phases: 18
-  completed_phases: 18
-  total_plans: 37
-  completed_plans: 37
+  total_phases: 22
+  completed_phases: 19
+  total_plans: 38
+  completed_plans: 38
   percent: 100
 ---
 
@@ -86,6 +86,7 @@ Progress: [██████████] 100%
 | Phase 18-situational-game-log-prop-queries P01 | 7 | 3 tasks | 6 files |
 | Phase 18-situational-game-log-prop-queries P02 | 7 | 3 tasks | 5 files |
 | Phase 18-situational-game-log-prop-queries P03 | 11 | 3 tasks | 6 files |
+| Phase 19-critical-integration-fixes P01 | 5 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -209,6 +210,8 @@ Recent decisions affecting current work:
 - [Phase 18-situational-game-log-prop-queries]: NFL last_n_games uses (season,week) IN subquery not game_id IN because existing player_stats rows have NULL game_id (migration 0005)
 - [Phase 18-situational-game-log-prop-queries]: teammate_out uses INTERVAL date-window on injury_reports.scraped_at; injury_reports.game_id is nullable in v1 so direct join unreliable
 - [Phase 18-situational-game-log-prop-queries]: conditional_small_sample data_source tag: executor tags total<30 conditional results so Kelly sizing can apply conservative multipliers
+- [Phase 19-critical-integration-fixes]: INT-2: sport=sport uses variable already in scope — single-token change in PlayerPropSnapshotCreate fixes NBA snapshot sport tag
+- [Phase 19-critical-integration-fixes]: INT-1 bridge pattern: state.get('situational_params') or {} handles None + absent-key; or None normalizes [] to None for PropQueryBuilder if-check compatibility
 
 ### Pending Todos
 
@@ -222,6 +225,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T18:37:35.492Z
-Stopped at: Completed 18-03-PLAN.md
+Last session: 2026-03-26T04:32:56.487Z
+Stopped at: Completed 19-01-PLAN.md
 Resume file: None
