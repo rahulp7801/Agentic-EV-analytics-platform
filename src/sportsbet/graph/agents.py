@@ -301,7 +301,7 @@ def make_context_agent(
                                 implied_prob = _Dec(str(round(float(raw_prob), 6)))
                                 point = outcome.get("point")
                                 snap = PlayerPropSnapshotCreate(
-                                    sport="nfl",
+                                    sport=sport,
                                     game_id=event_data.get("id"),
                                     player_name=outcome.get("name", "Unknown"),
                                     sportsbook=bookmaker.get("key", "unknown"),

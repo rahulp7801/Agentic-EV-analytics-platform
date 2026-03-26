@@ -168,6 +168,8 @@ def make_nba_quant_agent(
             prop_type: str = state.get("prop_type", "points")  # type: ignore[union-attr]
             prop_line_raw = state.get("prop_line", "0")  # type: ignore[union-attr]
             prop_filters: dict[str, object] = state.get("prop_filters", {})  # type: ignore[union-attr]
+            situational: dict = state.get("situational_params") or {}  # type: ignore[union-attr]
+            teammate_out: list[str] | None = situational.get("teammate_out_signals") or None
 
             # Convert line to Decimal — prop_line may arrive as float, int, str, or Decimal
             line = Decimal(str(prop_line_raw if prop_line_raw is not None else "0"))
@@ -180,6 +182,7 @@ def make_nba_quant_agent(
                 prop_type=prop_type,  # type: ignore[arg-type]
                 line=line,
                 filters=prop_filters if prop_filters else {},
+                teammate_out=teammate_out,
             )
         except ValidationError as exc:
             log.error(
