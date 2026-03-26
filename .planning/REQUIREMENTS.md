@@ -48,18 +48,18 @@
 
 ### Player Prop Engine (NFL + NBA)
 
-- [x] **PROP-01**: System ingests live NFL and NBA player prop odds (passing/rushing/receiving for NFL; points/rebounds/assists/3PM/PRA for NBA) from The Odds API and writes timestamped `PlayerPropSnapshot` rows to PostgreSQL
+- [ ] **PROP-01**: System ingests live NFL and NBA player prop odds (passing/rushing/receiving for NFL; points/rebounds/assists/3PM/PRA for NBA) from The Odds API and writes timestamped `PlayerPropSnapshot` rows to PostgreSQL
 - [x] **PROP-02**: System defines `PropParams` and `PropResult` Pydantic models with a two-stage validation gate — LLM produces `PropParams`, `PropQueryBuilder` constructs parameterized SQL, LLM never produces raw SQL or hallucinated stats
 - [x] **PROP-03**: System calculates true probability for NFL player props (passing yards/TDs/completions, rushing yards/attempts/TDs, receiving yards/receptions/targets) from historical PostgreSQL distributions with sample size and confidence interval
 - [x] **PROP-04**: System incorporates Kinematic Agent signals (separation, press-man coverage rate) into NFL receiving prop probability estimates where NGS data is available
-- [x] **PROP-05**: System calculates true probability for NBA player props (points, rebounds, assists, 3PM, steals, blocks, PRA, double-double) using pace-adjusted historical distributions with opponent defensive rating, rest days, and home/away context
+- [ ] **PROP-05**: System calculates true probability for NBA player props (points, rebounds, assists, 3PM, steals, blocks, PRA, double-double) using pace-adjusted historical distributions with opponent defensive rating, rest days, and home/away context
 - [x] **PROP-06**: `PropArbitrageAgent` flags mispriced player props by comparing `PropResult.true_probability` against sportsbook implied probability, outputting raw EV percentage and a 3-bullet Trade Plan thesis with fractional Kelly sizing — no flat bet sizes
 - [x] **PROP-07**: `CorrelationGuard` is extended with a prop conflict matrix that blocks simultaneous correlated prop exposures (e.g., Over passing yards + Under receiving yards on primary target in same game)
 
 ### NBA Data Foundation
 
 - [x] **NBA-01**: System ingests NBA player box scores (points, rebounds, assists, 3PM, steals, blocks, minutes) via `nba_api` with a year-by-year loading loop and composite index on season/game/player_id
-- [x] **NBA-02**: System applies pace adjustment, back-to-back rest penalty, and opponent defensive rating weighting to NBA player prop probability distributions
+- [ ] **NBA-02**: System applies pace adjustment, back-to-back rest penalty, and opponent defensive rating weighting to NBA player prop probability distributions
 
 ## v2 Requirements
 
@@ -121,22 +121,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KINE-01 | Phase 6 | Complete |
 | KINE-02 | Phase 6 | Complete |
 | KINE-03 | Phase 6 | Complete |
-| PROP-01 | Phase 14 | Complete |
+| PROP-01 | Phase 19 | Pending |
 | PROP-02 | Phase 10 | Complete |
 | PROP-03 | Phase 11 | Complete |
 | PROP-04 | Phase 11 | Complete |
-| PROP-05 | Phase 12 | Complete |
+| PROP-05 | Phase 20 | Pending |
 | PROP-06 | Phase 14 | Complete |
 | PROP-07 | Phase 13 | Complete |
 | NBA-01 | Phase 10 | Complete |
-| NBA-02 | Phase 14 | Complete |
+| NBA-02 | Phase 20 | Pending |
 
 **Coverage:**
 - v1 requirements: 32 total (23 original + 9 new: PROP-01–PROP-07, NBA-01, NBA-02)
 - Mapped to phases: 32
 - Unmapped: 0 ✓
-- All v1 requirements satisfied — closed by Phase 16 (2026-03-24)
+- 29/32 satisfied — 3 requirements (PROP-01, PROP-05, NBA-02) reset to Pending for gap closure phases 19–20 (2026-03-25)
 
 ---
 *Requirements defined: 2026-03-10*
-*Last updated: 2026-03-24 — all v1 requirements closed by Phase 16*
+*Last updated: 2026-03-25 — PROP-01, PROP-05, NBA-02 reset to Pending for gap closure phases 19–20*

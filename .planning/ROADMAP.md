@@ -29,6 +29,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 15: Context and Vig Completion** - Add NBA game-level odds ingestion to OddsAPIPoller and context agent; wire Pinnacle sharp devig as selectable config option (completed 2026-03-24)
 - [x] **Phase 16: Integration Fix & Documentation Hygiene** - Fix NBA prop sport routing hardcode, document kinematic two-invocation pattern, repair stale REQUIREMENTS.md checkboxes, ROADMAP.md checkboxes, and 7 SUMMARY files with missing requirements_completed frontmatter (completed 2026-03-24)
 - [x] **Phase 17: Nyquist Compliance** - Run retroactive Nyquist validation for phases 3–15 to achieve nyquist_compliant: true and wave_0_complete: true across all 15 phases (completed 2026-03-25)
+- [x] **Phase 18: Situational Game-Log Prop Queries** - nba_player_gamelogs schema + ingest, PropParams situational filters, dynamic WHERE clauses, Wilson CI widening for small samples (completed 2026-03-25)
+- [ ] **Phase 19: Critical Integration Fixes** - Fix INT-2 sport hardcode in PlayerPropSnapshotCreate and wire situational_params→PropParams bridge in prop_quant_agent (Gap Closure)
+- [ ] **Phase 20: NBA Context Signals Auto-Population** - Build NBAContextSignals producer agent with B2B detection, opponent def_rating lookup, and home/away resolution wired into pipeline (Gap Closure)
+- [ ] **Phase 21: Nyquist Validation Sign-off for Phases 16 & 18** - Achieve nyquist_compliant: true for phases 16 and 18 via retroactive wave-based validation (Gap Closure)
+- [ ] **Phase 22: Tech Debt Cleanup** - Fix PBP idempotency, Python 3.12 deprecation warnings, stale docstrings, PROP-04 missing kinematic warning, QUANT-04 automated closing-line pipeline, and documentation text fixes (Tech Debt)
 
 ## Phase Details
 
@@ -282,8 +287,72 @@ Plans:
 
 ## Progress
 
+### Phase 19: Critical Integration Fixes
+**Goal:** Close the two critical integration gaps blocking clean v1.0 milestone sign-off — the NBA sport field hardcode that corrupts all NBA prop snapshot writes, and the missing situational_params→PropParams bridge that prevents Phase 18 conditional WHERE clauses from ever firing in automated runs.
+**Depends on:** Phase 18
+**Requirements:** PROP-01
+**Gap Closure:** Closes INT-2 (PlayerPropSnapshotCreate sport hardcode → PROP-01 partial), INT-1 (situational_params never read by prop_quant_agent → Flow 4 broken)
+
+**Success Criteria** (what must be TRUE):
+  1. `PlayerPropSnapshotCreate` in `agents.py` uses the dynamic `sport` variable, not the string literal `"nfl"` — NBA prop snapshots written with `sport='nba'` when pipeline is invoked with sport=nba
+  2. `make_prop_quant_agent` reads `state.get("situational_params", {})` and forwards `teammate_out_signals` to `PropParams.teammate_out` before constructing the query
+  3. An integration test confirms that running the prop pipeline with `sport="nba"` writes rows with `sport='nba'` to `player_prop_snapshots`
+  4. An integration test confirms that injecting `{"situational_params": {"teammate_out_signals": ["LeBron James"]}}` into GraphState causes the conditional teammate_out WHERE clause to appear in the generated SQL
+
+Plans:
+- [ ] 19-01-PLAN.md — Fix sport="nfl" hardcode (agents.py:304); wire situational_params→PropParams bridge in make_prop_quant_agent; integration tests for both fixes
+
+### Phase 20: NBA Context Signals Auto-Population
+**Goal:** Build a `NBAContextSignalsProducer` node that automatically derives `pace_factor`, `opponent_def_rating`, `rest_days`, and `is_home` from data already in the system — eliminating the architectural gap where `nba_context_signals` is always `None` in automated pipeline runs and the four-stage contextual adjustment pipeline silently no-ops.
+**Depends on:** Phase 19
+**Requirements:** PROP-05, NBA-02
+**Gap Closure:** Closes INT-3 (NBAContextSignals has no pipeline producer → PROP-05 partial, NBA-02 partial, Flow 3 partial)
+
+**Success Criteria** (what must be TRUE):
+  1. A `NBAContextSignalsProducer` LangGraph node exists and is wired into the graph before `nba_quant_agent`
+  2. Producer queries `nba_player_gamelogs` (Phase 18 schema) to detect back-to-back games by inspecting consecutive game dates for a team
+  3. Producer queries existing NBA box score data to derive `opponent_def_rating` for the upcoming opponent
+  4. `GraphState.nba_context_signals` is non-None in automated runs — `_apply_nba_context_adjustments` in `nba_agents.py` fires all four adjustment stages
+  5. An integration test with a realistic game scenario confirms pace/rest/def_rating adjustments produce a different probability than the unadjusted baseline
+
+Plans:
+- [ ] 20-01-PLAN.md — NBAContextSignalsProducer: B2B detection from gamelogs, opponent def_rating lookup, home/away resolution; wire as LangGraph node before nba_quant_agent; integration tests
+
+### Phase 21: Nyquist Validation Sign-off for Phases 16 & 18
+**Goal:** Achieve `nyquist_compliant: true` and `wave_0_complete: true` in the VALIDATION.md files for phases 16 and 18, bringing Nyquist compliance to 18/18 phases and completing the v1.0 milestone quality bar.
+**Depends on:** Phase 20
+**Gap Closure:** Closes nyquist compliance gap for phases 16 and 18 identified in v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. Phase 16 VALIDATION.md has `nyquist_compliant: true` and `wave_0_complete: true`
+  2. Phase 18 VALIDATION.md has `nyquist_compliant: true` and `wave_0_complete: true`
+  3. At least one wave_0 test per phase validates the phase goal independently and passes
+
+Plans:
+- [ ] 21-01-PLAN.md — Retroactive Nyquist validation for Phase 16 (wave_0 tests + VALIDATION.md sign-off)
+- [ ] 21-02-PLAN.md — Retroactive Nyquist validation for Phase 18 (wave_0 tests + VALIDATION.md sign-off)
+
+### Phase 22: Tech Debt Cleanup
+**Goal:** Eliminate accumulated tech debt items that are non-blocking but degrade reliability, developer ergonomics, and documentation correctness — including data integrity risks, Python 3.12 compatibility warnings, missing warning logs, and stale documentation text.
+**Depends on:** Phase 21
+**Gap Closure:** Closes 6 tech debt items from v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. PBP ingestion uses `ON CONFLICT DO NOTHING` so re-running does not raise `IntegrityError` on duplicate play-by-play rows
+  2. `test_graph.py` and `test_quant.py` produce zero deprecation warnings under Python 3.12 (`datetime.utcnow()` and `asyncio.get_event_loop()` replaced)
+  3. `prop/agents.py` module docstring no longer contains "TODO placeholder" — replaced with accurate module description
+  4. `make_prop_quant_agent` logs a `WARNING` when `kinematic_result` is `None` on a receiving prop request (PROP-04 two-invocation pattern gap)
+  5. REQUIREMENTS.md DATA-02 description text updated from "nfl_data_py" to "nflreadpy"
+  6. QUANT-04: A script or CLI entry point connects `odds_snapshots` table rows to `BacktestSignal` input format for automated closing-line replay
+
+Plans:
+- [ ] 22-01-PLAN.md — PBP idempotency fix; Python 3.12 deprecation warning fixes; stale docstring removal; PROP-04 None warning log
+- [ ] 22-02-PLAN.md — QUANT-04 automated BacktestEngine pipeline from odds_snapshots; DATA-02 documentation text fix
+
+## Progress
+
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -305,6 +374,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 16. Integration Fix & Documentation Hygiene | 1/1 | Complete    | 2026-03-24 |
 | 17. Nyquist Compliance | 2/2 | Complete    | 2026-03-25 |
 | 18. Situational Game-Log Prop Queries | 3/3 | Complete    | 2026-03-25 |
+| 19. Critical Integration Fixes | 0/1 | Pending | — |
+| 20. NBA Context Signals Auto-Population | 0/1 | Pending | — |
+| 21. Nyquist Validation Sign-off (Phases 16 & 18) | 0/2 | Pending | — |
+| 22. Tech Debt Cleanup | 0/2 | Pending | — |
 
 ### Phase 18: Situational Game-Log Prop Queries
 
