@@ -35,6 +35,22 @@ log = structlog.get_logger()
 
 _NO_SIGNAL: dict[str, Any] = {"ev_signal": None}
 
+# Alias map: PropParams Literal shorthand -> Odds API market key format.
+# Used by prop_arbitrage_agent to match state["prop_type"] against
+# PlayerPropSnapshotCreate.prop_type (which stores raw Odds API market keys).
+# (Phase 23 — PROP-06)
+_PROP_TYPE_ALIAS_MAP: dict[str, str] = {
+    "pass_yds": "player_pass_yards",
+    "rush_yds": "player_rush_yards",
+    "rec_yds": "player_receiving_yards",
+    "pass_tds": "player_pass_tds",
+    "receptions": "player_receptions",
+    "points": "player_points",
+    "rebounds": "player_rebounds",
+    "assists": "player_assists",
+    "pra": "player_pra",
+}
+
 
 def _build_prop_trade_plan(
     ev_pct: Decimal,
@@ -152,21 +168,57 @@ def make_prop_arbitrage_agent(
             )
             return _NO_SIGNAL
 
-        # Guard 2: context_signals and odds_snapshot must exist
-        context_signals = state.get("context_signals")
-        if context_signals is None or context_signals.odds_snapshot is None:
-            log.info(
-                "prop_arbitrage_agent.no_odds_snapshot",
-                sport=resolved_sport,
-                reason="context_signals or odds_snapshot is None",
-            )
-            return _NO_SIGNAL
+        # Guard 2a: try player_prop_snapshots match path (Phase 23 — PROP-06 fix)
+        # Reads player_prop_snapshots from state, normalizes prop_type shorthand to
+        # Odds API market key, and matches on (prop_type, line) for commensurable EV.
+        snapshots: list | None = state.get("player_prop_snapshots")  # type: ignore[attr-defined]
+        target_prop_type: str = state.get("prop_type", "")  # type: ignore[attr-defined]
+        # Normalize PropParams shorthand (e.g. "pass_yds") to Odds API market key (e.g. "player_pass_yards")
+        normalized_prop_type = _PROP_TYPE_ALIAS_MAP.get(target_prop_type, target_prop_type)
+        raw_line = state.get("prop_line")  # type: ignore[attr-defined]
+        target_line: Decimal | None = None
+        if raw_line is not None:
+            try:
+                target_line = Decimal(str(raw_line))
+            except Exception:
+                pass
 
-        snapshot = context_signals.odds_snapshot
+        matched_snapshot = None
+        if snapshots:
+            for snap in snapshots:
+                type_match = snap.prop_type == normalized_prop_type
+                line_match = (target_line is None) or (snap.line == target_line)
+                if type_match and line_match:
+                    matched_snapshot = snap
+                    break
+
+        # Determine implied_prob, market_type, injury_flags from matched snapshot or fallback
+        context_signals = state.get("context_signals")  # type: ignore[attr-defined]
+        if matched_snapshot is not None:
+            implied_prob: Decimal = matched_snapshot.implied_probability
+            market_type: str = matched_snapshot.prop_type
+            injury_flags: dict[str, str] = (
+                context_signals.injury_flags
+                if context_signals is not None
+                else {}
+            )
+        else:
+            # Guard 2b: fall back to context_signals.odds_snapshot (non-prop or snapshot-missing routes)
+            if context_signals is None or context_signals.odds_snapshot is None:
+                log.info(
+                    "prop_arbitrage_agent.no_prop_snapshot",
+                    sport=resolved_sport,
+                    prop_type=target_prop_type,
+                    prop_line=str(raw_line),
+                    reason="no matching PlayerPropSnapshot found in state and no odds_snapshot fallback",
+                )
+                return _NO_SIGNAL
+            snapshot = context_signals.odds_snapshot
+            implied_prob = snapshot.implied_probability
+            market_type = snapshot.market_type
+            injury_flags = context_signals.injury_flags
+
         true_prob: Decimal = prop_result.true_probability
-        implied_prob: Decimal = snapshot.implied_probability
-        injury_flags: dict[str, str] = context_signals.injury_flags
-        market_type: str = snapshot.market_type
 
         # EV computation — floored at 0
         ev_pct = compute_ev_percentage(true_prob, implied_prob)

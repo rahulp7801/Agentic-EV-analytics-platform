@@ -116,6 +116,13 @@ class GraphState(TypedDict):
         (Phase 18 — SC-3). Non-None when injury_flags contains Out/Inactive players.
         Contains "teammate_out_signals" list for use by PropQueryBuilder in Plan 03.
         None for routes with no relevant injury context. Access via state.get().
+    player_prop_snapshots : list[Any] | None
+        List of PlayerPropSnapshotCreate objects produced during Step 1c of
+        context_agent (Phase 23 — PROP-06). Populated when Odds API player prop
+        markets are successfully fetched. None when fetch fails or list is empty.
+        PropArbitrageAgent matches against this list to obtain a prop-specific
+        implied_probability (commensurable with prop_result.true_probability).
+        Access via state.get("player_prop_snapshots").
     """
 
     session_id: str
@@ -144,3 +151,5 @@ class GraphState(TypedDict):
     prop_filters: dict[str, Any] | None  # type: ignore[misc]  # Optional prop filter context; None for non-prop routes (Phase 14 — INFRA-01)
     sport: str | None  # type: ignore[misc]  # "nfl" | "nba" — None defaults to "nfl" in context agent (Phase 15 — CTXT-04)
     situational_params: dict[str, Any] | None  # type: ignore[misc]  # Injected by ContextAgent after news parsing (Phase 18 — SC-3)
+    player_prop_snapshots: list[Any] | None  # type: ignore[misc]
+    # PlayerPropSnapshotCreate list from context_agent Step 1c (Phase 23 — PROP-06)

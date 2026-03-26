@@ -273,6 +273,9 @@ def make_context_agent(
         # sport variable resolved at line 187; "nba" routes NBA prop markets, "nfl" routes NFL markets.
         # Sync engine reuses _sync_engine_cache initialized in Step 1b.
         # write_player_prop_snapshot uses sync SQLAlchemy (v1 accepted tradeoff — low concurrency).
+        # _prop_snapshots initialized BEFORE try block so it is always in scope at Step 3
+        # even if the try block raises (except blocks log and continue). (Phase 23 — PROP-06)
+        _prop_snapshots: list = []
         try:
             async with OddsAPIPoller(api_key=api_key, daily_credit_cap=daily_credit_cap) as poller:
                 raw_props = await poller.fetch_player_props(sport)
@@ -310,6 +313,9 @@ def make_context_agent(
                                     price=int(price),
                                     implied_probability=implied_prob,
                                 )
+                                # Collect snap BEFORE writing — ensures _prop_snapshots is
+                                # populated even if write_player_prop_snapshot raises (Phase 23)
+                                _prop_snapshots.append(snap)
                                 write_player_prop_snapshot(snap, engine=_sync_engine_cache[0])
                             except Exception as snap_exc:
                                 log.warning("prop_snapshot_write_error", error=str(snap_exc))
@@ -355,7 +361,11 @@ def make_context_agent(
             injury_count=len(injury_flags),
             has_odds=odds_snapshot is not None,
         )
-        return {"context_signals": signals, "situational_params": situational_params}
+        return {
+            "context_signals": signals,
+            "situational_params": situational_params,
+            "player_prop_snapshots": _prop_snapshots if _prop_snapshots else None,
+        }
 
     return context_agent
 
