@@ -126,3 +126,13 @@ None - no external service configuration required. Module is pure Decimal arithm
 ---
 *Phase: 03-quant-engine*
 *Completed: 2026-03-13*
+
+## Self-Check: PASSED
+
+- FOUND: src/sportsbet/quant/vig.py
+- FOUND: src/sportsbet/quant/__init__.py
+- FOUND: tests/test_vig.py
+- FOUND: .planning/phases/03-quant-engine/03-02-SUMMARY.md
+- Commit 914e225 verified (test RED stubs)
+- Commit 6238c1f verified (feat GREEN implementation)
+- Commit 45b6307 verified (docs metadata)
