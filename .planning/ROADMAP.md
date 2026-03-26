@@ -31,9 +31,14 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 17: Nyquist Compliance** - Run retroactive Nyquist validation for phases 3–15 to achieve nyquist_compliant: true and wave_0_complete: true across all 15 phases (completed 2026-03-25)
 - [x] **Phase 18: Situational Game-Log Prop Queries** - nba_player_gamelogs schema + ingest, PropParams situational filters, dynamic WHERE clauses, Wilson CI widening for small samples (completed 2026-03-25)
 - [x] **Phase 19: Critical Integration Fixes** - Fix INT-2 sport hardcode in PlayerPropSnapshotCreate and wire situational_params→PropParams bridge in prop_quant_agent (Gap Closure) (completed 2026-03-26)
-- [x] **Phase 20: NBA Context Signals Auto-Population** - Build NBAContextSignals producer agent with B2B detection, opponent def_rating lookup, and home/away resolution wired into pipeline (Gap Closure) (completed 2026-03-26)
-- [x] **Phase 21: Nyquist Validation Sign-off for Phases 16 & 18** - Achieve nyquist_compliant: true for phases 16 and 18 via retroactive wave-based validation (Gap Closure) (completed 2026-03-26)
-- [x] **Phase 22: Tech Debt Cleanup** - Fix PBP idempotency, Python 3.12 deprecation warnings, stale docstrings, PROP-04 missing kinematic warning, QUANT-04 automated closing-line pipeline, and documentation text fixes (Tech Debt) (completed 2026-03-26)
+- [x] **Phase 20: NBA Context Signals Auto-Population** - Build NBAContextSignals producer agent with B2B detection, opponent def_rating lookup, and home/away resolution wired into pipeline (Gap Closure)
+ (completed 2026-03-26)
+- [x] **Phase 21: Nyquist Validation Sign-off for Phases 16 & 18** - Achieve nyquist_compliant: true for phases 16 and 18 via retroactive wave-based validation (Gap Closure)
+ (completed 2026-03-26)
+- [x] **Phase 22: Tech Debt Cleanup** - Fix PBP idempotency, Python 3.12 deprecation warnings, stale docstrings, PROP-04 missing kinematic warning, QUANT-04 automated closing-line pipeline, and documentation text fixes (Tech Debt)
+ (completed 2026-03-26)
+- [ ] **Phase 23: Fix PropArbitrageAgent EV — Player Prop Implied Probability** - Wire prop_arbitrage_agent to read player_prop_snapshots and derive implied probability from the matched player prop line instead of h2h moneyline odds (Gap Closure — PROP-06)
+- [ ] **Phase 24: Integration Documentation and Backtest NULL Fix** - Document quant->arbitrage and context->prop multi-invocation patterns; fix load_snapshots LEFT JOIN to prevent silent row drops on null game_id (Gap Closure — ARBT-01, CTXT-04/PROP-04, QUANT-04)
 
 ## Phase Details
 
@@ -356,7 +361,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22 → 23 → 24
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -382,6 +387,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 20. NBA Context Signals Auto-Population | 3/3 | Complete    | 2026-03-26 |
 | 21. Nyquist Validation Sign-off (Phases 16 & 18) | 2/2 | Complete    | 2026-03-26 |
 | 22. Tech Debt Cleanup | 2/2 | Complete    | 2026-03-26 |
+| 23. Fix PropArbitrageAgent EV — Player Prop Implied Probability | 0/1 | Pending     | — |
+| 24. Integration Documentation and Backtest NULL Fix | 0/1 | Pending     | — |
 
 ### Phase 18: Situational Game-Log Prop Queries
 
@@ -399,3 +406,33 @@ Plans:
 - [ ] 18-01-PLAN.md — `nba_player_gamelogs` schema + ingest pipeline; injury-join support for NBA and NFL
 - [ ] 18-02-PLAN.md — `PropParams` situational filter extensions + `GraphState` / `ContextAgent` injection
 - [ ] 18-03-PLAN.md — QueryBuilder dynamic WHERE clauses + Executor small-sample Wilson CI widening
+
+### Phase 23: Fix PropArbitrageAgent EV — Player Prop Implied Probability
+**Goal:** Correct the EV computation in PropArbitrageAgent so it compares PropResult.true_probability against the matching player prop line implied probability from player_prop_snapshots — replacing the current use of context_signals.odds_snapshot (h2h game-winner moneyline), which produces mathematically incommensurable probability comparisons.
+**Depends on:** Phase 22
+**Requirements:** PROP-06
+**Gap Closure:** Closes PROP-06 critical integration gap from v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. prop_arbitrage_agent reads state["player_prop_snapshots"] and matches on player/market/line from prop_result
+  2. implied_prob is derived from the matched PlayerPropSnapshot American odds field (via existing american_to_raw_prob + devig), not from context_signals.odds_snapshot
+  3. If no matching prop snapshot is found, agent returns _NO_SIGNAL with a structured log (not a crash)
+  4. EV and Kelly sizing outputs are computed from commensurable probabilities: P(prop outcome) vs implied P(prop outcome)
+
+Plans:
+- [ ] 23-01-PLAN.md — Fix prop_arbitrage_agent: player_prop_snapshots lookup, implied prob derivation, guard update
+
+### Phase 24: Integration Documentation and Backtest NULL Fix
+**Goal:** Close non-blocking gaps from v1.0 audit — document the quant→arbitrage and context→prop multi-invocation checkpoint patterns so callers understand invocation ordering requirements, and fix the load_snapshots LEFT JOIN to prevent silent row drops when game_id is NULL.
+**Depends on:** Phase 23
+**Requirements:** ARBT-01, CTXT-04, PROP-04, QUANT-04
+**Gap Closure:** Closes ARBT-01 documentation gap, CTXT-04/PROP-04 documentation gap, and QUANT-04 backtest flow gap from v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. graph.py or a developer doc explicitly describes the two-invocation pattern for quant_agent → arbitrage_agent: callers must invoke "quant_analysis" before "arbitrage_analysis" in the same thread_id
+  2. Prop agent entry points (make_prop_quant_agent, make_nba_prop_quant_agent) document the context_update → prop invocation ordering and situational_params fallback behavior
+  3. load_snapshots query handles NULL game_id rows — either filtered before the LEFT JOIN or joined with NULLIF guard — so no snapshot rows are silently dropped
+  4. A test or assertion confirms that an odds_snapshot row with game_id=NULL is not silently excluded from backtest replay output
+
+Plans:
+- [ ] 24-01-PLAN.md — quant→arbitrage and context→prop invocation pattern documentation; load_snapshots NULL game_id fix
