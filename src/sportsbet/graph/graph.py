@@ -7,7 +7,7 @@ create_graph() builds and compiles the full directed graph:
                                                -> context_agent         -> END
                                                -> kinematic_agent       -> END
                                                -> prop_quant_agent      -> prop_arbitrage_agent -> [correlation_guard -> aggregator ->] END
-                                               -> nba_quant_agent       -> prop_arbitrage_agent -> [correlation_guard -> aggregator ->] END
+                                               -> nba_context_producer -> nba_quant_agent -> prop_arbitrage_agent -> [correlation_guard -> aggregator ->] END
                                                -> prop_arbitrage_agent  -> [correlation_guard -> aggregator ->] END
                                                -> END  (on error or unknown type)
 
@@ -43,12 +43,22 @@ Both prop_quant_agent and nba_quant_agent chain to the same prop_arbitrage_agent
 prop_arbitrage_agent chains to correlation_guard (if present) or directly to END.
 create_graph_with_sqlite() wires all three when pool is provided.
 
+Phase 20 Plan 02 update: create_graph() accepts an optional nba_context_producer_node parameter.
+- If nba_context_producer_node is None (default): uses _nba_context_stub which returns
+  {"nba_context_signals": None} (neutral — no adjustments applied, backward-compat).
+- If nba_context_producer_node is provided: uses make_nba_context_signals_producer(pool).
+Router key "nba_quant_agent" now maps to "nba_context_producer" node in add_conditional_edges.
+Fixed edge nba_context_producer -> nba_quant_agent ensures sequential execution after signals
+are populated. create_graph_with_sqlite() wires make_nba_context_signals_producer(pool) when
+pool is provided.
+
 All tests use create_graph(checkpointer=MemorySaver()) for full isolation (no disk I/O).
 Tests requiring a real quant agent pass quant_node=make_quant_agent(pool) explicitly.
 Tests requiring a real context agent pass context_node=make_context_agent(pool, key, cap) explicitly.
 Tests requiring full arbitrage pipeline pass all three new node parameters explicitly.
 Tests requiring real kinematic agent pass kinematic_node=make_kinematic_agent(pool) explicitly.
 Tests requiring real prop agents pass prop_quant_node, nba_quant_node, prop_arbitrage_node explicitly.
+Tests requiring real NBA context producer pass nba_context_producer_node=make_nba_context_signals_producer(pool).
 """
 from __future__ import annotations
 
@@ -135,6 +145,7 @@ def create_graph(
     kinematic_node: Any = None,
     prop_quant_node: Any = None,
     nba_quant_node: Any = None,
+    nba_context_producer_node: Any = None,
     prop_arbitrage_node: Any = None,
 ) -> CompiledStateGraph:
     """Build and compile the LangGraph StateGraph for the sportsbet agent pipeline.
@@ -183,7 +194,12 @@ def create_graph(
     nba_quant_node:
         Optional async NBA prop quant agent node. If None, uses _nba_quant_stub which
         returns {"nba_prop_result": None}. Pass make_nba_quant_agent(pool) for real SQL.
-        Chains to prop_arbitrage_agent after execution.
+        Chains to prop_arbitrage_agent after execution (via nba_context_producer).
+    nba_context_producer_node:
+        Optional async NBA context signals producer node. If None, uses _nba_context_stub
+        which returns {"nba_context_signals": None} (neutral — no adjustments applied).
+        Pass make_nba_context_signals_producer(pool) to populate NBAContextSignals before
+        nba_quant_agent executes. Inserted between router and nba_quant_agent.
     prop_arbitrage_node:
         Optional async prop arbitrage agent node. If None, uses _prop_arb_stub which
         returns {"ev_signal": None}. Pass make_prop_arbitrage_agent(sport) for real EV.
@@ -231,6 +247,17 @@ def create_graph(
         """Inline stub: returns ev_signal=None when no real prop arbitrage node provided."""
         return {"ev_signal": None}
 
+    # nba_context_producer_node: populates NBAContextSignals before nba_quant_agent runs.
+    # Stub returns nba_context_signals=None (neutral — no adjustments applied).
+    def _nba_context_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
+        """Inline stub: returns nba_context_signals=None when no real producer node provided."""
+        return {"nba_context_signals": None}
+
+    active_nba_context_producer = (
+        nba_context_producer_node if nba_context_producer_node is not None
+        else _nba_context_stub
+    )
+
     active_prop_quant_node = prop_quant_node if prop_quant_node is not None else _prop_quant_stub
     active_nba_quant_node = nba_quant_node if nba_quant_node is not None else _nba_quant_stub
     active_prop_arbitrage_node = prop_arbitrage_node if prop_arbitrage_node is not None else _prop_arb_stub
@@ -247,6 +274,9 @@ def create_graph(
     builder.add_node("nba_quant_agent", active_nba_quant_node)
     builder.add_node("prop_arbitrage_agent", active_prop_arbitrage_node)
 
+    # Register Phase 20 NBA context producer node (inserted before nba_quant_agent)
+    builder.add_node("nba_context_producer", active_nba_context_producer)
+
     # Entry point: all requests pass through master_router first
     builder.set_entry_point("master_router")
 
@@ -261,7 +291,7 @@ def create_graph(
             "context_agent": "context_agent",
             "kinematic_agent": "kinematic_agent",
             "prop_quant_agent": "prop_quant_agent",
-            "nba_quant_agent": "nba_quant_agent",
+            "nba_quant_agent": "nba_context_producer",
             "prop_arbitrage_agent": "prop_arbitrage_agent",
             "end": END,
         },
@@ -288,6 +318,8 @@ def create_graph(
 
     # Both prop quant agents chain to the same prop_arbitrage_agent (single ainvoke)
     builder.add_edge("prop_quant_agent", "prop_arbitrage_agent")
+    # nba_context_producer runs before nba_quant_agent (Phase 20 — INT-3 closure)
+    builder.add_edge("nba_context_producer", "nba_quant_agent")
     builder.add_edge("nba_quant_agent", "prop_arbitrage_agent")
 
     # arbitrage pipeline: extend with guard/gate when both are provided
@@ -408,6 +440,12 @@ async def create_graph_with_sqlite(
         nba_quant_node = make_nba_quant_agent(pool)
         prop_arbitrage_node = make_prop_arbitrage_agent(sport=None)  # auto-detect NFL/NBA from state (Phase 14 — PROP-06)
 
+    # Phase 20 Plan 02: NBA context signals producer — gated on pool availability
+    nba_context_producer_node = None
+    if pool is not None:
+        from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
+        nba_context_producer_node = make_nba_context_signals_producer(pool)
+
     # Risk control nodes have no pool dependency — always constructed
     correlation_guard_node = make_correlation_guard_node()
     aggregator_node = make_aggregator_node(
@@ -429,5 +467,6 @@ async def create_graph_with_sqlite(
         kinematic_node=kinematic_node,
         prop_quant_node=prop_quant_node,
         nba_quant_node=nba_quant_node,
+        nba_context_producer_node=nba_context_producer_node,
         prop_arbitrage_node=prop_arbitrage_node,
     )
