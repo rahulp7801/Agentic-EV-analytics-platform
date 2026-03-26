@@ -13,8 +13,10 @@ import gc
 import psutil
 import sqlalchemy as sa
 import structlog
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from sportsbet.db.connection import get_sync_engine
+from sportsbet.db.models import PlayByPlay
 
 log = structlog.get_logger()
 
@@ -83,16 +85,21 @@ def ingest_pbp_seasons(seasons: list[int], engine: sa.Engine | None = None) -> N
         # Convert to pandas for SQLAlchemy to_sql — Polars not accepted by to_sql directly.
         df_pd = df.to_pandas()
 
-        # Chunked write: append + UniqueConstraint on (game_id, play_id) handles duplicates.
+        # Chunked write: ON CONFLICT DO NOTHING on (game_id, play_id) handles duplicates.
         # NEVER use if_exists='replace' — drops and recreates the table (RESEARCH.md Pitfall 5).
-        df_pd.to_sql(
-            "play_by_play",
-            engine,
-            if_exists="append",
-            index=False,
-            chunksize=1000,
-            method="multi",
-        )
+        # ON CONFLICT DO NOTHING only protects rows where both game_id and play_id are
+        # non-NULL (PostgreSQL treats NULL != NULL in unique indexes — NULL game_id rows
+        # are a known v1 limitation and will still insert as new rows on re-run).
+        CHUNK = 1000
+        rows = df_pd.to_dict(orient="records")
+        with engine.begin() as conn:
+            for i in range(0, len(rows), CHUNK):
+                conn.execute(
+                    pg_insert(PlayByPlay).on_conflict_do_nothing(
+                        index_elements=["game_id", "play_id"]
+                    ),
+                    rows[i : i + CHUNK],
+                )
 
         mem_after: float = psutil.virtual_memory().percent
         log.info(

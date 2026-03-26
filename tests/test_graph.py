@@ -197,7 +197,7 @@ def make_checkpoint_state(request_type: str = "quant_analysis") -> dict[str, Any
     return {
         "session_id": str(uuid.uuid4()),
         "request_type": request_type,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "game_id": "2023_01_KC_DET",
         "season": 2023,
         "week": 1,
