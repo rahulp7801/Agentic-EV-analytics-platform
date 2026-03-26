@@ -415,7 +415,7 @@ Plans:
 
 **Success Criteria** (what must be TRUE):
   1. prop_arbitrage_agent reads state["player_prop_snapshots"] and matches on player/market/line from prop_result
-  2. implied_prob is derived from the matched PlayerPropSnapshot American odds field (via existing american_to_raw_prob + devig), not from context_signals.odds_snapshot
+  2. implied_prob uses the stored implied_probability field from the matched PlayerPropSnapshot directly (vig-inclusive Decimal, consistent with how Phase 13 AgentOddsSnapshot.implied_probability was used) — not from context_signals.odds_snapshot; re-devigging a single-side price without its opposing side is not well-defined (see 23-RESEARCH.md Open Question 2)
   3. If no matching prop snapshot is found, agent returns _NO_SIGNAL with a structured log (not a crash)
   4. EV and Kelly sizing outputs are computed from commensurable probabilities: P(prop outcome) vs implied P(prop outcome)
 
