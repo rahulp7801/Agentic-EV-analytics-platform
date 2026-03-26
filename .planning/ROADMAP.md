@@ -315,11 +315,12 @@ Plans:
   4. `GraphState.nba_context_signals` is non-None in automated runs — `_apply_nba_context_adjustments` in `nba_agents.py` fires all four adjustment stages
   5. An integration test with a realistic game scenario confirms pace/rest/def_rating adjustments produce a different probability than the unadjusted baseline
 
-**Plans:** 2 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] 20-01-PLAN.md — make_nba_context_signals_producer TDD: B2B detection, opponent def_rating proxy, is_home derivation, cold-DB defaults (Wave 1)
 - [ ] 20-02-PLAN.md — Wire nba_context_producer node into create_graph() routing map and create_graph_with_sqlite() (Wave 2)
+- [ ] 20-03-PLAN.md — Integration test: NBAContextSignals pipeline produces adjusted probability vs. None-baseline (Wave 3)
 
 ### Phase 21: Nyquist Validation Sign-off for Phases 16 & 18
 **Goal:** Achieve `nyquist_compliant: true` and `wave_0_complete: true` in the VALIDATION.md files for phases 16 and 18, bringing Nyquist compliance to 18/18 phases and completing the v1.0 milestone quality bar.
@@ -378,7 +379,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 17. Nyquist Compliance | 2/2 | Complete    | 2026-03-25 |
 | 18. Situational Game-Log Prop Queries | 3/3 | Complete    | 2026-03-25 |
 | 19. Critical Integration Fixes | 1/1 | Complete    | 2026-03-26 |
-| 20. NBA Context Signals Auto-Population | 0/1 | Pending | — |
+| 20. NBA Context Signals Auto-Population | 0/3 | Pending | — |
 | 21. Nyquist Validation Sign-off (Phases 16 & 18) | 0/2 | Pending | — |
 | 22. Tech Debt Cleanup | 0/2 | Pending | — |
 
