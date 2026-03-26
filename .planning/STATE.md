@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 21-01-PLAN.md
-last_updated: "2026-03-26T18:53:16.378Z"
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-03-26T18:53:30.824Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 22
@@ -91,6 +91,7 @@ Progress: [██████████] 100%
 | Phase 20-nba-context-signals-auto-population P02 | 4 | 1 tasks | 1 files |
 | Phase 20-nba-context-signals-auto-population P03 | 4 | 1 tasks | 1 files |
 | Phase 21-nyquist-validation-sign-off P01 | 2 | 1 tasks | 1 files |
+| Phase 21-nyquist-validation-sign-off P02 | 3 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -223,6 +224,7 @@ Recent decisions affecting current work:
 - [Phase Phase Phase 20-03]: patch target is sportsbet.prop.nba_agents.run_nba_prop_query (consumer module, not origin) — Phase 8 patching pattern; target_date passed explicitly to producer for deterministic rest_days; Decimal BASE_PROB values required for PropResult strict=True
 - [Phase 21-nyquist-validation-sign-off]: Phase 16 Wave 0 section had no checklist — added 2 specific passing test names for self-evident verifiability
 - [Phase 21-nyquist-validation-sign-off]: Manual-only tasks (16-01-02,03,04) marked green — verified via grep and confirmed complete in 16-01-SUMMARY.md, consistent with Phase 17 precedent
+- [Phase 21-nyquist-validation-sign-off]: Phase 18 Nyquist sign-off: xfail stubs in test_gamelog_injury_join.py acceptable because SC-2 production behavior covered by GREEN tests in test_prop_query_builder_situational.py — consistent with Phase 17 xfail precedent
 
 ### Pending Todos
 
@@ -236,6 +238,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T18:53:07.009Z
-Stopped at: Completed 21-01-PLAN.md
+Last session: 2026-03-26T18:53:30.812Z
+Stopped at: Completed 21-02-PLAN.md
 Resume file: None
