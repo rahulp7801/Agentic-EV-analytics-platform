@@ -154,6 +154,18 @@ def make_nba_quant_agent(
     pool:
         asyncpg connection pool. Injected at construction time so the agent
         closure holds a stable reference throughout the process lifetime.
+
+    Invocation ordering (CTXT-04/PROP-04):
+        For NBA context adjustments (pace, def_rating, rest, home/away), the graph
+        automatically inserts nba_context_producer before nba_quant_agent (see graph.py
+        nba_context_producer -> nba_quant_agent edge). Callers using request_type=
+        "nba_prop_analysis" do not need to manually invoke a separate context step —
+        nba_context_producer runs automatically in the same ainvoke call.
+
+        When nba_context_signals is None (stub path or producer returns None), all four
+        context adjustments are skipped and the base NormalDist CDF probability from
+        run_nba_prop_query is returned unchanged. This is the correct fallback for
+        callers where live NBA context data is unavailable.
     """
 
     async def nba_quant_agent(state: GraphState) -> dict[str, Any]:  # type: ignore[type-arg]

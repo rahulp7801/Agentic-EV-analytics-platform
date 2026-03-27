@@ -299,6 +299,20 @@ def create_graph(
 
     # quant_agent and context_agent always terminate at END
     builder.add_edge("quant_agent", END)
+    # ARBT-01 quant->arbitrage two-invocation checkpoint pattern.
+    # arbitrage_agent reads quant_result from state. When using request_type="arbitrage_analysis"
+    # directly (without a prior quant step in the same pipeline invocation), callers must
+    # invoke "quant_analysis" before "arbitrage_analysis" in the same thread_id so that
+    # quant_result is persisted in the checkpoint before arbitrage reads it.
+    #   Invocation 1: ainvoke({"request_type": "quant_analysis", ...},
+    #                          config={"configurable": {"thread_id": tid}})
+    #                 -> quant_agent writes QuantResult to state["quant_result"]
+    #                 -> AsyncSqliteSaver persists it under thread_id
+    #   Invocation 2: ainvoke({"request_type": "arbitrage_analysis", ...},
+    #                          config={"configurable": {"thread_id": tid}})
+    #                 -> arbitrage_agent reads state.get("quant_result") from checkpoint
+    #                 -> Returns ev_signal=None (Guard 1) if quant_result is absent
+    # Both invocations MUST use the same thread_id. Single-invocation path not supported.
     builder.add_edge("context_agent", END)
 
     # kinematic_agent always terminates at END (independent pipeline)

@@ -126,6 +126,18 @@ def make_prop_quant_agent(
     pool:
         asyncpg connection pool. Injected at construction time so the agent
         closure holds a stable reference throughout the process lifetime.
+
+    Invocation ordering (CTXT-04/PROP-04):
+        For situational_params (injury-adjusted queries), callers must invoke
+        "context_update" before "prop_analysis" in the same thread_id. The context_agent
+        populates situational_params in GraphState; prop_quant_agent reads it via
+        state.get("situational_params") or {}.
+
+        When no prior context_update has been called, situational_params is None.
+        The agent falls back to {} (empty dict), which means teammate_out=None in
+        PropParams — the query runs without injury-adjusted WHERE clauses. This is
+        the correct production fallback for callers that run prop queries without
+        injury context.
     """
 
     async def prop_quant_agent(state: GraphState) -> dict[str, Any]:  # type: ignore[type-arg]
