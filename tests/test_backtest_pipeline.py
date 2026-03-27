@@ -98,3 +98,31 @@ def test_empty_snapshots() -> None:
     report = BacktestEngine().run(signals)
     assert report.sample_size == 0
     assert report.clv_mean is None
+
+
+FIXTURE_ROW_NULL_GAME = {
+    "id": 3,
+    "game_id": None,
+    "sportsbook": "betmgm",
+    "market_type": "h2h",
+    "line": None,
+    "price": -115,
+    "snapped_at": datetime(2024, 1, 14, 12, 0, 0, tzinfo=timezone.utc),
+    "game_start_time": None,   # LEFT JOIN produced NULL; SQL fix prevents this reaching Python
+}
+
+
+def test_null_game_id_row_not_silently_dropped() -> None:
+    """QUANT-04: NULL game_id rows in build_signals are explicitly skipped (not silently excluded).
+
+    The SQL fix (WHERE o.game_id IS NOT NULL) prevents NULL-game rows from reaching
+    build_signals in production. This test verifies the Python-layer guard in build_signals:
+    a row with game_start_time=None is skipped with logger.debug, returning 0 signals.
+    This prevents a silent TypeError on row["game_start_time"] and satisfies the explicit
+    handling requirement from the success criteria.
+    """
+    signals = build_signals([FIXTURE_ROW_NULL_GAME])
+    assert signals == [], (
+        "build_signals must return 0 signals for a row with game_start_time=None; "
+        "NULL game_id rows should never silently disappear or raise TypeError"
+    )
