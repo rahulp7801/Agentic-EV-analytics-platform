@@ -47,6 +47,34 @@ if TYPE_CHECKING:
 log = structlog.get_logger()
 
 # ---------------------------------------------------------------------------
+# stat_type inference constants and helper (Quick Task 2 — QUANT-03)
+# ---------------------------------------------------------------------------
+
+_RUSHING_PROP_TYPES: frozenset[str] = frozenset({"rush_yds", "rush_tds", "carries"})
+_RECEIVING_PROP_TYPES: frozenset[str] = frozenset({"rec_yds", "rec_tds", "receptions", "targets"})
+
+
+def _infer_stat_type(prop_filters: "dict | None") -> "str | None":
+    """Infer quant stat_type from prop_filters.prop_type.
+
+    Returns None for non-prop routes (prop_filters is None or prop_type is absent).
+    Returns "rushing" for NFL rushing prop types.
+    Returns "receiving" for NFL receiving prop types.
+    Returns "passing" as default for any other prop_type (pass_yds, pass_tds, NBA props).
+    """
+    if not prop_filters:
+        return None
+    pt = prop_filters.get("prop_type")
+    if pt in _RUSHING_PROP_TYPES:
+        return "rushing"
+    if pt in _RECEIVING_PROP_TYPES:
+        return "receiving"
+    if pt is not None:
+        return "passing"
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Module-level pool cache (lazy init for production entrypoint)
 # ---------------------------------------------------------------------------
 
@@ -365,6 +393,7 @@ def make_context_agent(
             "context_signals": signals,
             "situational_params": situational_params,
             "player_prop_snapshots": _prop_snapshots if _prop_snapshots else None,
+            "stat_type": _infer_stat_type(state.get("prop_filters")),  # QUANT-03: always set
         }
 
     return context_agent

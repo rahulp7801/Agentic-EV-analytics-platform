@@ -508,3 +508,123 @@ async def test_context_agent_rejects_stale_odds() -> None:
         "Stale odds snapshot must be rejected — odds_snapshot must be None"
     )
     mock_write.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Quick Task 2 — QUANT-03 context_agent stat_type inference
+# ---------------------------------------------------------------------------
+
+
+class TestContextAgentStatType:
+    """QUANT-03 quick-2: context_agent return dict always includes stat_type key.
+
+    stat_type is inferred from state["prop_filters"]["prop_type"]:
+    - rush_yds / rush_tds / carries -> "rushing"
+    - rec_yds / rec_tds / receptions / targets -> "receiving"
+    - any other prop_type (pass_yds, pass_tds, NBA props, etc.) -> "passing"
+    - prop_filters is None -> None
+    - prop_filters key absent -> None (no KeyError)
+    """
+
+    def _make_agent_with_mocks(self):
+        """Return a make_context_agent instance with all external calls mocked."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+        return patch, MagicMock, AsyncMock
+
+    async def _call_agent(self, prop_filters_value, *, include_key=True):
+        """Helper: call context_agent with given prop_filters and return the dict."""
+        import uuid
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from datetime import datetime, timezone
+
+        mock_pool = MagicMock()
+        state = {
+            "session_id": str(uuid.uuid4()),
+            "request_type": "prop_analysis",
+            "game_id": "2025_01_KC_LAC",
+            "home_team": "KC",
+            "away_team": "LAC",
+            "season": 2025,
+            "week": 1,
+        }
+        if include_key:
+            state["prop_filters"] = prop_filters_value
+        # else: key absent entirely
+
+        with (
+            patch("sportsbet.graph.agents.OddsAPIPoller") as mock_poller_cls,
+            patch("sportsbet.graph.agents.InjuryWeatherScraper") as mock_scraper_cls,
+            patch("sportsbet.graph.agents.write_odds_snapshot"),
+            patch("sportsbet.graph.agents.write_player_prop_snapshot"),
+            patch("sportsbet.graph.agents.get_sync_engine", return_value=MagicMock()),
+        ):
+            # Configure poller mock
+            mock_poller_instance = AsyncMock()
+            mock_poller_instance.fetch_nfl_odds = AsyncMock(return_value=[])
+            mock_poller_instance.fetch_nba_odds = AsyncMock(return_value=[])
+            mock_poller_instance.fetch_player_props = AsyncMock(return_value=[])
+            mock_poller_cls.return_value.__aenter__ = AsyncMock(return_value=mock_poller_instance)
+            mock_poller_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            # Configure scraper mock
+            mock_scraper_instance = AsyncMock()
+            mock_scraper_instance.fetch_team_injuries = AsyncMock(return_value=[])
+            mock_scraper_instance.write_injury_reports = AsyncMock(return_value=0)
+            mock_scraper_cls.return_value = mock_scraper_instance
+
+            agent = make_context_agent(mock_pool, api_key="test_key", daily_credit_cap=500)
+            return await agent(state)
+
+    @pytest.mark.asyncio
+    async def test_stat_type_rushing_for_rush_yds(self) -> None:
+        """prop_filters={"prop_type": "rush_yds"} -> stat_type="rushing"."""
+        result = await self._call_agent({"prop_type": "rush_yds"})
+        assert "stat_type" in result, "Return dict must include 'stat_type' key"
+        assert result["stat_type"] == "rushing", (
+            f"Expected 'rushing' for rush_yds, got {result['stat_type']!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_stat_type_receiving_for_rec_yds(self) -> None:
+        """prop_filters={"prop_type": "rec_yds"} -> stat_type="receiving"."""
+        result = await self._call_agent({"prop_type": "rec_yds"})
+        assert "stat_type" in result, "Return dict must include 'stat_type' key"
+        assert result["stat_type"] == "receiving", (
+            f"Expected 'receiving' for rec_yds, got {result['stat_type']!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_stat_type_receiving_for_rec_tds(self) -> None:
+        """prop_filters={"prop_type": "rec_tds"} -> stat_type="receiving"."""
+        result = await self._call_agent({"prop_type": "rec_tds"})
+        assert "stat_type" in result, "Return dict must include 'stat_type' key"
+        assert result["stat_type"] == "receiving", (
+            f"Expected 'receiving' for rec_tds, got {result['stat_type']!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_stat_type_passing_for_pass_yds(self) -> None:
+        """prop_filters={"prop_type": "pass_yds"} -> stat_type="passing"."""
+        result = await self._call_agent({"prop_type": "pass_yds"})
+        assert "stat_type" in result, "Return dict must include 'stat_type' key"
+        assert result["stat_type"] == "passing", (
+            f"Expected 'passing' for pass_yds, got {result['stat_type']!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_stat_type_none_for_none_prop_filters(self) -> None:
+        """prop_filters=None (non-prop game query) -> stat_type=None."""
+        result = await self._call_agent(None)
+        assert "stat_type" in result, "Return dict must include 'stat_type' key"
+        assert result["stat_type"] is None, (
+            f"Expected None for prop_filters=None, got {result['stat_type']!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_stat_type_none_when_prop_filters_key_absent(self) -> None:
+        """No 'prop_filters' key in state -> stat_type=None (no KeyError)."""
+        result = await self._call_agent(None, include_key=False)
+        assert "stat_type" in result, "Return dict must include 'stat_type' key"
+        assert result["stat_type"] is None, (
+            f"Expected None when prop_filters key absent, got {result['stat_type']!r}"
+        )
