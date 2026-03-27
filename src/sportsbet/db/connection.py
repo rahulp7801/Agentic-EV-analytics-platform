@@ -29,8 +29,9 @@ async def create_async_pool(min_size: int = 2, max_size: int = 10) -> asyncpg.Po
     where sub-millisecond overhead matters.
     command_timeout=60 prevents runaway long queries from blocking the pool.
     """
+    dsn = settings.database_url_async.replace("postgresql+asyncpg://", "postgresql://")
     pool: asyncpg.Pool = await asyncpg.create_pool(
-        settings.database_url_async,
+        dsn,
         min_size=min_size,
         max_size=max_size,
         command_timeout=60,

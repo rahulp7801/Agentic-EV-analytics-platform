@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     database_url_async: str = "postgresql+asyncpg://localhost/sportsbet"
     postgres_db: str = "sportsbet"
     log_level: str = "INFO"
+    odds_api_key: str | None = None
 
     # Risk management — Kelly Criterion configuration (Phase 5 agents read these)
     bankroll_usd: float = 10000.0

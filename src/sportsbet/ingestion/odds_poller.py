@@ -162,6 +162,7 @@ class OddsAPIPoller:
                 "apiKey": self._api_key,
                 "regions": regions,
                 "markets": markets,
+                "oddsFormat": "american",
             },
         )
         response.raise_for_status()
@@ -208,6 +209,7 @@ class OddsAPIPoller:
                 "apiKey": self._api_key,
                 "regions": regions,
                 "markets": markets,
+                "oddsFormat": "american",
             },
         )
         response.raise_for_status()
@@ -287,7 +289,9 @@ class OddsAPIPoller:
                 f"/v4/sports/{sport_key}/events/{event_id}/odds",
                 params={
                     "apiKey": self._api_key,
+                    "regions": "us",
                     "markets": prop_markets,
+                    "oddsFormat": "american",
                 },
             )
             props_response.raise_for_status()

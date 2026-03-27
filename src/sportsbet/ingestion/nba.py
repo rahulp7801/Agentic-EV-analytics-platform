@@ -86,7 +86,7 @@ def ingest_nba_seasons(
             stats = LeagueDashPlayerStats(
                 season=season_str,
                 season_type_all_star="Regular Season",
-                per_mode_simple="Totals",
+                per_mode_detailed="Totals",
                 timeout=30,
             )
             # Mandatory rate limit delay — NBA.com enforces per-request throttling.

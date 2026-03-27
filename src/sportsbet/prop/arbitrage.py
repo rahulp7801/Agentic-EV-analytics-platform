@@ -241,6 +241,16 @@ def make_prop_arbitrage_agent(
             fraction=Decimal(str(cfg.max_kelly_fraction)),
         )
 
+        # Guard: kelly_fraction must be positive to produce a valid EVSignal
+        if kelly_frac <= Decimal("0"):
+            log.info(
+                "prop_arbitrage_agent.zero_kelly",
+                sport=resolved_sport,
+                market_type=market_type,
+                kelly_frac=str(kelly_frac),
+            )
+            return _NO_SIGNAL
+
         # 3-bullet prop-aware trade plan
         trade_plan = _build_prop_trade_plan(
             ev_pct, kelly_frac, injury_flags, market_type, prop_result

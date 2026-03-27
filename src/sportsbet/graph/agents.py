@@ -37,6 +37,7 @@ from sportsbet.db.connection import get_sync_engine
 from sportsbet.graph.models import EVSignal, QuantParams, QuantResult
 from sportsbet.graph.state import GraphState
 from sportsbet.ingestion.odds import OddsSnapshotCreate, write_odds_snapshot
+from sportsbet.ingestion.free_odds import DraftKingsPoller, ESPNOddsPoller
 from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot
 from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
@@ -253,12 +254,23 @@ def make_context_agent(
                     raw_odds = await poller.fetch_nba_odds()
                 else:
                     raw_odds = await poller.fetch_nfl_odds()
-            # Extract first bookmaker h2h market for the matching game; dispatch vig_method (QUANT-02)
             odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method)
         except BudgetExhaustedError as exc:
-            log.warning("context_agent_budget_exhausted", session_id=session_id, error=str(exc))
+            log.warning("context_agent_budget_exhausted_trying_espn", session_id=session_id, error=str(exc))
+            try:
+                raw_odds = await ESPNOddsPoller().fetch_h2h_odds(sport)
+                odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method)
+                log.info("context_agent_espn_h2h_fallback_ok", session_id=session_id)
+            except Exception as espn_exc:
+                log.warning("context_agent_espn_fallback_failed", error=str(espn_exc))
         except Exception as exc:
             log.error("context_agent_odds_error", session_id=session_id, error=str(exc))
+            try:
+                raw_odds = await ESPNOddsPoller().fetch_h2h_odds(sport)
+                odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method)
+                log.info("context_agent_espn_h2h_fallback_ok", session_id=session_id)
+            except Exception as espn_exc:
+                log.warning("context_agent_espn_fallback_failed", error=str(espn_exc))
 
         # --- Step 1 (continued): Staleness gate (CTXT-02) ---
         if odds_snapshot is not None:
@@ -305,8 +317,18 @@ def make_context_agent(
         # even if the try block raises (except blocks log and continue). (Phase 23 — PROP-06)
         _prop_snapshots: list = []
         try:
-            async with OddsAPIPoller(api_key=api_key, daily_credit_cap=daily_credit_cap) as poller:
-                raw_props = await poller.fetch_player_props(sport)
+            try:
+                async with OddsAPIPoller(api_key=api_key, daily_credit_cap=daily_credit_cap) as poller:
+                    raw_props = await poller.fetch_player_props(sport)
+                log.info("context_agent_props_source", source="odds_api")
+            except Exception as odds_api_exc:
+                log.warning(
+                    "context_agent_odds_api_props_failed_trying_dk",
+                    error=str(odds_api_exc),
+                )
+                async with DraftKingsPoller() as dk:
+                    raw_props = await dk.fetch_player_props(sport)
+                log.info("context_agent_props_source", source="draftkings_fallback")
             if not _sync_engine_cache:
                 import sqlalchemy as _sa
                 from sportsbet.config import settings as _settings_inner
