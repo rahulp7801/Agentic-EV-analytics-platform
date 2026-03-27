@@ -13,6 +13,10 @@ Test inventory:
 6. test_quant_agent_live                 — live graph ainvoke integration (skipif no DB)
 7. test_insufficient_sample              — mock pool with 0 rows → insufficient_sample
 8. test_run_quant_query_mock_adequate_sample — mock pool with 50 rows → real Decimal CI
+9. test_quant_agent_stat_type_routing    — state.stat_type="rushing" → QuantParams(stat_type="rushing")
+10. test_quant_agent_stat_type_default_absent — no stat_type key in state → QuantParams(stat_type="passing")
+11. test_quant_agent_stat_type_default_none   — state.stat_type=None → QuantParams(stat_type="passing")
+12. test_graph_state_stat_type_field     — GraphState TypedDict accepts stat_type field
 """
 from __future__ import annotations
 
@@ -241,3 +245,174 @@ class _async_cm:  # noqa: N801
 
     async def __aexit__(self, *args: object) -> None:
         pass
+
+
+# ---------------------------------------------------------------------------
+# QUANT-03 stat_type routing tests (quick-1 plan 1)
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_pool_with_result() -> MagicMock:
+    """Return a mock asyncpg pool that returns total=50, successes=30."""
+    mock_row = {"total": 50, "successes": 30}
+    mock_conn = AsyncMock()
+    mock_conn.fetchrow = AsyncMock(return_value=mock_row)
+    mock_pool = MagicMock()
+    mock_pool.acquire = MagicMock(return_value=_async_cm(mock_conn))
+    return mock_pool
+
+
+def _base_state(**overrides: object) -> dict:
+    """Return a minimal GraphState-compatible dict for quant_agent tests."""
+    base: dict = {
+        "session_id": "test-session",
+        "request_type": "quant_analysis",
+        "game_id": "2023_01_KC_DET",
+        "season": 2023,
+        "week": 1,
+        "home_team": "KC",
+        "away_team": "DET",
+        "injury_flags": {},
+        "weather_json": None,
+        "error": None,
+        "quant_result": None,
+        "ev_signal": None,
+        "context_signals": None,
+        "pending_signals": [],
+        "cleared_signals": [],
+    }
+    base.update(overrides)
+    return base
+
+
+def test_quant_agent_stat_type_routing() -> None:
+    """state.stat_type='rushing' must produce QuantParams(stat_type='rushing'), not 'passing'.
+
+    QUANT-03: quant_agent was hardcoded to stat_type="passing". This test
+    verifies that state.stat_type is read and forwarded to QuantParams.
+
+    make_quant_agent is called INSIDE the patch context so the closure-local
+    'from sportsbet.quant.executor import run_quant_query' picks up the mock.
+    """
+    if not _EXECUTOR_IMPORTED:
+        pytest.fail("run_quant_query not importable — not implemented yet")
+
+    import asyncio
+    from unittest.mock import AsyncMock as _AM, patch
+
+    from sportsbet.graph.agents import make_quant_agent
+
+    captured_params: list[QuantParams] = []
+    mock_result = QuantResult(
+        true_probability=Decimal("0.6"),
+        sample_size=50,
+        data_source="postgresql",
+    )
+    fake_rqq = _AM(side_effect=lambda pool, params: _capture_and_return(captured_params, params, mock_result))
+
+    mock_pool = _make_mock_pool_with_result()
+    state = _base_state(stat_type="rushing")
+
+    with patch("sportsbet.quant.executor.run_quant_query", fake_rqq):
+        agent = make_quant_agent(mock_pool)
+        asyncio.run(agent(state))  # type: ignore[arg-type]
+
+    assert len(captured_params) == 1, "run_quant_query must be called exactly once"
+    assert captured_params[0].stat_type == "rushing", (
+        f"Expected stat_type='rushing', got '{captured_params[0].stat_type}'"
+    )
+
+
+def test_quant_agent_stat_type_default_absent() -> None:
+    """No stat_type key in state defaults to QuantParams(stat_type='passing').
+
+    QUANT-03: state.get('stat_type') returns None when key absent; 'or "passing"'
+    then provides the default. Ensures no KeyError on non-stat_type routes.
+    """
+    if not _EXECUTOR_IMPORTED:
+        pytest.fail("run_quant_query not importable — not implemented yet")
+
+    import asyncio
+    from unittest.mock import AsyncMock as _AM, patch
+
+    from sportsbet.graph.agents import make_quant_agent
+
+    captured_params: list[QuantParams] = []
+    mock_result = QuantResult(
+        true_probability=Decimal("0.6"),
+        sample_size=50,
+        data_source="postgresql",
+    )
+    fake_rqq = _AM(side_effect=lambda pool, params: _capture_and_return(captured_params, params, mock_result))
+
+    mock_pool = _make_mock_pool_with_result()
+    # Deliberately omit stat_type from state
+    state = _base_state()
+
+    with patch("sportsbet.quant.executor.run_quant_query", fake_rqq):
+        agent = make_quant_agent(mock_pool)
+        asyncio.run(agent(state))  # type: ignore[arg-type]
+
+    assert len(captured_params) == 1
+    assert captured_params[0].stat_type == "passing", (
+        f"Expected default stat_type='passing', got '{captured_params[0].stat_type}'"
+    )
+
+
+def test_quant_agent_stat_type_default_none() -> None:
+    """state.stat_type=None defaults to QuantParams(stat_type='passing').
+
+    QUANT-03: explicit None (e.g. caller passes stat_type=None) must also
+    fall back to 'passing' via the 'or "passing"' idiom.
+    """
+    if not _EXECUTOR_IMPORTED:
+        pytest.fail("run_quant_query not importable — not implemented yet")
+
+    import asyncio
+    from unittest.mock import AsyncMock as _AM, patch
+
+    from sportsbet.graph.agents import make_quant_agent
+
+    captured_params: list[QuantParams] = []
+    mock_result = QuantResult(
+        true_probability=Decimal("0.6"),
+        sample_size=50,
+        data_source="postgresql",
+    )
+    fake_rqq = _AM(side_effect=lambda pool, params: _capture_and_return(captured_params, params, mock_result))
+
+    mock_pool = _make_mock_pool_with_result()
+    state = _base_state(stat_type=None)
+
+    with patch("sportsbet.quant.executor.run_quant_query", fake_rqq):
+        agent = make_quant_agent(mock_pool)
+        asyncio.run(agent(state))  # type: ignore[arg-type]
+
+    assert len(captured_params) == 1
+    assert captured_params[0].stat_type == "passing", (
+        f"Expected default stat_type='passing' for None, got '{captured_params[0].stat_type}'"
+    )
+
+
+def _capture_and_return(
+    captured: list, params: QuantParams, result: QuantResult
+) -> QuantResult:
+    """Helper: capture params and return result synchronously (used via AsyncMock side_effect)."""
+    captured.append(params)
+    return result
+
+
+def test_graph_state_stat_type_field() -> None:
+    """GraphState TypedDict must declare a stat_type field without TypeError.
+
+    QUANT-03: verifies state.py was updated to include stat_type: str | None.
+    Uses typing.get_type_hints() as the canonical way to inspect TypedDict fields.
+    """
+    import typing
+
+    from sportsbet.graph.state import GraphState
+
+    hints = typing.get_type_hints(GraphState)
+    assert "stat_type" in hints, (
+        "stat_type field missing from GraphState TypedDict — update state.py"
+    )
