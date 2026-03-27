@@ -64,7 +64,7 @@ def _make_nfl_state(
 
     Phase 23 update: adds player_prop_snapshots keyword arg. Defaults to a list
     containing one PlayerPropSnapshotCreate for Patrick Mahomes passing yards,
-    matching prop_type="player_pass_yards" (Odds API format) and line=250.5.
+    matching prop_type="player_pass_yds" (Odds API format) and line=250.5.
     Supply player_prop_snapshots=None or [] to test no-snapshot guard paths.
     """
     if prop_result is ...:  # type: ignore[comparison-overlap]
@@ -84,7 +84,7 @@ def _make_nfl_state(
                     game_id="2024_01_KC_LV",
                     player_name="Patrick Mahomes",
                     sportsbook="draftkings",
-                    prop_type="player_pass_yards",  # Odds API market key format
+                    prop_type="player_pass_yds",  # Odds API market key format (corrected from player_pass_yards)
                     line=Decimal("250.5"),
                     price=-115,
                     implied_probability=implied_prob,
@@ -346,7 +346,7 @@ class TestProp06PlayerPropSnapshot:
     def test_snapshot_match_uses_prop_implied_prob(self) -> None:
         """When player_prop_snapshots is in state (no odds_snapshot), agent uses snapshot implied_prob.
 
-        State has player_prop_snapshots=[snap(prop_type="player_pass_yards", line=250.5,
+        State has player_prop_snapshots=[snap(prop_type="player_pass_yds", line=250.5,
         implied_probability=0.50)] and context_signals.odds_snapshot=None.
         Asserts ev_signal is not None and ev_signal.implied_probability == Decimal("0.50").
         """
@@ -358,7 +358,7 @@ class TestProp06PlayerPropSnapshot:
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
             sportsbook="draftkings",
-            prop_type="player_pass_yards",
+            prop_type="player_pass_yds",  # corrected from player_pass_yards
             line=Decimal("250.5"),
             price=-115,
             implied_probability=Decimal("0.50"),
@@ -388,9 +388,9 @@ class TestProp06PlayerPropSnapshot:
         )
 
     def test_prop_type_normalization(self) -> None:
-        """prop_type='pass_yds' (PropParams format) matches snapshot prop_type='player_pass_yards' (Odds API format).
+        """prop_type='pass_yds' (PropParams format) matches snapshot prop_type='player_pass_yds' (Odds API format).
 
-        State has player_prop_snapshots with prop_type='player_pass_yards' and state
+        State has player_prop_snapshots with prop_type='player_pass_yds' and state
         prop_type='pass_yds'. Asserts match succeeds (ev_signal is not None).
         """
         assert _IMPORT_OK, "make_prop_arbitrage_agent not importable yet"
@@ -401,7 +401,7 @@ class TestProp06PlayerPropSnapshot:
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
             sportsbook="draftkings",
-            prop_type="player_pass_yards",  # Odds API format
+            prop_type="player_pass_yds",  # Odds API format (corrected from player_pass_yards)
             line=Decimal("250.5"),
             price=-115,
             implied_probability=Decimal("0.50"),
@@ -411,7 +411,7 @@ class TestProp06PlayerPropSnapshot:
             implied_prob=Decimal("0.50"),
             player_prop_snapshots=[snap],
         )
-        # prop_type="pass_yds" is already set in _make_nfl_state — must normalize to "player_pass_yards"
+        # prop_type="pass_yds" is already set in _make_nfl_state — must normalize to "player_pass_yds"
         state["context_signals"] = ContextSignals(
             game_id="2024_01_KC_LV",
             injury_flags={},
@@ -421,7 +421,7 @@ class TestProp06PlayerPropSnapshot:
         result = asyncio.run(agent(state))
         ev_signal = result.get("ev_signal")
         assert ev_signal is not None, (
-            "Expected non-None EVSignal: prop_type alias 'pass_yds'->'player_pass_yards' should match"
+            "Expected non-None EVSignal: prop_type alias 'pass_yds'->'player_pass_yds' should match"
         )
 
 
@@ -478,7 +478,7 @@ class TestProp06NoSnapshotGuard:
             game_id="2024_01_KC_LV",
             player_name="Derrick Henry",
             sportsbook="draftkings",
-            prop_type="player_rush_yards",  # different prop_type, no match for "pass_yds"
+            prop_type="player_rush_yds",  # different prop_type, no match for "pass_yds" -> "player_pass_yds"
             line=Decimal("80.5"),
             price=-115,
             implied_probability=Decimal("0.50"),
@@ -517,7 +517,7 @@ class TestProp06CommensurableEV:
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
             sportsbook="draftkings",
-            prop_type="player_pass_yards",
+            prop_type="player_pass_yds",  # corrected from player_pass_yards
             line=Decimal("250.5"),
             price=-115,
             implied_probability=Decimal("0.50"),
@@ -555,7 +555,7 @@ class TestProp06CommensurableEV:
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
             sportsbook="draftkings",
-            prop_type="player_pass_yards",
+            prop_type="player_pass_yds",  # corrected from player_pass_yards
             line=Decimal("250.5"),
             price=-115,
             implied_probability=Decimal("0.50"),
@@ -588,7 +588,7 @@ class TestProp06CommensurableEV:
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
             sportsbook="draftkings",
-            prop_type="player_pass_yards",
+            prop_type="player_pass_yds",  # corrected from player_pass_yards
             line=Decimal("250.5"),
             price=-115,
             implied_probability=Decimal("0.50"),
