@@ -15,6 +15,7 @@ import argparse
 import structlog
 
 from sportsbet.db.connection import get_sync_engine
+from sportsbet.ingestion.games import ingest_games_seasons
 from sportsbet.ingestion.ngs import NGS_MIN_SEASON, ingest_ngs_seasons
 from sportsbet.ingestion.pbp import ingest_pbp_seasons
 from sportsbet.ingestion.player_stats import ingest_player_stats_seasons
@@ -38,6 +39,11 @@ def main() -> None:
         action="store_true",
         help="Load play-by-play data only (skip player stats and NGS)",
     )
+    parser.add_argument(
+        "--games",
+        action="store_true",
+        help="Ingest NFL game schedules into the games table (prerequisite for backtest)",
+    )
     args = parser.parse_args()
 
     engine = get_sync_engine()
@@ -57,6 +63,10 @@ def main() -> None:
             ingest_ngs_seasons(ngs_seasons, engine)
         else:
             log.info("ngs_skipped_all_pre_2016", seasons=seasons)
+
+    if args.games:
+        log.info("ingesting_games_schedules", seasons=seasons)
+        ingest_games_seasons(seasons, engine)
 
     log.info("ingestion_complete", seasons=seasons)
 
