@@ -119,3 +119,13 @@ None - no external service configuration required.
 ---
 *Phase: 23-prop-ev-fix*
 *Completed: 2026-03-26*
+
+## Self-Check: PASSED
+
+- FOUND: tests/test_prop_arbitrage.py
+- FOUND: src/sportsbet/graph/state.py
+- FOUND: src/sportsbet/graph/agents.py
+- FOUND: src/sportsbet/prop/arbitrage.py
+- FOUND: .planning/phases/23-prop-ev-fix/23-01-SUMMARY.md
+- FOUND: commit 5dee613 (test RED phase)
+- FOUND: commit 8353751 (feat GREEN phase)
