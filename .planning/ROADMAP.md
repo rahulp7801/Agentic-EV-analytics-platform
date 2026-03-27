@@ -37,8 +37,12 @@ Decimal phases appear between their surrounding integers in numeric order.
  (completed 2026-03-26)
 - [x] **Phase 22: Tech Debt Cleanup** - Fix PBP idempotency, Python 3.12 deprecation warnings, stale docstrings, PROP-04 missing kinematic warning, QUANT-04 automated closing-line pipeline, and documentation text fixes (Tech Debt)
  (completed 2026-03-26)
-- [x] **Phase 23: Fix PropArbitrageAgent EV — Player Prop Implied Probability** - Wire prop_arbitrage_agent to read player_prop_snapshots and derive implied probability from the matched player prop line instead of h2h moneyline odds (Gap Closure — PROP-06) (completed 2026-03-26)
-- [x] **Phase 24: Integration Documentation and Backtest NULL Fix** - Document quant->arbitrage and context->prop multi-invocation patterns; fix load_snapshots LEFT JOIN to prevent silent row drops on null game_id (Gap Closure — ARBT-01, CTXT-04/PROP-04, QUANT-04) (completed 2026-03-27)
+- [x] **Phase 23: Fix PropArbitrageAgent EV — Player Prop Implied Probability** - Wire prop_arbitrage_agent to read player_prop_snapshots and derive implied probability from the matched player prop line instead of h2h moneyline odds (Gap Closure — PROP-06)
+ (completed 2026-03-26)
+- [x] **Phase 24: Integration Documentation and Backtest NULL Fix** - Document quant->arbitrage and context->prop multi-invocation patterns; fix load_snapshots LEFT JOIN to prevent silent row drops on null game_id (Gap Closure — ARBT-01, CTXT-04/PROP-04, QUANT-04)
+ (completed 2026-03-27)
+- [ ] **Phase 25: Wire stat_type Routing Through GraphState** - Add stat_type field to GraphState TypedDict, have context_agent write it, have quant_agent read it instead of hardcoding "passing" (Gap Closure — QUANT-03)
+- [ ] **Phase 26: Add Games Ingestion Pipeline** - Add ingest_games_seasons() using nflreadpy.import_schedules(), wire into cli.py, so load_snapshots() returns real rows in fresh deploys (Gap Closure — QUANT-04)
 
 ## Phase Details
 
@@ -436,3 +440,33 @@ Plans:
 
 Plans:
 - [ ] 24-01-PLAN.md — quant→arbitrage and context→prop invocation pattern documentation; load_snapshots NULL game_id fix
+
+### Phase 25: Wire stat_type Routing Through GraphState
+**Goal:** Fix QUANT-03 by propagating stat_type through the LangGraph state so rushing/receiving query templates are reachable; eliminate the hardcoded `stat_type="passing"` in `make_quant_agent`.
+**Depends on:** Phase 24
+**Requirements:** QUANT-03
+**Gap Closure:** Closes QUANT-03 stat_type hardcoding gap from v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. `GraphState` TypedDict has a `stat_type: str | None` field
+  2. `context_agent` writes `stat_type` derived from parsed market context into the state
+  3. `quant_agent` reads `state.get("stat_type", "passing")` — no hardcoded `"passing"` string
+  4. A test confirms the rushing/receiving template is selected when `stat_type="rushing"`
+
+Plans:
+- [ ] 25-01-PLAN.md — add stat_type to GraphState; wire context_agent write and quant_agent read
+
+### Phase 26: Add Games Ingestion Pipeline
+**Goal:** Fix QUANT-04 by adding `ingest_games_seasons()` using `nflreadpy.import_schedules()` and wiring it into `cli.py`, so the `games` table is populated on fresh deploys and `load_snapshots()` returns real rows.
+**Depends on:** Phase 25
+**Requirements:** QUANT-04
+**Gap Closure:** Closes QUANT-04 games ingestion gap from v1.0 audit
+
+**Success Criteria** (what must be TRUE):
+  1. `ingest_games_seasons(pool, seasons)` exists in the ingestion module and populates `games` table from `nflreadpy.import_schedules()`
+  2. `cli.py` calls `ingest_games_seasons` alongside existing PBP ingestion
+  3. `load_snapshots()` returns non-zero rows after running ingestion in a test environment
+  4. A test or integration check confirms the games→snapshots join produces real output
+
+Plans:
+- [ ] 26-01-PLAN.md — ingest_games_seasons implementation; cli.py wiring; load_snapshots validation
