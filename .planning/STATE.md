@@ -5,7 +5,7 @@ milestone_name: milestone
 status: executing
 stopped_at: Completed 24-01-PLAN.md
 last_updated: "2026-03-27T03:33:40.640Z"
-last_activity: 2026-03-27 — Completed quick task 1: Fix QUANT-03 stat_type routing and QUANT-04 games ingestion pipeline
+last_activity: 2026-03-27 — Completed quick task 2: Fix PROP-06 alias key mismatch and QUANT-03 context_agent stat_type inference
 progress:
   total_phases: 24
   completed_phases: 24
@@ -251,6 +251,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | Fix QUANT-03 stat_type routing and QUANT-04 games ingestion pipeline | 2026-03-27 | efe4dcb | [1-fix-quant-03-stat-type-routing-and-quant](.planning/quick/1-fix-quant-03-stat-type-routing-and-quant/) |
+| 2 | Fix PROP-06 alias key mismatch and QUANT-03 context_agent stat_type inference | 2026-03-27 | bfb56f8 | [2-fix-prop-06-alias-key-mismatch-and-quant](.planning/quick/2-fix-prop-06-alias-key-mismatch-and-quant/) |
 
 ### Blockers/Concerns
 
