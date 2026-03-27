@@ -123,6 +123,11 @@ class GraphState(TypedDict):
         PropArbitrageAgent matches against this list to obtain a prop-specific
         implied_probability (commensurable with prop_result.true_probability).
         Access via state.get("player_prop_snapshots").
+    stat_type : str | None
+        Quant stat category override: "passing" | "rushing" | "receiving" | None.
+        None means quant_agent defaults to "passing". Written by context_agent when
+        request context indicates non-passing analysis. Access via state.get().
+        (quick-1 — QUANT-03)
     """
 
     session_id: str
@@ -153,3 +158,9 @@ class GraphState(TypedDict):
     situational_params: dict[str, Any] | None  # type: ignore[misc]  # Injected by ContextAgent after news parsing (Phase 18 — SC-3)
     player_prop_snapshots: list[Any] | None  # type: ignore[misc]
     # PlayerPropSnapshotCreate list from context_agent Step 1c (Phase 23 — PROP-06)
+    stat_type: str | None  # type: ignore[misc]
+    # Quant stat category override: "passing" | "rushing" | "receiving" | None.
+    # None means quant_agent defaults to "passing". Set by context_agent when
+    # request context indicates non-passing play analysis.
+    # Access via state.get("stat_type", "passing") — never require presence.
+    # (quick-1 — QUANT-03)

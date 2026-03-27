@@ -98,7 +98,7 @@ def make_quant_agent(
                 season=state["season"],
                 week=state["week"],
                 posteam=state["home_team"],  # default: query for home team offense
-                stat_type="passing",         # default stat type; Context Agent will override
+                stat_type=state.get("stat_type") or "passing",  # QUANT-03: read from state, default "passing"
                 filters={},
             )
             result = await run_quant_query(pool, params)
