@@ -387,7 +387,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 20. NBA Context Signals Auto-Population | 3/3 | Complete    | 2026-03-26 |
 | 21. Nyquist Validation Sign-off (Phases 16 & 18) | 2/2 | Complete    | 2026-03-26 |
 | 22. Tech Debt Cleanup | 2/2 | Complete    | 2026-03-26 |
-| 23. Fix PropArbitrageAgent EV — Player Prop Implied Probability | 1/1 | Complete   | 2026-03-26 |
+| 23. Fix PropArbitrageAgent EV — Player Prop Implied Probability | 1/1 | Complete    | 2026-03-27 |
 | 24. Integration Documentation and Backtest NULL Fix | 0/1 | Pending     | — |
 
 ### Phase 18: Situational Game-Log Prop Queries
