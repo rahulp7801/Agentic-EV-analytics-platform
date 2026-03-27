@@ -97,11 +97,15 @@ def build_signals(
             logger.debug("skipping_row_no_price", row_id=row.get("id"))
             continue
 
+        game_start_time = row.get("game_start_time")
+        if game_start_time is None:
+            logger.debug("skipping_row_no_game_start_time", row_id=row.get("id"), game_id=row.get("game_id"))
+            continue
+
         game_id = row.get("game_id")
         closing_implied_prob = _american_to_implied_prob(price)
         payout_multiplier = _american_to_payout(price)
         actual_outcome: bool = outcomes.get(game_id, False) if outcomes else False
-        game_start_time: datetime = row["game_start_time"]
         snapshot_time: datetime = row["snapped_at"]
 
         # CLV-only: use closing prob as signal probability so clv_mean reflects
@@ -152,6 +156,7 @@ async def load_snapshots(
     # Build query with optional filters using positional parameters
     params: list[str] = []
     where_clauses = [
+        "o.game_id IS NOT NULL",                                            # QUANT-04: filter NULL game_id rows before LEFT JOIN timestamp arithmetic
         "o.snapped_at < (g.game_date::timestamptz + INTERVAL '18 hours')",
         "o.price IS NOT NULL",
     ]
