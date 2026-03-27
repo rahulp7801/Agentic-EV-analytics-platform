@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-03-27T02:59:21.304Z"
+stopped_at: Completed 24-01-PLAN.md
+last_updated: "2026-03-27T03:29:49.564Z"
 last_activity: 2026-03-13 — Phase 3 Plan 01 complete — Quant engine SQL gate, Wilson CI, make_quant_agent closure
 progress:
   total_phases: 24
-  completed_phases: 23
-  total_plans: 46
-  completed_plans: 46
+  completed_phases: 24
+  total_plans: 47
+  completed_plans: 47
   percent: 100
 ---
 
@@ -95,6 +95,7 @@ Progress: [██████████] 100%
 | Phase 22-tech-debt-cleanup P02 | 6 | 2 tasks | 3 files |
 | Phase 22-tech-debt-cleanup P01 | 6 | 3 tasks | 5 files |
 | Phase 23-prop-ev-fix P01 | 12 | 2 tasks | 4 files |
+| Phase 24-integration-docs-backtest-fix P01 | 4 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -237,6 +238,9 @@ Recent decisions affecting current work:
 - [Phase 23-prop-ev-fix]: Phase 23 PROP-06: matched_snapshot.implied_probability used directly (vig-inclusive Decimal) rather than re-deriving via devig — single-side snapshots cannot be power-devigged without both sides co-located
 - [Phase 23-prop-ev-fix]: Phase 23 PROP-06: _PROP_TYPE_ALIAS_MAP at module level (9 entries) normalizes PropParams shorthand Literals to Odds API market key format at match time — no schema change needed
 - [Phase 23-prop-ev-fix]: Phase 23 PROP-06: _prop_snapshots initialized before try block in context_agent so always in scope at Step 3 return even if try raises
+- [Phase 24-integration-docs-backtest-fix]: ARBT-01 comment block placed immediately after add_edge('quant_agent', END) — co-located with node for API consumer visibility, mirrors existing PROP-04 kinematic block placement pattern
+- [Phase 24-integration-docs-backtest-fix]: o.game_id IS NOT NULL as first WHERE clause in load_snapshots — placed before timestamp arithmetic clause so NULL game_id rows are excluded before LEFT JOIN NULL evaluation
+- [Phase 24-integration-docs-backtest-fix]: game_start_time accessed via row.get() with None guard before use — defensive layer parallel to existing price is None skip, prevents silent TypeError for any NULL rows bypassing SQL guard
 
 ### Pending Todos
 
@@ -250,6 +254,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T21:11:56.767Z
-Stopped at: Completed 23-01-PLAN.md
+Last session: 2026-03-27T03:29:49.559Z
+Stopped at: Completed 24-01-PLAN.md
 Resume file: None
