@@ -608,3 +608,68 @@ class TestProp06CommensurableEV:
         assert result.get("ev_signal") is None, (
             "Expected None ev_signal when true_prob == snapshot implied_probability (no edge)"
         )
+
+
+# ---------------------------------------------------------------------------
+# Quick Task 2 — PROP-06 alias key audit (TestPropAliasMapKeys)
+# ---------------------------------------------------------------------------
+
+class TestPropAliasMapKeys:
+    """PROP-06 quick-2: Audit _PROP_TYPE_ALIAS_MAP NFL values against NFL_PROP_MARKETS keys.
+
+    NFL_PROP_MARKETS contains:
+      player_pass_yds, player_pass_tds, player_rush_yds, player_rush_tds,
+      player_reception_yds, player_reception_tds, player_receptions
+
+    Each NFL entry in _PROP_TYPE_ALIAS_MAP must map to a value present in that set.
+    NBA keys (points, rebounds, assists, pra) are not in NFL_PROP_MARKETS and are skipped.
+    """
+
+    def test_rec_yds_maps_to_player_reception_yds(self) -> None:
+        """rec_yds must map to 'player_reception_yds' (not 'player_receiving_yards')."""
+        from sportsbet.prop.arbitrage import _PROP_TYPE_ALIAS_MAP
+        assert _PROP_TYPE_ALIAS_MAP["rec_yds"] == "player_reception_yds", (
+            f"rec_yds maps to {_PROP_TYPE_ALIAS_MAP['rec_yds']!r} — "
+            f"expected 'player_reception_yds' (NFL_PROP_MARKETS key)"
+        )
+
+    def test_all_nfl_alias_values_in_nfl_prop_markets(self) -> None:
+        """All NFL-related _PROP_TYPE_ALIAS_MAP values must be present in NFL_PROP_MARKETS."""
+        from sportsbet.prop.arbitrage import _PROP_TYPE_ALIAS_MAP
+        from sportsbet.ingestion.odds_poller import NFL_PROP_MARKETS
+
+        # Parse NFL_PROP_MARKETS string into a set of keys
+        nfl_markets_set = set(NFL_PROP_MARKETS.replace("\n", "").replace(" ", "").split(","))
+
+        # NBA-only keys — not expected in NFL_PROP_MARKETS
+        nba_only_keys = {"points", "rebounds", "assists", "pra"}
+
+        mismatches: list[str] = []
+        for prop_key, market_value in _PROP_TYPE_ALIAS_MAP.items():
+            if prop_key in nba_only_keys:
+                continue  # Skip NBA props
+            if market_value not in nfl_markets_set:
+                mismatches.append(
+                    f"  {prop_key!r} -> {market_value!r} (not in NFL_PROP_MARKETS)"
+                )
+
+        assert not mismatches, (
+            "NFL _PROP_TYPE_ALIAS_MAP values not found in NFL_PROP_MARKETS:\n"
+            + "\n".join(mismatches)
+        )
+
+    def test_nba_keys_not_in_nfl_prop_markets(self) -> None:
+        """NBA-only keys (points, rebounds, assists, pra) are not in NFL_PROP_MARKETS — verify skip is safe."""
+        from sportsbet.prop.arbitrage import _PROP_TYPE_ALIAS_MAP
+        from sportsbet.ingestion.odds_poller import NFL_PROP_MARKETS
+
+        nfl_markets_set = set(NFL_PROP_MARKETS.replace("\n", "").replace(" ", "").split(","))
+        nba_only_keys = {"points", "rebounds", "assists", "pra"}
+
+        for prop_key in nba_only_keys:
+            market_value = _PROP_TYPE_ALIAS_MAP.get(prop_key)
+            if market_value is not None:
+                # NBA value should NOT be in NFL markets
+                assert market_value not in nfl_markets_set, (
+                    f"NBA key {prop_key!r} maps to {market_value!r} which is unexpectedly in NFL_PROP_MARKETS"
+                )

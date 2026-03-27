@@ -40,10 +40,12 @@ _NO_SIGNAL: dict[str, Any] = {"ev_signal": None}
 # PlayerPropSnapshotCreate.prop_type (which stores raw Odds API market keys).
 # (Phase 23 — PROP-06)
 _PROP_TYPE_ALIAS_MAP: dict[str, str] = {
-    "pass_yds": "player_pass_yards",
-    "rush_yds": "player_rush_yards",
-    "rec_yds": "player_receiving_yards",
+    "pass_yds": "player_pass_yds",        # was player_pass_yards — NFL_PROP_MARKETS key
+    "rush_yds": "player_rush_yds",        # was player_rush_yards — NFL_PROP_MARKETS key
+    "rec_yds": "player_reception_yds",    # was player_receiving_yards — NFL_PROP_MARKETS key (PROP-06)
     "pass_tds": "player_pass_tds",
+    "rush_tds": "player_rush_tds",        # added — present in NFL_PROP_MARKETS, was missing
+    "rec_tds": "player_reception_tds",    # added — present in NFL_PROP_MARKETS, was missing
     "receptions": "player_receptions",
     "points": "player_points",
     "rebounds": "player_rebounds",
