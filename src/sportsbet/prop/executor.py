@@ -86,6 +86,7 @@ async def run_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResult:
     is_conditional: bool = bool(
         params.last_n_games is not None
         or params.teammate_out
+        or params.teammate_out_contexts
         or params.opponent_team is not None
         or params.home_away is not None
     )

@@ -214,6 +214,36 @@ class PropQueryBuilder:
                 args.append(teammate_id)
                 next_idx += 1
 
+        # teammate_out_contexts: player_stats absence detection by team+position.
+        # When a player (e.g., "QB from KC") has no stat row for a given week,
+        # they didn't play — this is a reliable historical proxy for injury absence.
+        # Preferred over the injury_reports INTERVAL path because player_stats has
+        # multi-season history; injury_reports only has live/recent data.
+        # team and position come from StaticDict (NFL_SITUATIONAL_ALLOWED_KEYS expanded) — not user input.
+        if params.teammate_out_contexts:
+            for ctx in params.teammate_out_contexts:
+                team = ctx.get("team", "")
+                position = ctx.get("position", "")
+                if not team or not position or position == "Unknown":
+                    continue
+                sql = sql + (
+                    f"  AND NOT EXISTS (\n"
+                    f"      SELECT 1 FROM player_stats ps2\n"
+                    f"      WHERE ps2.season = player_stats.season\n"
+                    f"        AND ps2.week = player_stats.week\n"
+                    f"        AND ps2.team = ${next_idx}\n"
+                    f"        AND ps2.position = ${next_idx + 1}\n"
+                    f"        AND (\n"
+                    f"          COALESCE(ps2.passing_yards, 0) > 0\n"
+                    f"          OR COALESCE(ps2.rushing_yards, 0) > 0\n"
+                    f"          OR COALESCE(ps2.receiving_yards, 0) > 0\n"
+                    f"        )\n"
+                    f"  )\n"
+                )
+                args.append(team)
+                args.append(position)
+                next_idx += 2
+
         # last_n_games filter — (season, week) IN subquery with ORDER BY + LIMIT $N
         # Applied LAST so the subquery's opponent_team filter (if present) narrows
         # the recency window correctly for "last N games vs opponent" queries.

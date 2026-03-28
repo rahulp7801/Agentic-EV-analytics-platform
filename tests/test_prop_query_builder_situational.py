@@ -168,3 +168,74 @@ def test_nba_opponent_filter_uses_positional_param() -> None:
     # User-supplied value must be in args, NOT embedded in SQL string
     assert "GSW" not in sql, "Raw opponent_team value must not appear in SQL string"
     assert "GSW" in args, "opponent_team value must be in args tuple"
+
+
+def test_teammate_out_contexts_uses_player_stats_absence() -> None:
+    """teammate_out_contexts uses player_stats NOT EXISTS, not injury_reports INTERVAL.
+
+    When teammate_out_contexts is set (team+position context available), PropQueryBuilder
+    should use player_stats absence detection — works for historical data.
+    """
+    from sportsbet.prop.query_builder import PropQueryBuilder
+
+    params = _nfl_params(
+        teammate_out_contexts=[{"name": "Patrick Mahomes", "team": "KC", "position": "QB"}]
+    )
+    sql, args = PropQueryBuilder.build(params)
+
+    # Must use player_stats absence (NOT EXISTS), not injury_reports INTERVAL
+    assert "NOT EXISTS" in sql.upper(), "teammate_out_contexts must use NOT EXISTS subquery"
+    assert "player_stats" in sql, "teammate_out_contexts must reference player_stats table"
+    assert "INTERVAL" not in sql.upper() or "NOT EXISTS" in sql.upper(), (
+        "teammate_out_contexts path must use player_stats absence, not INTERVAL only"
+    )
+    # Team and position must be in args, NOT embedded in SQL string
+    assert "KC" not in sql, "Raw team abbreviation must not appear in SQL string"
+    assert "QB" not in sql, "Raw position must not appear in SQL string"
+    assert "KC" in args, "Team must be in args tuple"
+    assert "QB" in args, "Position must be in args tuple"
+
+
+def test_teammate_out_contexts_skips_unknown_position() -> None:
+    """teammate_out_contexts with Unknown position is skipped — no filter appended."""
+    from sportsbet.prop.query_builder import PropQueryBuilder
+
+    params = _nfl_params(
+        teammate_out_contexts=[{"name": "John Doe", "team": "KC", "position": "Unknown"}]
+    )
+    sql, args = PropQueryBuilder.build(params)
+
+    # Unknown position should be skipped — no extra WHERE clause added
+    assert "NOT EXISTS" not in sql.upper(), (
+        "Unknown position entry in teammate_out_contexts must be skipped"
+    )
+
+
+def test_nba_teammate_out_uses_gamelog_absence() -> None:
+    """NBA teammate_out filter uses nba_player_gamelogs NOT EXISTS, not INTERVAL."""
+    from sportsbet.prop.nba_query_builder import NBAQueryBuilder
+
+    params = _nba_params(
+        opponent_team="GSW",  # ensures conditional path
+        teammate_out=["Anthony Davis"],
+    )
+    sql, args = NBAQueryBuilder.build(params)
+
+    assert "NOT EXISTS" in sql.upper(), "NBA teammate_out must use NOT EXISTS"
+    assert "nba_player_gamelogs" in sql, "NBA teammate_out must reference nba_player_gamelogs"
+    assert "Anthony Davis" not in sql, "Player name must not appear in SQL string"
+    assert "Anthony Davis" in args, "Player name must be in args tuple"
+
+
+def test_prop_params_accepts_teammate_out_contexts() -> None:
+    """PropParams accepts teammate_out_contexts as list of dicts."""
+    params = _nfl_params(
+        teammate_out_contexts=[{"name": "Patrick Mahomes", "team": "KC", "position": "QB"}]
+    )
+    assert params.teammate_out_contexts == [{"name": "Patrick Mahomes", "team": "KC", "position": "QB"}]
+
+
+def test_prop_params_teammate_out_contexts_defaults_none() -> None:
+    """teammate_out_contexts defaults to None (backward compatible)."""
+    params = _nfl_params()
+    assert params.teammate_out_contexts is None

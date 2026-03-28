@@ -308,6 +308,11 @@ async def test_context_agent_updates_graphstate() -> None:
             new_callable=AsyncMock,
             return_value=0,
         ),
+        patch(
+            "sportsbet.graph.agents._fetch_sleeper_injuries",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
     ):
         mock_client_instance = AsyncMock()
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
@@ -366,6 +371,11 @@ async def test_downstream_reads_state() -> None:
             "sportsbet.ingestion.scraper.InjuryWeatherScraper.write_injury_reports",
             new_callable=AsyncMock,
             return_value=0,
+        ),
+        patch(
+            "sportsbet.graph.agents._fetch_sleeper_injuries",
+            new_callable=AsyncMock,
+            return_value=[],
         ),
     ):
         mock_client_instance = AsyncMock()

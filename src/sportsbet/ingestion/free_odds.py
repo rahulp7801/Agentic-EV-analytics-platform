@@ -35,6 +35,7 @@ context_agent prop-processing loop can consume them without changes:
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -77,6 +78,24 @@ _ESPN_SCOREBOARD_NBA = (
 _ESPN_SCOREBOARD_NFL = (
     "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
 )
+
+# ESPN Core API — prop bet provider ID (100 = ESPN BET / consensus line)
+_ESPN_CORE_BASE = "https://sports.core.api.espn.com/v2/sports"
+_ESPN_PROP_PROVIDER = 100
+
+# ESPN prop type name → Odds API market key (player-stat props only)
+_ESPN_TYPE_TO_MARKET: dict[str, str] = {
+    "total points": "player_points",
+    "total rebounds": "player_rebounds",
+    "total assists": "player_assists",
+    "total 3-point field goals": "player_threes",
+    "total steals": "player_steals",
+    "total blocks": "player_blocks",
+    "total points, rebounds, and assists": "player_points_rebounds_assists",
+    "total points and rebounds": "player_points_rebounds_assists",
+    "total points and assists": "player_points_rebounds_assists",
+    "total assists and rebounds": "player_rebounds",  # closest available key
+}
 
 
 # ---------------------------------------------------------------------------
@@ -238,8 +257,8 @@ def _add_offer_to_events(
             continue
 
         market_entry["outcomes"].append({
-            "name": player_name,
-            "description": side,
+            "name": side,
+            "description": player_name,
             "price": price,
             "point": float(line_val) if line_val is not None else None,
         })
@@ -254,6 +273,217 @@ def _extract_player_from_label(label: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# ESPN props poller (player prop fallback)
+# ---------------------------------------------------------------------------
+
+
+class ESPNPropsPoller:
+    """Fetch live NBA player prop odds from ESPN's Core API (no auth required).
+
+    Uses ESPN's undocumented sports.core.api.espn.com endpoint which powers
+    ESPN BET. Returns props normalised to the same Odds API-compatible format
+    as OddsAPIPoller so the context_agent loop consumes them unchanged.
+
+    Prop items arrive in consecutive pairs (same athlete + type): index 0 is
+    the Over line, index 1 is the Under line. Athlete names are resolved via
+    parallel requests to the athlete detail endpoint.
+
+    Usage:
+        async with ESPNPropsPoller() as poller:
+            props = await poller.fetch_player_props("nba")
+    """
+
+    def __init__(self, timeout: float = 15.0) -> None:
+        self._timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+        self._client_cm: httpx.AsyncClient | None = None
+
+    async def __aenter__(self) -> "ESPNPropsPoller":
+        self._client_cm = httpx.AsyncClient(timeout=self._timeout)
+        self._client = await self._client_cm.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        if self._client_cm is not None:
+            await self._client_cm.__aexit__(exc_type, exc_val, exc_tb)
+            self._client_cm = None
+            self._client = None
+
+    async def fetch_player_props(self, sport: str) -> list[dict[str, Any]]:
+        """Fetch all player prop odds for today's games.
+
+        Args:
+            sport: "nba" or "nfl"
+
+        Returns:
+            List of event dicts in Odds API-compatible format.
+            Empty list if no games scheduled or ESPN unreachable.
+        """
+        assert self._client is not None, "called outside async context manager"
+
+        # Step 1: get today's events from the scoreboard
+        if sport == "nba":
+            league = "basketball/leagues/nba"
+            scoreboard_url = _ESPN_SCOREBOARD_NBA
+        else:
+            league = "football/leagues/nfl"
+            scoreboard_url = _ESPN_SCOREBOARD_NFL
+
+        sb_resp = await self._client.get(scoreboard_url)
+        sb_resp.raise_for_status()
+        events_raw = sb_resp.json().get("events", [])
+
+        if not events_raw:
+            log.info("espn_props_no_events_today", sport=sport)
+            return []
+
+        log.info("espn_props_events_found", sport=sport, event_count=len(events_raw))
+
+        # Step 2: for each event, fetch propBets (paginated) in parallel
+        tasks = [
+            self._fetch_event_props(league, e)
+            for e in events_raw
+        ]
+        event_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        normalised: list[dict[str, Any]] = []
+        for result in event_results:
+            if isinstance(result, Exception):
+                log.warning("espn_props_event_error", error=str(result))
+                continue
+            if result:
+                normalised.append(result)
+
+        log.info("espn_props_fetched", sport=sport, event_count=len(normalised))
+        return normalised
+
+    async def _fetch_event_props(
+        self, league: str, event: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Fetch and normalise prop bets for a single event."""
+        assert self._client is not None
+        event_id = event.get("id", "")
+        comp = (event.get("competitions") or [{}])[0]
+        competitors = {
+            c.get("homeAway", ""): c.get("team", {}).get("abbreviation", "")
+            for c in comp.get("competitors", [])
+        }
+
+        # Fetch all pages of propBets
+        base_url = (
+            f"{_ESPN_CORE_BASE}/{league}/events/{event_id}"
+            f"/competitions/{event_id}/odds/{_ESPN_PROP_PROVIDER}/propBets"
+        )
+        all_items: list[dict] = []
+        page = 1
+        while True:
+            resp = await self._client.get(
+                base_url, params={"lang": "en", "region": "us", "limit": 200, "page": page}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            all_items.extend(data.get("items", []))
+            if page >= data.get("pageCount", 1):
+                break
+            page += 1
+
+        if not all_items:
+            return None
+
+        # Step 3: resolve unique athlete IDs → names in parallel
+        unique_athlete_refs: dict[str, str] = {}  # ref_url → athlete_id
+        for item in all_items:
+            ref = item.get("athlete", {}).get("$ref", "")
+            if ref:
+                athlete_id = ref.split("/athletes/")[-1].split("?")[0]
+                unique_athlete_refs[athlete_id] = ref
+
+        name_map = await self._resolve_athlete_names(unique_athlete_refs)
+
+        # Step 4: group consecutive pairs by (athlete_id, type_id) → Over/Under
+        outcomes_by_market: dict[str, list[dict]] = {}  # market_key → outcomes
+
+        # Track pairing: consecutive items with same (athlete_id, type_id) = Over then Under
+        pair_tracker: dict[tuple[str, str], int] = {}  # (athlete_id, type_id) → pair_index
+
+        for item in all_items:
+            type_name = item.get("type", {}).get("name", "").lower()
+            market_key = _ESPN_TYPE_TO_MARKET.get(type_name)
+            if market_key is None:
+                continue  # skip game-level bets (spreads, totals, quarters)
+
+            ref = item.get("athlete", {}).get("$ref", "")
+            athlete_id = ref.split("/athletes/")[-1].split("?")[0] if ref else ""
+            type_id = item.get("type", {}).get("id", "")
+            player_name = name_map.get(athlete_id, "Unknown")
+
+            odds_block = item.get("odds", {})
+            line_val = item.get("current", {}).get("target", {}).get("value")
+            if line_val is None:
+                line_val = odds_block.get("total", {}).get("value")
+
+            try:
+                price = int(str(odds_block.get("american", {}).get("value", "0")).replace("+", ""))
+            except (ValueError, TypeError):
+                continue
+
+            if not player_name or price == 0:
+                continue
+
+            pair_key = (athlete_id, type_id)
+            pair_index = pair_tracker.get(pair_key, 0)
+            pair_tracker[pair_key] = pair_index + 1
+
+            side = "Over" if pair_index % 2 == 0 else "Under"
+
+            if market_key not in outcomes_by_market:
+                outcomes_by_market[market_key] = []
+
+            outcomes_by_market[market_key].append({
+                "name": side,
+                "description": player_name,
+                "price": price,
+                "point": float(line_val) if line_val is not None else None,
+            })
+
+        if not outcomes_by_market:
+            return None
+
+        markets = [
+            {"key": mk, "outcomes": outcomes}
+            for mk, outcomes in outcomes_by_market.items()
+        ]
+
+        return {
+            "id": event_id,
+            "home_team": competitors.get("home", ""),
+            "away_team": competitors.get("away", ""),
+            "bookmakers": [{"key": "espn_bet", "markets": markets}],
+        }
+
+    async def _resolve_athlete_names(
+        self, athlete_refs: dict[str, str]
+    ) -> dict[str, str]:
+        """Resolve athlete IDs to display names via parallel ESPN athlete API calls."""
+        assert self._client is not None
+
+        async def fetch_name(athlete_id: str, ref_url: str) -> tuple[str, str]:
+            try:
+                r = await self._client.get(ref_url)  # type: ignore[union-attr]
+                r.raise_for_status()
+                data = r.json()
+                name = data.get("displayName") or data.get("fullName") or "Unknown"
+                return athlete_id, name
+            except Exception:
+                return athlete_id, "Unknown"
+
+        results = await asyncio.gather(
+            *[fetch_name(aid, ref) for aid, ref in athlete_refs.items()]
+        )
+        return dict(results)
+
+
+# ---------------------------------------------------------------------------
 # ESPN odds poller (h2h fallback)
 # ---------------------------------------------------------------------------
 
@@ -265,7 +495,7 @@ class ESPNOddsPoller:
     normalised to Odds API format for use as an h2h fallback when The Odds
     API budget is exhausted.
 
-    Does NOT provide player props — use DraftKingsPoller for those.
+    Does NOT provide player props — use ESPNPropsPoller for those.
     """
 
     def __init__(self, timeout: float = 10.0) -> None:

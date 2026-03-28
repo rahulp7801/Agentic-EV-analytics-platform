@@ -37,10 +37,11 @@ from sportsbet.db.connection import get_sync_engine
 from sportsbet.graph.models import EVSignal, QuantParams, QuantResult
 from sportsbet.graph.state import GraphState
 from sportsbet.ingestion.odds import OddsSnapshotCreate, write_odds_snapshot
-from sportsbet.ingestion.free_odds import DraftKingsPoller, ESPNOddsPoller
+from sportsbet.ingestion.free_odds import DraftKingsPoller, ESPNOddsPoller, ESPNPropsPoller
 from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot
 from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
+from sportsbet.ingestion.sleeper import fetch_sleeper_team_injuries as _fetch_sleeper_injuries
 
 if TYPE_CHECKING:
     pass
@@ -326,9 +327,18 @@ def make_context_agent(
                     "context_agent_odds_api_props_failed_trying_dk",
                     error=str(odds_api_exc),
                 )
-                async with DraftKingsPoller() as dk:
-                    raw_props = await dk.fetch_player_props(sport)
-                log.info("context_agent_props_source", source="draftkings_fallback")
+                try:
+                    async with DraftKingsPoller() as dk:
+                        raw_props = await dk.fetch_player_props(sport)
+                    log.info("context_agent_props_source", source="draftkings_fallback")
+                except Exception as dk_exc:
+                    log.warning(
+                        "context_agent_dk_props_failed_trying_espn",
+                        error=str(dk_exc),
+                    )
+                    async with ESPNPropsPoller() as espn:
+                        raw_props = await espn.fetch_player_props(sport)
+                    log.info("context_agent_props_source", source="espn_fallback")
             if not _sync_engine_cache:
                 import sqlalchemy as _sa
                 from sportsbet.config import settings as _settings_inner
@@ -356,12 +366,13 @@ def make_context_agent(
                                 snap = PlayerPropSnapshotCreate(
                                     sport=sport,
                                     game_id=event_data.get("id"),
-                                    player_name=outcome.get("name", "Unknown"),
+                                    player_name=outcome.get("description") or outcome.get("name", "Unknown"),
                                     sportsbook=bookmaker.get("key", "unknown"),
                                     prop_type=market.get("key", "unknown"),
                                     line=_Dec(str(point)) if point is not None else None,
                                     price=int(price),
                                     implied_probability=implied_prob,
+                                    side=outcome.get("name", ""),
                                 )
                                 # Collect snap BEFORE writing — ensures _prop_snapshots is
                                 # populated even if write_player_prop_snapshot raises (Phase 23)
@@ -377,20 +388,67 @@ def make_context_agent(
 
         # --- Step 2: Fetch injury reports ---
         injury_flags: dict[str, str] = {}
+        # injury_details: richer per-player context (name, team, position, status)
+        # Used to build teammate_out_contexts for PropQueryBuilder's player_stats absence filter.
+        injury_details: list[dict[str, str]] = []
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                scraper = InjuryWeatherScraper(client)
+            if sport == "nba":
+                # Sleeper API covers NBA injuries (TEAM_ABBR_TO_ESPN_ID is NFL-only)
                 for team_abbr in (home_team, away_team):
-                    team_id = TEAM_ABBR_TO_ESPN_ID.get(team_abbr)
-                    if team_id is None:
-                        log.warning("context_agent_unknown_team", team_abbr=team_abbr)
-                        continue
-                    injuries = await scraper.fetch_team_injuries(team_id)
-                    await scraper.write_injury_reports(pool, injuries, team_abbr, game_id)
-                    # Only flag Out and Questionable — skip Probable/Doubtful for signal clarity
-                    for inj in injuries:
-                        if inj.get("status") in ("Out", "Questionable"):
-                            injury_flags[inj.get("player_name", "Unknown")] = inj["status"]
+                    sleeper_injuries = await _fetch_sleeper_injuries("nba", team_abbr)
+                    for inj in sleeper_injuries:
+                        status = inj.get("status", "Unknown")
+                        name = inj.get("player_name", "Unknown")
+                        position = inj.get("position", "Unknown")
+                        if status in ("Out", "Questionable"):
+                            injury_flags[name] = status
+                            injury_details.append({
+                                "name": name,
+                                "team": team_abbr,
+                                "position": position,
+                                "status": status,
+                            })
+            else:
+                # NFL: ESPN Core API (primary) + Sleeper supplement
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    scraper = InjuryWeatherScraper(client)
+                    for team_abbr in (home_team, away_team):
+                        team_id = TEAM_ABBR_TO_ESPN_ID.get(team_abbr)
+                        if team_id is None:
+                            log.warning("context_agent_unknown_team", team_abbr=team_abbr)
+                            continue
+                        injuries = await scraper.fetch_team_injuries(team_id)
+                        await scraper.write_injury_reports(pool, injuries, team_abbr, game_id)
+                        for inj in injuries:
+                            status = inj.get("status", "Unknown")
+                            name = inj.get("player_name", "Unknown")
+                            position = inj.get("position", "Unknown")
+                            if status in ("Out", "Questionable"):
+                                injury_flags[name] = status
+                                injury_details.append({
+                                    "name": name,
+                                    "team": team_abbr,
+                                    "position": position,
+                                    "status": status,
+                                })
+                # Supplement NFL with Sleeper (catches IR/PUP players ESPN may miss)
+                try:
+                    for team_abbr in (home_team, away_team):
+                        sleeper_injs = await _fetch_sleeper_injuries("nfl", team_abbr)
+                        for inj in sleeper_injs:
+                            name = inj.get("player_name", "Unknown")
+                            status = inj.get("status", "Unknown")
+                            # Only add players not already captured by ESPN
+                            if name not in injury_flags and status in ("Out", "Questionable"):
+                                injury_flags[name] = status
+                                injury_details.append({
+                                    "name": name,
+                                    "team": inj.get("team", team_abbr),
+                                    "position": inj.get("position", "Unknown"),
+                                    "status": status,
+                                })
+                except Exception as sleeper_exc:
+                    log.warning("context_agent_sleeper_supplement_failed", error=str(sleeper_exc))
         except Exception as exc:
             log.error("context_agent_scraper_error", session_id=session_id, error=str(exc))
 
@@ -404,7 +462,19 @@ def make_context_agent(
         )
         # Extract situational params from injury signals (Phase 18 — SC-3).
         # Non-None when Out/Inactive players exist; None otherwise (no noise).
-        situational_params = _extract_situational_params(signals)
+        # Build richer situational_params from injury_details (has team+position context).
+        # teammate_out_contexts enables PropQueryBuilder's player_stats absence filter,
+        # which works for historical data (unlike the injury_reports INTERVAL approach).
+        out_details = [d for d in injury_details if d["status"] == "Out"]
+        situational_params: dict | None = None
+        if out_details:
+            situational_params = {
+                "teammate_out_signals": [d["name"] for d in out_details],
+                "teammate_out_contexts": [
+                    {"name": d["name"], "team": d["team"], "position": d["position"]}
+                    for d in out_details
+                ],
+            }
         log.info(
             "context_agent_complete",
             session_id=session_id,
@@ -543,15 +613,47 @@ def make_arbitrage_agent(
             log.info("arbitrage_agent_no_probability", session_id=session_id)
             return {"ev_signal": None}
 
-        # Guard: need live odds snapshot
-        if context_signals is None or context_signals.odds_snapshot is None:
-            log.warning("arbitrage_agent_no_odds", session_id=session_id)
-            return {"ev_signal": None}
-
-        snapshot = context_signals.odds_snapshot
         true_prob: Decimal = quant_result.true_probability
-        implied_prob: Decimal = snapshot.implied_probability
-        injury_flags: dict[str, str] = context_signals.injury_flags
+        injury_flags: dict[str, str] = (context_signals.injury_flags if context_signals else {})
+
+        # Prefer player-specific prop snapshot over h2h when available.
+        # prop_type in state is a short key ("points") — map to Odds API market key ("player_points").
+        player_name: str = state.get("player_name", "")  # type: ignore[assignment]
+        raw_prop_type: str = state.get("prop_type", "") or ""  # type: ignore[assignment]
+        prop_market_key = f"player_{raw_prop_type}" if raw_prop_type else ""
+        player_prop_snapshots: list = state.get("player_prop_snapshots") or []  # type: ignore[assignment]
+
+        prop_snap = None
+        if player_name and prop_market_key and player_prop_snapshots:
+            prop_snap = next(
+                (
+                    s for s in player_prop_snapshots
+                    if player_name.lower() in s.player_name.lower()
+                    and s.prop_type == prop_market_key
+                    and getattr(s, "side", "Over") in ("Over", "")
+                ),
+                None,
+            )
+
+        if prop_snap is not None:
+            implied_prob: Decimal = prop_snap.implied_probability
+            active_market_type = prop_snap.prop_type
+            log.info(
+                "prop_arbitrage_agent.enter",
+                sport=state.get("sport"),
+                player=player_name,
+                prop_type=prop_market_key,
+                source=getattr(prop_snap, "sportsbook", "unknown"),
+            )
+        else:
+            # Fall back to h2h odds snapshot
+            if context_signals is None or context_signals.odds_snapshot is None:
+                log.warning("arbitrage_agent_no_odds", session_id=session_id)
+                return {"ev_signal": None}
+            snapshot = context_signals.odds_snapshot
+            implied_prob = snapshot.implied_probability
+            active_market_type = snapshot.market_type
+            log.info("prop_arbitrage_agent.enter", sport=state.get("sport"))
 
         ev_pct = compute_ev_percentage(true_prob, implied_prob)
         if ev_pct == Decimal("0"):
@@ -569,7 +671,7 @@ def make_arbitrage_agent(
             fraction=Decimal(str(cfg.max_kelly_fraction)),
         )
 
-        trade_plan = build_trade_plan(ev_pct, kelly_frac, injury_flags, snapshot.market_type)
+        trade_plan = build_trade_plan(ev_pct, kelly_frac, injury_flags, active_market_type)
 
         signal = EVSignal(
             ev_percentage=ev_pct,
@@ -577,7 +679,7 @@ def make_arbitrage_agent(
             implied_probability=implied_prob,
             kelly_fraction=kelly_frac,
             trade_plan=trade_plan,
-            market_type=snapshot.market_type,
+            market_type=active_market_type,
         )
         log.info(
             "arbitrage_agent_complete",

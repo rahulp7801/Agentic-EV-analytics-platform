@@ -60,7 +60,7 @@ _SQL_LAST_GAME = """
 # SQL: opponent scoring proxy from nba_player_stats (season aggregate)
 # avg_pts_per_game approximates defensive rating via points allowed per player
 _SQL_OPP_DEF = """
-    SELECT AVG(CAST(pts AS FLOAT) / NULLIF(games_played, 0)) AS avg_pts_per_game
+    SELECT AVG(CAST(points AS FLOAT) / NULLIF(games_played, 0)) AS avg_pts_per_game
     FROM nba_player_stats
     WHERE team_abbreviation = $1
       AND season = $2

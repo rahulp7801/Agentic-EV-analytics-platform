@@ -155,6 +155,7 @@ def make_prop_quant_agent(
             prop_filters: dict[str, object] = state.get("prop_filters", {})  # type: ignore[union-attr]
             situational: dict = state.get("situational_params") or {}  # type: ignore[union-attr]
             teammate_out: list[str] | None = situational.get("teammate_out_signals") or None
+            teammate_out_contexts: list[dict[str, str]] | None = situational.get("teammate_out_contexts") or None
 
             # Convert line to Decimal — prop_line may arrive as float, int, str, or Decimal
             line = Decimal(str(prop_line_raw if prop_line_raw is not None else "0"))
@@ -168,6 +169,7 @@ def make_prop_quant_agent(
                 line=line,
                 filters=prop_filters if prop_filters else {},
                 teammate_out=teammate_out,
+                teammate_out_contexts=teammate_out_contexts,
             )
         except ValidationError as exc:
             log.error(

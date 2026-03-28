@@ -196,6 +196,7 @@ class PropParams(BaseModel):
     # ConfigDict(strict=True) accepts Optional[T] = None per Phase 9 locked decision.
     last_n_games: Optional[int] = None
     teammate_out: Optional[list[str]] = None
+    teammate_out_contexts: Optional[list[dict[str, str]]] = None
     opponent_team: Optional[str] = None
     home_away: Optional[Literal["home", "away"]] = None
 

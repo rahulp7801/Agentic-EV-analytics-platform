@@ -164,3 +164,6 @@ class GraphState(TypedDict):
     # request context indicates non-passing play analysis.
     # Access via state.get("stat_type", "passing") — never require presence.
     # (quick-1 — QUANT-03)
+    player_name: str  # Display name of the player being analysed (e.g. "Jayson Tatum").
+    # Used by arbitrage_agent to look up the matching player prop snapshot.
+    # Access via state.get("player_name", "") — not required for non-prop routes.

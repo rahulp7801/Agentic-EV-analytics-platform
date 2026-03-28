@@ -109,3 +109,58 @@ def test_ngs_season_guard() -> None:
 
     with pytest.raises(ValueError, match="2016"):
         ingest_ngs_seasons([2015], engine)
+
+
+def test_sleeper_module_importable() -> None:
+    """Sleeper API client module is importable with correct function signatures."""
+    from sportsbet.ingestion.sleeper import fetch_sleeper_team_injuries
+    import inspect
+    sig = inspect.signature(fetch_sleeper_team_injuries)
+    assert "sport" in sig.parameters
+    assert "team_abbr" in sig.parameters
+
+
+def test_balldontlie_module_importable() -> None:
+    """Ball Don't Lie API client module is importable with correct function signatures."""
+    from sportsbet.ingestion.balldontlie import (
+        fetch_player_season_averages,
+        fetch_team_recent_games,
+        fetch_player_game_logs,
+    )
+    import inspect
+    for fn in (fetch_player_season_averages, fetch_team_recent_games, fetch_player_game_logs):
+        sig = inspect.signature(fn)
+        assert len(sig.parameters) >= 1
+
+
+def test_draftkings_poller_outcome_format() -> None:
+    """DraftKingsPoller outcomes use name=side, description=player_name format.
+
+    This is required so context_agent's prop processing loop reads
+    description as player_name and name as side — consistent with ESPN format.
+    """
+    from sportsbet.ingestion.free_odds import _add_offer_to_events
+
+    normalised: dict = {}
+    event_map = {"99": {"eventId": 99, "teamName1": "LAL", "teamName2": "BOS"}}
+    offer = [
+        {
+            "eventId": 99,
+            "label": "LeBron James Over 24.5",
+            "oddsAmerican": "-110",
+            "line": 24.5,
+            "participant": "LeBron James",
+        }
+    ]
+    _add_offer_to_events(offer, "player_points", normalised, event_map)
+
+    outcomes = normalised["99"]["bookmakers"][0]["markets"][0]["outcomes"]
+    assert len(outcomes) == 1
+    outcome = outcomes[0]
+    # After the fix: name=side, description=player_name
+    assert outcome["description"] == "LeBron James", (
+        f"description should be player_name 'LeBron James', got {outcome['description']!r}"
+    )
+    assert outcome["name"] in ("Over", "Under"), (
+        f"name should be side (Over/Under), got {outcome['name']!r}"
+    )

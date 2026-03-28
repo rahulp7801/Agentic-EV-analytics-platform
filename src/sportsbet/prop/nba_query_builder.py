@@ -184,6 +184,7 @@ def _is_conditional(params: "PropParams") -> bool:
     return bool(
         params.last_n_games is not None
         or params.teammate_out
+        or params.teammate_out_contexts
         or params.opponent_team is not None
         or params.home_away is not None
     )
@@ -268,6 +269,21 @@ class NBAQueryBuilder:
                 sql = sql + f"  AND is_home = ${next_idx}\n"
                 args.append(params.home_away == "home")  # "home" -> True, "away" -> False
                 next_idx += 1
+
+            # teammate_out filter — uses nba_player_gamelogs absence by player_name.
+            # nba_player_gamelogs has player_name column; NOT EXISTS checks teammate
+            # was absent on the same game_date (didn't appear in gamelogs = didn't play).
+            if params.teammate_out:
+                for teammate_name in params.teammate_out:
+                    sql = sql + (
+                        f"  AND NOT EXISTS (\n"
+                        f"      SELECT 1 FROM nba_player_gamelogs gl2\n"
+                        f"      WHERE gl2.game_date = nba_player_gamelogs.game_date\n"
+                        f"        AND gl2.player_name ILIKE ${next_idx}\n"
+                        f"  )\n"
+                    )
+                    args.append(teammate_name)
+                    next_idx += 1
 
             # last_n_games filter — game_id IN subquery (gamelogs have game_id)
             if params.last_n_games is not None:

@@ -49,6 +49,7 @@ class PlayerPropSnapshotCreate(BaseModel):
     line: Optional[Decimal] = None
     price: Optional[int] = None  # American odds e.g. -115
     implied_probability: Decimal
+    side: Optional[str] = None  # "Over" | "Under" — in-memory only, not persisted to DB
 
 
 def write_player_prop_snapshot(
