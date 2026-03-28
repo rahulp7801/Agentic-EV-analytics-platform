@@ -393,9 +393,18 @@ def make_context_agent(
         injury_details: list[dict[str, str]] = []
         try:
             if sport == "nba":
-                # Sleeper API covers NBA injuries (TEAM_ABBR_TO_ESPN_ID is NFL-only)
-                for team_abbr in (home_team, away_team):
-                    sleeper_injuries = await _fetch_sleeper_injuries("nba", team_abbr)
+                # Sleeper API covers NBA injuries — fetch both teams in parallel (each call
+                # downloads the full players list, so parallel cuts latency in half).
+                import asyncio as _asyncio
+                home_injs, away_injs = await _asyncio.gather(
+                    _fetch_sleeper_injuries("nba", home_team),
+                    _fetch_sleeper_injuries("nba", away_team),
+                    return_exceptions=True,
+                )
+                for team_abbr, sleeper_injuries in (
+                    (home_team, home_injs if not isinstance(home_injs, Exception) else []),
+                    (away_team, away_injs if not isinstance(away_injs, Exception) else []),
+                ):
                     for inj in sleeper_injuries:
                         status = inj.get("status", "Unknown")
                         name = inj.get("player_name", "Unknown")

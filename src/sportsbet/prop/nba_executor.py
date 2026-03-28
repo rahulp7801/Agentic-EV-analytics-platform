@@ -253,7 +253,10 @@ async def run_nba_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResu
     filter is set. The gamelog path uses Wilson CI (binary frequency) instead of
     NormalDist CDF. Season-aggregate path preserved for unconditional queries.
     """
-    # Phase 18 SC-5: route conditional queries to gamelog binary frequency path
+    # Phase 18 SC-5: route conditional queries to gamelog binary frequency path.
+    # If the conditional query returns 0 rows (e.g. multi-teammate filter eliminates all
+    # historical games), fall back to the season-aggregate path rather than returning
+    # insufficient_sample. This handles the known teammate_out 0-row edge case.
     is_conditional = bool(
         params.last_n_games is not None
         or params.teammate_out
@@ -261,7 +264,24 @@ async def run_nba_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResu
         or params.home_away is not None
     )
     if is_conditional:
-        return await run_nba_gamelog_query(pool, params)
+        gamelog_result = await run_nba_gamelog_query(pool, params)
+        if gamelog_result.sample_size == 0 and gamelog_result.data_source == "insufficient_sample":
+            log.info(
+                "nba_gamelog_fallback_to_season_aggregate",
+                prop_type=params.prop_type,
+                player_id=params.player_id,
+                reason="conditional_filter_returned_zero_rows",
+            )
+            # Strip conditional fields so NBAQueryBuilder routes to season-aggregate path
+            params = params.model_copy(update={
+                "last_n_games": None,
+                "teammate_out": None,
+                "teammate_out_contexts": None,
+                "opponent_team": None,
+                "home_away": None,
+            })
+        else:
+            return gamelog_result
 
     sql, args = NBAQueryBuilder.build(params)
 

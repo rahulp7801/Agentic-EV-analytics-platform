@@ -30,10 +30,10 @@ async def main():
     base_state = {
         "session_id": "live-test",
         "game_id": "bos_atl_today",
-        "season": 2024,
+        "season": 2025,
         "week": 1,
         "home_team": "LAL",
-        "away_team": "BKN",
+        "away_team": "GSW",
         "injury_flags": {},
         "weather_json": None,
         "receiver_gsis_id": PLAYER_ID,

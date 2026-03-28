@@ -117,7 +117,7 @@ class DraftKingsPoller:
     context_agent prop-processing loop consumes them without modification.
     """
 
-    def __init__(self, timeout: float = 15.0) -> None:
+    def __init__(self, timeout: float = 5.0) -> None:
         self._timeout = timeout
         self._client: httpx.AsyncClient | None = None
         self._client_cm: httpx.AsyncClient | None = None
@@ -293,7 +293,7 @@ class ESPNPropsPoller:
             props = await poller.fetch_player_props("nba")
     """
 
-    def __init__(self, timeout: float = 15.0) -> None:
+    def __init__(self, timeout: float = 5.0) -> None:
         self._timeout = timeout
         self._client: httpx.AsyncClient | None = None
         self._client_cm: httpx.AsyncClient | None = None
