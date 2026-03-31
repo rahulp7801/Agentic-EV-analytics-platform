@@ -108,7 +108,8 @@ def _apply_nba_context_adjustments(
 
     # Stage 2: Opponent defensive rating adjustment
     # Higher opponent_def_rating = worse defense = more scoring opportunity
-    def_ratio = LEAGUE_AVG_DEF_RATING / context.opponent_def_rating
+    # Ratio > 1 when opponent is weaker than league avg (boosts probability)
+    def_ratio = context.opponent_def_rating / LEAGUE_AVG_DEF_RATING
     def_ratio = max(Decimal("0.7"), min(Decimal("1.3"), def_ratio))
     prob = prob * def_ratio
 

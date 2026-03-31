@@ -185,12 +185,17 @@ def make_prop_arbitrage_agent(
             except Exception:
                 pass
 
+        target_player: str = state.get("player_name", "")  # type: ignore[attr-defined]
         matched_snapshot = None
         if snapshots:
             for snap in snapshots:
                 type_match = snap.prop_type == normalized_prop_type
                 line_match = (target_line is None) or (snap.line == target_line)
-                if type_match and line_match:
+                player_match = (
+                    not target_player
+                    or target_player.lower() in snap.player_name.lower()
+                )
+                if type_match and line_match and player_match:
                     matched_snapshot = snap
                     break
 
