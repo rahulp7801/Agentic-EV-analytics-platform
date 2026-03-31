@@ -5,6 +5,10 @@ DraftKingsPoller  — fetches live NBA/NFL player prop odds from DraftKings'
 ESPNOddsPoller    — fetches NBA/NFL h2h game odds from ESPN's hidden scoreboard
                     API (no auth). Used as h2h fallback when Odds API is over
                     budget or unavailable.
+PrizePicksPoller  — fetches live NBA player prop lines from PrizePicks' public
+                    API (no auth required). Used as final fallback when all other
+                    prop sources fail. Returns standard Odds API-compatible format
+                    with synthetic American odds based on PrizePicks odds_type.
 
 Both normalise their output to the same Odds API-compatible dict format so the
 context_agent prop-processing loop can consume them without changes:
@@ -576,6 +580,183 @@ class ESPNOddsPoller:
 
         log.info("espn_odds_fetched", sport=sport, event_count=len(normalised))
         return normalised
+
+
+# ---------------------------------------------------------------------------
+# PrizePicks poller (final fallback for NBA player props)
+# ---------------------------------------------------------------------------
+
+# PrizePicks stat type names → Odds API market keys
+_PP_STAT_TO_MARKET: dict[str, str] = {
+    "Points": "player_points",
+    "Rebounds": "player_rebounds",
+    "Assists": "player_assists",
+    "3-PT Made": "player_threes",
+    "Steals": "player_steals",
+    "Blocked Shots": "player_blocks",
+    "Turnovers": "player_turnovers",
+}
+
+# PrizePicks odds_type → synthetic American odds (used to derive implied probability)
+# goblin = favorable for bettor, standard = ~-115 each side, demon = heavy juice
+_PP_ODDS_TYPE_PRICE: dict[str, int] = {
+    "goblin": -110,
+    "standard": -115,
+    "demon": -135,
+}
+
+# PrizePicks NBA league_id
+_PP_NBA_LEAGUE_ID = 7
+
+
+class PrizePicksPoller:
+    """Fetch live NBA player prop lines from PrizePicks' public API.
+
+    No API key or authentication required. PrizePicks exposes this endpoint to
+    power their web application. Returns props normalised to the same Odds API-
+    compatible format so the context_agent prop-processing loop is unchanged.
+
+    PrizePicks does not publish traditional -110/-110 odds — instead each prop
+    is offered at a fixed price tier (goblin/-110, standard/-115, demon/-135).
+    We emit both Over and Under at the same price so the devigged implied
+    probability reflects the symmetric vig structure.
+
+    Usage:
+        async with PrizePicksPoller() as poller:
+            props = await poller.fetch_player_props("nba")
+    """
+
+    _PP_BASE = "https://api.prizepicks.com"
+
+    def __init__(self, timeout: float = 10.0) -> None:
+        self._timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+        self._client_cm: httpx.AsyncClient | None = None
+
+    async def __aenter__(self) -> "PrizePicksPoller":
+        self._client_cm = httpx.AsyncClient(
+            timeout=self._timeout,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        self._client = await self._client_cm.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        if self._client_cm is not None:
+            await self._client_cm.__aexit__(exc_type, exc_val, exc_tb)
+            self._client_cm = None
+            self._client = None
+
+    async def fetch_player_props(self, sport: str) -> list[dict[str, Any]]:
+        """Fetch all live player prop lines for today's NBA games.
+
+        Args:
+            sport: Only "nba" is supported (PrizePicks league_id=7). Returns
+                   empty list for other sports.
+
+        Returns:
+            List of event dicts in Odds API-compatible format.
+            Each unique game_id becomes one event dict. Props across all
+            supported stat types are bundled into a single bookmaker entry.
+        """
+        assert self._client is not None, "called outside async context manager"
+
+        if sport != "nba":
+            return []
+
+        resp = await self._client.get(
+            f"{self._PP_BASE}/projections",
+            params={
+                "league_id": str(_PP_NBA_LEAGUE_ID),
+                "per_page": "500",
+                "single_stat": "true",
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Build player_id → attributes map (skip combo players like "A + B")
+        included = data.get("included", [])
+        player_map: dict[str, dict] = {}
+        for item in included:
+            if item.get("type") == "new_player":
+                attrs = item["attributes"]
+                if "+" not in attrs.get("name", ""):
+                    player_map[item["id"]] = attrs
+
+        # Group outcomes by game_id for Odds API event structure
+        # game_events: game_id -> {markets: {market_key -> outcomes[]}}
+        game_events: dict[str, dict[str, list[dict]]] = {}
+
+        projections = data.get("data", [])
+        for proj in projections:
+            a = proj["attributes"]
+            stat_type = a.get("stat_type", "")
+            market_key = _PP_STAT_TO_MARKET.get(stat_type)
+            if market_key is None:
+                continue  # skip combo/unsupported stat types
+
+            odds_type = a.get("odds_type", "")
+            price = _PP_ODDS_TYPE_PRICE.get(odds_type)
+            if price is None:
+                continue
+
+            line = a.get("line_score")
+            if line is None:
+                continue
+
+            player_id = proj["relationships"]["new_player"]["data"]["id"]
+            player = player_map.get(player_id)
+            if not player:
+                continue
+
+            player_name = player.get("name", "")
+            if "+" in player_name or not player_name:
+                continue
+
+            # Use PrizePicks game_id or fall back to a synthetic key
+            game_id = a.get("game_id") or f"pp_{a.get('start_time', 'unknown')[:10]}"
+
+            if game_id not in game_events:
+                game_events[game_id] = {}
+            if market_key not in game_events[game_id]:
+                game_events[game_id][market_key] = []
+
+            # Emit Over and Under at the same price (symmetric PrizePicks pricing)
+            game_events[game_id][market_key].append({
+                "name": "Over",
+                "description": player_name,
+                "price": price,
+                "point": float(line),
+            })
+            game_events[game_id][market_key].append({
+                "name": "Under",
+                "description": player_name,
+                "price": price,
+                "point": float(line),
+            })
+
+        # Convert to Odds API event list format
+        result: list[dict[str, Any]] = []
+        for game_id, markets_dict in game_events.items():
+            markets = [
+                {"key": mk, "outcomes": outcomes}
+                for mk, outcomes in markets_dict.items()
+            ]
+            result.append({
+                "id": game_id,
+                "home_team": "",
+                "away_team": "",
+                "bookmakers": [{"key": "prizepicks", "markets": markets}],
+            })
+
+        log.info(
+            "prizepicks_props_fetched",
+            sport=sport,
+            event_count=len(result),
+            total_projections=len(projections),
+        )
+        return result
 
 
 def _parse_espn_moneyline(odds_entry: dict, side: str) -> int | None:

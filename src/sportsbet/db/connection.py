@@ -7,6 +7,16 @@ Provides:
 
 from __future__ import annotations
 
+import asyncio
+import sys
+
+# asyncpg requires SelectorEventLoop on Windows — ProactorEventLoop (the default
+# in Python 3.8+ on Windows) does not support the SSL protocol asyncpg needs.
+# Set policy before the first asyncio call, not just before pool creation, because
+# asyncpg introspects the running loop during import on some Windows builds.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import asyncpg
 import sqlalchemy as sa
 

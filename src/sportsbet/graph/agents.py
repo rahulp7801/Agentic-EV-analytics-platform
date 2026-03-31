@@ -37,7 +37,7 @@ from sportsbet.db.connection import get_sync_engine
 from sportsbet.graph.models import EVSignal, QuantParams, QuantResult
 from sportsbet.graph.state import GraphState
 from sportsbet.ingestion.odds import OddsSnapshotCreate, write_odds_snapshot
-from sportsbet.ingestion.free_odds import DraftKingsPoller, ESPNOddsPoller, ESPNPropsPoller
+from sportsbet.ingestion.free_odds import DraftKingsPoller, ESPNOddsPoller, ESPNPropsPoller, PrizePicksPoller
 from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot
 from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
@@ -336,9 +336,18 @@ def make_context_agent(
                         "context_agent_dk_props_failed_trying_espn",
                         error=str(dk_exc),
                     )
-                    async with ESPNPropsPoller() as espn:
-                        raw_props = await espn.fetch_player_props(sport)
-                    log.info("context_agent_props_source", source="espn_fallback")
+                    try:
+                        async with ESPNPropsPoller() as espn:
+                            raw_props = await espn.fetch_player_props(sport)
+                        log.info("context_agent_props_source", source="espn_fallback")
+                    except Exception as espn_exc:
+                        log.warning(
+                            "context_agent_espn_props_failed_trying_prizepicks",
+                            error=str(espn_exc),
+                        )
+                        async with PrizePicksPoller() as pp:
+                            raw_props = await pp.fetch_player_props(sport)
+                        log.info("context_agent_props_source", source="prizepicks_fallback")
             if not _sync_engine_cache:
                 import sqlalchemy as _sa
                 from sportsbet.config import settings as _settings_inner
