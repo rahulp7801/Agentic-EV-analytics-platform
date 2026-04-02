@@ -21,19 +21,25 @@ Design rules (locked from CLAUDE.md and Phase decisions):
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 
 import structlog
 
 from sportsbet.arbitrage.ev import build_trade_plan, compute_ev_percentage
 from sportsbet.arbitrage.kelly import fractional_kelly
 from sportsbet.config import settings as _settings
-from sportsbet.graph.models import EVSignal, PropResult
+from sportsbet.graph.models import EVSignal, NBAContextSignals, PropResult
 from sportsbet.graph.state import GraphState
 
 log = structlog.get_logger()
 
 _NO_SIGNAL: dict[str, Any] = {"ev_signal": None}
+
+# EV ceiling: any signal above this is almost certainly a model artifact
+# (NormalDist overconfidence vs. easy/goblin lines, or stale season-avg).
+# Real exploitable edges in liquid prop markets are typically 1–8%.
+# 15% is a hard upper bound — if the model claims more, suppress the signal.
+_EV_CAP: Decimal = Decimal("0.15")
 
 # Alias map: PropParams Literal shorthand -> Odds API market key format.
 # Used by prop_arbitrage_agent to match state["prop_type"] against
@@ -50,8 +56,16 @@ _PROP_TYPE_ALIAS_MAP: dict[str, str] = {
     "points": "player_points",
     "rebounds": "player_rebounds",
     "assists": "player_assists",
+    "threes": "player_threes",    # added — scan_game_ev strips "player_" prefix
+    "steals": "player_steals",    # added — same prefix-stripping issue
+    "blocks": "player_blocks",    # added — same prefix-stripping issue
     "pra": "player_pra",
 }
+
+
+_LEAGUE_AVG_DEF_RATING: float = 115.0
+_REST_PENALTY_PP: float = 3.0     # percentage points removed for back-to-back
+_HOME_BOOST_PP: float = 1.5       # percentage points added for home court
 
 
 def _build_prop_trade_plan(
@@ -60,12 +74,20 @@ def _build_prop_trade_plan(
     injury_flags: dict[str, str],
     market_type: str,
     prop_result: PropResult,
+    nba_context: Optional[NBAContextSignals] = None,
+    teammate_out: Optional[list[str]] = None,
 ) -> list[str]:
     """Build a 3-bullet prop-specific trade plan thesis.
 
-    Bullet 1: EV edge on the specific prop market.
-    Bullet 2: Kelly sizing with sample_size and mean_stat from PropResult.
-    Bullet 3: injury flags or clean bill of health.
+    For NBA (nba_context provided):
+        Bullet 1: EV edge + historical base (n, mean).
+        Bullet 2: Context adjustments applied — opponent def rating, rest, home/away.
+        Bullet 3: Kelly sizing + injury flags.
+
+    For NFL (nba_context=None):
+        Bullet 1: EV edge on the specific prop market.
+        Bullet 2: Kelly sizing with sample_size and mean_stat from PropResult.
+        Bullet 3: injury flags or clean bill of health.
 
     Parameters
     ----------
@@ -78,36 +100,80 @@ def _build_prop_trade_plan(
     market_type : str
         Market identifier from AgentOddsSnapshot (e.g. "over_pass_yds").
     prop_result : PropResult
-        Carries sample_size and mean_stat for bullet 2 context.
+        Carries sample_size and mean_stat for bullet context.
+    nba_context : NBAContextSignals, optional
+        When provided, bullet 2 becomes a context-adjustment summary instead of
+        Kelly sizing, and NBA-specific factors are surfaced explicitly.
 
     Returns
     -------
     list[str]
-        Exactly 3 non-empty strings describing edge, sizing, and context.
+        Exactly 3 non-empty strings.
     """
-    # Bullet 1: quantitative EV edge on the specific prop market
-    bullet_1 = f"+{float(ev_pct):.1%} EV edge on {market_type} prop market"
-
-    # Bullet 2: Kelly sizing rationale with prop-specific sample and mean
     sample = prop_result.sample_size if prop_result.sample_size is not None else "N/A"
     mean = (
         f"{float(prop_result.mean_stat):.1f}"
         if prop_result.mean_stat is not None
         else "N/A"
     )
-    bullet_2 = (
-        f"Kelly sizing: {float(kelly_frac):.1%} fractional stake "
-        f"(n={sample}, historical mean={mean}, bankroll-relative)"
-    )
+    kelly_str = f"Kelly: {float(kelly_frac):.1%} bankroll stake (fractional, not flat)"
 
-    # Bullet 3: injury/weather context
-    if injury_flags:
-        flagged = ", ".join(
-            f"{player} ({status})" for player, status in injury_flags.items()
+    if nba_context is not None:
+        # Bullet 1: historical base + EV edge
+        bullet_1 = (
+            f"+{float(ev_pct):.1%} EV edge on {market_type} | "
+            f"n={sample} games, mean={mean} historical"
         )
-        bullet_3 = f"Material injury flags: {flagged}"
+
+        # Bullet 2: context adjustment chain
+        def_rating = float(nba_context.opponent_def_rating)
+        def_delta = def_rating - _LEAGUE_AVG_DEF_RATING
+        if def_delta > 0.5:
+            def_tag = f"opp def {def_rating:.1f} > avg {_LEAGUE_AVG_DEF_RATING:.0f} (weak D → scoring boost)"
+        elif def_delta < -0.5:
+            def_tag = f"opp def {def_rating:.1f} < avg {_LEAGUE_AVG_DEF_RATING:.0f} (strong D → prob suppressed)"
+        else:
+            def_tag = f"opp def {def_rating:.1f} ≈ league avg (neutral)"
+
+        rest_days = nba_context.rest_days
+        if rest_days == 0:
+            rest_tag = f"B2B (−{_REST_PENALTY_PP:.0f}pp fatigue penalty applied)"
+        elif rest_days == 1:
+            rest_tag = "1d rest (standard)"
+        else:
+            rest_tag = f"{rest_days}d rest (well-rested)"
+
+        home_tag = (
+            f"HOME (+{_HOME_BOOST_PP:.1f}pp boost applied)"
+            if nba_context.is_home
+            else "AWAY (no home boost)"
+        )
+
+        teammate_tag = ""
+        if teammate_out:
+            absent = ", ".join(teammate_out[:2])
+            teammate_tag = f" · sample conditioned on {absent} inactive"
+        bullet_2 = f"Context: {def_tag} · {rest_tag} · {home_tag}{teammate_tag}"
+
+        # Bullet 3: Kelly sizing + injury
+        if injury_flags:
+            flagged = ", ".join(f"{p} ({s})" for p, s in injury_flags.items())
+            bullet_3 = f"{kelly_str} · Injury flags: {flagged}"
+        else:
+            bullet_3 = f"{kelly_str} · No material injury flags"
+
     else:
-        bullet_3 = "No material injury flags for this game"
+        # NFL path (no nba_context)
+        bullet_1 = f"+{float(ev_pct):.1%} EV edge on {market_type} prop market"
+        bullet_2 = (
+            f"Kelly sizing: {float(kelly_frac):.1%} fractional stake "
+            f"(n={sample}, historical mean={mean}, bankroll-relative)"
+        )
+        if injury_flags:
+            flagged = ", ".join(f"{p} ({s})" for p, s in injury_flags.items())
+            bullet_3 = f"Material injury flags: {flagged}"
+        else:
+            bullet_3 = "No material injury flags for this game"
 
     return [bullet_1, bullet_2, bullet_3]
 
@@ -239,6 +305,22 @@ def make_prop_arbitrage_agent(
             )
             return _NO_SIGNAL
 
+        # EV ceiling guard: suppress signals the model can't reliably produce.
+        # Real prop edges are 1–8%; anything above _EV_CAP (15%) is almost
+        # certainly NormalDist overconfidence vs. an easy/goblin line, not a
+        # genuine market inefficiency. Log the suppression so it is auditable.
+        if ev_pct > _EV_CAP:
+            log.warning(
+                "prop_arbitrage_agent.ev_cap_exceeded",
+                sport=resolved_sport,
+                market_type=market_type,
+                ev_pct=str(ev_pct),
+                true_prob=str(true_prob),
+                implied_prob=str(implied_prob),
+                reason="ev_pct > _EV_CAP — likely model overconfidence or easy/goblin line",
+            )
+            return _NO_SIGNAL
+
         # Kelly sizing — Decimal(str(...)) pattern locked in Phase 2
         kelly_frac = fractional_kelly(
             p=true_prob,
@@ -256,9 +338,17 @@ def make_prop_arbitrage_agent(
             )
             return _NO_SIGNAL
 
-        # 3-bullet prop-aware trade plan
+        # Read NBA context signals for context-aware bullet 2
+        nba_context: Optional[NBAContextSignals] = state.get("nba_context_signals")  # type: ignore[attr-defined]
+
+        # Pull teammate_out list from situational_params so bullet_2 surfaces it
+        _situational: dict = state.get("situational_params") or {}  # type: ignore[attr-defined]
+        _teammate_out_for_plan: Optional[list[str]] = _situational.get("teammate_out_signals") or None
+
+        # 3-bullet prop-aware trade plan — NBA path surfaces context adjustments
         trade_plan = _build_prop_trade_plan(
-            ev_pct, kelly_frac, injury_flags, market_type, prop_result
+            ev_pct, kelly_frac, injury_flags, market_type, prop_result, nba_context,
+            teammate_out=_teammate_out_for_plan,
         )
 
         signal = EVSignal(

@@ -358,3 +358,49 @@ class NBAPlayerGameLog(Base):
         Index("idx_nba_gamelog_game_date", "game_date", "season"),
         Index("idx_nba_gamelog_opponent", "opponent_team", "season"),
     )
+
+
+class EVSignalRecord(Base):
+    """Historical EV signal output from the EV scanner pipeline.
+
+    Append-only. One row per player-prop EV signal produced by scan_game_ev.py.
+    Enables backtesting, CLV tracking, and trend analysis across scans.
+
+    scan_id groups all signals from a single scan run (THREAD_BASE timestamp).
+    """
+
+    __tablename__ = "ev_signals"
+
+    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
+    scan_id: Mapped[str] = mapped_column(String(30), nullable=False)
+    game_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    home_team: Mapped[str] = mapped_column(String(5), nullable=False)
+    away_team: Mapped[str] = mapped_column(String(5), nullable=False)
+    game_date: Mapped[str] = mapped_column(String(8), nullable=False)  # YYYYMMDD
+    player_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    prop_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    line: Mapped[Decimal] = mapped_column(Numeric(7, 2), nullable=False)
+    true_probability: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
+    implied_probability: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
+    ev_percentage: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
+    kelly_fraction: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
+    american_odds: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    sample_size: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    mean_stat: Mapped[Optional[Decimal]] = mapped_column(Numeric(7, 2))
+    sportsbook: Mapped[str] = mapped_column(String(50), nullable=False)
+    gated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    trade_plan: Mapped[Optional[dict]] = mapped_column(JSONB)  # list[str] stored as JSONB
+    opponent_def_rating: Mapped[Optional[Decimal]] = mapped_column(Numeric(7, 2))
+    rest_days: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    is_home: Mapped[Optional[bool]] = mapped_column(Boolean)
+    strength: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("idx_ev_scan_id", "scan_id"),
+        Index("idx_ev_game_date", "game_date"),
+        Index("idx_ev_player_prop", "player_name", "prop_type"),
+        Index("idx_ev_created_at", "created_at"),
+    )

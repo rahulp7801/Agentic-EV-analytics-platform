@@ -360,6 +360,7 @@ async def create_graph_with_sqlite(
     daily_credit_cap: int = 500,
     bankroll_usd: float = 10000.0,
     daily_drawdown_limit: float = 0.05,
+    target_date: Any = None,
 ) -> CompiledStateGraph:
     """Build and compile the graph with an AsyncSqliteSaver checkpointer for runtime use.
 
@@ -458,7 +459,7 @@ async def create_graph_with_sqlite(
     nba_context_producer_node = None
     if pool is not None:
         from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
-        nba_context_producer_node = make_nba_context_signals_producer(pool)
+        nba_context_producer_node = make_nba_context_signals_producer(pool, target_date=target_date)
 
     # Risk control nodes have no pool dependency — always constructed
     correlation_guard_node = make_correlation_guard_node()

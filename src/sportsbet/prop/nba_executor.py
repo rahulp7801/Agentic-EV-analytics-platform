@@ -340,7 +340,25 @@ async def run_nba_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResu
     cv: Decimal = NBA_PROP_CV_MAP[params.prop_type]
     std: float = max(0.5, avg_per_game * float(cv))
 
-    p_over: float = _norm_cdf_over(avg_per_game, std, float(params.line))
+    # Regression-to-the-line: blend season average 50% toward the sportsbook line.
+    # Rationale: the book sets lines at tonight's EXPECTED performance (already
+    # adjusted for opponent, rest, home/away). Using raw season_avg as the
+    # NormalDist mean ignores that context, causing P(OVER easy_line) to inflate
+    # to 70–90% and produce fake +EV. Equal-weight blending halves that gap.
+    # The four NBA context adjustments in nba_agents.py still apply on top of this.
+    _MEAN_SHRINK: float = 0.5  # weight on season average (vs sportsbook line)
+    line_f: float = float(params.line)
+    blended_mean: float = _MEAN_SHRINK * avg_per_game + (1.0 - _MEAN_SHRINK) * line_f
+
+    log.debug(
+        "nba_prop_mean_shrinkage",
+        prop_type=params.prop_type,
+        avg_per_game=round(avg_per_game, 2),
+        line=line_f,
+        blended_mean=round(blended_mean, 2),
+    )
+
+    p_over: float = _norm_cdf_over(blended_mean, std, line_f)
     true_prob = Decimal(str(round(p_over, 6)))
     true_prob = max(Decimal("0.01"), min(Decimal("0.99"), true_prob))
 

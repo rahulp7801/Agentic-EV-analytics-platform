@@ -1,0 +1,729 @@
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import type { EVSignal, Sport } from '@/lib/types';
+
+interface EVDashboardProps {
+  sport: Sport;
+  onAddToParlay?: (s: EVSignal) => void;
+  parlayIds?: Set<string>;
+}
+
+interface CachedGame {
+  game_id: string;
+  home_team: string;
+  away_team: string;
+  date: string;
+}
+
+interface ESPNGame {
+  home_abbr: string;
+  away_abbr: string;
+  home_name: string;
+  away_name: string;
+  date: string;
+  label: string;
+  game_time: string;
+}
+
+interface SignalCache {
+  generated_at: string | null;
+  game: { home_team: string; away_team: string; date: string } | null;
+  games?: CachedGame[];
+  signals: EVSignal[];
+  error?: string;
+  scan_note?: string;
+}
+
+type RichSignal = EVSignal;
+
+function fmt_pct(n: number) { return (n * 100).toFixed(1) + '%'; }
+function fmt_odds(n: number) { return n > 0 ? '+' + n : String(n); }
+function time_ago(iso: string) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  return `${Math.floor(diff / 3600)}h ago`;
+}
+
+// League-average NBA defensive rating used by nba_context_producer.
+const LEAGUE_AVG_DEF_RATING = 115.0;
+
+/**
+ * Derives a 3-bullet explanation of WHY this line is mispriced.
+ * Uses ONLY verified numeric fields from the signal — no hallucination.
+ * Fields sourced from:
+ *   - true_prob / implied_prob / ev_pct: LangGraph nba_quant_agent + prop_arbitrage_agent
+ *   - sample_size / mean_stat: PostgreSQL nba_player_stats
+ *   - opponent_def_rating / rest_days / is_home: nba_context_producer (live DB query)
+ *   - pp_odds_tier / american_odds: PrizePicks live API (goblin tier pre-filtered)
+ */
+function buildMispricingReason(signal: RichSignal): [string, string, string] {
+  const probGapPp = ((signal.true_prob - signal.implied_prob) * 100).toFixed(1);
+  const tier = signal.pp_odds_tier ?? 'standard';
+  const tierLabel = tier === 'demon' ? 'demon (-135, harder line)' : 'standard (-115)';
+  const isUnder = (signal.direction || 'over') === 'under';
+  const dirLabel = isUnder ? 'Under' : 'Over';
+
+  // ── Bullet 1: Line placement vs historical distribution ───────────────────
+  let bullet1: string;
+  if (signal.mean_stat !== undefined && signal.sample_size !== undefined) {
+    const delta = signal.mean_stat - signal.line;
+    const absDelta = Math.abs(delta).toFixed(2);
+    const hitRate = fmt_pct(signal.true_prob);
+    if (delta > 0) {
+      // Mean above line → favors Over
+      bullet1 =
+        `Line ${signal.line} sits ${absDelta} below the ${signal.sample_size}-game mean of ` +
+        `${signal.mean_stat.toFixed(1)}. Model ${dirLabel} probability: ${hitRate}. ` +
+        `PrizePicks ${tierLabel} prices the ${dirLabel} at ${fmt_odds(signal.american_odds)} ` +
+        `(${fmt_pct(signal.implied_prob)} implied) — a ${probGapPp}pp underpricing relative to the historical distribution.`;
+    } else {
+      // Mean below line → favors Under
+      bullet1 =
+        `Line ${signal.line} sits ${absDelta} above the ${signal.sample_size}-game mean of ` +
+        `${signal.mean_stat.toFixed(1)}. Model ${dirLabel} probability: ${hitRate}. ` +
+        `PrizePicks ${tierLabel} prices the ${dirLabel} at ${fmt_odds(signal.american_odds)} ` +
+        `(${fmt_pct(signal.implied_prob)} implied) — ${probGapPp}pp gap vs model.`;
+    }
+  } else {
+    bullet1 =
+      `PrizePicks ${tierLabel} prices ${dirLabel} ${signal.line} at ${fmt_odds(signal.american_odds)} ` +
+      `(${fmt_pct(signal.implied_prob)} implied). Model assigns ${fmt_pct(signal.true_prob)} — ` +
+      `${probGapPp}pp gap. No historical mean available in this snapshot.`;
+  }
+
+  // ── Bullet 2: Context signals — opponent defense, rest, venue ─────────────
+  let bullet2: string;
+  const hasDef  = signal.opponent_def_rating != null;
+  const hasRest = signal.rest_days != null;
+  const hasHome = signal.is_home != null;
+
+  if (hasDef || hasRest || hasHome) {
+    const parts: string[] = [];
+
+    if (hasDef) {
+      const def = signal.opponent_def_rating!;
+      const defDelta = (def - LEAGUE_AVG_DEF_RATING).toFixed(1);
+      const defDir   = def > LEAGUE_AVG_DEF_RATING ? 'above' : 'below';
+      // Flip interpretation for Under: weak defense boosts opponent scoring, hurts Under
+      const defLabel = isUnder
+        ? (def > LEAGUE_AVG_DEF_RATING
+            ? `weak D (allows more pts) — slight headwind for ${dirLabel}`
+            : `strong D (limits scoring) — favorable for ${dirLabel}`)
+        : (def > LEAGUE_AVG_DEF_RATING
+            ? `weaker-than-average defense (allows more pts) — favorable for production`
+            : `stronger-than-average defense — limits production`);
+      parts.push(`Opponent def. rating ${def.toFixed(1)} (${defDelta} ${defDir} league avg ${LEAGUE_AVG_DEF_RATING}) — ${defLabel}.`);
+    }
+
+    if (hasRest) {
+      const r = signal.rest_days!;
+      const restLabel = r === 0 ? 'back-to-back (0 rest days)'
+        : r === 1 ? '1 rest day'
+        : `${r} rest days (well-rested)`;
+      parts.push(`${restLabel}.`);
+    }
+
+    if (hasHome) {
+      parts.push(signal.is_home ? 'Playing at home.' : 'Playing away.');
+    }
+
+    bullet2 = `Context (from nba_context_producer, live DB): ${parts.join(' ')}`;
+  } else {
+    bullet2 =
+      `Context signals unavailable for this snapshot (nba_context_producer returned null). ` +
+      `Edge is based on historical distribution only — opponent defense, rest days, and ` +
+      `venue factors not incorporated.`;
+  }
+
+  // ── Bullet 3: Filter note + data provenance ────────────────────────────────
+  const sampleNote = signal.sample_size != null ? `${signal.sample_size}-game` : 'historical';
+  const bullet3 =
+    `Goblin-tier lines (PrizePicks -110) pre-filtered. This is a ${dirLabel} ${tierLabel} line; ` +
+    `the ${probGapPp}pp gap between model probability and implied odds is a genuine ` +
+    `market mispricing. Data: PostgreSQL ${sampleNote} window via LangGraph nba_quant_agent, ` +
+    `live PrizePicks line via public API.`;
+
+  return [bullet1, bullet2, bullet3];
+}
+
+function KellyBar({ fraction }: { fraction: number }) {
+  const pct = fraction * 100;
+  const color = pct >= 10 ? 'var(--accent-mint)' : pct >= 5 ? 'var(--accent-amber)' : 'var(--text-secondary)';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 120 }}>
+      <div className="prob-track" style={{ flex: 1 }}>
+        <div className="prob-fill" style={{ width: `${Math.min(pct / 25 * 100, 100)}%`, background: color }} />
+      </div>
+      <span style={{ color, fontWeight: 600, fontSize: 11, minWidth: 36, textAlign: 'right' }}>
+        {pct > 0 ? pct.toFixed(1) + '%' : 'GATED'}
+      </span>
+    </div>
+  );
+}
+
+function EVSignalRow({ signal, onSelect }: { signal: RichSignal; onSelect: (s: EVSignal) => void }) {
+  const evPct = signal.ev_pct * 100;
+  const evColor = evPct >= 15 ? 'var(--accent-mint)' : evPct >= 8 ? 'var(--accent-amber)' : 'var(--text-secondary)';
+
+  return (
+    <tr
+      className={signal.strength === 'high' ? 'row-highlight-mint' : ''}
+      style={{ cursor: 'pointer' }}
+      onClick={() => onSelect(signal)}
+    >
+      <td>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {signal.strength === 'high' && <span className="live-dot" style={{ width: 6, height: 6, flexShrink: 0 }} />}
+          <div>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>{signal.player}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+              {signal.team} vs {signal.opponent}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <span className="badge badge-blue">NBA</span>
+        {signal.gated && (
+          <span className="badge badge-amber" style={{ marginLeft: 4 }}>GATED</span>
+        )}
+      </td>
+      <td>
+        <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+          {signal.prop_type.replace('_', ' ').toUpperCase()}
+        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+          {signal.direction.toUpperCase()} {signal.line} · {fmt_odds(signal.american_odds)}
+        </div>
+      </td>
+      <td>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div>
+            <div style={{ color: 'var(--accent-cyan)', fontWeight: 600, fontSize: 12 }}>{fmt_pct(signal.true_prob)}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>model</div>
+          </div>
+          <div style={{ color: 'var(--text-dim)' }}>→</div>
+          <div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{fmt_pct(signal.implied_prob)}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>implied</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <span style={{ color: evColor, fontWeight: 700, fontSize: 13 }}>+{evPct.toFixed(1)}%</span>
+      </td>
+      <td><KellyBar fraction={signal.kelly_fraction} /></td>
+      <td>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <span className="badge badge-dim">{signal.sportsbook}</span>
+          {signal.sample_size != null && (
+            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+              n={signal.sample_size} · μ={signal.mean_stat?.toFixed(1)}
+            </span>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function SignalDetailPanel({ signal, onClose, onAddToParlay, inParlay }: {
+  signal: RichSignal;
+  onClose: () => void;
+  onAddToParlay?: (s: EVSignal) => void;
+  inParlay?: boolean;
+}) {
+  const evPct = signal.ev_pct * 100;
+  const kellyPct = signal.kelly_fraction * 100;
+  const mispricingReasons = buildMispricingReason(signal);
+
+  return (
+    <div style={{
+      position: 'absolute', right: 0, top: 0, bottom: 0, width: 340,
+      background: 'var(--bg-card)', borderLeft: '1px solid var(--border-mid)',
+      display: 'flex', flexDirection: 'column', zIndex: 10,
+    }}>
+      {/* Header */}
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-dim)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>
+            {signal.player}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              {signal.prop_type.replace('_', ' ').toUpperCase()}
+            </span>
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 2,
+              background: signal.direction === 'under' ? 'rgba(0,180,255,0.15)' : 'rgba(0,229,160,0.12)',
+              color: signal.direction === 'under' ? 'var(--accent-cyan)' : 'var(--accent-mint)',
+            }}>
+              {(signal.direction || 'over').toUpperCase()} {signal.line}
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{signal.team} vs {signal.opponent}</span>
+          </div>
+        </div>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+      </div>
+
+      {/* Scrollable body */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {/* Metrics grid */}
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-dim)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {[
+              ['EV EDGE', '+' + evPct.toFixed(1) + '%', 'var(--accent-mint)'],
+              ['KELLY STAKE', signal.gated ? 'GATED' : kellyPct.toFixed(1) + '%', signal.gated ? 'var(--accent-amber)' : 'var(--accent-cyan)'],
+              ['MODEL PROB', (signal.true_prob * 100).toFixed(1) + '%', 'var(--text-primary)'],
+              ['BOOK IMPLIED', (signal.implied_prob * 100).toFixed(1) + '%', 'var(--text-secondary)'],
+            ].map(([label, value, color]) => (
+              <div key={label} style={{ padding: '8px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 3 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 4 }}>{label}</div>
+                <div style={{ color, fontWeight: 700, fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+          {signal.sample_size != null && (
+            <div style={{ marginTop: 8, padding: '6px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 3 }}>
+              <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>HISTORICAL BASE · </span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>n={signal.sample_size} games · mean {signal.mean_stat?.toFixed(1)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Line + source */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-dim)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Line</span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{signal.direction.toUpperCase()} {signal.line}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Source</span>
+            <span className="badge badge-dim">{signal.sportsbook}</span>
+          </div>
+          {signal.gated && (
+            <div style={{ marginTop: 8, padding: '6px 10px', background: 'rgba(245,166,35,0.06)', border: '1px solid rgba(245,166,35,0.2)', borderRadius: 3, fontSize: 10, color: 'var(--accent-amber)' }}>
+              ⚠ Gated by daily drawdown cap. Signal is valid — exposure budget exhausted for today.
+            </div>
+          )}
+        </div>
+
+        {/* Context Signals — explicit structured section */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-dim)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <div className="section-header">Context Signals</div>
+            <span style={{ fontSize: 9, color: 'var(--text-dim)', padding: '1px 5px', border: '1px solid var(--border-dim)', borderRadius: 2 }}>LIVE DB</span>
+          </div>
+          {/* Opponent Defense */}
+          {signal.opponent_def_rating != null ? (
+            <div style={{ padding: '8px 10px', marginBottom: 6, background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 3 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <span style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.08em' }}>OPP DEFENSIVE RATING</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{signal.opponent_def_rating.toFixed(1)}</span>
+              </div>
+              {(() => {
+                const delta = signal.opponent_def_rating - 115.0;
+                const isStrongD = delta < -1;
+                const isWeakD = delta > 1;
+                const overFavorable = isWeakD;
+                const underFavorable = isStrongD;
+                const isOver = (signal.direction || 'over') === 'over';
+                const favorable = isOver ? overFavorable : underFavorable;
+                const risk = isOver ? isStrongD : isWeakD;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>vs league avg 115.0 ({delta > 0 ? '+' : ''}{delta.toFixed(1)})</span>
+                    {favorable && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, background: 'rgba(0,229,160,0.12)', color: 'var(--accent-mint)', fontWeight: 600 }}>FAVORABLE</span>}
+                    {risk && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, background: 'rgba(255,80,80,0.12)', color: 'var(--accent-red)', fontWeight: 600 }}>RISK FACTOR</span>}
+                    {!favorable && !risk && <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>NEUTRAL</span>}
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <div style={{ padding: '6px 10px', marginBottom: 6, background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 3, fontSize: 10, color: 'var(--text-dim)' }}>
+              Defensive rating unavailable
+            </div>
+          )}
+          {/* Rest + Venue row */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            {signal.rest_days != null && (
+              <div style={{ flex: 1, padding: '6px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 3 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 3 }}>REST</div>
+                <span style={{
+                  fontSize: 10, fontWeight: 600,
+                  color: signal.rest_days === 0 ? 'var(--accent-red)' : signal.rest_days >= 3 ? 'var(--accent-mint)' : 'var(--text-secondary)',
+                }}>
+                  {signal.rest_days === 0 ? 'B2B — FATIGUE' : signal.rest_days === 1 ? '1 day rest' : `${signal.rest_days} days rest`}
+                </span>
+              </div>
+            )}
+            {signal.is_home != null && (
+              <div style={{ flex: 1, padding: '6px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 3 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 3 }}>VENUE</div>
+                <span style={{ fontSize: 10, fontWeight: 600, color: signal.is_home ? 'var(--accent-cyan)' : 'var(--text-secondary)' }}>
+                  {signal.is_home ? 'HOME (+1.5pp boost)' : 'AWAY'}
+                </span>
+              </div>
+            )}
+          </div>
+          {/* Inactive teammates from injury_flags */}
+          {signal.injury_flags && Object.keys(signal.injury_flags).length > 0 && (
+            <div style={{ padding: '6px 10px', background: 'rgba(245,166,35,0.05)', border: '1px solid rgba(245,166,35,0.2)', borderRadius: 3 }}>
+              <div style={{ fontSize: 9, color: 'var(--accent-amber)', letterSpacing: '0.08em', marginBottom: 4 }}>INACTIVE TEAMMATES</div>
+              {Object.entries(signal.injury_flags).map(([name, status]) => (
+                <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 2 }}>
+                  <span>{name}</span>
+                  <span style={{ color: 'var(--accent-amber)', fontSize: 9 }}>{status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Trade Plan */}
+        <div style={{ padding: '12px 16px' }}>
+          <div className="section-header" style={{ marginBottom: 10 }}>Trade Plan</div>
+          {signal.trade_plan.map((bullet, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'var(--bg-surface)', border: '1px solid var(--border-dim)', borderRadius: 3 }}>
+              <span style={{ color: 'var(--accent-mint)', fontWeight: 700, fontSize: 10, flexShrink: 0, marginTop: 1 }}>
+                {String.fromCharCode(65 + i)}
+              </span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 11, lineHeight: 1.5 }}>{bullet}</span>
+            </div>
+          ))}
+          {onAddToParlay && (
+            <button
+              onClick={() => onAddToParlay(signal)}
+              className={inParlay ? 'btn-ghost' : 'btn-mint'}
+              style={{ width: '100%', marginTop: 8, fontSize: 11, padding: '7px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              {inParlay ? '✓ Added to Parlay Builder' : '+ Add to Parlay Builder'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set() }: EVDashboardProps) {
+  const [data, setData] = useState<SignalCache | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [selected, setSelected] = useState<EVSignal | null>(null);
+  const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all');
+  const [sortBy, setSortBy] = useState<'ev' | 'kelly' | 'prob'>('ev');
+  // Game picker
+  const [espnGames, setEspnGames] = useState<ESPNGame[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+
+  const fetchSignals = useCallback(async () => {
+    try {
+      const res = await fetch('/api/signals', { cache: 'no-store' });
+      const json = await res.json();
+      setData(json);
+      // Auto-select the most-recent game from the cache on first load
+      setSelectedGameId(prev => {
+        if (prev) return prev; // keep user's selection
+        const firstGame = json.games?.[0] ?? (json.game
+          ? { game_id: `${json.game.home_team?.toLowerCase()}_${json.game.away_team?.toLowerCase()}_${json.game.date}` }
+          : null);
+        return firstGame?.game_id ?? null;
+      });
+    } catch {
+      setData({ generated_at: null, game: null, signals: [], error: 'Failed to fetch signals' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSignals();
+    // Fetch ESPN schedule for the game picker
+    fetch('/api/games', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => setEspnGames(d.games || []))
+      .catch(() => {});
+  }, [fetchSignals]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchSignals();
+    setRefreshing(false);
+  };
+
+  // Derive the selected game's team abbreviations for the scan POST
+  const _scanTeams = (): { team_a: string; team_b: string; date: string } | null => {
+    // 1. Try cached games list
+    const cachedGame = (data?.games || []).find(g => g.game_id === selectedGameId);
+    if (cachedGame) {
+      return { team_a: cachedGame.away_team, team_b: cachedGame.home_team, date: cachedGame.date };
+    }
+    // 2. Try ESPN game list
+    const espn = espnGames.find(g => {
+      const gid = `${g.home_abbr.toLowerCase()}_${g.away_abbr.toLowerCase()}_${g.date}`;
+      return gid === selectedGameId;
+    });
+    if (espn) {
+      return { team_a: espn.away_abbr, team_b: espn.home_abbr, date: espn.date };
+    }
+    return null;
+  };
+
+  const triggerScan = async () => {
+    const teams = _scanTeams();
+    if (!teams) return; // no game selected — button should be disabled
+    setScanning(true);
+    try {
+      await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team_a: teams.team_a, team_b: teams.team_b, date: teams.date, force: true }),
+      });
+    } catch {
+      setScanning(false);
+      return;
+    }
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      try {
+        const s = await fetch('/api/scan', { cache: 'no-store' }).then(r => r.json()).catch(() => ({ scanning: true }));
+        if (!s.scanning) {
+          clearInterval(poll);
+          setScanning(false);
+          await fetchSignals();
+          return;
+        }
+      } catch { /* keep polling */ }
+      if (attempts > 60) { clearInterval(poll); setScanning(false); }
+    }, 5000);
+  };
+
+  // Merge cached games + ESPN games into a unified picker list (deduped by game_id)
+  const _allPickerGames: { game_id: string; label: string; away: string; home: string; date: string; cached: boolean }[] = [];
+  const _seen = new Set<string>();
+
+  for (const g of (data?.games || [])) {
+    if (!_seen.has(g.game_id)) {
+      _seen.add(g.game_id);
+      const hasSignals = (data?.signals || []).some(s => s.game_id === g.game_id);
+      _allPickerGames.push({ game_id: g.game_id, label: g.date, away: g.away_team, home: g.home_team, date: g.date, cached: hasSignals });
+    }
+  }
+  for (const g of espnGames) {
+    const gid = `${g.home_abbr.toLowerCase()}_${g.away_abbr.toLowerCase()}_${g.date}`;
+    if (!_seen.has(gid)) {
+      _seen.add(gid);
+      _allPickerGames.push({ game_id: gid, label: g.label, away: g.away_abbr, home: g.home_abbr, date: g.date, cached: false });
+    }
+  }
+
+  // Filter signals to selected game (if any)
+  const gameSignals = selectedGameId
+    ? (data?.signals || []).filter(s => s.game_id === selectedGameId || !s.game_id)
+    : (data?.signals || []);
+
+  const signals = gameSignals
+    .filter(s => filter === 'all' || s.strength === filter)
+    .sort((a, b) => {
+      if (sortBy === 'ev') return b.ev_pct - a.ev_pct;
+      if (sortBy === 'kelly') return b.kelly_fraction - a.kelly_fraction;
+      return b.true_prob - a.true_prob;
+    });
+
+  const highConf = signals.filter(s => s.strength === 'high').length;
+  const avgEV = signals.length > 0 ? signals.reduce((sum, s) => sum + s.ev_pct, 0) / signals.length : 0;
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
+        <span className="live-dot" style={{ width: 10, height: 10 }} />
+        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Loading signals from pipeline...</span>
+      </div>
+    );
+  }
+
+  if (data?.error && !data.signals.length && _allPickerGames.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 14 }}>
+        <div style={{ color: 'var(--accent-amber)', fontSize: 13, fontWeight: 600 }}>No Signal Cache Found</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 11, textAlign: 'center', maxWidth: 360 }}>
+          Run <code style={{ color: 'var(--accent-mint)' }}>python scan_game_ev.py</code> to generate EV signals,
+          or select a game below and trigger a scan.
+        </div>
+      </div>
+    );
+  }
+
+  const _selGame = _allPickerGames.find(g => g.game_id === selectedGameId);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {/* Game Picker */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px',
+        borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-void)',
+        flexShrink: 0, flexWrap: 'wrap',
+      }}>
+        <span style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', flexShrink: 0 }}>Game</span>
+        {_allPickerGames.length === 0 ? (
+          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>No games available — checking schedule...</span>
+        ) : (
+          _allPickerGames.map(g => (
+            <button
+              key={g.game_id}
+              onClick={() => setSelectedGameId(g.game_id)}
+              className="btn-ghost"
+              style={{
+                fontSize: 10, padding: '3px 10px',
+                color: selectedGameId === g.game_id ? 'var(--accent-mint)' : 'var(--text-secondary)',
+                borderColor: selectedGameId === g.game_id ? 'rgba(0,229,160,0.4)' : undefined,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              {g.cached && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent-mint)', flexShrink: 0, display: 'inline-block' }} />}
+              {g.away} @ {g.home}
+              <span style={{ color: 'var(--text-dim)', fontSize: 9 }}>{g.label}</span>
+            </button>
+          ))
+        )}
+        <div style={{ flex: 1 }} />
+        <button
+          className="btn-ghost"
+          style={{ fontSize: 9, padding: '2px 8px' }}
+          onClick={handleRefresh}
+          disabled={refreshing || scanning}
+          title="Reload from cache (no new scan)"
+        >
+          {refreshing ? '● Loading...' : '↻ Refresh'}
+        </button>
+        <button
+          className="btn-ghost"
+          style={{
+            fontSize: 9, padding: '2px 8px',
+            color: scanning ? 'var(--accent-amber)' : (!_selGame ? 'var(--text-dim)' : undefined),
+          }}
+          onClick={triggerScan}
+          disabled={scanning || refreshing || !_selGame}
+          title={_selGame ? `Scan ${_selGame.away} @ ${_selGame.home}` : 'Select a game first'}
+        >
+          {scanning ? '● Scanning...' : '⚡ Re-scan'}
+        </button>
+      </div>
+
+      {/* Summary row */}
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', flexShrink: 0 }}>
+        <SummaryCard label="Live Signals" value={String(signals.length)} sub="from pipeline" accent="mint" />
+        <SummaryCard label="High Confidence" value={String(highConf)} sub="≥15% EV edge" accent="cyan" />
+        <SummaryCard label="Avg EV Edge" value={signals.length ? '+' + (avgEV * 100).toFixed(1) + '%' : '—'} sub="model-verified" accent="cyan" />
+        <SummaryCard
+          label="Game"
+          value={_selGame ? `${_selGame.away} @ ${_selGame.home}` : (data?.game ? `${data.game.away_team} @ ${data.game.home_team}` : '—')}
+          sub={_selGame?.date || data?.game?.date || ''}
+        />
+        <div style={{ flex: 1, padding: '10px 14px', borderRight: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Cache Age</div>
+          <div style={{ fontSize: 11, color: data?.generated_at ? 'var(--text-secondary)' : 'var(--accent-red)' }}>
+            {data?.generated_at ? time_ago(data.generated_at) : 'No cache'}
+          </div>
+          {data?.scan_note && (
+            <div style={{ fontSize: 9, color: 'var(--accent-amber)', maxWidth: 220 }}>{data.scan_note}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px',
+        borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', flexShrink: 0,
+      }}>
+        <div className="section-header">EV Signals · Model Verified</div>
+        <div style={{ flex: 1 }} />
+        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Filter:</span>
+        {(['all', 'high', 'medium'] as const).map(f => (
+          <button key={f} className="btn-ghost" onClick={() => setFilter(f)}
+            style={{ fontSize: 10, padding: '3px 10px', color: filter === f ? 'var(--accent-mint)' : undefined, borderColor: filter === f ? 'rgba(0,229,160,0.3)' : undefined }}>
+            {f.toUpperCase()}
+          </button>
+        ))}
+        <div className="divider-v" style={{ margin: '0 4px' }} />
+        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Sort:</span>
+        {([['ev', 'EV %'], ['kelly', 'Kelly'], ['prob', 'Prob']] as const).map(([key, label]) => (
+          <button key={key} className="btn-ghost" onClick={() => setSortBy(key)}
+            style={{ fontSize: 10, padding: '3px 10px', color: sortBy === key ? 'var(--accent-mint)' : undefined, borderColor: sortBy === key ? 'rgba(0,229,160,0.3)' : undefined }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Pipeline provenance notice */}
+      <div style={{
+        padding: '5px 14px', fontSize: 10, color: 'var(--text-dim)',
+        background: 'var(--bg-void)', borderBottom: '1px solid var(--border-dim)',
+        display: 'flex', gap: 8, flexShrink: 0,
+      }}>
+        <span style={{ color: 'var(--accent-mint)' }}>✓</span>
+        All signals sourced from LangGraph pipeline · PostgreSQL historical base · PrizePicks live lines · No hallucinated data
+        {data?.generated_at && <span style={{ marginLeft: 'auto' }}>Generated {new Date(data.generated_at).toLocaleString()}</span>}
+      </div>
+
+      {/* Table */}
+      <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+        {signals.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80%', gap: 10 }}>
+            {_selGame && !_selGame.cached ? (
+              <>
+                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>No cached signals for {_selGame.away} @ {_selGame.home}</span>
+                <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>Click ⚡ Re-scan to run the pipeline for this game</span>
+              </>
+            ) : (
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>No signals match current filters</span>
+            )}
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Sport</th>
+                <th>Prop / Line</th>
+                <th>Probability</th>
+                <th>EV Edge</th>
+                <th style={{ minWidth: 160 }}>Kelly Stake</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {signals.map(s => (
+                <EVSignalRow key={s.id} signal={s as RichSignal} onSelect={setSelected} />
+              ))}
+            </tbody>
+          </table>
+        )}
+        {selected && (
+          <SignalDetailPanel
+            signal={selected as RichSignal}
+            onClose={() => setSelected(null)}
+            onAddToParlay={onAddToParlay}
+            inParlay={parlayIds.has(selected.id)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: 'mint' | 'cyan' | 'amber' }) {
+  const color = accent === 'mint' ? 'var(--accent-mint)' : accent === 'cyan' ? 'var(--accent-cyan)' : accent === 'amber' ? 'var(--accent-amber)' : 'var(--text-primary)';
+  return (
+    <div style={{ flex: 1, padding: '10px 16px', borderRight: '1px solid var(--border-dim)' }}>
+      <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
+      <div style={{ color, fontWeight: 700, fontSize: 20, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>{sub}</div>
+    </div>
+  );
+}

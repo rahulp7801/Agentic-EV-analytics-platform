@@ -1,0 +1,193 @@
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import type { Sport, GameLog } from '@/lib/types';
+
+interface GameLogsProps { sport: Sport; }
+
+const NBA_COLS = ['points', 'rebounds', 'assists', 'threes', 'steals', 'blocks', 'minutes'] as const;
+const NFL_COLS = ['pass_yds', 'pass_tds', 'rush_yds', 'rec_yds', 'receptions'] as const;
+
+function StatCell({ value, prop, line }: { value?: number; prop: string; line?: number }) {
+  if (value === undefined) return <td style={{ color: 'var(--text-dim)' }}>—</td>;
+  const beat = line !== undefined ? value > line : undefined;
+  return (
+    <td style={{
+      color: beat === true ? 'var(--accent-mint)' : beat === false ? 'var(--accent-red)' : 'var(--text-primary)',
+      fontWeight: beat !== undefined ? 600 : 400,
+      fontVariantNumeric: 'tabular-nums',
+    }}>
+      {value}
+    </td>
+  );
+}
+
+export default function GameLogs({ sport }: GameLogsProps) {
+  const [playerFilter, setPlayerFilter] = useState('');
+  const [activeProp, setActiveProp] = useState<string>('points');
+  const [activeLine, setActiveLine] = useState<string>('30.5');
+  const [selectedSport, setSelectedSport] = useState<'nba' | 'nfl'>('nba');
+  const [allLogs, setAllLogs] = useState<GameLog[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ sport: selectedSport, limit: '40' });
+      if (playerFilter) params.set('player', playerFilter);
+      const res = await fetch(`/api/gamelogs?${params}`, { cache: 'no-store' });
+      const data = await res.json();
+      // Map DB row format → GameLog
+      const logs: GameLog[] = (data.logs || []).map((r: Record<string, unknown>, i: number) => ({
+        id: String(i),
+        player: String(r.player ?? ''),
+        team: String(r.team ?? ''),
+        opponent: String(r.opponent ?? ''),
+        sport: selectedSport,
+        date: String(r.date ?? ''),
+        home_away: r.is_home ? 'home' : 'away',
+        result: String(r.result ?? 'W') as 'W' | 'L',
+        points: r.points != null ? Number(r.points) : undefined,
+        rebounds: r.rebounds != null ? Number(r.rebounds) : undefined,
+        assists: r.assists != null ? Number(r.assists) : undefined,
+        threes: r.threes != null ? Number(r.threes) : undefined,
+        steals: r.steals != null ? Number(r.steals) : undefined,
+        blocks: r.blocks != null ? Number(r.blocks) : undefined,
+        minutes: r.minutes != null ? Number(r.minutes) : undefined,
+      }));
+      setAllLogs(logs);
+    } catch { setAllLogs([]); }
+    finally { setLoading(false); }
+  }, [selectedSport, playerFilter]);
+
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  const cols = selectedSport === 'nba' ? NBA_COLS : NFL_COLS;
+  const logs = allLogs;
+
+  const lineVal = parseFloat(activeLine) || undefined;
+  const hitRate = lineVal && logs.length > 0
+    ? logs.filter(g => {
+        const stat = g[activeProp as keyof GameLog] as number | undefined;
+        return stat !== undefined && stat > lineVal;
+      }).length / logs.length
+    : null;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Toolbar */}
+      <div style={{
+        padding: '10px 14px',
+        borderBottom: '1px solid var(--border-dim)',
+        background: 'var(--bg-base)',
+        display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap',
+      }}>
+        <div className="section-header">Game Log Browser</div>
+        <div className="divider-v" />
+        <div className="sport-toggle" style={{ width: 120 }}>
+          <button className={`sport-btn ${selectedSport === 'nba' ? 'active-nba' : ''}`} onClick={() => setSelectedSport('nba')}>NBA</button>
+          <button className={`sport-btn ${selectedSport === 'nfl' ? 'active-nfl' : ''}`} onClick={() => setSelectedSport('nfl')}>NFL</button>
+        </div>
+        <input
+          className="term-input" style={{ width: 180 }}
+          placeholder="Filter player..."
+          value={playerFilter}
+          onChange={e => setPlayerFilter(e.target.value)}
+        />
+        <div style={{ flex: 1 }} />
+
+        {/* Hit rate analysis */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: 'var(--bg-card)', border: '1px solid var(--border-mid)',
+          borderRadius: 3, padding: '5px 12px',
+        }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>ANALYZE</span>
+          <select className="term-select" style={{ width: 120 }} value={activeProp} onChange={e => setActiveProp(e.target.value)}>
+            {cols.map(c => <option key={c} value={c}>{c.replace('_', ' ').toUpperCase()}</option>)}
+          </select>
+          <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>OVER</span>
+          <input
+            className="term-input" style={{ width: 60 }}
+            value={activeLine}
+            onChange={e => setActiveLine(e.target.value)}
+            placeholder="Line"
+          />
+          {hitRate !== null && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 8, borderLeft: '1px solid var(--border-dim)' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>HIT RATE</span>
+              <span style={{
+                fontWeight: 700, fontSize: 14,
+                color: hitRate >= 0.6 ? 'var(--accent-mint)' : hitRate >= 0.5 ? 'var(--accent-amber)' : 'var(--accent-red)',
+              }}>
+                {(hitRate * 100).toFixed(0)}%
+              </span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>({logs.filter(g => {
+                const s = g[activeProp as keyof GameLog] as number | undefined;
+                return s !== undefined && s > (lineVal || 0);
+              }).length}/{logs.length})</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Date</th>
+              <th>Matchup</th>
+              <th>H/A</th>
+              <th>Result</th>
+              {cols.map(c => (
+                <th key={c} style={{ color: c === activeProp ? 'var(--accent-cyan)' : undefined }}>
+                  {c.replace('_', ' ').toUpperCase()}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map(log => (
+              <tr key={log.id}>
+                <td>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 12 }}>{log.player}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{log.team}</div>
+                </td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{log.date}</td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                  {log.team} vs {log.opponent}
+                </td>
+                <td>
+                  <span className={`badge ${log.home_away === 'home' ? 'badge-blue' : 'badge-dim'}`}>
+                    {log.home_away === 'home' ? 'HOME' : 'AWAY'}
+                  </span>
+                </td>
+                <td>
+                  <span className={`badge ${log.result === 'W' ? 'badge-mint' : 'badge-red'}`}>
+                    {log.result}
+                  </span>
+                </td>
+                {cols.map(c => (
+                  <StatCell
+                    key={c}
+                    value={log[c as keyof GameLog] as number | undefined}
+                    prop={c}
+                    line={c === activeProp ? lineVal : undefined}
+                  />
+                ))}
+              </tr>
+            ))}
+            {logs.length === 0 && (
+              <tr>
+                <td colSpan={12} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
+                  No game logs found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

@@ -45,14 +45,17 @@ log = structlog.get_logger()
 # Module constants
 # ---------------------------------------------------------------------------
 
-LEAGUE_AVG_PTS_PER_PLAYER: float = 8.0
+LEAGUE_AVG_PTS_PER_PLAYER: float = 11.0
 
-# SQL: most recent gamelog entry for player/season
+# SQL: most recent gamelog entry for player before the target game date.
+# Filtering by game_date < $2 (target date) instead of season = $2 avoids
+# season-numbering mismatches (2025 label vs 2026 label for the same NBA season)
+# and guarantees we always get the true last game played before this matchup.
 _SQL_LAST_GAME = """
     SELECT team_abbreviation, game_date
     FROM nba_player_gamelogs
     WHERE player_id = $1
-      AND season = $2
+      AND game_date < $2
     ORDER BY game_date DESC
     LIMIT 1
 """
@@ -142,8 +145,9 @@ def make_nba_context_signals_producer(
 
         # --- 2. Query DB ---
         async with pool.acquire() as conn:
-            # 2a. Most recent gamelog for player/season
-            gamelog_row = await conn.fetchrow(_SQL_LAST_GAME, player_id, season)
+            # 2a. Most recent gamelog before target game date (not filtered by season —
+            # avoids season-numbering mismatches; game_date cutoff is more reliable)
+            gamelog_row = await conn.fetchrow(_SQL_LAST_GAME, player_id, today)
 
             if gamelog_row is None:
                 log.info(

@@ -185,6 +185,21 @@ def make_nba_quant_agent(
             teammate_out: list[str] | None = situational.get("teammate_out_signals") or None
             teammate_out_contexts: list[dict[str, str]] | None = situational.get("teammate_out_contexts") or None
 
+            # Derive opponent_team and home_away from nba_context_signals + game state.
+            # nba_context_producer runs before this node so context is available.
+            # Using these activates the gamelog conditional path (real frequency counts
+            # rather than season-aggregate NormalDist), which is strictly more accurate
+            # because it matches against actual opponent matchup history.
+            nba_ctx: Optional[NBAContextSignals] = state.get("nba_context_signals")  # type: ignore[union-attr]
+            home_team_str: str = state.get("home_team", "")  # type: ignore[union-attr]
+            away_team_str: str = state.get("away_team", "")  # type: ignore[union-attr]
+            opponent_team: Optional[str] = None
+            home_away_param: Optional[str] = None
+            if nba_ctx is not None:
+                home_away_param = "home" if nba_ctx.is_home else "away"
+                raw_opp = away_team_str if nba_ctx.is_home else home_team_str
+                opponent_team = raw_opp if raw_opp else None
+
             # Convert line to Decimal — prop_line may arrive as float, int, str, or Decimal
             line = Decimal(str(prop_line_raw if prop_line_raw is not None else "0"))
 
@@ -198,6 +213,8 @@ def make_nba_quant_agent(
                 filters=prop_filters if prop_filters else {},
                 teammate_out=teammate_out,
                 teammate_out_contexts=teammate_out_contexts,
+                opponent_team=opponent_team,
+                home_away=home_away_param,  # type: ignore[arg-type]
             )
         except ValidationError as exc:
             log.error(

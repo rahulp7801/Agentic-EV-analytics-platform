@@ -24,6 +24,8 @@ from decimal import Decimal
 from dotenv import load_dotenv
 load_dotenv()
 
+import httpx
+
 from sportsbet.db.connection import create_async_pool
 from sportsbet.graph.graph import create_graph_with_sqlite
 from sportsbet.ingestion.free_odds import PrizePicksPoller
@@ -34,15 +36,46 @@ from sportsbet.config import settings
 # Fresh thread ID each run — avoids replaying stale SQLite checkpoint state
 THREAD_ID = f"predict-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
+_ESPN_NBA_SCOREBOARD = (
+    "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+)
+
 # Target player — edit to test any player on today's PrizePicks slate
-PLAYER_ID = "203952"          # Andrew Wiggins NBA.com ID
-PLAYER_NAME = "Andrew Wiggins"
-HOME_TEAM = "MIA"
-AWAY_TEAM = "IND"
+PLAYER_ID = "1628983"                    # Shai Gilgeous-Alexander NBA.com ID
+PLAYER_NAME = "Shai Gilgeous-Alexander"
+PLAYER_TEAM = "OKC"                      # used to look up today's matchup from schedule
+# HOME_TEAM / AWAY_TEAM are derived from ESPN's live scoreboard — never hardcoded
 
 
-async def fetch_prizepicks_snapshots(sport: str = "nba") -> list[PlayerPropSnapshotCreate]:
-    """Fetch PrizePicks props and convert to PlayerPropSnapshotCreate objects (no DB write)."""
+async def fetch_todays_matchup(team_abbr: str) -> tuple[str, str] | None:
+    """Return (home_team, away_team) for the game involving team_abbr today.
+
+    Hits ESPN's public NBA scoreboard (no API key required). Returns None if
+    the team has no game scheduled today.
+    """
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(_ESPN_NBA_SCOREBOARD)
+        resp.raise_for_status()
+        events = resp.json().get("events", [])
+
+    team_upper = team_abbr.upper()
+    for event in events:
+        comp = (event.get("competitions") or [{}])[0]
+        competitors = {
+            c.get("homeAway", ""): c.get("team", {}).get("abbreviation", "").upper()
+            for c in comp.get("competitors", [])
+        }
+        home = competitors.get("home", "")
+        away = competitors.get("away", "")
+        if team_upper in (home, away):
+            return home, away
+
+    return None
+
+
+async def fetch_prizepicks_snapshots(sport: str = "nba") -> tuple[list[PlayerPropSnapshotCreate], list[dict]]:
+    """Fetch PrizePicks props and convert to PlayerPropSnapshotCreate objects (no DB write).
+    Returns (snapshots, raw_events) so callers can inspect matchup metadata."""
     async with PrizePicksPoller() as pp:
         raw_events = await pp.fetch_player_props(sport)
 
@@ -67,37 +100,52 @@ async def fetch_prizepicks_snapshots(sport: str = "nba") -> list[PlayerPropSnaps
                         implied_probability=Decimal(str(round(float(raw_prob), 6))),
                         side=outcome.get("name", ""),
                     ))
-    return snapshots
+    return snapshots, raw_events
 
 
 async def main():
     print(f"DB:  {'asyncpg pool'}")
     print(f"Run: {THREAD_ID}")
 
+    # ── Step 0: Confirm today's matchup from ESPN schedule ────────────────────
+    print(f"\n[0/2] Checking ESPN NBA schedule for {PLAYER_TEAM} today...")
+    matchup = await fetch_todays_matchup(PLAYER_TEAM)
+    if matchup is None:
+        print(f"  [!] {PLAYER_TEAM} has no game scheduled today per ESPN. Aborting.")
+        return
+    home_team, away_team = matchup
+    print(f"  Confirmed matchup: {away_team} @ {home_team}")
+
     # ── Step 1: Fetch PrizePicks props in memory (no Supabase write) ──────────
     print(f"\n[1/2] Fetching PrizePicks NBA props (in-memory, no DB write)...")
-    snapshots = await fetch_prizepicks_snapshots("nba")
+    snapshots, _ = await fetch_prizepicks_snapshots("nba")
     print(f"  Props loaded: {len(snapshots)}")
 
-    # Find the player's Over snapshot to display the line we'll test
-    player_snap = next(
-        (s for s in snapshots
+    # Find the player's Over snapshot — prefer standard/goblin (-110/-115) over demon (-135)
+    # PrizePicks posts multiple line tiers per player; pick lowest-vig (smallest abs price)
+    player_snaps = sorted(
+        [s for s in snapshots
          if PLAYER_NAME.lower() in s.player_name.lower()
          and s.prop_type == "player_points"
-         and s.side == "Over"),
-        None
+         and s.side == "Over"],
+        key=lambda s: abs(s.price),
     )
+    player_snap = player_snaps[0] if player_snaps else None
+
     if player_snap:
+        all_lines = sorted(set(float(s.line) for s in player_snaps))
         prop_line = float(player_snap.line)
-        print(f"  {PLAYER_NAME} points line: {prop_line} @ {player_snap.price} "
+        print(f"  {PLAYER_NAME} lines available: {all_lines}")
+        print(f"  Using: O {prop_line} @ {player_snap.price} "
               f"(implied={float(player_snap.implied_probability):.1%})")
     else:
-        # Fall back to a manual line if player not on today's slate
-        prop_line = 12.5
-        print(f"  [!] {PLAYER_NAME} not found on PrizePicks today — using manual line {prop_line}")
+        # Player not on today's slate — abort
+        print(f"  [!] {PLAYER_NAME} not found on PrizePicks today — slate may not be posted yet.")
         pts_samples = [s for s in snapshots if s.prop_type == "player_points" and s.side == "Over"][:5]
         for s in pts_samples:
             print(f"      on slate: {s.player_name} {s.line}")
+        print("  Aborting.")
+        return
 
     # ── Step 2: nba_prop_analysis — model prob + EV ───────────────────────────
     print(f"\n[2/2] nba_prop_analysis: {PLAYER_NAME} Points Over {prop_line} (NBA_id={PLAYER_ID})...")
@@ -111,11 +159,11 @@ async def main():
     result = await graph.ainvoke(
         {
             "session_id": "predict-test",
-            "game_id": f"{HOME_TEAM.lower()}_{AWAY_TEAM.lower()}_{datetime.now().strftime('%Y%m%d')}",
+            "game_id": f"{home_team.lower()}_{away_team.lower()}_{datetime.now().strftime('%Y%m%d')}",
             "season": 2025,
             "week": 1,
-            "home_team": HOME_TEAM,
-            "away_team": AWAY_TEAM,
+            "home_team": home_team,
+            "away_team": away_team,
             "injury_flags": {},
             "weather_json": None,
             "receiver_gsis_id": PLAYER_ID,
