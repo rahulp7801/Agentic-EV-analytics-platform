@@ -131,6 +131,7 @@ class GraphState(TypedDict):
     """
 
     session_id: str
+    outcome_name: str | None
     request_type: str
     created_at: datetime
     last_n_games: int | None

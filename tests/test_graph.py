@@ -293,8 +293,12 @@ class TestPhase7Wiring:
         """_extract_odds_snapshot must return devigged prob (0.5) for -110/-110, not raw (0.5238)."""
         from sportsbet.graph.agents import _extract_odds_snapshot
         raw_odds = [{
+            "id": "2024_01_KC_LV",
+            "home_team": "KC",
+            "commence_time": "2026-12-01T20:00:00Z",
             "bookmakers": [{
                 "key": "fanduel",
+                "last_update": "2026-09-10T12:00:00Z",
                 "markets": [{
                     "key": "h2h",
                     "outcomes": [

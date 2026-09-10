@@ -38,6 +38,7 @@ ODDS_FIXTURE = [
         "bookmakers": [
             {
                 "key": "draftkings",
+                "last_update": datetime.now(timezone.utc).isoformat(),
                 "markets": [
                     {
                         "key": "h2h",
@@ -419,6 +420,8 @@ async def test_context_agent_persists_odds_snapshot() -> None:
     mock_pool = MagicMock()
 
     with (
+        patch.object(OddsAPIPoller, "fetch_player_props", new_callable=AsyncMock, return_value=[]),
+        patch("sportsbet.graph.agents._fetch_sleeper_injuries", new_callable=AsyncMock, return_value=[]),
         patch("sportsbet.graph.agents.get_sync_engine", return_value=MagicMock()),
         patch("sportsbet.graph.agents.write_odds_snapshot") as mock_write,
         patch.object(
@@ -443,6 +446,7 @@ async def test_context_agent_persists_odds_snapshot() -> None:
     ):
         agent = make_context_agent(mock_pool, api_key="test_key", daily_credit_cap=500)
         state = _make_full_state()
+        state["game_id"] = "test_event_001"
         await agent(state)
 
     assert mock_write.call_count == 1, (

@@ -255,12 +255,12 @@ def make_context_agent(
                     raw_odds = await poller.fetch_nba_odds()
                 else:
                     raw_odds = await poller.fetch_nfl_odds()
-            odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method)
+            odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
         except BudgetExhaustedError as exc:
             log.warning("context_agent_budget_exhausted_trying_espn", session_id=session_id, error=str(exc))
             try:
                 raw_odds = await ESPNOddsPoller().fetch_h2h_odds(sport)
-                odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method)
+                odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
                 log.info("context_agent_espn_h2h_fallback_ok", session_id=session_id)
             except Exception as espn_exc:
                 log.warning("context_agent_espn_fallback_failed", error=str(espn_exc))
@@ -268,7 +268,7 @@ def make_context_agent(
             log.error("context_agent_odds_error", session_id=session_id, error=str(exc))
             try:
                 raw_odds = await ESPNOddsPoller().fetch_h2h_odds(sport)
-                odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method)
+                odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
                 log.info("context_agent_espn_h2h_fallback_ok", session_id=session_id)
             except Exception as espn_exc:
                 log.warning("context_agent_espn_fallback_failed", error=str(espn_exc))
@@ -512,75 +512,60 @@ def make_context_agent(
 
 
 def _extract_odds_snapshot(
-    raw_odds: list[dict],
-    game_id: str,
-    vig_method: str = "multiplicative",
+    raw_odds: list[dict], game_id: str, vig_method: str = "multiplicative",
+    outcome_name: str | None = None,
 ) -> "AgentOddsSnapshot | None":
-    """Extract first bookmaker h2h market from Odds API response as AgentOddsSnapshot.
+    """Match one provider event and named h2h outcome; preserve observed quote time.
 
-    Converts American odds to fair (devigged) Decimal implied_probability using
-    the selected devig method (Phase 15 — QUANT-02):
-    - "multiplicative" (default): remove_vig_multiplicative — proportional normalization.
-      Both-positive-odds markets fall back to raw_probs to avoid ValueError propagation.
-    - "pinnacle": remove_vig_power — power/binary-search devig correcting favorite-longshot bias.
-
-    Returns None if raw_odds is empty, no h2h market found, or fewer than 2 outcomes.
+    The default selection is the matched event's home team. Internal game IDs
+    must be mapped to provider IDs before calling; never attach unrelated odds.
     """
-    from datetime import datetime, timezone
-
-    from sportsbet.graph.models import AgentOddsSnapshot
-    from sportsbet.quant.vig import american_to_raw_prob, remove_vig_multiplicative
-
-    if not raw_odds:
-        return None
-
-    event = raw_odds[0]  # Use first event; caller may filter by game_id in future
-    bookmakers = event.get("bookmakers", [])
-    if not bookmakers:
-        return None
-
-    bookmaker = bookmakers[0]
-    markets = bookmaker.get("markets", [])
-    h2h = next((m for m in markets if m.get("key") == "h2h"), None)
-    if h2h is None:
-        return None
-
-    outcomes = h2h.get("outcomes", [])
-    if len(outcomes) < 2:
-        # Need at least 2 outcomes for multiplicative devig overround calculation
-        return None
-
-    prices = [o.get("price", 0) for o in outcomes]
-    if any(p == 0 for p in prices):
-        return None
-
-    raw_probs = [american_to_raw_prob(p) for p in prices]
-
-    if vig_method == "pinnacle":
-        from sportsbet.quant.vig import remove_vig_power
-        fair_probs = remove_vig_power(raw_probs)
-    else:
-        try:
-            fair_probs = remove_vig_multiplicative(raw_probs)
-        except ValueError:
-            # Both-positive-odds market (overround <= 1) — fall back to raw prob for first outcome
-            fair_probs = raw_probs
-
-    # Round to 10 decimal places to eliminate sub-ulp residual from Decimal division.
-    # Preserves precision well beyond Kelly Criterion requirements (6 dp sufficient).
+    from datetime import datetime
     from decimal import ROUND_HALF_EVEN
-    fair_prob = fair_probs[0].quantize(Decimal("0.0000000001"), rounding=ROUND_HALF_EVEN)
+    from sportsbet.graph.models import AgentOddsSnapshot
+    from sportsbet.quant.vig import american_to_raw_prob, remove_vig_multiplicative, remove_vig_power
 
-    return AgentOddsSnapshot(
-        game_id=game_id,
-        sportsbook=bookmaker.get("key", "unknown"),
-        market_type="h2h",
-        implied_probability=fair_prob,
-        snapped_at=datetime.now(timezone.utc),
-        american_odds=prices[0],  # raw int for CLV persistence (GAP-3)
-        outcome_name=outcomes[0].get("name"),
-        game_start_time=datetime.fromisoformat(event["commence_time"].replace("Z", "+00:00")) if event.get("commence_time") else None,
-    )
+    events = [e for e in raw_odds if e.get('id') == game_id]
+    if len(events) != 1:
+        return None
+    event = events[0]
+    selection = outcome_name or event.get('home_team')
+    if not selection or not event.get('commence_time'):
+        return None
+    try:
+        start = datetime.fromisoformat(event['commence_time'].replace('Z','+00:00'))
+        if start.tzinfo is None:
+            return None
+    except (ValueError, TypeError, AttributeError):
+        return None
+    for book in event.get('bookmakers', []):
+        for market in book.get('markets', []):
+            if market.get('key') != 'h2h' or not book.get('key'):
+                continue
+            outcomes = market.get('outcomes', [])
+            names = [o.get('name') for o in outcomes]
+            if len(outcomes) < 2 or len(set(names)) != len(names) or selection not in names or not all(names):
+                continue
+            prices = [o.get('price') for o in outcomes]
+            if any(type(price) is not int or abs(price) < 100 for price in prices):
+                continue
+            updated = market.get('last_update') or book.get('last_update')
+            try:
+                observed = datetime.fromisoformat(updated.replace('Z','+00:00'))
+                if observed.tzinfo is None:
+                    continue
+            except (ValueError, TypeError, AttributeError):
+                continue
+            raw_probs = [american_to_raw_prob(price) for price in prices]
+            try:
+                fair_probs = remove_vig_power(raw_probs) if vig_method == 'pinnacle' else remove_vig_multiplicative(raw_probs)
+            except ValueError:
+                fair_probs = raw_probs
+            index = names.index(selection)
+            return AgentOddsSnapshot(game_id=game_id, sportsbook=book['key'], market_type='h2h',
+                implied_probability=fair_probs[index].quantize(Decimal('0.0000000001'), rounding=ROUND_HALF_EVEN),
+                snapped_at=observed, american_odds=prices[index], outcome_name=selection, game_start_time=start)
+    return None
 
 
 # ---------------------------------------------------------------------------

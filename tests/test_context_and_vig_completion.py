@@ -26,9 +26,12 @@ from sportsbet.ingestion.scraper import InjuryWeatherScraper
 NBA_ODDS_FIXTURE = [
     {
         "id": "nba_game_001",
+        "home_team": "Boston Celtics",
+        "commence_time": "2026-12-01T20:00:00Z",
         "bookmakers": [
             {
                 "key": "draftkings",
+                "last_update": datetime.now(timezone.utc).isoformat(),
                 "markets": [
                     {
                         "key": "h2h",
@@ -45,6 +48,24 @@ NBA_ODDS_FIXTURE = [
 
 # Same asymmetric -200/+170 odds used for vig_method dispatch tests
 ASYMMETRIC_ODDS_FIXTURE = NBA_ODDS_FIXTURE
+
+
+def test_quote_identity_and_observation_time_do_not_depend_on_list_order():
+    from copy import deepcopy
+    event = deepcopy(NBA_ODDS_FIXTURE[0])
+    event['bookmakers'][0]['last_update'] = '2026-01-01T12:00:00Z'
+    unrelated = {**deepcopy(event), 'id':'unrelated'}
+    snap = _extract_odds_snapshot([unrelated,event], 'nba_game_001', outcome_name='Miami Heat')
+    assert snap is not None
+    assert snap.game_id == 'nba_game_001'
+    assert snap.outcome_name == 'Miami Heat'
+    assert snap.american_odds == 170
+    assert snap.snapped_at == datetime(2026,1,1,12,tzinfo=timezone.utc)
+    assert _extract_odds_snapshot([unrelated], 'nba_game_001') is None
+    assert _extract_odds_snapshot([event,event], 'nba_game_001') is None
+    assert _extract_odds_snapshot([event], 'nba_game_001', outcome_name='Unknown') is None
+    del event['bookmakers'][0]['last_update']
+    assert _extract_odds_snapshot([event], 'nba_game_001') is None
 
 
 def _make_full_state(sport: str | None = None) -> dict:
@@ -144,6 +165,7 @@ async def test_nfl_default_still_calls_fetch_nfl_odds() -> None:
             "bookmakers": [
                 {
                     "key": "draftkings",
+                "last_update": datetime.now(timezone.utc).isoformat(),
                     "markets": [
                         {
                             "key": "h2h",

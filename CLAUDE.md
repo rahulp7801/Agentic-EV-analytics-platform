@@ -49,6 +49,8 @@
 
 ## Model and pricing contracts
 
+- Generic context h2h extraction now requires exactly one matching provider event and a named outcome (default matched home team), rather than using the first event/outcome. Missing identity/start/quote timestamp fails closed; provider observation time is preserved instead of stamping old odds as newly observed. GraphState retains explicit outcome_name. Callers with internal game IDs must map them to provider event IDs first.
+
 - Dated NBA queries count pre-game logs, excluding target/future dates before taking recent games. Empty situational samples broaden to pre-game logs, never season totals. Actual double-double counts include steals/blocks.
 - NFL cutoff matches each player's own team/week schedule, not the earliest game in the week. Latest-N queries apply situational filters before LIMIT.
 - Unfitted home/rest/pace/defense/kinematic adjustments default off. Experimental changes discard incompatible CIs and do not adjust push markets. Neutral defense/pace are placeholders, not measured features.
@@ -76,5 +78,5 @@
 - npm audit zero vulnerabilities; pip-audit2.10.1 found no known Python vulnerabilities and is now a CI gate. Passing audits cannot prove all security gaps closed.
 - Need reachable production DB, migration/backfill, read-only Vercel role, worker secrets and measured quota/coverage before live readiness. Do not claim season readiness from deployment alone.
 - Automatic settlement and out-of-sample calibration/profitability remain incomplete. Historical injury/roster conditioning is not fully point-in-time; current hosted baseline does not apply it. Legacy undated NBA aggregate estimates remain low-level paths.
-- Generic context odds extraction still needs explicit event/selection matching beyond the play_success gate. NFL schedule ingestion ignores corrections, and home_away enrichment remains incomplete. NFL game-log UI is still unavailable.
+- Generic custom market_outcome probabilities still need richer matching outcome metadata beyond the play_success gate. NFL game-log UI is still unavailable.
 - Two expected-failure gamelog/injury tests import obsolete modules; replace with real-builder regression coverage rather than hiding failures. Ledger malformed/naive timestamp validation and reporting by model-version cohort still need hardening.
