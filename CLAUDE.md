@@ -20,14 +20,16 @@
 
 ## Deployment and credentials
 
+- Automatic approval review rejected copying local ODDS_API_KEY to GitHub because the user had not specifically approved credential export. No key was copied. An explicit approval question is pending; do not retry or work around the rejection without user authorization.
+
 - Production URL: https://agentic-ev-analytics-platform.vercel.app.
 - Vercel project agentic-ev-analytics-platform under rahulp7801s-projects; rootDirectory frontend. IDs are repository Actions variables; VERCEL_TOKEN is a repository secret.
 - Project-scoped token works. Vercel CLI 59.15.1 pull fails during team metadata lookup (vercel/vercel#17506); direct deploy --yes --prod supports owner-lookup fallback. Do not request a broader token or export/reuse interactive OAuth credentials.
 - CI deploy depends on backend, frontend and isolated PostgreSQL checks. Automatic Vercel git deployments disabled in frontend/vercel.json. Vercel performs the hosted build. .vercelignore limits uploads to frontend sources, excluding environment files, build outputs and legacy signal cache.
-- First full deployment success: GitHub run 34538930708 (eb728ef). Run 34539302175 (bdadfa1) also passed. Verified homepage 200, security headers, public scan POST 403, sanitized signals/metrics 503 while DB is unconfigured.
+- First full deployment success: GitHub run 34538930708 (eb728ef). Runs34539302175 (bdadfa1) and34540128712 (87c55e1) also passed. Verified homepage 200, security headers, public scan POST 403, sanitized signals/metrics 503 while DB is unconfigured.
 - Runtime database from local .env remains unreachable (previous DNS failures; latest connection OperationalError). Odds API catalog probe previously passed HTTP 200. Never print secret values. Vercel production DATABASE_URL still needs a reachable dedicated read-only role.
 - Worker needs repository secrets DATABASE_URL, DATABASE_URL_ASYNC, ODDS_API_KEY. ANALYTICS_DATABASE_URL uses writable DATABASE_URL in Actions. .env.example and README distinguish Python, Vercel and GitHub settings.
-- GitHub secret scanning and push protection enabled. Dependabot security updates enabled. CodeQL extended default setup requested for Python, JS/TS and Actions; inspect completed analysis before claiming it is clean.
+- GitHub secret scanning and push protection enabled. Dependabot security updates enabled. CodeQL extended default setup configured for Python, JS/TS and Actions. Latest completed analysis at87c55e1 passed with no open alerts; this is not proof of complete security.
 
 ## Data and orchestration
 
@@ -64,9 +66,9 @@
 
 ## Verification and remaining gaps
 
-- Production NFL schedule smoke test returned an empty list despite a successful local provider response. Schedule route now formats YYYYMMDD explicitly and distinguishes complete upstream failure (503) from a valid empty schedule, with sanitized server diagnostics. Verify the next deployed response before claiming live schedule coverage.
+- Production NFL schedule smoke test returned an empty list despite a successful local provider response. Schedule route now formats YYYYMMDD explicitly and distinguishes complete upstream failure (503) from a valid empty schedule, with sanitized server diagnostics. At87c55e1, a cache-busted deployed request returned503/partial=true while the same Node handler locally returned2 NFL games. Provider access from Vercel remains unresolved; do not claim live schedule coverage.
 
-- Latest local full Python suite:290 passed,15 DB skips,2 pre-existing expected failures. Real PostgreSQL CI passed model SQL through both graphs, target-game exclusion, repeatable upserts, migrations and concurrent exposure reservation. Seven frontend metric/access tests, TypeScript and production build passed.
+- Latest local full Python suite:290 passed,15 DB skips,2 pre-existing expected failures. Real PostgreSQL CI passed model SQL through both graphs, target-game exclusion, repeatable upserts, migrations and concurrent exposure reservation. Nine frontend metric/access/schedule tests, TypeScript and production build passed.
 - npm audit zero vulnerabilities; pip-audit2.10.1 found no known Python vulnerabilities and is now a CI gate. Passing audits cannot prove all security gaps closed.
 - Need reachable production DB, migration/backfill, read-only Vercel role, worker secrets and measured quota/coverage before live readiness. Do not claim season readiness from deployment alone.
 - Automatic settlement and out-of-sample calibration/profitability remain incomplete. Historical injury/roster conditioning is not fully point-in-time; current hosted baseline does not apply it. Legacy undated NBA aggregate estimates remain low-level paths.
