@@ -140,34 +140,10 @@ export default function Sidebar({ activeView, onViewChange, sport, onSportChange
 
       <div className="divider" style={{ margin: '0 10px' }} />
 
-      {/* System status */}
-      <div style={{ padding: '10px 12px 14px' }}>
-        <div className="section-header" style={{ marginBottom: 8 }}>System</div>
-        <StatusRow label="Pipeline" status="online" color="mint" />
-        <StatusRow label="PrizePicks" status="live" color="mint" />
-        <StatusRow label="Odds API" status="active" color="mint" />
-        <StatusRow label="PostgreSQL" status="connected" color="mint" />
-        <StatusRow label="LangGraph" status="idle" color="amber" />
+      <div style={{ padding: '10px 12px 14px', fontSize: 10, color: 'var(--text-muted)' }}>
+        Estimates reflect observed quotes. Availability and eligibility can change.
       </div>
     </aside>
   );
 }
 
-function StatusRow({ label, status, color }: { label: string; status: string; color: 'mint' | 'red' | 'amber' }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      marginBottom: 4,
-    }}>
-      <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{label}</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{
-          fontSize: 9, letterSpacing: '0.08em',
-          color: color === 'mint' ? 'var(--accent-mint)' : color === 'red' ? 'var(--accent-red)' : 'var(--accent-amber)',
-        }}>{status}</span>
-        <span className={`live-dot ${color === 'red' ? 'live-dot-red' : color === 'amber' ? 'live-dot-amber' : ''}`}
-          style={{ width: 6, height: 6 }} />
-      </div>
-    </div>
-  );
-}

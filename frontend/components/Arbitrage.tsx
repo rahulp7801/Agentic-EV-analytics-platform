@@ -1,5 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import type { Sport } from '@/lib/types';
+import { expectedProfit } from '@/lib/signalMetrics';
 
 function fmt_odds(n: number) { return n > 0 ? '+' + n : String(n); }
 function fmt_pct(n: number) { return (n * 100).toFixed(1) + '%'; }
@@ -10,127 +12,6 @@ function time_ago(iso: string) {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-interface NBAGame {
-  home_abbr: string;
-  away_abbr: string;
-  home_name: string;
-  away_name: string;
-  date: string;
-  label: string;
-  game_time: string;
-}
-
-function GameSelector({
-  games,
-  selected,
-  onSelect,
-  scanning,
-  onScan,
-}: {
-  games: NBAGame[];
-  selected: NBAGame | null;
-  onSelect: (g: NBAGame) => void;
-  scanning: boolean;
-  onScan: () => void;
-}) {
-  if (games.length === 0) {
-    return (
-      <div style={{
-        padding: '10px 14px',
-        background: 'rgba(255,180,0,0.04)',
-        borderBottom: '1px solid var(--border-dim)',
-        fontSize: 11, color: 'var(--text-muted)',
-      }}>
-        No upcoming NBA games found — ESPN may be unavailable.
-      </div>
-    );
-  }
-
-  return (
-    <div style={{
-      padding: '10px 14px',
-      borderBottom: '1px solid var(--border-dim)',
-      background: 'var(--bg-void)',
-    }}>
-      <div style={{
-        fontSize: 9, color: 'var(--text-muted)',
-        letterSpacing: '0.12em', marginBottom: 8, textTransform: 'uppercase',
-      }}>
-        Select Game to Scan
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        {games.map(g => {
-          const key = `${g.away_abbr}@${g.home_abbr}-${g.date}`;
-          const isSelected = selected?.home_abbr === g.home_abbr &&
-                             selected?.away_abbr === g.away_abbr &&
-                             selected?.date === g.date;
-          return (
-            <button
-              key={key}
-              onClick={() => onSelect(g)}
-              style={{
-                padding: '5px 12px',
-                border: isSelected
-                  ? '1px solid var(--accent-mint)'
-                  : '1px solid var(--border-dim)',
-                borderRadius: 4,
-                background: isSelected ? 'rgba(0,229,160,0.08)' : 'var(--bg-base)',
-                cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
-              }}
-            >
-              <div style={{
-                fontSize: 12, fontWeight: 700,
-                color: isSelected ? 'var(--accent-mint)' : 'var(--text-primary)',
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                {g.away_abbr} @ {g.home_abbr}
-              </div>
-              <div style={{ fontSize: 9, color: 'var(--text-muted)', display: 'flex', gap: 6 }}>
-                <span style={{
-                  color: g.label === 'Today' ? 'var(--accent-amber)' : 'var(--accent-cyan)',
-                }}>{g.label}</span>
-                <span>{new Date(g.game_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
-              </div>
-            </button>
-          );
-        })}
-
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {selected && (
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-              {selected.away_abbr} @ {selected.home_abbr} · {selected.label}
-            </span>
-          )}
-          <button
-            className="btn-ghost"
-            onClick={onScan}
-            disabled={scanning || !selected}
-            style={{
-              fontSize: 10, padding: '4px 14px',
-              color: scanning ? 'var(--accent-amber)' : selected ? 'var(--accent-mint)' : 'var(--text-dim)',
-              borderColor: scanning ? 'rgba(245,166,35,0.3)' : selected ? 'rgba(0,229,160,0.3)' : 'var(--border-dim)',
-              display: 'flex', alignItems: 'center', gap: 5,
-            }}
-          >
-            {scanning ? (
-              <>
-                <span style={{ fontSize: 12, animation: 'spin 1s linear infinite' }}>⟳</span>
-                Scanning...
-              </>
-            ) : (
-              <>
-                <span style={{ fontSize: 12 }}>▶</span>
-                Run Scan
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
   const [stake, setStake] = useState(100);
   const direction = (signal.direction as string) || 'over';
@@ -139,7 +20,7 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
   const truePct = (signal.true_prob as number) * 100;
   const impliedPct = (signal.implied_prob as number) * 100;
   const probGap = truePct - impliedPct;
-  const estimatedProfit = (signal.ev_pct as number) * stake;
+  const estimatedProfit = expectedProfit(signal.expected_return, stake);
   const dirLabel = isUnder ? 'U' : 'O';
   const dirColor = isUnder ? 'var(--accent-amber)' : 'var(--accent-mint)';
 
@@ -172,7 +53,7 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
               {dirLabel} {signal.line as number}
             </span>
           </div>
-          <span className="badge badge-blue">NBA</span>
+          <span className="badge badge-blue">{String(signal.sport).toUpperCase()}</span>
           {(signal.pp_odds_tier as string) === 'demon' && (
             <span className="badge badge-amber">DEMON</span>
           )}
@@ -184,7 +65,7 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>EDGE (pp)</div>
             <div style={{ color: dirColor, fontWeight: 700, fontSize: 16 }}>
-              +{evPct.toFixed(1)}%
+              +{evPct.toFixed(1)}pp
             </div>
           </div>
         </div>
@@ -198,7 +79,7 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
           label={isUnder ? 'MODEL PROB (UNDER)' : 'MODEL PROB (OVER)'}
           value={fmt_pct(signal.true_prob as number)}
           color="var(--accent-cyan)"
-          note="PostgreSQL base"
+          note="Historical game sample"
         />
         <div className="divider-v" />
         <ProbSide label="BOOK IMPLIED" value={fmt_pct(signal.implied_prob as number)} color="var(--text-secondary)" note={`${signal.sportsbook as string} ${fmt_odds(signal.american_odds as number)}`} />
@@ -221,7 +102,7 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
         </div>
         <p>Estimated win probability: {fmt_pct(signal.true_prob as number)}. Probability edge: {probGap.toFixed(1)}pp.</p>
         <p>Expected return per unit stake: {signal.expected_return == null ? 'Unavailable' : fmt_pct(signal.expected_return as number)}.</p>
-        <p>Sample: {String(signal.sample_size ?? 'unknown')}. Source: {String(signal.data_source ?? 'unknown')}. {signal.gated ? `Gated: ${signal.gate_reason}` : 'Not validated by settled results.'}</p>
+        <p>Sample: {String(signal.sample_size ?? 'unknown')}. {signal.gated ? `Gated: ${signal.gate_reason}` : 'Not validated by settled results.'}</p>
       </div>
 
       {/* Structured matchup context: rest, home/away, opponent def rating, team/opponent */}
@@ -306,14 +187,14 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
           <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>$</span>
           <input
             type="number" className="term-input" style={{ width: 80 }}
-            value={stake} onChange={e => setStake(Number(e.target.value))}
+            min={0} value={stake} onChange={e => setStake(Math.max(0, Number(e.target.value)))}
           />
         </div>
         <div className="divider-v" style={{ margin: '0 4px' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>EXPECTED PROFIT</span>
           <span style={{ color: 'var(--accent-mint)', fontWeight: 700, fontSize: 14 }}>
-            ${estimatedProfit.toFixed(2)}
+            {estimatedProfit == null ? 'Unavailable' : `$${estimatedProfit.toFixed(2)}`}
           </span>
         </div>
         {!(signal.gated as boolean) && (signal.kelly_fraction as number) > 0 && (
@@ -359,117 +240,38 @@ function CtxChip({ label, value, color, note }: { label: string; value: string; 
   );
 }
 
-export default function Arbitrage() {
+export default function Arbitrage({ sport }: { sport: Sport }) {
   const [sortBy, setSortBy] = useState<'arb' | 'time'>('arb');
   const [evSignals, setEvSignals] = useState<Record<string, unknown>[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
-  const [games, setGames] = useState<NBAGame[]>([]);
-  const [selectedGame, setSelectedGame] = useState<NBAGame | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [scanMsg, setScanMsg] = useState('');
-  const [cacheGame, setCacheGame] = useState<{ home_team: string; away_team: string } | null>(null);
-  const [scanNote, setScanNote] = useState<string | null>(null);
-  const [scanProgress, setScanProgress] = useState<{
-    stage: number; stage_label: string; total_stages: number;
-    players_total: number; players_done: number; current_player: string;
-  } | null>(null);
-
   const fetchEVSignals = useCallback(async () => {
     try {
       const res = await fetch('/api/signals', { cache: 'no-store' });
-      if (!res.ok) return;
+      if (!res.ok) { setEvSignals([]); return; }
       const json = await res.json();
       // Always update signals (including empty array) — never fall back to stale state
       const filtered = ((json.signals ?? []) as Record<string, unknown>[]).filter(
-        s => !s.gated
+        s => !s.gated && s.sport === sport
       );
       setEvSignals(filtered);
-      if (json.game) {
-        setCacheGame(json.game);
-      }
-      setScanNote(json.scan_note ?? null);
-    } catch {
-      // fall through — keep whatever was loaded
-    }
-  }, []);
 
-  const fetchGames = useCallback(async () => {
-    try {
-      const res = await fetch('/api/games', { cache: 'no-store' });
-      const json = await res.json();
-      if (json.games?.length) {
-        setGames(json.games);
-      }
-    } catch { /* ESPN unavailable */ }
-  }, []);
+    } catch {
+      setEvSignals([]);
+    }
+  }, [sport]);
 
   useEffect(() => {
     fetchEVSignals();
-    fetchGames();
-  }, [fetchEVSignals, fetchGames]);
+    const timer = setInterval(fetchEVSignals, 30000);
+    return () => clearInterval(timer);
+  }, [fetchEVSignals]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchEVSignals(), fetchGames()]);
+    await fetchEVSignals();
     setLastRefreshed(new Date());
     setRefreshing(false);
-  };
-
-  const handleScan = async () => {
-    if (!selectedGame || scanning) return;
-    setScanning(true);
-    setScanMsg('');
-    setScanProgress(null);
-    // Clear stale signals immediately so the old game's data isn't shown during scan
-    setEvSignals([]);
-    setCacheGame(null);
-    try {
-      const res = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          team_a: selectedGame.away_abbr,
-          team_b: selectedGame.home_abbr,
-          date: selectedGame.date,
-        }),
-      });
-      const json = await res.json();
-      if (json.status === 'already_running') {
-        setScanMsg('Scan already in progress — check back shortly.');
-        setScanning(false);
-        return;
-      }
-      setScanMsg(`Scanning ${selectedGame.away_abbr} @ ${selectedGame.home_abbr}…`);
-      // Poll for scan completion + progress every 3s, max 40 attempts (~2 min)
-      let pollAttempts = 0;
-      const poll = setInterval(async () => {
-        pollAttempts++;
-        try {
-          const s = await fetch('/api/scan', { cache: 'no-store' }).then(r => r.json()).catch(() => ({ scanning: true, progress: null }));
-          if (s.progress) setScanProgress(s.progress);
-          if (!s.scanning) {
-            clearInterval(poll);
-            setScanning(false);
-            setScanMsg('');
-            setScanProgress(null);
-            await fetchEVSignals();
-            setLastRefreshed(new Date());
-            return;
-          }
-        } catch { /* keep polling */ }
-        if (pollAttempts >= 40) {
-          clearInterval(poll);
-          setScanning(false);
-          setScanProgress(null);
-          setScanMsg('Scan timed out — check scan_out.txt for errors.');
-        }
-      }, 3000);
-    } catch {
-      setScanMsg('Scan request failed — check server logs.');
-      setScanning(false);
-      setScanProgress(null);
-    }
   };
 
   const evSorted = [...evSignals].sort((a, b) =>
@@ -495,11 +297,7 @@ export default function Arbitrage() {
             </span>
           </>
         )}
-        {cacheGame && (
-          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-            — {cacheGame.away_team} @ {cacheGame.home_team}
-          </span>
-        )}
+
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
           {time_ago(lastRefreshed.toISOString())}
@@ -538,79 +336,6 @@ export default function Arbitrage() {
         </span>
       </div>
 
-      {/* Game selector */}
-      <div style={{ flexShrink: 0 }}>
-        <GameSelector
-          games={games}
-          selected={selectedGame}
-          onSelect={setSelectedGame}
-          scanning={scanning}
-          onScan={handleScan}
-        />
-        {(scanning || scanMsg) && (
-          <div style={{
-            padding: '8px 14px',
-            background: scanning ? 'rgba(245,166,35,0.04)' : 'rgba(0,229,160,0.04)',
-            borderBottom: '1px solid var(--border-dim)',
-          }}>
-            {/* Status line */}
-            <div style={{
-              fontSize: 10,
-              color: scanning ? 'var(--accent-amber)' : 'var(--accent-mint)',
-              marginBottom: scanning && scanProgress ? 6 : 0,
-            }}>
-              {scanMsg || (scanning ? 'Starting scan...' : '')}
-              {scanning && scanProgress && (
-                <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
-                  {scanProgress.stage_label}
-                </span>
-              )}
-            </div>
-            {/* Progress bar */}
-            {scanning && (() => {
-              const p = scanProgress;
-              let pct = 0;
-              if (p) {
-                if (p.stage <= 1) pct = 5;
-                else if (p.stage === 2) pct = 20;
-                else if (p.stage === 3) pct = 35;
-                else if (p.stage === 4) {
-                  const base = 40;
-                  const range = 58;
-                  pct = p.players_total > 0
-                    ? base + Math.round((p.players_done / p.players_total) * range)
-                    : base;
-                }
-              }
-              return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{
-                    flex: 1, height: 3, borderRadius: 2,
-                    background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
-                  }}>
-                    <div style={{
-                      width: `${pct}%`,
-                      height: '100%',
-                      background: 'var(--accent-amber)',
-                      borderRadius: 2,
-                      transition: 'width 0.6s ease',
-                    }} />
-                  </div>
-                  <span style={{ fontSize: 9, color: 'var(--text-dim)', minWidth: 28, textAlign: 'right' }}>
-                    {pct}%
-                  </span>
-                  {p && p.players_total > 0 && (
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>
-                      {p.players_done}/{p.players_total} players
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        )}
-      </div>
-
       {/* EV signal cards */}
       <div style={{ flex: 1, overflow: 'auto', padding: '14px' }}>
         {evSorted.length > 0 ? (
@@ -619,7 +344,7 @@ export default function Arbitrage() {
               fontSize: 9, color: 'var(--text-muted)',
               letterSpacing: '0.12em', marginBottom: 8, textTransform: 'uppercase',
             }}>
-              Single-Book EV Signals — Pipeline ({evSorted.length})
+              Eligible market estimates — ({evSorted.length})
             </div>
             {evSorted.map((s, i) => (
               <EVSignalArbCard key={(s.id as string) || i} signal={s} />
@@ -634,12 +359,10 @@ export default function Arbitrage() {
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
             </svg>
             <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-              {scanNote ? 'Scan complete — no signals' : 'No EV signals loaded'}
+              No eligible estimates available
             </span>
             <span style={{ color: 'var(--text-dim)', fontSize: 10, textAlign: 'center', maxWidth: 400 }}>
-              {scanNote
-                ? scanNote
-                : 'Select a game above and click Run Scan to analyze props against the historical distribution model.'}
+              Market estimates appear after the next successful update.
             </span>
           </div>
         )}

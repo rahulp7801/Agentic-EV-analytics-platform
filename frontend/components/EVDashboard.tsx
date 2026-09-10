@@ -14,6 +14,7 @@ interface CachedGame {
   home_team: string;
   away_team: string;
   date: string;
+  sport?: Sport;
 }
 
 interface ESPNGame {
@@ -50,7 +51,7 @@ function buildMispricingReason(signal: RichSignal): [string, string, string] {
   return [
     `${signal.direction.toUpperCase()} ${signal.line}: ${(signal.true_prob * 100).toFixed(1)}% estimated win probability.`,
     signal.expected_return == null ? 'Expected return unavailable.' : `${(signal.expected_return * 100).toFixed(1)}% expected return per unit stake at the quoted payout.`,
-    `Sample: ${signal.sample_size ?? 'unknown'} games. Source: ${signal.data_source ?? 'unknown'}. ${signal.gated ? `Gated: ${signal.gate_reason ?? 'risk policy'}.` : 'Estimate has not been validated by settled results.'}`,
+    `Sample: ${signal.sample_size ?? 'unknown'} games. ${signal.gated ? `Gated: ${signal.gate_reason ?? 'risk policy'}.` : 'Estimate has not been validated by settled results.'}`,
   ];
 }
 
@@ -320,7 +321,6 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
   const [data, setData] = useState<SignalCache | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [scanning, setScanning] = useState(false);
   const [selected, setSelected] = useState<EVSignal | null>(null);
   const [filter, setFilter] = useState<'all' | 'eligible' | 'gated'>('all');
   const [sortBy, setSortBy] = useState<'ev' | 'kelly' | 'prob'>('ev');
@@ -333,14 +333,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
       const res = await fetch('/api/signals', { cache: 'no-store' });
       const json = await res.json();
       setData(json);
-      // Auto-select the most-recent game from the cache on first load
-      setSelectedGameId(prev => {
-        if (prev) return prev; // keep user's selection
-        const firstGame = json.games?.[0] ?? (json.game
-          ? { game_id: `${json.game.home_team?.toLowerCase()}_${json.game.away_team?.toLowerCase()}_${json.game.date}` }
-          : null);
-        return firstGame?.game_id ?? null;
-      });
+
     } catch {
       setData({ generated_at: null, game: null, signals: [], error: 'Failed to fetch signals' });
     } finally {
@@ -351,10 +344,16 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
   useEffect(() => {
     fetchSignals();
     // Fetch ESPN schedule for the game picker
-    fetch('/api/games', { cache: 'no-store' })
+    fetch(`/api/games?sport=${sport}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(d => setEspnGames(d.games || []))
       .catch(() => {});
+  }, [fetchSignals, sport]);
+
+  useEffect(() => { setSelectedGameId(null); }, [sport]);
+  useEffect(() => {
+    const timer = setInterval(fetchSignals, 30000);
+    return () => clearInterval(timer);
   }, [fetchSignals]);
 
   const handleRefresh = async () => {
@@ -363,59 +362,11 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
     setRefreshing(false);
   };
 
-  // Derive the selected game's team abbreviations for the scan POST
-  const _scanTeams = (): { team_a: string; team_b: string; date: string } | null => {
-    // 1. Try cached games list
-    const cachedGame = (data?.games || []).find(g => g.game_id === selectedGameId);
-    if (cachedGame) {
-      return { team_a: cachedGame.away_team, team_b: cachedGame.home_team, date: cachedGame.date };
-    }
-    // 2. Try ESPN game list
-    const espn = espnGames.find(g => {
-      const gid = `${g.home_abbr.toLowerCase()}_${g.away_abbr.toLowerCase()}_${g.date}`;
-      return gid === selectedGameId;
-    });
-    if (espn) {
-      return { team_a: espn.away_abbr, team_b: espn.home_abbr, date: espn.date };
-    }
-    return null;
-  };
-
-  const triggerScan = async () => {
-    const teams = _scanTeams();
-    if (!teams) return; // no game selected — button should be disabled
-    setScanning(true);
-    try {
-      await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ team_a: teams.team_a, team_b: teams.team_b, date: teams.date, force: true }),
-      });
-    } catch {
-      setScanning(false);
-      return;
-    }
-    let attempts = 0;
-    const poll = setInterval(async () => {
-      attempts++;
-      try {
-        const s = await fetch('/api/scan', { cache: 'no-store' }).then(r => r.json()).catch(() => ({ scanning: true }));
-        if (!s.scanning) {
-          clearInterval(poll);
-          setScanning(false);
-          await fetchSignals();
-          return;
-        }
-      } catch { /* keep polling */ }
-      if (attempts > 60) { clearInterval(poll); setScanning(false); }
-    }, 5000);
-  };
-
   // Merge cached games + ESPN games into a unified picker list (deduped by game_id)
   const _allPickerGames: { game_id: string; label: string; away: string; home: string; date: string; cached: boolean }[] = [];
   const _seen = new Set<string>();
 
-  for (const g of (data?.games || [])) {
+  for (const g of (data?.games || []).filter(g => g.sport === sport || (!g.sport && sport === 'nba'))) {
     if (!_seen.has(g.game_id)) {
       _seen.add(g.game_id);
       const hasSignals = (data?.signals || []).some(s => s.game_id === g.game_id);
@@ -436,6 +387,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
     : (data?.signals || []);
 
   const signals = gameSignals
+    .filter(s => s.sport === sport)
     .filter(s => filter === 'all' || (filter === 'gated' ? s.gated : !s.gated))
     .sort((a, b) => {
       if (sortBy === 'ev') return b.ev_pct - a.ev_pct;
@@ -450,7 +402,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
         <span className="live-dot" style={{ width: 10, height: 10 }} />
-        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Loading signals from pipeline...</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Loading market estimates...</span>
       </div>
     );
   }
@@ -458,10 +410,9 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
   if (data?.error && !data.signals.length && _allPickerGames.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 14 }}>
-        <div style={{ color: 'var(--accent-amber)', fontSize: 13, fontWeight: 600 }}>No Signal Cache Found</div>
+        <div style={{ color: 'var(--accent-amber)', fontSize: 13, fontWeight: 600 }}>Market estimates unavailable</div>
         <div style={{ color: 'var(--text-muted)', fontSize: 11, textAlign: 'center', maxWidth: 360 }}>
-          Run <code style={{ color: 'var(--accent-mint)' }}>python scan_game_ev.py</code> to generate EV signals,
-          or select a game below and trigger a scan.
+          Market estimates will appear after the next successful update.
         </div>
       </div>
     );
@@ -504,28 +455,17 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
           className="btn-ghost"
           style={{ fontSize: 9, padding: '2px 8px' }}
           onClick={handleRefresh}
-          disabled={refreshing || scanning}
-          title="Reload from cache (no new scan)"
+          disabled={refreshing}
+          title="Refresh market estimates"
         >
           {refreshing ? '● Loading...' : '↻ Refresh'}
         </button>
-        <button
-          className="btn-ghost"
-          style={{
-            fontSize: 9, padding: '2px 8px',
-            color: scanning ? 'var(--accent-amber)' : (!_selGame ? 'var(--text-dim)' : undefined),
-          }}
-          onClick={triggerScan}
-          disabled={scanning || refreshing || !_selGame}
-          title={_selGame ? `Scan ${_selGame.away} @ ${_selGame.home}` : 'Select a game first'}
-        >
-          {scanning ? '● Scanning...' : '⚡ Re-scan'}
-        </button>
+
       </div>
 
       {/* Summary row */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', flexShrink: 0 }}>
-        <SummaryCard label="Cached estimates" value={String(signals.length)} sub="from pipeline" accent="mint" />
+        <SummaryCard label="Cached estimates" value={String(signals.length)} sub="observed quotes" accent="mint" />
         <SummaryCard label="With uncertainty" value={String(highConf)} sub="reported intervals" accent="cyan" />
         <SummaryCard label="Avg probability edge" value={signals.length ? '+' + (avgEV * 100).toFixed(1) + 'pp' : '—'} sub="percentage points" accent="cyan" />
         <SummaryCard
@@ -577,7 +517,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
         display: 'flex', gap: 8, flexShrink: 0,
       }}>
         <span style={{ color: 'var(--accent-mint)' }}>✓</span>
-        All signals sourced from LangGraph pipeline · PostgreSQL historical base · PrizePicks live lines · No hallucinated data
+        Historical estimates with recorded quotes; performance requires settled outcomes.
         {data?.generated_at && <span style={{ marginLeft: 'auto' }}>Generated {new Date(data.generated_at).toLocaleString()}</span>}
       </div>
 

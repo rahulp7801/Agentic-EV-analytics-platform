@@ -1,4 +1,9 @@
 /** Validate display metrics without inventing uncertainty or execution eligibility. */
+export function expectedProfit(expectedReturn: unknown, stake: number): number | null {
+  return typeof expectedReturn === 'number' && Number.isFinite(expectedReturn) && Number.isFinite(stake) && stake >= 0
+    ? expectedReturn * stake : null;
+}
+
 export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
   const p = Number(s.true_prob), odds = Number(s.american_odds);
   const push = Number(s.push_probability ?? 0);

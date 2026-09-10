@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const ESPN_SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
+const SCOREBOARDS = {nba:'basketball/nba', nfl:'football/nfl'};
 
 // NBA schedule dates are in Eastern Time — always compute relative to ET
 // so a 9pm ET game shows as "Today" even when the server clock is past midnight UTC.
@@ -11,7 +11,10 @@ function etDateStr(offsetDays: number): string {
   return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const sport = new URL(request.url).searchParams.get('sport') ?? 'nba';
+  if (sport !== 'nba' && sport !== 'nfl') return NextResponse.json({error:'Invalid sport'}, {status:400});
+  const scoreboard = `https://site.api.espn.com/apis/site/v2/sports/${SCOREBOARDS[sport]}/scoreboard`;
   const dates = [etDateStr(-1), etDateStr(0), etDateStr(1)];
   const labels = ['Yesterday', 'Today', 'Tomorrow'];
 
@@ -28,8 +31,10 @@ export async function GET() {
   for (let i = 0; i < dates.length; i++) {
     const dateStr = dates[i];
     try {
-      const res = await fetch(`${ESPN_SCOREBOARD}?dates=${dateStr}`, {
+      const res = await fetch(`${scoreboard}?dates=${dateStr}`, {
         headers: { 'User-Agent': 'QuantSports/1.0' },
+        signal: AbortSignal.timeout(5000),
+        next: {revalidate:60},
       });
       if (!res.ok) continue;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

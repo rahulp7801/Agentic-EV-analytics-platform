@@ -64,7 +64,7 @@ export default function Home() {
             {view === 'dashboard' && <EVDashboard sport={sport} onAddToParlay={addToParlay} parlayIds={new Set(parlayLegs.map(s => s.id))} />}
             {view === 'props'     && <PropsAnalysis sport={sport} />}
             {view === 'gamelogs' && <GameLogs sport={sport} />}
-            {view === 'arbitrage' && <Arbitrage />}
+            {view === 'arbitrage' && <Arbitrage sport={sport} />}
             {view === 'parlay'    && <ParlayBuilder externalLegs={parlayLegs} onRemoveExternal={(id) => setParlayLegs(p => p.filter(s => s.id !== id))} />}
             {view === 'kelly'     && <KellyCalc />}
           </div>
