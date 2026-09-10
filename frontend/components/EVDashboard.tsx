@@ -1,4 +1,5 @@
 'use client';
+import Performance from "@/components/Performance";
 import { useState, useEffect, useCallback } from 'react';
 import type { EVSignal, Sport } from '@/lib/types';
 
@@ -45,106 +46,12 @@ function time_ago(iso: string) {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-// League-average NBA defensive rating used by nba_context_producer.
-const LEAGUE_AVG_DEF_RATING = 115.0;
-
-/**
- * Derives a 3-bullet explanation of WHY this line is mispriced.
- * Uses ONLY verified numeric fields from the signal — no hallucination.
- * Fields sourced from:
- *   - true_prob / implied_prob / ev_pct: LangGraph nba_quant_agent + prop_arbitrage_agent
- *   - sample_size / mean_stat: PostgreSQL nba_player_stats
- *   - opponent_def_rating / rest_days / is_home: nba_context_producer (live DB query)
- *   - pp_odds_tier / american_odds: PrizePicks live API (goblin tier pre-filtered)
- */
 function buildMispricingReason(signal: RichSignal): [string, string, string] {
-  const probGapPp = ((signal.true_prob - signal.implied_prob) * 100).toFixed(1);
-  const tier = signal.pp_odds_tier ?? 'standard';
-  const tierLabel = tier === 'demon' ? 'demon (-135, harder line)' : 'standard (-115)';
-  const isUnder = (signal.direction || 'over') === 'under';
-  const dirLabel = isUnder ? 'Under' : 'Over';
-
-  // ── Bullet 1: Line placement vs historical distribution ───────────────────
-  let bullet1: string;
-  if (signal.mean_stat !== undefined && signal.sample_size !== undefined) {
-    const delta = signal.mean_stat - signal.line;
-    const absDelta = Math.abs(delta).toFixed(2);
-    const hitRate = fmt_pct(signal.true_prob);
-    if (delta > 0) {
-      // Mean above line → favors Over
-      bullet1 =
-        `Line ${signal.line} sits ${absDelta} below the ${signal.sample_size}-game mean of ` +
-        `${signal.mean_stat.toFixed(1)}. Model ${dirLabel} probability: ${hitRate}. ` +
-        `PrizePicks ${tierLabel} prices the ${dirLabel} at ${fmt_odds(signal.american_odds)} ` +
-        `(${fmt_pct(signal.implied_prob)} implied) — a ${probGapPp}pp underpricing relative to the historical distribution.`;
-    } else {
-      // Mean below line → favors Under
-      bullet1 =
-        `Line ${signal.line} sits ${absDelta} above the ${signal.sample_size}-game mean of ` +
-        `${signal.mean_stat.toFixed(1)}. Model ${dirLabel} probability: ${hitRate}. ` +
-        `PrizePicks ${tierLabel} prices the ${dirLabel} at ${fmt_odds(signal.american_odds)} ` +
-        `(${fmt_pct(signal.implied_prob)} implied) — ${probGapPp}pp gap vs model.`;
-    }
-  } else {
-    bullet1 =
-      `PrizePicks ${tierLabel} prices ${dirLabel} ${signal.line} at ${fmt_odds(signal.american_odds)} ` +
-      `(${fmt_pct(signal.implied_prob)} implied). Model assigns ${fmt_pct(signal.true_prob)} — ` +
-      `${probGapPp}pp gap. No historical mean available in this snapshot.`;
-  }
-
-  // ── Bullet 2: Context signals — opponent defense, rest, venue ─────────────
-  let bullet2: string;
-  const hasDef  = signal.opponent_def_rating != null;
-  const hasRest = signal.rest_days != null;
-  const hasHome = signal.is_home != null;
-
-  if (hasDef || hasRest || hasHome) {
-    const parts: string[] = [];
-
-    if (hasDef) {
-      const def = signal.opponent_def_rating!;
-      const defDelta = (def - LEAGUE_AVG_DEF_RATING).toFixed(1);
-      const defDir   = def > LEAGUE_AVG_DEF_RATING ? 'above' : 'below';
-      // Flip interpretation for Under: weak defense boosts opponent scoring, hurts Under
-      const defLabel = isUnder
-        ? (def > LEAGUE_AVG_DEF_RATING
-            ? `weak D (allows more pts) — slight headwind for ${dirLabel}`
-            : `strong D (limits scoring) — favorable for ${dirLabel}`)
-        : (def > LEAGUE_AVG_DEF_RATING
-            ? `weaker-than-average defense (allows more pts) — favorable for production`
-            : `stronger-than-average defense — limits production`);
-      parts.push(`Opponent def. rating ${def.toFixed(1)} (${defDelta} ${defDir} league avg ${LEAGUE_AVG_DEF_RATING}) — ${defLabel}.`);
-    }
-
-    if (hasRest) {
-      const r = signal.rest_days!;
-      const restLabel = r === 0 ? 'back-to-back (0 rest days)'
-        : r === 1 ? '1 rest day'
-        : `${r} rest days (well-rested)`;
-      parts.push(`${restLabel}.`);
-    }
-
-    if (hasHome) {
-      parts.push(signal.is_home ? 'Playing at home.' : 'Playing away.');
-    }
-
-    bullet2 = `Context (from nba_context_producer, live DB): ${parts.join(' ')}`;
-  } else {
-    bullet2 =
-      `Context signals unavailable for this snapshot (nba_context_producer returned null). ` +
-      `Edge is based on historical distribution only — opponent defense, rest days, and ` +
-      `venue factors not incorporated.`;
-  }
-
-  // ── Bullet 3: Filter note + data provenance ────────────────────────────────
-  const sampleNote = signal.sample_size != null ? `${signal.sample_size}-game` : 'historical';
-  const bullet3 =
-    `Goblin-tier lines (PrizePicks -110) pre-filtered. This is a ${dirLabel} ${tierLabel} line; ` +
-    `the ${probGapPp}pp gap between model probability and implied odds is a genuine ` +
-    `market mispricing. Data: PostgreSQL ${sampleNote} window via LangGraph nba_quant_agent, ` +
-    `live PrizePicks line via public API.`;
-
-  return [bullet1, bullet2, bullet3];
+  return [
+    `${signal.direction.toUpperCase()} ${signal.line}: ${(signal.true_prob * 100).toFixed(1)}% estimated win probability.`,
+    signal.expected_return == null ? 'Expected return unavailable.' : `${(signal.expected_return * 100).toFixed(1)}% expected return per unit stake at the quoted payout.`,
+    `Sample: ${signal.sample_size ?? 'unknown'} games. Source: ${signal.data_source ?? 'unknown'}. ${signal.gated ? `Gated: ${signal.gate_reason ?? 'risk policy'}.` : 'Estimate has not been validated by settled results.'}`,
+  ];
 }
 
 function KellyBar({ fraction }: { fraction: number }) {
@@ -211,7 +118,7 @@ function EVSignalRow({ signal, onSelect }: { signal: RichSignal; onSelect: (s: E
         </div>
       </td>
       <td>
-        <span style={{ color: evColor, fontWeight: 700, fontSize: 13 }}>+{evPct.toFixed(1)}%</span>
+        <span style={{ color: evColor, fontWeight: 700, fontSize: 13 }}>+{evPct.toFixed(1)}pp</span>
       </td>
       <td><KellyBar fraction={signal.kelly_fraction} /></td>
       <td>
@@ -273,8 +180,9 @@ function SignalDetailPanel({ signal, onClose, onAddToParlay, inParlay }: {
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-dim)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {[
-              ['EV EDGE', '+' + evPct.toFixed(1) + '%', 'var(--accent-mint)'],
+              ['EDGE (pp)', '+' + evPct.toFixed(1) + 'pp', 'var(--accent-mint)'],
               ['KELLY STAKE', signal.gated ? 'GATED' : kellyPct.toFixed(1) + '%', signal.gated ? 'var(--accent-amber)' : 'var(--accent-cyan)'],
+              ['EXPECTED RETURN', signal.expected_return == null ? 'Unavailable' : (signal.expected_return * 100).toFixed(1) + '%', 'var(--accent-mint)'],
               ['MODEL PROB', (signal.true_prob * 100).toFixed(1) + '%', 'var(--text-primary)'],
               ['BOOK IMPLIED', (signal.implied_prob * 100).toFixed(1) + '%', 'var(--text-secondary)'],
             ].map(([label, value, color]) => (
@@ -414,7 +322,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
   const [refreshing, setRefreshing] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [selected, setSelected] = useState<EVSignal | null>(null);
-  const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all');
+  const [filter, setFilter] = useState<'all' | 'eligible' | 'gated'>('all');
   const [sortBy, setSortBy] = useState<'ev' | 'kelly' | 'prob'>('ev');
   // Game picker
   const [espnGames, setEspnGames] = useState<ESPNGame[]>([]);
@@ -528,14 +436,14 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
     : (data?.signals || []);
 
   const signals = gameSignals
-    .filter(s => filter === 'all' || s.strength === filter)
+    .filter(s => filter === 'all' || (filter === 'gated' ? s.gated : !s.gated))
     .sort((a, b) => {
       if (sortBy === 'ev') return b.ev_pct - a.ev_pct;
       if (sortBy === 'kelly') return b.kelly_fraction - a.kelly_fraction;
       return b.true_prob - a.true_prob;
     });
 
-  const highConf = signals.filter(s => s.strength === 'high').length;
+  const highConf = signals.filter(s => s.confidence_interval != null).length;
   const avgEV = signals.length > 0 ? signals.reduce((sum, s) => sum + s.ev_pct, 0) / signals.length : 0;
 
   if (loading) {
@@ -617,9 +525,9 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
 
       {/* Summary row */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', flexShrink: 0 }}>
-        <SummaryCard label="Live Signals" value={String(signals.length)} sub="from pipeline" accent="mint" />
-        <SummaryCard label="High Confidence" value={String(highConf)} sub="≥15% EV edge" accent="cyan" />
-        <SummaryCard label="Avg EV Edge" value={signals.length ? '+' + (avgEV * 100).toFixed(1) + '%' : '—'} sub="model-verified" accent="cyan" />
+        <SummaryCard label="Cached estimates" value={String(signals.length)} sub="from pipeline" accent="mint" />
+        <SummaryCard label="With uncertainty" value={String(highConf)} sub="reported intervals" accent="cyan" />
+        <SummaryCard label="Avg probability edge" value={signals.length ? '+' + (avgEV * 100).toFixed(1) + 'pp' : '—'} sub="percentage points" accent="cyan" />
         <SummaryCard
           label="Game"
           value={_selGame ? `${_selGame.away} @ ${_selGame.home}` : (data?.game ? `${data.game.away_team} @ ${data.game.home_team}` : '—')}
@@ -636,15 +544,17 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
         </div>
       </div>
 
+      <Performance />
+
       {/* Toolbar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px',
         borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', flexShrink: 0,
       }}>
-        <div className="section-header">EV Signals · Model Verified</div>
+        <div className="section-header">EV Signals · Model Estimates</div>
         <div style={{ flex: 1 }} />
         <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Filter:</span>
-        {(['all', 'high', 'medium'] as const).map(f => (
+        {(['all', 'eligible', 'gated'] as const).map(f => (
           <button key={f} className="btn-ghost" onClick={() => setFilter(f)}
             style={{ fontSize: 10, padding: '3px 10px', color: filter === f ? 'var(--accent-mint)' : undefined, borderColor: filter === f ? 'rgba(0,229,160,0.3)' : undefined }}>
             {f.toUpperCase()}
@@ -652,7 +562,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
         ))}
         <div className="divider-v" style={{ margin: '0 4px' }} />
         <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Sort:</span>
-        {([['ev', 'EV %'], ['kelly', 'Kelly'], ['prob', 'Prob']] as const).map(([key, label]) => (
+        {([['ev', 'Edge (pp)'], ['kelly', 'Kelly'], ['prob', 'Prob']] as const).map(([key, label]) => (
           <button key={key} className="btn-ghost" onClick={() => setSortBy(key)}
             style={{ fontSize: 10, padding: '3px 10px', color: sortBy === key ? 'var(--accent-mint)' : undefined, borderColor: sortBy === key ? 'rgba(0,229,160,0.3)' : undefined }}>
             {label}
@@ -692,7 +602,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
                 <th>Sport</th>
                 <th>Prop / Line</th>
                 <th>Probability</th>
-                <th>EV Edge</th>
+                <th>Edge (pp)</th>
                 <th style={{ minWidth: 160 }}>Kelly Stake</th>
                 <th>Source</th>
               </tr>

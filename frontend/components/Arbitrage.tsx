@@ -20,18 +20,6 @@ interface NBAGame {
   game_time: string;
 }
 
-/** Goblin lines: PrizePicks-specific -110 easy lines that aren't true mispricings.
- *  Real sportsbooks (DraftKings, FanDuel) price at -110 normally — do NOT filter those. */
-function isPrizePicksGoblin(s: Record<string, unknown>): boolean {
-  return (s.sportsbook as string)?.toLowerCase() === 'prizepicks' &&
-         (s.american_odds as number) === -110;
-}
-
-/** Cap at 15% EV — anything above is a model artifact, not a real market inefficiency. */
-function isEVArtifact(s: Record<string, unknown>): boolean {
-  return (s.ev_pct as number) > 0.15;
-}
-
 function GameSelector({
   games,
   selected,
@@ -194,7 +182,7 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>EV EDGE</div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>EDGE (pp)</div>
             <div style={{ color: dirColor, fontWeight: 700, fontSize: 16 }}>
               +{evPct.toFixed(1)}%
             </div>
@@ -229,38 +217,15 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
         background: isUnder ? 'rgba(245,166,35,0.02)' : 'rgba(0,229,160,0.02)',
       }}>
         <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 5 }}>
-          WHY MISPRICED · DATA-DERIVED
+          ESTIMATE DETAILS
         </div>
-        {(signal.sample_size as number) != null && (signal.mean_stat as number) != null ? (() => {
-          const mean = signal.mean_stat as number;
-          const line = signal.line as number;
-          const delta = mean - line;
-          const absDelta = Math.abs(delta).toFixed(2);
-          // Explain from the direction's perspective
-          const mispricingReason = isUnder
-            ? delta > 0
-              ? `Mean of ${mean.toFixed(1)} is ${absDelta} above the line — book overestimates likelihood of hitting ${line}.`
-              : `Mean of ${mean.toFixed(1)} is near the line — under edge relies on distribution tail.`
-            : delta > 0
-              ? `Line ${line} set ${absDelta} below the ${signal.sample_size as number}-game mean of ${mean.toFixed(1)}.`
-              : `Line ${line} set ${absDelta} above the mean of ${mean.toFixed(1)} — edge from distribution skew.`;
-          return (
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              {mispricingReason}{' '}
-              {signal.sportsbook as string} prices {fmt_odds(signal.american_odds as number)} → {fmt_pct(signal.implied_prob as number)} implied;
-              model assigns {fmt_pct(signal.true_prob as number)} {isUnder ? 'under' : 'over'} probability.{' '}
-              Gap of +{probGap.toFixed(1)}pp is the quantified mispricing.
-            </span>
-          );
-        })() : (
-          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-            {signal.sportsbook as string} implied {fmt_pct(signal.implied_prob as number)} vs model {fmt_pct(signal.true_prob as number)} — {probGap.toFixed(1)}pp gap from PostgreSQL historical base.
-          </span>
-        )}
+        <p>Estimated win probability: {fmt_pct(signal.true_prob as number)}. Probability edge: {probGap.toFixed(1)}pp.</p>
+        <p>Expected return per unit stake: {signal.expected_return == null ? 'Unavailable' : fmt_pct(signal.expected_return as number)}.</p>
+        <p>Sample: {String(signal.sample_size ?? 'unknown')}. Source: {String(signal.data_source ?? 'unknown')}. {signal.gated ? `Gated: ${signal.gate_reason}` : 'Not validated by settled results.'}</p>
       </div>
 
       {/* Structured matchup context: rest, home/away, opponent def rating, team/opponent */}
-      {(signal.rest_days != null || signal.is_home != null || signal.opponent_def_rating != null || signal.team || signal.opponent) && (
+      {Boolean(signal.rest_days != null || signal.is_home != null || signal.opponent_def_rating != null || signal.team || signal.opponent) && (
         <div style={{
           padding: '8px 14px',
           borderTop: '1px solid var(--border-dim)',
@@ -270,7 +235,7 @@ function EVSignalArbCard({ signal }: { signal: Record<string, unknown> }) {
             MATCHUP CONTEXT
           </div>
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-            {(signal.team || signal.opponent) && (
+            {Boolean(signal.team || signal.opponent) && (
               <CtxChip
                 label="MATCHUP"
                 value={signal.team && signal.opponent ? `${signal.team as string} vs ${signal.opponent as string}` : ((signal.team || signal.opponent) as string)}
@@ -417,7 +382,7 @@ export default function Arbitrage() {
       const json = await res.json();
       // Always update signals (including empty array) — never fall back to stale state
       const filtered = ((json.signals ?? []) as Record<string, unknown>[]).filter(
-        s => !isPrizePicksGoblin(s) && !isEVArtifact(s)
+        s => !s.gated
       );
       setEvSignals(filtered);
       if (json.game) {
@@ -555,7 +520,7 @@ export default function Arbitrage() {
         </button>
         <div className="divider-v" style={{ margin: '0 4px' }} />
         <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Sort:</span>
-        <button className="btn-ghost" onClick={() => setSortBy('arb')} style={{ fontSize: 10, padding: '3px 10px', color: sortBy === 'arb' ? 'var(--accent-mint)' : undefined }}>By EV%</button>
+        <button className="btn-ghost" onClick={() => setSortBy('arb')} style={{ fontSize: 10, padding: '3px 10px', color: sortBy === 'arb' ? 'var(--accent-mint)' : undefined }}>By edge</button>
         <button className="btn-ghost" onClick={() => setSortBy('time')} style={{ fontSize: 10, padding: '3px 10px', color: sortBy === 'time' ? 'var(--accent-mint)' : undefined }}>By Time</button>
       </div>
 
@@ -568,8 +533,8 @@ export default function Arbitrage() {
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span style={{ fontSize: 10, color: 'var(--accent-purple)' }}>
-          PrizePicks goblin lines (-110) excluded. EV capped at 15% — signals above are model artifacts.
-          Direction (OVER/UNDER) shown explicitly on each card. EV derived from PostgreSQL historical base + live props.
+          Only eligible signals are shown. Edge is a probability difference in percentage points; expected return uses the quoted payout.
+
         </span>
       </div>
 

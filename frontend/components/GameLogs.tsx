@@ -45,7 +45,7 @@ export default function GameLogs({ sport }: GameLogsProps) {
         sport: selectedSport,
         date: String(r.date ?? ''),
         home_away: r.is_home ? 'home' : 'away',
-        result: String(r.result ?? 'W') as 'W' | 'L',
+        result: r.result === 'W' || r.result === 'L' ? r.result : undefined,
         points: r.points != null ? Number(r.points) : undefined,
         rebounds: r.rebounds != null ? Number(r.rebounds) : undefined,
         assists: r.assists != null ? Number(r.assists) : undefined,

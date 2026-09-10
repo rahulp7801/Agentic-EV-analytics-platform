@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawnSync } from 'child_process';
-import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { ROOT, PYTHON } from '@/lib/python';
 
-const ROOT = path.join(process.cwd(), '..');
+
+
 
 // Python script reads sport/player/limit from environment variables, never from
 // command-line args or stdin interpolation — eliminates shell injection risk.
@@ -48,28 +50,14 @@ export async function GET(req: NextRequest) {
   const validSport = sport === 'nba' || sport === 'nfl' ? sport : 'nba';
   const safeLimit  = isNaN(limit) || limit < 1 ? 30 : Math.min(limit, 200);
 
-  const proc = spawnSync('python', ['-'], {
-    input: SCRIPT,
-    cwd: ROOT,
-    timeout: 20000,
-    encoding: 'utf-8',
-    env: {
-      ...process.env,
-      GAMELOGS_SPORT:  validSport,
-      GAMELOGS_PLAYER: player,          // passed via env, never interpolated into code
-      GAMELOGS_LIMIT:  String(safeLimit),
-    },
-  });
-
-  if (proc.error || proc.status !== 0) {
-    const msg = proc.error?.message || proc.stderr || 'Python script failed';
-    return NextResponse.json({ error: msg, logs: [] }, { status: 500 });
-  }
-
   try {
-    return NextResponse.json(JSON.parse(proc.stdout.trim()));
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg, logs: [] }, { status: 500 });
+    const {stdout} = await promisify(execFile)(PYTHON, ['-c', SCRIPT], {
+      cwd: ROOT, timeout: 20000, encoding: 'utf-8',
+      env: {...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1',
+        GAMELOGS_SPORT: validSport, GAMELOGS_PLAYER: player, GAMELOGS_LIMIT: String(safeLimit)},
+    });
+    return NextResponse.json(JSON.parse(stdout.trim()));
+  } catch {
+    return NextResponse.json({error: 'Game logs unavailable. Check database configuration.', logs: []}, {status: 503});
   }
 }

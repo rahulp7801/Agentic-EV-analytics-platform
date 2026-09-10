@@ -2,7 +2,7 @@ export type Sport = 'nba' | 'nfl';
 export type PropType = 'points' | 'rebounds' | 'assists' | 'threes' | 'pra' | 'steals' | 'blocks' |
   'pass_yds' | 'pass_tds' | 'rush_yds' | 'rec_yds' | 'receptions';
 
-export type SignalStrength = 'high' | 'medium' | 'low';
+export type SignalStrength = 'high' | 'medium' | 'low' | 'unrated';
 export type Direction = 'over' | 'under';
 
 export interface EVSignal {
@@ -19,6 +19,13 @@ export interface EVSignal {
   true_prob: number;         // 0–1
   implied_prob: number;      // 0–1
   ev_pct: number;            // 0–1 (positive only)
+  expected_return?: number | null;
+  push_probability?: number;
+  confidence_interval?: [number, number] | null;
+  gate_reason?: string;
+  data_source?: string;
+  model_version?: string;
+  game_start_time?: string;
   kelly_fraction: number;    // 0–0.25
   american_odds: number;
   pp_odds_tier?: 'standard' | 'demon'; // goblin (-110) filtered out at scan time
@@ -48,7 +55,7 @@ export interface GameLog {
   sport: Sport;
   date: string;
   home_away: 'home' | 'away';
-  result: 'W' | 'L';
+  result?: 'W' | 'L';
   // NBA
   points?: number;
   rebounds?: number;

@@ -7,7 +7,7 @@ interface PropAnalysis {
   id: string; player: string; player_id: string; team: string; opponent: string;
   sport: Sport; prop_type: PropType; line: number; direction: 'over' | 'under';
   model_prob: number; implied_prob: number; ev_pct: number; kelly_fraction: number;
-  mean_stat: number; sample_size: number; confidence_interval: [number, number];
+  mean_stat: number | null; sample_size: number; confidence_interval: [number, number] | null;
   sportsbook: string; american_odds: number; gated?: boolean;
 }
 
@@ -48,14 +48,14 @@ function ProbabilityComparison({ model, implied }: { model: number; implied: num
   );
 }
 
-function ConfidenceBar({ ci, mean, line }: { ci: [number, number]; mean: number; line: number }) {
+function ConfidenceBar({ ci, mean, line }: { ci: [number, number] | null; mean: number | null; line: number }) {
   return (
     <div style={{ minWidth: 130 }}>
       <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 3 }}>
-        95% CI: [{(ci[0] * 100).toFixed(0)}%, {(ci[1] * 100).toFixed(0)}%]
+        {ci ? `95% CI: [${(ci[0] * 100).toFixed(0)}%, ${(ci[1] * 100).toFixed(0)}%]` : "Uncertainty unavailable"}
       </div>
       <div style={{ fontSize: 9, color: 'var(--text-secondary)' }}>
-        μ = <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{mean.toFixed(1)}</span>
+        μ = <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{mean?.toFixed(1) ?? "Unavailable"}</span>
         {' '}/ line {line}
       </div>
     </div>
@@ -78,19 +78,19 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
           id: String(s.id ?? i),
           player: String(s.player ?? ''),
           player_id: String(s.id ?? i),
-          team: String(s.home_team ?? ''),
-          opponent: String(s.away_team ?? ''),
+          team: String(s.team ?? ''),
+          opponent: String(s.opponent ?? ''),
           sport: 'nba' as Sport,
           prop_type: String(s.prop_type ?? 'points') as PropType,
           line: Number(s.line ?? 0),
-          direction: 'over' as const,
+          direction: s.direction === 'under' ? 'under' as const : 'over' as const,
           model_prob: Number(s.true_prob ?? 0),
           implied_prob: Number(s.implied_prob ?? 0),
           ev_pct: Number(s.ev_pct ?? 0),
           kelly_fraction: Number(s.kelly_fraction ?? 0),
-          mean_stat: Number(s.mean_stat ?? 0),
+          mean_stat: s.mean_stat == null ? null : Number(s.mean_stat),
           sample_size: Number(s.sample_size ?? 0),
-          confidence_interval: [Number(s.true_prob ?? 0) - 0.05, Number(s.true_prob ?? 0) + 0.05] as [number, number],
+          confidence_interval: Array.isArray(s.confidence_interval) ? s.confidence_interval as [number, number] : null,
           sportsbook: String(s.sportsbook ?? 'PrizePicks'),
           american_odds: Number(s.american_odds ?? -105),
           gated: Boolean(s.gated),
@@ -139,14 +139,14 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
           {PROP_TYPES.map(p => <option key={p} value={p}>{p.replace('_', ' ').toUpperCase()}</option>)}
         </select>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap' }}>Min EV%</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap' }}>Min edge (pp)</span>
           <input
             type="range" min={0} max={20} step={1} value={minEV}
             onChange={e => setMinEV(Number(e.target.value))}
             style={{ width: 80, accentColor: 'var(--accent-mint)' }}
           />
           <span style={{ color: 'var(--accent-mint)', fontSize: 10, fontWeight: 600, minWidth: 30 }}>
-            {minEV}%
+            {minEV}pp
           </span>
         </div>
       </div>
@@ -160,7 +160,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
               <th>Prop</th>
               <th>Line / Dir</th>
               <th>Probability Comparison</th>
-              <th>EV %</th>
+              <th>Edge (pp)</th>
               <th>Kelly</th>
               <th>Stats</th>
               <th>Book / Odds</th>
@@ -211,7 +211,7 @@ function PropRow({ prop }: { prop: PropAnalysis }) {
         <span style={{
           color: evPct >= 10 ? 'var(--accent-mint)' : evPct >= 5 ? 'var(--accent-amber)' : 'var(--text-secondary)',
           fontWeight: 700, fontSize: 13,
-        }}>+{evPct.toFixed(1)}%</span>
+        }}>+{evPct.toFixed(1)}pp</span>
       </td>
       <td>
         <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>

@@ -6,7 +6,7 @@ import fs from 'fs';
 // Force dynamic — never cache this route handler.
 export const dynamic = 'force-dynamic';
 
-const ROOT = path.join(process.cwd(), '..');
+import { ROOT, PYTHON } from '@/lib/python';
 const LOCK_FILE = path.join(ROOT, '.scan_lock');
 const LOCK_MAX_AGE_MS = 10 * 60 * 1000; // 10 min stale threshold
 
@@ -39,31 +39,24 @@ export async function POST(req: Request) {
     if (body.force)  force = true;
   } catch { /* use defaults */ }
 
-  fs.writeFileSync(LOCK_FILE, new Date().toISOString());
-
-  // Clear the signals cache immediately so the frontend never reads stale data
-  // from a previous scan while the new one is running or if it exits early.
-  const CACHE_FILE = path.join(ROOT, 'frontend', 'public', 'signals_cache.json');
+  if (typeof teamA !== 'string' || typeof teamB !== 'string' || !/^[A-Z]{2,3}$/.test(teamA) || !/^[A-Z]{2,3}$/.test(teamB) || typeof dateStr !== 'string' || (dateStr && !/^\d{4}-?\d{2}-?\d{2}$/.test(dateStr))) {
+    return NextResponse.json({error: 'Invalid teams or date'}, {status: 400});
+  }
   try {
-    fs.writeFileSync(
-      CACHE_FILE,
-      JSON.stringify({
-        generated_at: new Date().toISOString(),
-        game: { home_team: teamB, away_team: teamA, date: dateStr },
-        signals: [],
-      }),
-    );
-  } catch { /* non-fatal — Python will overwrite anyway */ }
+    fs.writeFileSync(LOCK_FILE, new Date().toISOString(), {flag: 'wx'});
+  } catch {
+    return NextResponse.json({status: 'already_running'});
+  }
 
   const args = ['scan_game_ev.py', '--team-a', teamA, '--team-b', teamB];
-  if (dateStr) args.push('--date', dateStr);
+  if (dateStr) args.push('--date', dateStr.replaceAll('-', '')); 
   if (force) args.push('--force');
 
   // Pipe stdout/stderr to scan_out.txt for debugging. Using 'pipe' + stream.write
   // avoids Windows fd-inheritance issues with direct fd passing to spawn.
   const LOG_FILE = path.join(ROOT, 'scan_out.txt');
   const logStream = fs.createWriteStream(LOG_FILE, { flags: 'w' });
-  const proc = spawn('python', args, {
+  const proc = spawn(PYTHON, args, {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
