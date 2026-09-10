@@ -1,3 +1,4 @@
+import { hosted } from '@/lib/database';
 import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
@@ -26,6 +27,12 @@ function isScanRunning(): boolean {
 }
 
 export async function POST(req: Request) {
+  // Hosted scans run in the authenticated GitHub workflow, never a public subprocess.
+  if (hosted) return NextResponse.json({error:'Scans are managed by the scheduled service.'}, {status:403});
+  const origin = req.headers.get('origin');
+  const host = new URL(req.url).hostname;
+  if (!['localhost','127.0.0.1','[::1]'].includes(host) || (origin && new URL(origin).host !== new URL(req.url).host))
+    return NextResponse.json({error:'Not authorized'}, {status:403});
   if (isScanRunning()) {
     return NextResponse.json({ status: 'already_running', message: 'Scan already in progress.' });
   }
@@ -92,6 +99,7 @@ function readProgress(): Record<string, unknown> | null {
 }
 
 export async function GET() {
+  if (hosted) return NextResponse.json({scanning:false,managed:true,progress:null});
   const scanning = isScanRunning();
   const progress = scanning ? readProgress() : null;
   return NextResponse.json({ scanning, progress });

@@ -80,7 +80,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
           player_id: String(s.id ?? i),
           team: String(s.team ?? ''),
           opponent: String(s.opponent ?? ''),
-          sport: 'nba' as Sport,
+          sport: (s.sport === 'nfl' ? 'nfl' : 'nba') as Sport,
           prop_type: String(s.prop_type ?? 'points') as PropType,
           line: Number(s.line ?? 0),
           direction: s.direction === 'under' ? 'under' as const : 'over' as const,
@@ -102,6 +102,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   }, [sport]);
 
   const props = allProps.filter(p => {
+    if (p.sport !== sport) return false;
     if (playerFilter && !p.player.toLowerCase().includes(playerFilter.toLowerCase())) return false;
     if (propFilter !== 'all' && p.prop_type !== propFilter) return false;
     if (p.ev_pct < minEV / 100) return false;

@@ -4,6 +4,8 @@ import argparse
 import hashlib
 import json
 import sqlite3
+from contextlib import contextmanager
+from sportsbet.config import settings
 from datetime import datetime, timezone
 from pathlib import Path
 from decimal import Decimal
@@ -13,7 +15,10 @@ from sportsbet.quant.backtest import BacktestSignal, BacktestEngine
 DEFAULT_PATH = Path('.checkpoints/analytics.sqlite')
 
 class Ledger:
-    def __init__(self, path: str | Path = DEFAULT_PATH):
+    def __init__(self, path: str | Path = DEFAULT_PATH, database_url: str | None = None):
+        self.database_url = database_url or (settings.analytics_database_url if Path(path) == DEFAULT_PATH else None)
+        if self.database_url:
+            return
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
@@ -23,8 +28,30 @@ class Ledger:
             db.execute('CREATE INDEX IF NOT EXISTS exposure_day ON exposure(risk_day)')
             db.execute('CREATE INDEX IF NOT EXISTS exposure_group ON exposure(group_key)')
 
+    @contextmanager
     def connect(self):
-        return sqlite3.connect(self.path, timeout=15)
+        if self.database_url:
+            import psycopg
+            conn = psycopg.connect(self.database_url.replace('postgresql+psycopg://','postgresql://'), connect_timeout=10)
+            class Session:
+                def execute(self, sql, args=()):
+                    if sql == 'BEGIN IMMEDIATE':
+                        return conn.execute('SELECT pg_advisory_xact_lock(739201)')
+                    return conn.execute(sql.replace('?', '%s'), args)
+            try:
+                with conn:
+                    conn.execute('SET LOCAL search_path TO analytics, public')
+                    yield Session()
+            finally:
+                conn.close()
+        else:
+            conn = sqlite3.connect(self.path, timeout=15)
+            try:
+                with conn:
+                    yield conn
+            finally:
+                conn.close()
+
 
     def reserve(self, signal: EVSignal, line: float | None, limit: float = 0.05, risk_day: str | None = None) -> tuple[bool, str]:
         if not signal.game_id:
@@ -46,7 +73,7 @@ class Ledger:
             total = db.execute('SELECT COALESCE(SUM(fraction),0) FROM exposure WHERE risk_day=?',(day,)).fetchone()[0]
             if total + delta > limit + 1e-12:
                 return False, 'daily_exposure_limit'
-            db.execute('INSERT INTO exposure VALUES (?,?,?,?) ON CONFLICT(identity) DO UPDATE SET fraction=MAX(fraction,excluded.fraction)',
+            db.execute('INSERT INTO exposure VALUES (?,?,?,?) ON CONFLICT(identity) DO UPDATE SET fraction=CASE WHEN exposure.fraction > excluded.fraction THEN exposure.fraction ELSE excluded.fraction END',
                        (identity,group,day,amount))
         return True, 'accepted'
 
@@ -65,8 +92,8 @@ class Ledger:
                 if captured:
                     captured = datetime.fromisoformat(captured).astimezone(timezone.utc).isoformat()
                     probability = float(quote_terms(payload['american_odds'],Decimal(0))[0])
-                    db.execute('INSERT OR IGNORE INTO quotes VALUES (?,?,?)', (self.quote_identity(payload),captured,probability))
-            db.execute('INSERT OR IGNORE INTO predictions(id,scan_id,payload) VALUES (?,?,?)',
+                    db.execute('INSERT INTO quotes VALUES (?,?,?) ON CONFLICT DO NOTHING', (self.quote_identity(payload),captured,probability))
+            db.execute('INSERT INTO predictions(id,scan_id,payload) VALUES (?,?,?) ON CONFLICT DO NOTHING',
                        (key,scan_id,json.dumps(payload,allow_nan=False)))
         return key
 
@@ -77,6 +104,11 @@ class Ledger:
                     raise ValueError('Settlement must be true/false/push/void/null')
                 if db.execute('UPDATE predictions SET outcome=? WHERE id=?', (json.dumps(outcome), key)).rowcount != 1:
                     raise ValueError(f'Unknown prediction ID: {key}')
+
+    def predictions(self) -> list[dict]:
+        with self.connect() as db:
+            rows = db.execute('SELECT id,payload,outcome FROM predictions ORDER BY id').fetchall()
+        return [{'prediction_id':key, **json.loads(payload), 'outcome':json.loads(outcome) if outcome else None} for key,payload,outcome in rows]
 
     def report(self, recommendations_only: bool = False) -> dict:
         from dataclasses import fields
@@ -128,11 +160,12 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--path', default=str(DEFAULT_PATH))
     parser.add_argument('--settlements', help='JSON mapping prediction IDs to true/false/push/void/null')
+    parser.add_argument('--list', action='store_true', help='Export prediction IDs and observations for settlement')
     parser.add_argument('--recommendations-only',action='store_true')
     args=parser.parse_args(); ledger=Ledger(args.path)
     if args.settlements:
         ledger.settle(json.loads(Path(args.settlements).read_text(encoding='utf-8-sig')))
-    print(json.dumps(ledger.report(args.recommendations_only),indent=2))
+    print(json.dumps(ledger.predictions() if args.list else ledger.report(args.recommendations_only),indent=2))
 
 if __name__=='__main__':
     main()

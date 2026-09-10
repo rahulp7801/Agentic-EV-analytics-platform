@@ -16,9 +16,9 @@ export default function TopBar() {
     return () => clearInterval(t);
   }, []);
 
-  const [signals, setSignals] = useState<{ player: string; prop_type: string; line: number; ev_pct: number }[]>([]);
+  const [signals, setSignals] = useState<{ player: string; prop_type: string; line: number; ev_pct: number; direction: string; sport: string; gated?: boolean }[]>([]);
   useEffect(() => {
-    fetch('/api/signals', { cache: 'no-store' }).then(r => r.json()).then(d => setSignals(d.signals || [])).catch(() => {});
+    fetch('/api/signals', { cache: 'no-store' }).then(r => r.json()).then(d => setSignals((d.signals || []).filter((s: {gated?: boolean}) => !s.gated))).catch(() => {});
   }, []);
   const tickerItems = [...signals, ...signals];
 
@@ -34,7 +34,7 @@ export default function TopBar() {
       <div className="topbar-item" style={{ gap: 8, minWidth: 160 }}>
         <span className="live-dot" style={{ width: 8, height: 8 }} />
         <span style={{ color: 'var(--accent-mint)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em' }}>
-          PIPELINE LIVE
+          MARKET ESTIMATES
         </span>
       </div>
 
@@ -42,15 +42,15 @@ export default function TopBar() {
       <div className="ticker-wrap" style={{ flex: 1, borderRight: '1px solid var(--border-dim)', borderLeft: '1px solid var(--border-dim)' }}>
         <div className="ticker-inner" style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 0 }}>
           {tickerItems.length === 0 ? (
-            <span style={{ color: 'var(--text-dim)', fontSize: 10, padding: '0 20px' }}>Run scan_game_ev.py to populate signals</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: 10, padding: '0 20px' }}>Waiting for fresh market estimates</span>
           ) : tickerItems.map((item, i) => (
             <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, paddingRight: 32 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>NBA</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{item.sport?.toUpperCase()}</span>
               <span style={{ color: 'var(--text-secondary)', fontSize: 10 }}>
-                {item.player?.split(' ').pop()?.toUpperCase()} {item.prop_type?.toUpperCase()} O{item.line}
+                {item.player?.split(' ').pop()?.toUpperCase()} {item.prop_type?.toUpperCase()} {item.direction === 'under' ? 'U' : 'O'}{item.line}
               </span>
               <span style={{ color: 'var(--accent-mint)', fontSize: 10, fontWeight: 600 }}>
-                +{(item.ev_pct * 100).toFixed(1)}%
+                +{(item.ev_pct * 100).toFixed(1)}pp
               </span>
               <span style={{ color: 'var(--border-bright)', fontSize: 10 }}>·</span>
             </span>

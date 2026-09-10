@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     postgres_db: str = "sportsbet"
     log_level: str = "INFO"
     odds_api_key: str | None = None
+    analytics_database_url: str | None = None
 
     # Risk management — Kelly Criterion configuration (Phase 5 agents read these)
     bankroll_usd: float = Field(default=10000.0, gt=0)

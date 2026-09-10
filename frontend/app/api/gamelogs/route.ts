@@ -1,3 +1,4 @@
+import { database, hosted } from '@/lib/database';
 import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -50,6 +51,15 @@ export async function GET(req: NextRequest) {
   const validSport = sport === 'nba' || sport === 'nfl' ? sport : 'nba';
   const safeLimit  = isNaN(limit) || limit < 1 ? 30 : Math.min(limit, 200);
 
+  if (hosted) {
+    try {
+      if (validSport !== 'nba') return NextResponse.json({logs:[], error:'NFL game logs are not available in this view yet.'});
+      const {rows} = await database().query(
+        "SELECT game_date::text AS date, player_name AS player, team_abbreviation AS team, opponent_team AS opponent, is_home, points, rebounds, assists, threes_made AS threes, steals, blocks, minutes FROM nba_player_gamelogs WHERE ($1 = '' OR player_name ILIKE $2) ORDER BY game_date DESC LIMIT $3",
+        [player, `%${player}%`, safeLimit]);
+      return NextResponse.json({logs:rows});
+    } catch { return NextResponse.json({error:'Game logs are temporarily unavailable.',logs:[]},{status:503}); }
+  }
   try {
     const {stdout} = await promisify(execFile)(PYTHON, ['-c', SCRIPT], {
       cwd: ROOT, timeout: 20000, encoding: 'utf-8',

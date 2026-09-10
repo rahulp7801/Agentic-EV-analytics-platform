@@ -38,3 +38,6 @@ env/
 Thumbs.db
 
 .test-tmp*/
+
+.test-tmp-*
+.vercel/
