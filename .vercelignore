@@ -1,0 +1,8 @@
+*
+!frontend
+!frontend/**
+frontend/.env*
+frontend/.vercel
+frontend/.next
+frontend/node_modules
+.git

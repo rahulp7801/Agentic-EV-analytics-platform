@@ -105,6 +105,6 @@ jobs:
           if (settings.rootDirectory !== 'frontend') throw new Error('Vercel root directory must be frontend');
           console.log('Vercel project access verified');
           JS
-      - run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-      - run: vercel build --prod --token="$VERCEL_TOKEN"
-      - run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      # CLI pull requires team lookup that project-scoped tokens cannot perform.
+      # Direct deploy supports restricted tokens; Vercel builds after all CI gates pass.
+      - run: vercel deploy --yes --prod --token="$VERCEL_TOKEN"
