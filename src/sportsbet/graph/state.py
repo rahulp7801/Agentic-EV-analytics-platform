@@ -153,6 +153,8 @@ class GraphState(TypedDict):
     nba_context_signals: Optional[NBAContextSignals]  # type: ignore[misc]  # Set by caller for NBA prop queries (Phase 12)
     nba_prop_result: Optional[PropResult]  # type: ignore[misc]  # Set by make_nba_quant_agent (Phase 12)
     prop_type: str  # Prop market type identifier for PropArbitrageAgent (Phase 13 — PROP-06)
+    gate_reason: str | None
+    prop_side: str  # over/under; PropResult stores Over probability.
     prop_line: Any  # type: ignore[misc]  # Numeric/string prop line value (Phase 13 — PROP-06)
     prop_filters: dict[str, Any] | None  # type: ignore[misc]  # Optional prop filter context; None for non-prop routes (Phase 14 — INFRA-01)
     sport: str | None  # type: ignore[misc]  # "nfl" | "nba" — None defaults to "nfl" in context agent (Phase 15 — CTXT-04)

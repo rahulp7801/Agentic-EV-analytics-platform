@@ -96,7 +96,7 @@ def _apply_nba_context_adjustments(
         Adjusted PropResult with updated true_probability and data_source,
         or the original result object when conditions are not met.
     """
-    if context is None or result.true_probability is None:
+    if context is None or result.true_probability is None or result.push_probability > 0:
         return result
 
     prob = result.true_probability  # Decimal
@@ -128,6 +128,7 @@ def _apply_nba_context_adjustments(
     return result.model_copy(update={
         "true_probability": prob,
         "data_source": f"{result.data_source or 'unknown'}+nba_context",
+        "confidence_interval": result.confidence_interval if prob == result.true_probability else None,
     })
 
 

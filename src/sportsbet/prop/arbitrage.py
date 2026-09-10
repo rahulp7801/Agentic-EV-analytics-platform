@@ -33,7 +33,7 @@ from sportsbet.graph.state import GraphState
 
 log = structlog.get_logger()
 
-_NO_SIGNAL: dict[str, Any] = {"ev_signal": None}
+_NO_SIGNAL: dict[str, Any] = {"ev_signal": None, "pending_signals": []}
 
 # EV ceiling: any signal above this is almost certainly a model artifact
 # (NormalDist overconfidence vs. easy/goblin lines, or stale season-avg).
@@ -236,6 +236,12 @@ def make_prop_arbitrage_agent(
             )
             return _NO_SIGNAL
 
+        if (prop_result.sample_size or 0) < 20:
+            return {**_NO_SIGNAL, "gate_reason": "insufficient_sample"}
+        direction = state.get("prop_side", "over").lower()
+        if direction not in ("over", "under"):
+            return _NO_SIGNAL
+
         # Guard 2a: try player_prop_snapshots match path (Phase 23 — PROP-06 fix)
         # Reads player_prop_snapshots from state, normalizes prop_type shorthand to
         # Odds API market key, and matches on (prop_type, line) for commensurable EV.
@@ -262,7 +268,7 @@ def make_prop_arbitrage_agent(
                     or target_player.lower() in snap.player_name.lower()
                 )
                 # PropResult is P(Over); never compare it to an Under quote.
-                side_match = snap.side in (None, "", "Over")
+                side_match = snap.side == direction.title() or (direction == "over" and snap.side in (None, ""))
                 if type_match and line_match and player_match and side_match:
                     matched_snapshot = snap
                     break
@@ -270,6 +276,8 @@ def make_prop_arbitrage_agent(
         # Determine implied_prob, market_type, injury_flags from matched snapshot or fallback
         context_signals = state.get("context_signals")  # type: ignore[attr-defined]
         if matched_snapshot is not None:
+            if matched_snapshot.sportsbook.lower() == "prizepicks":
+                return {**_NO_SIGNAL, "gate_reason": "synthetic_price"}
             implied_prob: Decimal = matched_snapshot.implied_probability
             american_odds = matched_snapshot.price
             market_type: str = matched_snapshot.prop_type
@@ -295,7 +303,10 @@ def make_prop_arbitrage_agent(
             market_type = snapshot.market_type
             injury_flags = context_signals.injury_flags
 
-        true_prob: Decimal = prop_result.true_probability
+        push_prob = prop_result.push_probability
+        true_prob: Decimal = prop_result.true_probability if direction == "over" else Decimal("1") - prop_result.true_probability - push_prob
+        if not 0 <= push_prob < 1 or not 0 <= true_prob <= 1 - push_prob:
+            return _NO_SIGNAL
 
         try:
             implied_prob, net_payout = quote_terms(american_odds, implied_prob)
@@ -303,6 +314,7 @@ def make_prop_arbitrage_agent(
             return _NO_SIGNAL
 
         # EV computation — floored at 0
+        implied_prob *= 1 - push_prob
         ev_pct = compute_ev_percentage(true_prob, implied_prob)
         if ev_pct == Decimal("0"):
             log.info(
@@ -332,7 +344,7 @@ def make_prop_arbitrage_agent(
 
         # Kelly sizing — Decimal(str(...)) pattern locked in Phase 2
         kelly_frac = fractional_kelly(
-            p=true_prob,
+            p=true_prob / (1 - push_prob),
             b=net_payout,
             fraction=Decimal(str(cfg.max_kelly_fraction)),
         )
@@ -362,7 +374,14 @@ def make_prop_arbitrage_agent(
 
         signal = EVSignal(
             ev_percentage=ev_pct,
-            expected_return=compute_expected_return(true_prob, net_payout),
+            expected_return=compute_expected_return(true_prob, net_payout, push_prob),
+            push_probability=push_prob,
+            confidence_interval=prop_result.confidence_interval if direction == "over" else None,
+            sample_size=prop_result.sample_size,
+            data_source=prop_result.data_source,
+            game_id=state.get("game_id"),
+            player_name=target_player or None,
+            direction=direction,
             true_probability=true_prob,
             implied_probability=implied_prob,
             kelly_fraction=kelly_frac,
@@ -377,6 +396,6 @@ def make_prop_arbitrage_agent(
             ev_pct=str(ev_pct),
             kelly_frac=str(kelly_frac),
         )
-        return {"ev_signal": signal, "pending_signals": [signal]}
+        return {"ev_signal": signal, "pending_signals": [signal], "gate_reason": None}
 
     return prop_arbitrage_agent

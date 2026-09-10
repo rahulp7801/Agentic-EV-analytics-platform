@@ -48,13 +48,13 @@ def quote_terms(american_odds: int | None, implied_probability: Decimal) -> tupl
     return probability, payout
 
 
-def compute_expected_return(true_prob: Decimal, net_payout: Decimal) -> Decimal:
+def compute_expected_return(true_prob: Decimal, net_payout: Decimal, push_probability: Decimal = Decimal("0")) -> Decimal:
     """Expected profit per unit staked for a binary market with no push mass.
 
     Unlike legacy compute_ev_percentage (probability edge), negative returns
     are preserved. Integer lines with possible pushes need separate settlement.
     """
-    return true_prob * net_payout - (Decimal("1") - true_prob)
+    return true_prob * net_payout - (Decimal("1") - true_prob - push_probability)
 
 
 def compute_ev_percentage(true_prob: Decimal, implied_prob: Decimal) -> Decimal:

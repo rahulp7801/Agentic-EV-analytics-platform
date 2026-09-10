@@ -1,0 +1,138 @@
+"""Durable prediction audit and atomic recommendation exposure budget (SQLite)."""
+from __future__ import annotations
+import argparse
+import hashlib
+import json
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from decimal import Decimal
+from sportsbet.graph.models import EVSignal, QuantResult
+from sportsbet.quant.backtest import BacktestSignal, BacktestEngine
+
+DEFAULT_PATH = Path('.checkpoints/analytics.sqlite')
+
+class Ledger:
+    def __init__(self, path: str | Path = DEFAULT_PATH):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.connect() as db:
+            db.execute('CREATE TABLE IF NOT EXISTS predictions (id TEXT PRIMARY KEY, scan_id TEXT NOT NULL, payload TEXT NOT NULL, outcome TEXT)')
+            db.execute('CREATE TABLE IF NOT EXISTS exposure (identity TEXT PRIMARY KEY, group_key TEXT NOT NULL, risk_day TEXT NOT NULL, fraction REAL NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS quotes (identity TEXT NOT NULL, captured_at TEXT NOT NULL, probability REAL NOT NULL, PRIMARY KEY(identity,captured_at))')
+            db.execute('CREATE INDEX IF NOT EXISTS exposure_day ON exposure(risk_day)')
+            db.execute('CREATE INDEX IF NOT EXISTS exposure_group ON exposure(group_key)')
+
+    def connect(self):
+        return sqlite3.connect(self.path, timeout=15)
+
+    def reserve(self, signal: EVSignal, line: float | None, limit: float = 0.05, risk_day: str | None = None) -> tuple[bool, str]:
+        if not signal.game_id:
+            return False, 'missing_game_identity'
+        group = json.dumps([signal.game_id, signal.player_name or signal.market_type])
+        identity = json.dumps([group, signal.market_type, signal.direction, line])
+        day = risk_day or datetime.now(timezone.utc).date().isoformat()
+        amount = float(signal.kelly_fraction)
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            other = db.execute('SELECT identity FROM exposure WHERE group_key=? AND identity<>?', (group,identity)).fetchone()
+            if other:
+                return False, 'correlated_exposure'
+            existing = db.execute('SELECT fraction, risk_day FROM exposure WHERE identity=?', (identity,)).fetchone()
+            if existing and existing[1] != day:
+                return False, 'previously_reserved'
+            old = existing[0] if existing else 0
+            delta = max(0, amount-old)
+            total = db.execute('SELECT COALESCE(SUM(fraction),0) FROM exposure WHERE risk_day=?',(day,)).fetchone()[0]
+            if total + delta > limit + 1e-12:
+                return False, 'daily_exposure_limit'
+            db.execute('INSERT INTO exposure VALUES (?,?,?,?) ON CONFLICT(identity) DO UPDATE SET fraction=MAX(fraction,excluded.fraction)',
+                       (identity,group,day,amount))
+        return True, 'accepted'
+
+    @staticmethod
+    def quote_identity(payload):
+        return json.dumps([payload.get(k) for k in ('game_id','player','prop_type','direction','line','sportsbook')])
+
+    def record(self, scan_id: str, payload: dict) -> str:
+        # Immutable per-scan, per-selection record; rescans retain separate predictions.
+        identity = [scan_id, payload['game_id'], payload['player'], payload['prop_type'], payload['direction'], payload['line'], payload.get('sportsbook')]
+        key = hashlib.sha256(json.dumps(identity).encode()).hexdigest()
+        with self.connect() as db:
+            if payload.get('american_odds') and not payload.get('synthetic_price'):
+                from sportsbet.arbitrage.ev import quote_terms
+                captured = payload.get('quote_time') or payload.get('captured_at')
+                if captured:
+                    captured = datetime.fromisoformat(captured).astimezone(timezone.utc).isoformat()
+                    probability = float(quote_terms(payload['american_odds'],Decimal(0))[0])
+                    db.execute('INSERT OR IGNORE INTO quotes VALUES (?,?,?)', (self.quote_identity(payload),captured,probability))
+            db.execute('INSERT OR IGNORE INTO predictions(id,scan_id,payload) VALUES (?,?,?)',
+                       (key,scan_id,json.dumps(payload,allow_nan=False)))
+        return key
+
+    def settle(self, outcomes: dict) -> None:
+        with self.connect() as db:
+            for key, outcome in outcomes.items():
+                if outcome is not None and type(outcome) is not bool and outcome not in ('push','void'):
+                    raise ValueError('Settlement must be true/false/push/void/null')
+                if db.execute('UPDATE predictions SET outcome=? WHERE id=?', (json.dumps(outcome), key)).rowcount != 1:
+                    raise ValueError(f'Unknown prediction ID: {key}')
+
+    def report(self, recommendations_only: bool = False) -> dict:
+        from dataclasses import fields
+        from sportsbet.arbitrage.ev import quote_terms
+        with self.connect() as db:
+            records = db.execute('SELECT payload,outcome FROM predictions').fetchall()
+        signals = []
+        excluded = 0
+        duplicate = 0
+        seen = set()
+        records.sort(key=lambda row: json.loads(row[0]).get("captured_at", ""))
+        for raw, outcome in records:
+            p = json.loads(raw)
+            if recommendations_only and not p.get('accepted'):
+                continue
+            # Without recorded actual tipoff/entry, no trustworthy historical evaluation.
+            if not p.get('game_start_time') or not p.get('captured_at') or p.get('model_probability') is None:
+                excluded += 1
+                continue
+            start = datetime.fromisoformat(p['game_start_time'])
+            entered = datetime.fromisoformat(p['captured_at'])
+            if entered >= start or p.get('synthetic_price'):
+                excluded += 1
+                continue
+            selection = tuple(p.get(k) for k in ('game_id','player','prop_type','direction','line'))
+            if selection in seen:
+                duplicate += 1
+                continue
+            seen.add(selection)
+            with self.connect() as db:
+                closing = db.execute('SELECT captured_at,probability FROM quotes WHERE identity=? AND captured_at>? AND captured_at<? ORDER BY captured_at DESC LIMIT 1',
+                    (self.quote_identity(p), entered.astimezone(timezone.utc).isoformat(),start.astimezone(timezone.utc).isoformat())).fetchone()
+            close = closing[1] if closing else None
+            signals.append(BacktestSignal(
+                QuantResult(true_probability=Decimal(str(p['model_probability']))),
+                Decimal(str(close)) if close is not None else None,
+                json.loads(outcome) if outcome is not None else None,
+                Decimal(str(p.get('stake_fraction',0))) if recommendations_only else Decimal('1'),
+                quote_terms(p['american_odds'],Decimal(0))[1]+1, start,
+                datetime.fromisoformat(closing[0] if closing else p['captured_at']), entered,
+                push_probability=Decimal(str(p.get('push_probability',0))),
+            ))
+        report = BacktestEngine().run(signals)
+        return {**{f.name:getattr(report,f.name) for f in fields(report) if f.name!='signals_df'},
+                'excluded_missing_metadata':excluded, 'duplicate_predictions':duplicate, 'cohort':'recommendations' if recommendations_only else 'all_predictions'}
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--path', default=str(DEFAULT_PATH))
+    parser.add_argument('--settlements', help='JSON mapping prediction IDs to true/false/push/void/null')
+    parser.add_argument('--recommendations-only',action='store_true')
+    args=parser.parse_args(); ledger=Ledger(args.path)
+    if args.settlements:
+        ledger.settle(json.loads(Path(args.settlements).read_text(encoding='utf-8-sig')))
+    print(json.dumps(ledger.report(args.recommendations_only),indent=2))
+
+if __name__=='__main__':
+    main()

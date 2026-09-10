@@ -13,11 +13,12 @@ Pydantic v2 ONLY: ConfigDict(strict=True). No v1 patterns.
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import datetime, timezone
 from typing import Optional
 
 import sqlalchemy as sa
 import structlog
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from sportsbet.db.connection import get_sync_engine
 from sportsbet.db.models import PlayerPropSnapshot
@@ -49,6 +50,8 @@ class PlayerPropSnapshotCreate(BaseModel):
     line: Optional[Decimal] = None
     price: Optional[int] = None  # American odds e.g. -115
     implied_probability: Decimal
+    game_start_time: Optional[datetime] = None
+    snapped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     side: Optional[str] = None  # "Over" | "Under" — in-memory only, not persisted to DB
 
 
@@ -82,6 +85,9 @@ def write_player_prop_snapshot(
                 line=snapshot.line,
                 price=snapshot.price,
                 implied_probability=snapshot.implied_probability,
+                side=snapshot.side,
+                game_start_time=snapshot.game_start_time,
+                snapped_at=snapshot.snapped_at,
             )
             .returning(PlayerPropSnapshot.id)
         )

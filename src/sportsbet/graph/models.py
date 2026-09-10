@@ -73,6 +73,13 @@ class EVSignal(BaseModel):
     ev_percentage: Annotated[Decimal, Field(gt=Decimal("0"))]
     # Legacy ev_percentage is probability edge, not return on stake.
     expected_return: Optional[Decimal] = None
+    push_probability: Decimal = Decimal("0")
+    confidence_interval: Optional[tuple[Decimal, Decimal]] = None
+    sample_size: Optional[int] = None
+    data_source: Optional[str] = None
+    game_id: Optional[str] = None
+    player_name: Optional[str] = None
+    direction: str = "over"
     true_probability: Decimal
     implied_probability: Decimal
     kelly_fraction: Annotated[
@@ -225,6 +232,7 @@ class PropResult(BaseModel):
     confidence_interval: Optional[tuple[Decimal, Decimal]] = None
     data_source: Optional[str] = None
     mean_stat: Optional[Decimal] = None
+    push_probability: Decimal = Decimal("0")
 
 
 class NBAContextSignals(BaseModel):

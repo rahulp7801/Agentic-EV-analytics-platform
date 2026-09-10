@@ -707,6 +707,8 @@ def make_arbitrage_agent(
         signal = EVSignal(
             ev_percentage=ev_pct,
             expected_return=compute_expected_return(true_prob, net_payout),
+            game_id=state.get("game_id"),
+            player_name=state.get("player_name"),
             true_probability=true_prob,
             implied_probability=implied_prob,
             kelly_fraction=kelly_frac,

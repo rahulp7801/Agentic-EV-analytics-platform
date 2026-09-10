@@ -28,28 +28,17 @@ import pathlib
 import httpx
 
 from sportsbet.db.connection import create_async_pool
-from sportsbet.graph.graph import create_graph_with_sqlite
+from sportsbet.graph.graph import create_graph
+from sportsbet.prop.nba_agents import make_nba_quant_agent
+from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
+from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.ingestion.free_odds import PrizePicksPoller, ESPNPropsPoller
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.config import settings
+from sportsbet.ledger import Ledger
 from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
 from sportsbet.arbitrage.kelly import fractional_kelly
-
-# ── Under signal support ──────────────────────────────────────────────────────
-from dataclasses import dataclass, field as _field
-from decimal import Decimal as _Decimal
-
-@dataclass
-class _SyntheticSignal:
-    """Minimal EVSignal-compatible container for synthetic Under signals."""
-    ev_percentage: _Decimal
-    true_probability: _Decimal
-    implied_probability: _Decimal
-    kelly_fraction: _Decimal
-    trade_plan: list[str] = _field(default_factory=list)
-    market_type: str = ""
-
 
 def _under_kelly(true_prob: float, american_odds: int, fraction: float = 0.25) -> float:
     """Fractional Kelly for a bet at the given American odds."""
@@ -57,51 +46,7 @@ def _under_kelly(true_prob: float, american_odds: int, fraction: float = 0.25) -
     return float(fractional_kelly(Decimal(str(true_prob)), payout, Decimal(str(fraction))))
 
 
-_LEAGUE_AVG_DEF = 115.0
-
-
-def _build_under_trade_plan(
-    ev_pct: float,
-    kelly: float,
-    prop_type: str,
-    line: float,
-    mean_stat,
-    sample_size,
-    context,
-    teammate_out: list[str] | None,
-) -> list[str]:
-    n = str(int(sample_size)) if sample_size is not None else "N/A"
-    mean = f"{float(mean_stat):.1f}" if mean_stat is not None else "N/A"
-    bullet_1 = (
-        f"+{ev_pct:.1%} EV edge on {prop_type} UNDER {line} | "
-        f"n={n} games, mu={mean} historical"
-    )
-    if context:
-        def_r = float(context.opponent_def_rating)
-        def_d = def_r - _LEAGUE_AVG_DEF
-        if def_d < -0.5:
-            def_tag = f"opp def {def_r:.1f} < avg {_LEAGUE_AVG_DEF:.0f} (strong D -> favorable for Under)"
-        elif def_d > 0.5:
-            def_tag = f"opp def {def_r:.1f} > avg {_LEAGUE_AVG_DEF:.0f} (weak D -> risk factor for Under)"
-        else:
-            def_tag = f"opp def {def_r:.1f} approx avg (neutral)"
-        rd = context.rest_days
-        rest_tag = ("B2B (fatigue -> favorable for Under)" if rd == 0
-                    else "1d rest (standard)" if rd == 1
-                    else f"{rd}d rest (well-rested -- slight risk for Under)")
-        home_tag = "HOME (home boost -> risk for Under)" if context.is_home else "AWAY (no home boost)"
-        tm_tag = ""
-        if teammate_out:
-            tm_tag = f" - conditioned on {', '.join(teammate_out[:2])} inactive"
-        bullet_2 = f"Context: {def_tag} - {rest_tag} - {home_tag}{tm_tag}"
-    else:
-        bullet_2 = "Context unavailable -- edge based on historical distribution only"
-    bullet_3 = f"Kelly: {kelly:.1%} bankroll stake (fractional, not flat) - No material injury flags"
-    return [bullet_1, bullet_2, bullet_3]
-
-
 _PROGRESS_PATH = pathlib.Path(__file__).parent / ".scan_progress.json"
-
 
 def _write_progress(
     stage: int,
@@ -243,6 +188,8 @@ def _normalize_raw_events(
                         price=int(price),
                         implied_probability=Decimal(str(round(float(raw_prob), 6))),
                         side=outcome.get("name", ""),
+                        game_start_time=datetime.fromisoformat(event["commence_time"].replace("Z", "+00:00")) if event.get("commence_time") else None,
+                        snapped_at=datetime.fromisoformat(bookmaker["last_update"].replace("Z", "+00:00")) if bookmaker.get("last_update") else datetime.now(timezone.utc),
                     ))
     return snapshots
 
@@ -581,70 +528,27 @@ async def run_ev_for_player(
             "snap_price": int(snap.price),
             "snap_sportsbook": snap.sportsbook,
             "direction":  "over",
+            "quote": snap,
+            "gate_reason": state.get("gate_reason"),
         })
 
-        # ── Under evaluation: compute 1-true_prob vs Under implied prob ──────
-        # Skip when P(Over) hit the probability floor (0.01) — that means the
-        # NormalDist model ran out of resolution (line is far above historical mean).
-        # Producing an Under signal here would just be 1 - floor = 0.99, which is a
-        # model artifact, not a genuine edge.
-        #
-        # Also skip if the Over snap itself was a PrizePicks goblin line (-110 from
-        # PrizePicks). Goblin lines are easy lines set well above a player's true mean —
-        # their complementary Unders would always show huge +EV because 1-P(easy_over)
-        # is structurally inflated. The Over side is already filtered; we must filter
-        # the Under side too to avoid surfacing the same artifact from the other direction.
-        _p_over_raw = float(prop.true_probability) if prop and prop.true_probability else 0.0
-        if prop and prop.true_probability and _p_over_raw > 0.01 and not _is_prizepicks_goblin(snap):
-            under_snaps = sorted(
-                [s for s in all_snapshots
-                 if player_name.lower() in s.player_name.lower()
-                 and s.prop_type == snap.prop_type
-                 and s.line == snap.line
-                 and s.side == "Under"],
-                key=lambda s: american_to_raw_prob(s.price),
-            )
-            if under_snaps:
-                u_snap = under_snaps[0]
-                u_true = 1.0 - float(prop.true_probability)
-                u_implied = float(american_to_raw_prob(int(u_snap.price)))
-                u_ev = u_true - u_implied
-                u_price = int(u_snap.price)
-                u_kelly = _under_kelly(u_true, u_price, settings.max_kelly_fraction)
-                # EV cap: mirror the _EV_CAP = 0.15 guard from prop_arbitrage_agent.
-                # Under signals bypass the LangGraph arbitrage node and must apply the
-                # same ceiling inline. Anything above 15% is almost certainly model
-                # overconfidence vs. a soft line, not a genuine market inefficiency.
-                _UNDER_EV_CAP: float = 0.15
-                if u_ev > 0 and u_ev <= _UNDER_EV_CAP and u_kelly > 0:
-                    u_plan = _build_under_trade_plan(
-                        u_ev, u_kelly,
-                        prop_type.replace("player_", ""),
-                        prop_line,
-                        prop.mean_stat, prop.sample_size,
-                        context,
-                        inactive_teammates,
-                    )
-                    u_sig = _SyntheticSignal(
-                        ev_percentage=_Decimal(str(round(u_ev, 6))),
-                        true_probability=_Decimal(str(round(u_true, 6))),
-                        implied_probability=_Decimal(str(round(u_implied, 6))),
-                        kelly_fraction=_Decimal(str(round(u_kelly, 6))),
-                        trade_plan=u_plan,
-                        market_type=snap.prop_type,
-                    )
-                    results.append({
-                        "player":        player_name,
-                        "prop_type":     prop_type,
-                        "line":          prop_line,
-                        "prop":          prop,
-                        "ev":            u_sig,
-                        "pending":       [],
-                        "context":       context,
-                        "snap_price":    u_price,
-                        "snap_sportsbook": u_snap.sportsbook,
-                        "direction":     "under",
-                    })
+        # Evaluate Under through the identical pricing and sample gates.
+        under_snaps = sorted(
+            [q for q in all_snapshots if q.player_name.casefold() == snap.player_name.casefold()
+             and q.prop_type == snap.prop_type and q.line == snap.line and q.side == "Under"],
+            key=lambda q: american_to_raw_prob(q.price),
+        )
+        if under_snaps:
+            u_snap = under_snaps[0]
+            under = await make_prop_arbitrage_agent(sport="nba")({
+                **state, "prop_side": "under", "player_prop_snapshots": [u_snap],
+            })
+            results.append({
+                "player": player_name, "prop_type": prop_type, "line": prop_line,
+                "prop": prop, "ev": under.get("ev_signal"), "pending": [], "context": context,
+                "snap_price": int(u_snap.price), "snap_sportsbook": u_snap.sportsbook,
+                "direction": "under", "gate_reason": under.get("gate_reason"), "quote": u_snap,
+            })
 
     return results
 
@@ -652,6 +556,8 @@ async def run_ev_for_player(
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 async def main():
+    if TARGET_DATE_OBJ < datetime.now().date():
+        raise ValueError("Historical dates require recorded pre-game quotes; use offline evaluation.")
     print(f"=== NBA EV SCANNER — {TARGET_DATE} ===")
     print(f"Target: {TEAM_A} vs {TEAM_B}\n")
 
@@ -691,82 +597,8 @@ async def main():
         per_team_roster[abbr] = roster
         all_players.extend(roster)
 
-    # 2b. Check DB cache — if this game_id already has signals, skip API calls
     _game_id = f"{home_team.lower()}_{away_team.lower()}_{TARGET_DATE}"
-    _cached_rows: list[dict] = []
-    if not FORCE:
-        _write_progress(2, f"Checking DB cache for {_game_id}...")
-        print(f"\n[2b] Checking DB cache for {_game_id}...")
-        try:
-            _pool_check = await asyncio.wait_for(create_async_pool(), timeout=45.0)
-            _cached_rows = await load_signals_from_db(_pool_check, _game_id)
-            try:
-                await asyncio.wait_for(_pool_check.close(), timeout=8.0)
-            except Exception:
-                pass
-        except Exception as _ce:
-            _cached_rows = []
-            print(f"  [!] DB cache check failed (non-fatal): {_ce}")
-    else:
-        print(f"\n[2b] --force flag set — bypassing DB cache.")
-
-    if _cached_rows:
-        print(f"  Found {len(_cached_rows)} cached signal(s) in DB — skipping API calls.")
-        cache_path = pathlib.Path(__file__).parent / "frontend" / "public" / "signals_cache.json"
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        # Convert DB rows to the same export format as the full scan
-        _export: list[dict] = []
-        for _row in _cached_rows:
-            _trade_plan = _row.get("trade_plan")
-            if isinstance(_trade_plan, str):
-                try:
-                    _trade_plan = json.loads(_trade_plan)
-                except Exception:
-                    _trade_plan = []
-            _pt = str(_row.get("prop_type", "")).replace("player_", "")
-            _is_home = _row.get("is_home")
-            _player_team     = home_team if _is_home is True else away_team
-            _player_opponent = away_team if _is_home is True else home_team
-            _direction = _row.get("direction") or "over"
-            _export.append({
-                "id": f"{str(_row['player_name']).replace(' ','_').lower()}_{_row['prop_type']}{'_under' if _direction == 'under' else ''}",
-                "player": _row["player_name"],
-                "team": _player_team,
-                "opponent": _player_opponent,
-                "sport": "nba",
-                "prop_type": _pt,
-                "line": float(_row["line"]),
-                "direction": _direction,
-                "true_prob": float(_row["true_probability"]),
-                "implied_prob": float(_row["implied_probability"]),
-                "ev_pct": float(_row["ev_percentage"]),
-                "expected_return": float(compute_expected_return(
-                    Decimal(str(_row["true_probability"])),
-                    quote_terms(int(_row["american_odds"]), Decimal("0"))[1],
-                )),
-                "kelly_fraction": float(_row["kelly_fraction"]) if not _row.get("gated") else 0.0,
-                "american_odds": int(_row["american_odds"]),
-                "sportsbook": _row.get("sportsbook", "unknown"),
-                "trade_plan": _trade_plan or [],
-                "strength": _row.get("strength", "medium"),
-                "gated": bool(_row.get("gated", False)),
-                "sample_size": _row.get("sample_size"),
-                "mean_stat": float(_row["mean_stat"]) if _row.get("mean_stat") is not None else None,
-                "home_team": home_team,
-                "away_team": away_team,
-                "opponent_def_rating": float(_row["opponent_def_rating"]) if _row.get("opponent_def_rating") is not None else None,
-                "rest_days": _row.get("rest_days"),
-                "is_home": _is_home,
-                "snapped_at": datetime.now(timezone.utc).isoformat(),
-            })
-        _combined = _merge_signals_cache(cache_path, _game_id, home_team, away_team, _export)
-        _tmp = cache_path.with_suffix(".tmp")
-        _tmp.write_text(json.dumps(_combined, indent=2), encoding="utf-8")
-        _tmp.replace(cache_path)
-        _PROGRESS_PATH.unlink(missing_ok=True)
-        print(f"  Signals loaded from DB cache -> {cache_path}")
-        print(f"  (Re-run with --force to bypass cache and re-scan)")
-        return
+    # Always evaluate current quotes; historical recommendations are audit records.
 
     # 3. Fetch props slate (Odds API → PrizePicks cascade)
     _write_progress(3, "Fetching prop slate (Odds API → PrizePicks → ESPN)...")
@@ -868,8 +700,7 @@ async def main():
                     sn = _norm_name(slate_name)
                     if rn in sn or sn in rn:
                         player_team_map[slate_name] = abbr
-            else:
-                inactive.append(rname)
+            # A missing prop listing is not an injury report.
         team_inactives[abbr] = inactive
         if inactive:
             print(f"  {abbr} likely inactive ({len(inactive)}): {', '.join(inactive[:5])}"
@@ -891,10 +722,15 @@ async def main():
         return
     print("ready.")
     print("  Building LangGraph...", end=" ", flush=True)
-    graph = await create_graph_with_sqlite(pool=pool, api_key=settings.odds_api_key, target_date=TARGET_DATE_OBJ)
+    graph = create_graph(
+        nba_quant_node=make_nba_quant_agent(pool, target_date=TARGET_DATE_OBJ),
+        nba_context_producer_node=make_nba_context_signals_producer(pool, target_date=TARGET_DATE_OBJ),
+        prop_arbitrage_node=make_prop_arbitrage_agent(sport="nba"),
+    )
     print("ready.\n")
 
     ev_signals = []
+    all_results = []
     no_data = []
     scan_start = time.perf_counter()
 
@@ -938,6 +774,7 @@ async def main():
         n_ev    = sum(1 for r in player_results if r["ev"] and r["ev"].ev_percentage and float(r["ev"].ev_percentage) > 0)
         print(f"    done — {n_props} prop(s), {n_ev} +EV  ({player_elapsed:.1f}s)", flush=True)
 
+        all_results.extend(player_results)
         for r in player_results:
             prop = r["prop"]
             ev   = r["ev"]
@@ -949,43 +786,44 @@ async def main():
 
     _write_progress(4, "Finalizing...", players_total=len(on_slate), players_done=len(on_slate))
 
+    # Both directions share one durable daily budget and one-prop-per-player guard.
+    ledger = Ledger()
+    for r in sorted(all_results, key=lambda r: float(r['ev'].expected_return) if r.get('ev') else -1, reverse=True):
+        sig, prop, quote = r.get('ev'), r.get('prop'), r.get('quote')
+        accepted, reason = False, r.get('gate_reason') or 'no_positive_edge'
+        if sig is not None:
+            if quote is None or quote.game_start_time is None:
+                reason = 'missing_start_time'
+            elif datetime.now(timezone.utc) >= quote.game_start_time:
+                reason = 'game_started'
+            elif (datetime.now(timezone.utc) - quote.snapped_at).total_seconds() > 300:
+                reason = 'stale_quote'
+            else:
+                accepted, reason = ledger.reserve(sig, r['line'])
+            r['gated'] = not accepted
+        r['gate_reason'] = reason
+        r['prediction_id'] = ledger.record(THREAD_BASE, {
+            'game_id': _game_id, 'player': r['player'], 'prop_type': r['prop_type'],
+            'direction': r['direction'], 'line': r['line'], 'sportsbook': r.get('snap_sportsbook'),
+            'american_odds': r.get('snap_price'),
+            'model_probability': float(sig.true_probability) if sig else (
+                float(prop.true_probability if r['direction']=='over' else 1-prop.true_probability-prop.push_probability)
+                if prop and prop.true_probability is not None else None),
+            'push_probability': float(prop.push_probability) if prop else 0,
+            'captured_at': datetime.now(timezone.utc).isoformat(),
+            'game_start_time': quote.game_start_time.isoformat() if quote and quote.game_start_time else None,
+            'quote_time': quote.snapped_at.isoformat() if quote else None,
+            'synthetic_price': r.get('snap_sportsbook','').lower()=='prizepicks',
+            'accepted': accepted, 'gate_reason': reason,
+            'stake_fraction': float(sig.kelly_fraction) if accepted else 0,
+            'sample_size': prop.sample_size if prop else 0,
+            'model_version': 'empirical-v2',
+        })
+
     # ── Persist signals to PostgreSQL ev_signals table (async, before pool close) ──
     if ev_signals:
         try:
             async with pool.acquire() as _conn:
-                await _conn.execute("""
-                    CREATE TABLE IF NOT EXISTS ev_signals (
-                        id BIGSERIAL PRIMARY KEY,
-                        scan_id VARCHAR(30) NOT NULL,
-                        game_id VARCHAR(50) NOT NULL,
-                        home_team VARCHAR(5) NOT NULL,
-                        away_team VARCHAR(5) NOT NULL,
-                        game_date VARCHAR(8) NOT NULL,
-                        player_name VARCHAR(100) NOT NULL,
-                        prop_type VARCHAR(40) NOT NULL,
-                        line NUMERIC(7,2) NOT NULL,
-                        true_probability NUMERIC(8,6) NOT NULL,
-                        implied_probability NUMERIC(8,6) NOT NULL,
-                        ev_percentage NUMERIC(8,6) NOT NULL,
-                        kelly_fraction NUMERIC(8,6) NOT NULL,
-                        american_odds SMALLINT NOT NULL,
-                        sample_size SMALLINT,
-                        mean_stat NUMERIC(7,2),
-                        sportsbook VARCHAR(50) NOT NULL,
-                        gated BOOLEAN NOT NULL DEFAULT FALSE,
-                        trade_plan JSONB,
-                        opponent_def_rating NUMERIC(7,2),
-                        rest_days SMALLINT,
-                        is_home BOOLEAN,
-                        strength VARCHAR(10) NOT NULL DEFAULT 'medium',
-                        direction VARCHAR(5) NOT NULL DEFAULT 'over',
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    )
-                """)
-                # Add direction column to pre-existing tables that lack it
-                await _conn.execute(
-                    "ALTER TABLE ev_signals ADD COLUMN IF NOT EXISTS direction VARCHAR(5) DEFAULT 'over'"
-                )
                 for _r in ev_signals:
                     _ev   = _r["ev"]
                     _pend = _r["pending"]
@@ -1021,7 +859,7 @@ async def main():
                         float(_ctx.opponent_def_rating) if _ctx else None,
                         _ctx.rest_days if _ctx else None,
                         _ctx.is_home if _ctx else None,
-                        "high" if float(_sig.ev_percentage) >= 0.15 else "medium",
+                        "unrated",
                         _r.get("direction", "over"),
                     )
             print(f"  {len(ev_signals)} signal(s) persisted to ev_signals table.")
@@ -1097,7 +935,7 @@ async def main():
         player_opponent = away_team if is_home is True else home_team
 
         export.append({
-            "id":            f"{r['player'].replace(' ','_').lower()}_{r['prop_type']}{'_under' if r.get('direction')=='under' else ''}",
+            "id": r["prediction_id"],
             "player":        r["player"],
             "team":          player_team,
             "opponent":      player_opponent,
@@ -1108,9 +946,12 @@ async def main():
             "true_prob":     float(sig.true_probability),
             "implied_prob":  float(sig.implied_probability),
             "ev_pct":        float(sig.ev_percentage),
-            "expected_return": float(compute_expected_return(
-                sig.true_probability, quote_terms(snap_price, Decimal("0"))[1],
-            )),
+            "expected_return": float(sig.expected_return),
+            "push_probability": float(sig.push_probability),
+            "confidence_interval": [float(x) for x in sig.confidence_interval] if sig.confidence_interval else None,
+            "data_source": sig.data_source,
+            "prediction_id": r.get('prediction_id'),
+            "gate_reason": r.get('gate_reason'),
             "kelly_fraction": float(sig.kelly_fraction) if not r.get("gated") else 0.0,
             "american_odds": snap_price,
             "sportsbook":    r.get("snap_sportsbook", "unknown"),
@@ -1121,8 +962,10 @@ async def main():
             ],
             "injury_flags":   {},
             "market_type":    r["prop_type"],
-            "snapped_at":     datetime.now(timezone.utc).isoformat(),
-            "strength":       "high" if float(sig.ev_percentage) >= 0.15 else "medium",
+            "snapped_at": r["quote"].snapped_at.isoformat(),
+            "game_start_time": r["quote"].game_start_time.isoformat() if r["quote"].game_start_time else None,
+            "model_version": "empirical-v2",
+            "strength": "unrated",
             "gated":          r.get("gated", False),
             "sample_size":    prop.sample_size if prop else None,
             "mean_stat":      float(prop.mean_stat) if (prop and prop.mean_stat) else None,

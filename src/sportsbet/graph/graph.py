@@ -100,6 +100,7 @@ def make_correlation_guard_node() -> Callable[[GraphState], dict]:  # type: igno
 def make_aggregator_node(
     bankroll_usd: float,
     daily_drawdown_limit: float = 0.05,
+    ledger_path: str | None = None,
 ) -> Callable[[GraphState], dict]:  # type: ignore[type-arg]
     """Return a sync LangGraph node that applies the Aggregator daily drawdown gate.
 
@@ -120,12 +121,14 @@ def make_aggregator_node(
     """
     from sportsbet.arbitrage.aggregator import Aggregator
     agg = Aggregator(bankroll_usd=bankroll_usd, daily_drawdown_limit=daily_drawdown_limit)
+    from sportsbet.ledger import Ledger
+    ledger = Ledger(ledger_path) if ledger_path else None
 
     def aggregator_node(state: GraphState) -> dict:  # type: ignore[type-arg]
         candidates = state.get("pending_signals") or []  # type: ignore[attr-defined]
         cleared = []
         for sig in candidates:
-            if agg.record_signal(sig):
+            if (ledger.reserve(sig, state.get("prop_line"), daily_drawdown_limit)[0] if ledger else agg.record_signal(sig)):
                 cleared.append(sig)
         return {
             "cleared_signals": cleared,
@@ -466,6 +469,7 @@ async def create_graph_with_sqlite(
     aggregator_node = make_aggregator_node(
         bankroll_usd=bankroll_usd,
         daily_drawdown_limit=daily_drawdown_limit,
+        ledger_path=os.path.join(os.path.dirname(db_path), "analytics.sqlite"),
     )
 
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)

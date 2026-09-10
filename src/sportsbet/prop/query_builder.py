@@ -101,7 +101,8 @@ PROP_COLUMN_MAP: dict[str, str] = {
 _NFL_PROP_TEMPLATE = """\
 SELECT
     COUNT(*) AS total,
-    SUM(CASE WHEN {col} >= $3 THEN 1 ELSE 0 END) AS successes,
+    SUM(CASE WHEN {col} > $3 THEN 1 ELSE 0 END) AS successes,
+    SUM(CASE WHEN {col} = $3 THEN 1 ELSE 0 END) AS pushes,
     AVG({col}::float) AS mean_val
 FROM player_stats
 WHERE player_id = $1

@@ -210,6 +210,7 @@ async def run_nba_gamelog_query(pool: asyncpg.Pool, params: PropParams) -> PropR
         true_probability=true_prob,
         sample_size=total,
         confidence_interval=ci,
+        push_probability=Decimal(str(round(int(row.get("pushes") or 0) / total, 6))),
         data_source=data_src,
         mean_stat=mean_stat,
     )
