@@ -50,6 +50,9 @@ def main() -> None:
     seasons: list[int] = args.seasons
     log.info("ingestion_start", seasons=seasons)
 
+    if args.games:
+        ingest_games_seasons(seasons, engine)
+
     log.info("ingesting_pbp", seasons=seasons)
     ingest_pbp_seasons(seasons, engine)
 
@@ -63,10 +66,6 @@ def main() -> None:
             ingest_ngs_seasons(ngs_seasons, engine)
         else:
             log.info("ngs_skipped_all_pre_2016", seasons=seasons)
-
-    if args.games:
-        log.info("ingesting_games_schedules", seasons=seasons)
-        ingest_games_seasons(seasons, engine)
 
     log.info("ingestion_complete", seasons=seasons)
 

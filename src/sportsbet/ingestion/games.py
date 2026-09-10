@@ -43,8 +43,7 @@ def ingest_games_seasons(
 ) -> None:
     """Load NFL game schedule rows for the specified seasons into games table.
 
-    Uses pg_insert ON CONFLICT DO NOTHING — safe to re-run; existing rows
-    are not overwritten. Applies Polars-first write path: nflreadpy returns
+    Updates existing rows when the provider corrects a schedule. nflreadpy returns
     Polars, .to_pandas() called only before to_dict(orient='records').
 
     Args:
@@ -61,7 +60,7 @@ def ingest_games_seasons(
         except Exception as exc:
             log.warning("games_load_failed", season=season, error_type=type(exc).__name__)
             gc.collect()
-            continue
+            raise RuntimeError('NFL schedule refresh failed') from None
 
         # Select only the columns we need; skip missing columns gracefully
         available = [c for c in GAMES_COLUMNS if c in df.columns]
@@ -83,7 +82,9 @@ def ingest_games_seasons(
 
         rows = df.to_pandas().to_dict(orient="records")
         with engine.begin() as conn:
-            stmt = pg_insert(Game).values(rows).on_conflict_do_nothing(index_elements=["game_id"])
+            stmt = pg_insert(Game).values(rows)
+            stmt = stmt.on_conflict_do_update(index_elements=["game_id"],
+                set_={column:stmt.excluded[column] for column in rows[0] if column != 'game_id'})
             conn.execute(stmt)
 
         log.info("games_ingested", season=season, rows=len(rows))

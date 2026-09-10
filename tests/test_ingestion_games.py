@@ -5,7 +5,7 @@ quick-1 plan 1, Task 2 — TDD RED/GREEN.
 Test inventory:
 1. test_load_schedules_called_once       — ingest_games_seasons calls nfl.load_schedules exactly once
 2. test_rows_mapped_to_game_schema       — written rows contain required Game schema columns
-3. test_duplicate_game_ids_no_raise      — ON CONFLICT DO NOTHING; re-ingest same data does not raise
+3. test_duplicate_game_ids_no_raise      — ON CONFLICT DO UPDATE; re-ingest same data does not raise
 4. test_cli_games_flag_calls_ingest      — CLI --games flag calls ingest_games_seasons (unit mock)
 
 Implementation note: all tests mock nfl.load_schedules AND mock pg_insert so that
@@ -19,6 +19,13 @@ from unittest.mock import MagicMock, patch
 
 import polars as pl
 import pytest
+
+
+def test_schedule_failure_stops_refresh():
+    from sportsbet.ingestion.games import ingest_games_seasons
+    with patch('sportsbet.ingestion.games.nfl.load_schedules', side_effect=RuntimeError('provider failed')):
+        with pytest.raises(RuntimeError, match='NFL schedule refresh failed'):
+            ingest_games_seasons([2026], engine=MagicMock())
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +85,7 @@ def _make_mock_engine() -> MagicMock:
 
 
 class _OnConflictTracker:
-    """Intercepting pg_insert replacement that records on_conflict_do_nothing calls."""
+    """Intercepting pg_insert replacement that records on_conflict_do_update calls."""
 
     def __init__(self) -> None:
         self.captured_rows: list[dict] = []
@@ -90,13 +97,14 @@ class _OnConflictTracker:
     class _InsertStmt:
         def __init__(self, tracker: "_OnConflictTracker") -> None:
             self._tracker = tracker
+            self.excluded = MagicMock()
 
         def values(self, rows: list[dict]) -> "_OnConflictTracker._InsertStmt":
             self._tracker.captured_rows.extend(rows)
             return self
 
-        def on_conflict_do_nothing(
-            self, index_elements: list[str] | None = None
+        def on_conflict_do_update(
+            self, index_elements: list[str] | None = None, set_: dict | None = None
         ) -> "_OnConflictTracker._InsertStmt":
             self._tracker.on_conflict_calls.append(index_elements)
             return self
@@ -176,14 +184,14 @@ def test_rows_mapped_to_game_schema() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 3: duplicate game_ids do not raise (ON CONFLICT DO NOTHING)
+# Test 3: duplicate game_ids do not raise (ON CONFLICT DO UPDATE)
 # ---------------------------------------------------------------------------
 
 def test_duplicate_game_ids_no_raise() -> None:
-    """Re-ingesting the same season data does not raise — pg_insert ON CONFLICT DO NOTHING.
+    """Re-ingesting the same season data does not raise — pg_insert ON CONFLICT DO UPDATE.
 
     Calls ingest_games_seasons twice with identical data. Neither call should raise.
-    Verifies on_conflict_do_nothing(index_elements=['game_id']) is called each time.
+    Verifies on_conflict_do_update(index_elements=['game_id']) is called each time.
     """
     from sportsbet.ingestion.games import ingest_games_seasons
 
@@ -201,11 +209,11 @@ def test_duplicate_game_ids_no_raise() -> None:
         mock_nfl.load_schedules.return_value = schedule_df
         # First ingest — must not raise
         ingest_games_seasons([2024], engine=_make_mock_engine())
-        # Second ingest with same data — must not raise (ON CONFLICT DO NOTHING)
+        # Second ingest with same data — must not raise (ON CONFLICT DO UPDATE)
         ingest_games_seasons([2024], engine=_make_mock_engine())
 
     assert len(tracker.on_conflict_calls) == 2, (
-        f"on_conflict_do_nothing should be called once per ingest, got {len(tracker.on_conflict_calls)}"
+        f"on_conflict_do_update should be called once per ingest, got {len(tracker.on_conflict_calls)}"
     )
     assert tracker.on_conflict_calls[0] == ["game_id"], (
         f"ON CONFLICT must target 'game_id', got {tracker.on_conflict_calls[0]}"

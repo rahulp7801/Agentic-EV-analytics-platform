@@ -60,7 +60,8 @@ def ingest_player_stats_seasons(
     """Load player weekly stats for the specified seasons.
 
     Applies column whitelist and renames nflreadpy fields to match the
-    player_stats schema. Uses append+gc pattern consistent with pbp.py.
+    player_stats schema. Upserts stats and enriches unambiguous schedule context
+    in one transaction, so a failed refresh cannot publish partially updated rows.
 
     Args:
         seasons: List of NFL season years to ingest.
@@ -88,14 +89,27 @@ def ingest_player_stats_seasons(
         if rename_map:
             df = df.rename(rename_map)
 
-        df.to_pandas().to_sql(
-            "player_stats",
-            engine,
-            if_exists="append",
-            index=False,
-            chunksize=1000,
-            method=upsert_rows(['player_id', 'season', 'week']),
-        )
+        with engine.begin() as conn:
+            df.to_pandas().to_sql(
+                "player_stats", conn, if_exists="append", index=False, chunksize=1000,
+                method=upsert_rows(['player_id', 'season', 'week']),
+            )
+            conn.execute(sa.text('''
+                WITH team_games AS (
+                    SELECT season,week,home_team AS team,away_team AS opponent,'home' AS venue
+                    FROM games WHERE season=:season
+                    UNION ALL
+                    SELECT season,week,away_team,home_team,'away'
+                    FROM games WHERE season=:season
+                ), unambiguous AS (
+                    SELECT season,week,team,MIN(opponent) AS opponent,MIN(venue) AS venue
+                    FROM team_games GROUP BY season,week,team HAVING COUNT(*)=1
+                )
+                UPDATE player_stats p SET (opponent_team,home_away)=(
+                    SELECT g.opponent,g.venue FROM unambiguous g
+                    WHERE p.season=g.season AND p.week=g.week AND p.team=g.team
+                ) WHERE p.season=:season
+            '''), {'season':season})
 
         del df
         gc.collect()

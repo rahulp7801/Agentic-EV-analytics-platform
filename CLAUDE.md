@@ -35,6 +35,8 @@
 
 ## Data and orchestration
 
+- NFL schedules now upsert corrections instead of ignoring existing games; provider failures stop refreshes. Weekly stat refresh writes rows and derives opponent/home-away from a unique team/season/week schedule in one transaction; missing or ambiguous matches clear old context instead of reusing it. CLI loads schedules before player stats. Regression coverage includes rescheduled dates, venue swaps, corrected yardage and ambiguous-match clearing in real PostgreSQL CI.
+
 - Hosted dashboard reads dashboard_snapshots via server-only PostgreSQL. Python publishes snapshots; no local subprocesses/files are relied upon on Vercel.
 - Public scan POST is always forbidden, including local mode: Host header checks were spoofable. Only authenticated CLI/Actions workers spend provider credits and write audit data.
 - sportsbet.scan routes NBA/NFL through the actual LangGraph, passes exclusive as_of_date and last_n_games=40. GraphState must declare these fields or LangGraph silently drops them.
