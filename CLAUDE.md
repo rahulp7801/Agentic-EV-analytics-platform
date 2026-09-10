@@ -20,7 +20,7 @@
 
 ## Deployment and credentials
 
-- Automatic approval review rejected copying local ODDS_API_KEY to GitHub because the user had not specifically approved credential export. No key was copied. An explicit approval question is pending; do not retry or work around the rejection without user authorization.
+- User explicitly approved exporting the local ODDS_API_KEY to this repository. It was successfully stored as an encrypted GitHub Actions repository secret and its presence verified without displaying the value. Worker database secrets and reachable production database setup remain outstanding; scheduled scans stay disabled until readiness checks pass.
 
 - Production URL: https://agentic-ev-analytics-platform.vercel.app.
 - Vercel project agentic-ev-analytics-platform under rahulp7801s-projects; rootDirectory frontend. IDs are repository Actions variables; VERCEL_TOKEN is a repository secret.
