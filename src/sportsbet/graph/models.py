@@ -55,6 +55,7 @@ class QuantResult(BaseModel):
     sample_size: Optional[int] = None
     confidence_interval: Optional[tuple[Decimal, Decimal]] = None
     data_source: Optional[str] = None
+    prediction_target: Optional[Literal["play_success", "market_outcome"]] = None
 
 
 class EVSignal(BaseModel):

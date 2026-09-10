@@ -81,3 +81,24 @@ async def test_default_nba_estimate_keeps_empirical_probability_and_interval(mon
         result=await make_nba_quant_agent(MagicMock())({'receiver_gsis_id':'1','game_id':'g','season':2025,
             'prop_type':'points','prop_line':'20.5','nba_context_signals':NBAContextSignals(is_home=True,rest_days=0,pace_factor=Decimal('100'),opponent_def_rating=Decimal('115'))})
     assert result['nba_prop_result']==base
+
+
+async def test_play_success_probability_cannot_become_market_recommendation():
+    from sportsbet.graph.agents import make_arbitrage_agent
+    from sportsbet.graph.models import QuantResult
+    result=await make_arbitrage_agent()({'session_id':'test','quant_result':QuantResult(
+        true_probability=Decimal('.7'),prediction_target='play_success')})
+    assert result['ev_signal'] is None
+    assert result['gate_reason']=='incompatible_prediction_target'
+
+
+async def test_async_database_uses_exact_configured_endpoint(monkeypatch):
+    from sportsbet.db.connection import create_async_pool
+    from sportsbet.config import settings
+    url='postgresql+asyncpg://test:encoded%40password@db.example.test:5432/test?sslmode=require'
+    monkeypatch.setattr(settings,'database_url_async',url)
+    create=AsyncMock()
+    with patch('sportsbet.db.connection.asyncpg.create_pool',create):
+        await create_async_pool()
+    assert create.call_args.args[0]==url.replace('postgresql+asyncpg://','postgresql://')
+    assert 'ssl' not in create.call_args.kwargs

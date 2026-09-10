@@ -84,7 +84,7 @@ def _make_state(true_prob: Decimal, implied_prob: Decimal, quant_result_none: bo
     if quant_result_none:
         quant_result = None
     else:
-        quant_result = QuantResult(
+        quant_result = QuantResult(prediction_target="market_outcome", 
             true_probability=true_prob,
             sample_size=45,
             data_source="test",
@@ -543,7 +543,7 @@ def _make_pre_populated_state(
     from sportsbet.graph.models import AgentOddsSnapshot, ContextSignals, QuantResult
 
     state = _base_state("arbitrage_analysis")
-    state["quant_result"] = QuantResult(
+    state["quant_result"] = QuantResult(prediction_target="market_outcome", 
         true_probability=true_probability,
         sample_size=50,
         data_source="mock",

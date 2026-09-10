@@ -331,3 +331,9 @@ async def test_prop_quant_agent_teammate_out_none_when_no_situational() -> None:
     assert params.teammate_out is None, (
         f"Backward compat: expected params.teammate_out is None but got {params.teammate_out!r}"
     )
+
+
+@pytest.fixture(autouse=True)
+def isolated_injury_sources(monkeypatch):
+    # These tests exercise orchestration with fixture data, never live injury feeds.
+    monkeypatch.setattr('sportsbet.graph.agents._fetch_sleeper_injuries', AsyncMock(return_value=[]))

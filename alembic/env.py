@@ -25,7 +25,8 @@ from sportsbet.db.models import Base  # noqa: E402
 config = context.config
 
 # Set the database URL dynamically from settings (never from alembic.ini).
-config.set_main_option("sqlalchemy.url", settings.database_url)
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

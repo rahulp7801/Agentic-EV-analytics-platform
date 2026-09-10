@@ -201,6 +201,10 @@ def test_prop_arbitrage_sport_none_resolves_nba() -> None:
         "prop_filters": None,
     }
 
+    from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
+    state['player_name'] = 'Test Player'
+    state['player_prop_snapshots'] = [PlayerPropSnapshotCreate(sport='nba',player_name='Test Player',
+        sportsbook='draftkings',prop_type='player_points',side='Over',line=Decimal('28.0'),price=100,implied_probability=Decimal('.5'))]
     agent = make_prop_arbitrage_agent(sport=None)
     result = asyncio.run(agent(state))
 
@@ -228,3 +232,9 @@ def test_graphstate_declares_prop_filters() -> None:
         "INFRA-01 gap not yet closed: add 'prop_filters: dict[str, Any] | None' "
         "to GraphState TypedDict in src/sportsbet/graph/state.py."
     )
+
+
+@pytest.fixture(autouse=True)
+def isolated_injury_sources(monkeypatch):
+    # These tests exercise orchestration with fixture data, never live injury feeds.
+    monkeypatch.setattr('sportsbet.graph.agents._fetch_sleeper_injuries', AsyncMock(return_value=[]))

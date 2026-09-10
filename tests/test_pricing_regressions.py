@@ -28,7 +28,7 @@ async def test_actual_payout_sizes_kelly(price, expected, prop_agent):
         "session_id": "pricing", "player_name": "Test Player",
         "prop_type": "points", "prop_line": Decimal("20.5"),
         "nba_prop_result": PropResult(true_probability=Decimal("0.6"), sample_size=50),
-        "quant_result": QuantResult(true_probability=Decimal("0.6")),
+        "quant_result": QuantResult(prediction_target="market_outcome", true_probability=Decimal("0.6")),
         "player_prop_snapshots": [quote(price)],
     }
     agent = make_prop_arbitrage_agent(sport="nba", settings_override=cfg) if prop_agent else make_arbitrage_agent(cfg)
@@ -60,7 +60,7 @@ async def test_negative_return_quote_cannot_produce_positive_kelly():
 
 async def test_context_quote_uses_actual_odds_not_devigged_probability():
     now = datetime.now(timezone.utc)
-    state = {"session_id": "pricing", "quant_result": QuantResult(true_probability=Decimal("0.6")),
+    state = {"session_id": "pricing", "quant_result": QuantResult(prediction_target="market_outcome", true_probability=Decimal("0.6")),
              "context_signals": ContextSignals(game_id="game", signals_captured_at=now, injury_flags={},
                  odds_snapshot=AgentOddsSnapshot(game_id="game", sportsbook="testbook",
                      market_type="h2h", american_odds=-110, implied_probability=Decimal("0.5"),

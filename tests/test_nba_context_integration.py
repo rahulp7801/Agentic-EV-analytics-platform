@@ -74,7 +74,9 @@ def _base_state(nba_context_signals=None):
 # ---------------------------------------------------------------------------
 
 
-async def test_context_signals_adjust_probability():
+async def test_context_signals_adjust_probability(monkeypatch):
+    from sportsbet.config import settings
+    monkeypatch.setattr(settings, "experimental_probability_adjustments", True)
     """Full pipeline: producer emits NBAContextSignals -> agent applies adjustments.
 
     Scenario:

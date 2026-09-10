@@ -324,3 +324,9 @@ async def test_fetch_player_props_called_with_nfl_when_sport_absent() -> None:
         await agent(state)  # type: ignore[arg-type]
 
     mock_props.assert_called_once_with("nfl")
+
+
+@pytest.fixture(autouse=True)
+def isolated_injury_sources(monkeypatch):
+    # These tests exercise orchestration with fixture data, never live injury feeds.
+    monkeypatch.setattr('sportsbet.graph.agents._fetch_sleeper_injuries', AsyncMock(return_value=[]))

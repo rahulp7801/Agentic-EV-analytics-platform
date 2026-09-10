@@ -635,6 +635,8 @@ def make_arbitrage_agent(
             log.info("arbitrage_agent_no_probability", session_id=session_id)
             return {"ev_signal": None}
 
+        if quant_result.prediction_target != "market_outcome":
+            return {"ev_signal": None, "pending_signals": [], "gate_reason": "incompatible_prediction_target"}
         true_prob: Decimal = quant_result.true_probability
         injury_flags: dict[str, str] = (context_signals.injury_flags if context_signals else {})
 
@@ -650,10 +652,10 @@ def make_arbitrage_agent(
             prop_snap = next(
                 (
                     s for s in player_prop_snapshots
-                    if player_name.lower() in s.player_name.lower()
+                    if player_name.strip().casefold() == s.player_name.strip().casefold()
                     and s.prop_type == prop_market_key
-                    and getattr(s, "side", None) in (None, "Over", "")
-                    and (state.get("prop_line") is None or s.line == Decimal(str(state["prop_line"])))
+                    and getattr(s, "side", None) == "Over"
+                    and state.get("prop_line") is not None and s.line == Decimal(str(state["prop_line"]))
                 ),
                 None,
             )
@@ -669,8 +671,10 @@ def make_arbitrage_agent(
                 prop_type=prop_market_key,
                 source=getattr(prop_snap, "sportsbook", "unknown"),
             )
+        elif raw_prop_type:
+            return {"ev_signal": None, "pending_signals": [], "gate_reason": "missing_matching_prop_quote"}
         else:
-            # Fall back to h2h odds snapshot
+            # Only a market-outcome model may consume game odds.
             if context_signals is None or context_signals.odds_snapshot is None:
                 log.warning("arbitrage_agent_no_odds", session_id=session_id)
                 return {"ev_signal": None}

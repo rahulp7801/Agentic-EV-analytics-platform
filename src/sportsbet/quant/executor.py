@@ -55,7 +55,8 @@ async def run_quant_query(pool: asyncpg.Pool, params: QuantParams) -> QuantResul
     -------
     QuantResult
         - data_source="insufficient_sample", true_probability=None if total < MIN_SAMPLE_SIZE
-        - data_source="postgresql", Decimal true_probability + tuple[Decimal,Decimal] CI otherwise
+        - data_source="postgresql",
+        prediction_target="play_success", Decimal true_probability + tuple[Decimal,Decimal] CI otherwise
 
     Notes
     -----
@@ -114,4 +115,5 @@ async def run_quant_query(pool: asyncpg.Pool, params: QuantParams) -> QuantResul
         sample_size=total,
         confidence_interval=ci,
         data_source="postgresql",
+        prediction_target="play_success",
     )
