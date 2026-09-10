@@ -24,6 +24,13 @@ from sportsbet.config import settings
 from sportsbet.graph import create_graph
 
 
+def pytest_configure(config):
+    # Pytest creates basetemp itself, but not its parent on a fresh checkout.
+    from pathlib import Path
+    if base := config.getoption('basetemp'):
+        Path(base).parent.mkdir(parents=True, exist_ok=True)
+
+
 @pytest.fixture(scope="session")
 def alembic_cfg() -> Config:
     """Alembic Config pointed at alembic.ini.

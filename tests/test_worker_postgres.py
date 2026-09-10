@@ -24,7 +24,7 @@ def test_nfl_refresh_applies_schedule_corrections_and_clears_ambiguous_context()
     from sportsbet.ingestion.games import ingest_games_seasons
     from sportsbet.ingestion.player_stats import ingest_player_stats_seasons
     engine = sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
-    identity = uuid.uuid4().hex[:20]
+    identity = uuid.uuid4().hex[:19]
     game = dict(game_id=identity,season=2026,week=1,home_team='ZZ1',away_team='ZZ2',gameday='2026-09-10')
     stat = dict(player_id=identity,player_display_name='Fixture',season=2026,week=1,team='ZZ1',passing_yards=200,season_type='REG')
     try:
