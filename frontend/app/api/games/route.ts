@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-
 const SCOREBOARDS = {nba:'basketball/nba', nfl:'football/nfl'};
 
 // NBA schedule dates are in Eastern Time — always compute relative to ET
@@ -7,16 +5,18 @@ const SCOREBOARDS = {nba:'basketball/nba', nfl:'football/nfl'};
 function etDateStr(offsetDays: number): string {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  // toLocaleDateString('en-CA') → 'YYYY-MM-DD'
-  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, '');
+  const parts = new Intl.DateTimeFormat('en', {timeZone:'America/New_York',
+    year:'numeric', month:'2-digit', day:'2-digit'}).formatToParts(d);
+  return ['year','month','day'].map(type => parts.find(p => p.type === type)!.value).join('');
 }
 
 export async function GET(request: Request) {
   const sport = new URL(request.url).searchParams.get('sport') ?? 'nba';
-  if (sport !== 'nba' && sport !== 'nfl') return NextResponse.json({error:'Invalid sport'}, {status:400});
+  if (sport !== 'nba' && sport !== 'nfl') return Response.json({error:'Invalid sport'}, {status:400});
   const scoreboard = `https://site.api.espn.com/apis/site/v2/sports/${SCOREBOARDS[sport]}/scoreboard`;
   const dates = [etDateStr(-1), etDateStr(0), etDateStr(1)];
   const labels = ['Yesterday', 'Today', 'Tomorrow'];
+  let availableDates = 0;
 
   const games: {
     home_abbr: string;
@@ -36,9 +36,14 @@ export async function GET(request: Request) {
         signal: AbortSignal.timeout(5000),
         next: {revalidate:60},
       });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        console.warn('Schedule provider unavailable', sport, res.status);
+        continue;
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
+      if (!Array.isArray(data.events)) continue;
+      availableDates++;
       for (const event of (data.events || [])) {
         const comp = (event.competitions || [{}])[0];
         const competitors = comp.competitors || [];
@@ -57,9 +62,11 @@ export async function GET(request: Request) {
         });
       }
     } catch {
-      // ESPN unreachable — skip
+      console.warn('Schedule provider request failed', sport);
     }
   }
 
-  return NextResponse.json({ games }, { headers: { 'Cache-Control': 'no-store' } });
+  return Response.json({ games, partial: availableDates < dates.length,
+    ...(availableDates === 0 ? {error:'Schedules are temporarily unavailable.'} : {}) },
+    {status:availableDates === 0 ? 503 : 200, headers:{'Cache-Control':'no-store'}});
 }

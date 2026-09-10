@@ -64,6 +64,8 @@
 
 ## Verification and remaining gaps
 
+- Production NFL schedule smoke test returned an empty list despite a successful local provider response. Schedule route now formats YYYYMMDD explicitly and distinguishes complete upstream failure (503) from a valid empty schedule, with sanitized server diagnostics. Verify the next deployed response before claiming live schedule coverage.
+
 - Latest local full Python suite:290 passed,15 DB skips,2 pre-existing expected failures. Real PostgreSQL CI passed model SQL through both graphs, target-game exclusion, repeatable upserts, migrations and concurrent exposure reservation. Seven frontend metric/access tests, TypeScript and production build passed.
 - npm audit zero vulnerabilities; pip-audit2.10.1 found no known Python vulnerabilities and is now a CI gate. Passing audits cannot prove all security gaps closed.
 - Need reachable production DB, migration/backfill, read-only Vercel role, worker secrets and measured quota/coverage before live readiness. Do not claim season readiness from deployment alone.
