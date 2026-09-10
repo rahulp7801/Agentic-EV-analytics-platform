@@ -11,9 +11,11 @@
 
 ## Runtime and development
 
+- User requested removal/hiding of generated workspace clutter. Disposable root .test-tmp-* artifacts are removed where accessible, otherwise excluded from the local editor file tree (Windows denies delete/move/attribute/ACL access on15 old pytest directories); tooling directories retain their existing paths but use Windows Hidden attributes. Future test output/cache lives under ignored hidden .local/ via pytest defaults. Do not create new root test-output files or scatter temporary directories. Preserve .env, source, migrations, lockfiles and audit data.
+
 - Python 3.12, uv 0.11.32, Node 24, Next.js 16.3.4, PostgreSQL 16. Python dependencies are locked in uv.lock; npm in frontend/package-lock.json.
 - Graph nodes are deterministic Python, not LLM calls. No OpenAI/Anthropic key is consumed. Runtime requires langgraph and langgraph-checkpoint-sqlite.
-- Windows: use .venv/Scripts/python.exe and npm.cmd. Sandbox pytest needs --basetemp=.test-tmp-<task>. Local tooling/cache files are ignored.
+- Windows: use .venv/Scripts/python.exe and npm.cmd. Pytest temp/cache paths default under .local/. Local tooling/cache files are ignored; do not create root .test-tmp directories.
 - Read frontend/AGENTS.md and relevant installed Next documentation before frontend edits.
 - Tests must opt into SPORTSBET_TEST_DATABASE_URL pointing to a disposable DB; never fall back to runtime credentials.
 - Alembic respects explicit test URLs and escapes percent characters. Async DB factory preserves exact provider host/user/password/SSL mode; no guessed pooler or region rewrite.

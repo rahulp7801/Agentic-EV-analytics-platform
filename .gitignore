@@ -41,3 +41,5 @@ Thumbs.db
 
 .test-tmp-*
 .vercel/
+.local/
+.pytest_cache/

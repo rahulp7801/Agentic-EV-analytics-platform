@@ -85,7 +85,7 @@ npx tsc --noEmit
 npm run build
 ```
 
-PostgreSQL tests require `SPORTSBET_TEST_DATABASE_URL` pointing to a **disposable** database. Tests never fall back to the runtime database. In the Windows sandbox, add `--basetemp=.test-tmp-check` to pytest.
+PostgreSQL tests require `SPORTSBET_TEST_DATABASE_URL` pointing to a **disposable** database. Tests never fall back to the runtime database. Pytest stores generated temporary files and cache under ignored `.local/` by default.
 
 ## Readiness still requiring evidence
 

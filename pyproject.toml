@@ -46,6 +46,8 @@ dev = [
 packages = ["src/sportsbet"]
 
 [tool.pytest.ini_options]
+addopts = "--basetemp=.local/test-tmp"
+cache_dir = ".local/pytest-cache"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src", "site-packages"]
