@@ -133,6 +133,9 @@ class GraphState(TypedDict):
     session_id: str
     request_type: str
     created_at: datetime
+    last_n_games: int | None
+    opponent_team: str | None
+    home_away: str | None
     as_of_date: date | None  # Exclusive history cutoff for NBA predictions.
     game_id: str
     season: int

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+from sportsbet.ingestion.upsert import upsert_rows
 import sys
 import time
 from typing import Optional
@@ -139,7 +140,7 @@ def ingest_nba_gamelogs_season(
 
     # Append rows — UniqueConstraint on (player_id, game_id) handles re-runs.
     # NEVER use if_exists='replace' — drops and recreates the table.
-    df.to_sql("nba_player_gamelogs", engine, if_exists="append", index=False)
+    df.to_sql("nba_player_gamelogs", engine, if_exists="append", index=False, chunksize=500, method=upsert_rows(["player_id", "game_id"]))
 
     log.info(
         "nba_gamelogs_ingestion.season_complete",

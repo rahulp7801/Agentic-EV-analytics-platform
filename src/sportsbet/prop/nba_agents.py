@@ -222,6 +222,7 @@ def make_nba_quant_agent(
                 teammate_out_contexts=teammate_out_contexts,
                 opponent_team=opponent_team,
                 home_away=home_away_param,  # type: ignore[arg-type]
+                last_n_games=state.get("last_n_games"),
                 as_of_date=state.get("as_of_date") or target_date or date.today(),
             )
         except ValidationError as exc:

@@ -9,6 +9,7 @@ Pattern: year-by-year loop mirroring pbp.py with gc.collect() after each season.
 from __future__ import annotations
 
 import gc
+from sportsbet.ingestion.upsert import upsert_rows
 import time
 import argparse
 import sys
@@ -112,7 +113,7 @@ def ingest_nba_seasons(
                 if_exists="append",
                 index=False,
                 chunksize=500,
-                method="multi",
+                method=upsert_rows(['player_id', 'season']),
             )
             log.info(
                 "nba_ingestion.season_complete",

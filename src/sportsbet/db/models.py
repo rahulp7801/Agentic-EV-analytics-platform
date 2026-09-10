@@ -107,6 +107,7 @@ class PlayerStat(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
     player_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    player_name: Mapped[Optional[str]] = mapped_column(String(100), index=True)
     season: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     week: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     team: Mapped[Optional[str]] = mapped_column(String(3))

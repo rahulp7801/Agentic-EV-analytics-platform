@@ -387,16 +387,11 @@ def _merge_signals_cache(
 
 async def resolve_player_id(pool, player_name: str) -> str:
     """Look up NBA.com player_id from nba_player_stats by fuzzy name match."""
-    parts = player_name.split()
-    if len(parts) < 2:
-        return ""
-    pattern = f"%{parts[0]}%{parts[-1]}%"
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT player_id FROM nba_player_stats WHERE player_name ILIKE $1 LIMIT 1",
-            pattern,
-        )
-    return str(row["player_id"]) if row else ""
+        rows = await conn.fetch(
+            "SELECT DISTINCT player_id FROM nba_player_stats WHERE LOWER(player_name) = LOWER($1)", player_name.strip())
+    return str(rows[0]["player_id"]) if len(rows) == 1 else ""
+
 
 
 async def run_ev_for_player(

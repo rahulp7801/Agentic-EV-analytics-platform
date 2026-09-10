@@ -9,6 +9,7 @@ nflreadpy.load_player_stats() returns a Polars DataFrame.
 from __future__ import annotations
 
 import gc
+from sportsbet.ingestion.upsert import upsert_rows
 
 import polars as pl
 import nflreadpy as nfl  # NOT nfl_data_py — archived Sep 2025
@@ -23,6 +24,9 @@ log = structlog.get_logger()
 # nflreadpy field names used here; renames applied via _COLUMN_RENAMES below.
 PLAYER_STATS_COLUMNS: list[str] = [
     "player_id",
+    "player_display_name",
+    "team",
+    "opponent_team",
     "season",
     "week",
     "recent_team",   # renamed to 'team' to match schema
@@ -46,6 +50,7 @@ PLAYER_STATS_COLUMNS: list[str] = [
 # 'recent_team' in nflreadpy -> 'team' in our player_stats table.
 _COLUMN_RENAMES: dict[str, str] = {
     "recent_team": "team",
+    "player_display_name": "player_name",
 }
 
 
@@ -69,6 +74,11 @@ def ingest_player_stats_seasons(
 
         df: pl.DataFrame = nfl.load_player_stats([season])
 
+        if "season_type" in df.columns:
+            df = df.filter(pl.col("season_type") == "REG")
+        if "team" in df.columns and "recent_team" in df.columns:
+            df = df.drop("recent_team")
+
         # Available-only filter — prevents KeyError if a season lacks a column.
         available: list[str] = [c for c in PLAYER_STATS_COLUMNS if c in df.columns]
         df = df.select(available)
@@ -84,7 +94,7 @@ def ingest_player_stats_seasons(
             if_exists="append",
             index=False,
             chunksize=1000,
-            method="multi",
+            method=upsert_rows(['player_id', 'season', 'week']),
         )
 
         del df

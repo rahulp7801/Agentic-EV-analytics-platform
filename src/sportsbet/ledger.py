@@ -25,6 +25,7 @@ class Ledger:
             db.execute('CREATE TABLE IF NOT EXISTS predictions (id TEXT PRIMARY KEY, scan_id TEXT NOT NULL, payload TEXT NOT NULL, outcome TEXT)')
             db.execute('CREATE TABLE IF NOT EXISTS exposure (identity TEXT PRIMARY KEY, group_key TEXT NOT NULL, risk_day TEXT NOT NULL, fraction REAL NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS quotes (identity TEXT NOT NULL, captured_at TEXT NOT NULL, probability REAL NOT NULL, PRIMARY KEY(identity,captured_at))')
+            db.execute('CREATE TABLE IF NOT EXISTS api_usage (risk_day TEXT PRIMARY KEY, credits INTEGER NOT NULL)')
             db.execute('CREATE INDEX IF NOT EXISTS exposure_day ON exposure(risk_day)')
             db.execute('CREATE INDEX IF NOT EXISTS exposure_group ON exposure(group_key)')
 
@@ -76,6 +77,18 @@ class Ledger:
             db.execute('INSERT INTO exposure VALUES (?,?,?,?) ON CONFLICT(identity) DO UPDATE SET fraction=CASE WHEN exposure.fraction > excluded.fraction THEN exposure.fraction ELSE excluded.fraction END',
                        (identity,group,day,amount))
         return True, 'accepted'
+
+    def reserve_api_credits(self, cost: int, limit: int = 25) -> bool:
+        if cost < 1 or limit < 1:
+            return False
+        day = datetime.now(timezone.utc).date().isoformat()
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT credits FROM api_usage WHERE risk_day=?', (day,)).fetchone()
+            if (row[0] if row else 0) + cost > limit:
+                return False
+            db.execute('INSERT INTO api_usage VALUES (?,?) ON CONFLICT(risk_day) DO UPDATE SET credits=api_usage.credits+excluded.credits', (day,cost))
+        return True
 
     @staticmethod
     def quote_identity(payload):
