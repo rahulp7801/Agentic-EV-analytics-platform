@@ -606,7 +606,7 @@ def make_arbitrage_agent(
     The sync arbitrage_agent stub is preserved below for backward-compat with
     Phase 2 tests using create_graph() without an arbitrage_node parameter.
     """
-    from sportsbet.arbitrage.ev import build_trade_plan, compute_ev_percentage
+    from sportsbet.arbitrage.ev import build_trade_plan, compute_ev_percentage, compute_expected_return, quote_terms
     from sportsbet.arbitrage.kelly import fractional_kelly
     from sportsbet.config import settings as _settings
 
@@ -648,13 +648,15 @@ def make_arbitrage_agent(
                     s for s in player_prop_snapshots
                     if player_name.lower() in s.player_name.lower()
                     and s.prop_type == prop_market_key
-                    and getattr(s, "side", "Over") in ("Over", "")
+                    and getattr(s, "side", None) in (None, "Over", "")
+                    and (state.get("prop_line") is None or s.line == Decimal(str(state["prop_line"])))
                 ),
                 None,
             )
 
         if prop_snap is not None:
             implied_prob: Decimal = prop_snap.implied_probability
+            american_odds = prop_snap.price
             active_market_type = prop_snap.prop_type
             log.info(
                 "prop_arbitrage_agent.enter",
@@ -670,9 +672,14 @@ def make_arbitrage_agent(
                 return {"ev_signal": None}
             snapshot = context_signals.odds_snapshot
             implied_prob = snapshot.implied_probability
+            american_odds = snapshot.american_odds
             active_market_type = snapshot.market_type
             log.info("prop_arbitrage_agent.enter", sport=state.get("sport"))
 
+        try:
+            implied_prob, net_payout = quote_terms(american_odds, implied_prob)
+        except ValueError:
+            return {"ev_signal": None}
         ev_pct = compute_ev_percentage(true_prob, implied_prob)
         if ev_pct == Decimal("0"):
             log.info(
@@ -685,14 +692,17 @@ def make_arbitrage_agent(
 
         kelly_frac = fractional_kelly(
             p=true_prob,
-            b=Decimal("1.0"),
+            b=net_payout,
             fraction=Decimal(str(cfg.max_kelly_fraction)),
         )
 
+        if kelly_frac <= Decimal("0"):
+            return {"ev_signal": None}
         trade_plan = build_trade_plan(ev_pct, kelly_frac, injury_flags, active_market_type)
 
         signal = EVSignal(
             ev_percentage=ev_pct,
+            expected_return=compute_expected_return(true_prob, net_payout),
             true_probability=true_prob,
             implied_probability=implied_prob,
             kelly_fraction=kelly_frac,

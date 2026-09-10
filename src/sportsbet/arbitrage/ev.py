@@ -22,7 +22,39 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from sportsbet.quant.vig import american_to_raw_prob
+
 _ZERO = Decimal("0")
+
+
+def quote_terms(american_odds: int | None, implied_probability: Decimal) -> tuple[Decimal, Decimal]:
+    """Return break-even probability and net payout from the same quote.
+
+    Raw price is authoritative when present (stored probability may be devigged).
+    Legacy snapshots without price imply payout from their break-even probability.
+    Synthetic provider prices remain synthetic; this does not validate their payout.
+    """
+    if american_odds is not None:
+        if american_odds == 0:
+            raise ValueError("American odds cannot be zero")
+        probability = american_to_raw_prob(american_odds)
+        odds = Decimal(american_odds)
+        payout = Decimal("100") / abs(odds) if odds < 0 else odds / Decimal("100")
+    else:
+        probability = implied_probability
+        if not probability.is_finite() or not _ZERO < probability < Decimal("1"):
+            raise ValueError("Break-even probability must be between zero and one")
+        payout = (Decimal("1") - probability) / probability
+    return probability, payout
+
+
+def compute_expected_return(true_prob: Decimal, net_payout: Decimal) -> Decimal:
+    """Expected profit per unit staked for a binary market with no push mass.
+
+    Unlike legacy compute_ev_percentage (probability edge), negative returns
+    are preserved. Integer lines with possible pushes need separate settlement.
+    """
+    return true_prob * net_payout - (Decimal("1") - true_prob)
 
 
 def compute_ev_percentage(true_prob: Decimal, implied_prob: Decimal) -> Decimal:

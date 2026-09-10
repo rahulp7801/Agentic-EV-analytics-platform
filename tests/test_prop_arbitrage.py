@@ -17,6 +17,8 @@ import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from sportsbet.quant.vig import american_to_raw_prob
+
 import pytest
 
 from sportsbet.graph.models import (
@@ -382,8 +384,8 @@ class TestProp06PlayerPropSnapshot:
         assert ev_signal is not None, (
             "Expected non-None EVSignal when player_prop_snapshots match exists"
         )
-        assert ev_signal.implied_probability == Decimal("0.50"), (
-            f"implied_probability should be Decimal('0.50') from snapshot, "
+        assert ev_signal.implied_probability == american_to_raw_prob(-115), (
+            f"implied_probability must reflect the snapshot's actual -115 price, "
             f"got {ev_signal.implied_probability}"
         )
 
@@ -541,8 +543,8 @@ class TestProp06CommensurableEV:
         assert ev_signal.ev_percentage > Decimal("0"), (
             f"ev_percentage should be > 0, got {ev_signal.ev_percentage}"
         )
-        assert ev_signal.implied_probability == Decimal("0.50"), (
-            f"implied_probability should come from prop snapshot (0.50), not h2h"
+        assert ev_signal.implied_probability == american_to_raw_prob(-115), (
+            "implied_probability should come from the prop price, not h2h"
         )
 
     def test_kelly_sizing_nonzero_with_positive_ev(self) -> None:
@@ -642,7 +644,7 @@ class TestPropAliasMapKeys:
         nfl_markets_set = set(NFL_PROP_MARKETS.replace("\n", "").replace(" ", "").split(","))
 
         # NBA-only keys — not expected in NFL_PROP_MARKETS
-        nba_only_keys = {"points", "rebounds", "assists", "pra"}
+        nba_only_keys = {"points", "rebounds", "assists", "pra", "threes", "steals", "blocks"}
 
         mismatches: list[str] = []
         for prop_key, market_value in _PROP_TYPE_ALIAS_MAP.items():

@@ -71,6 +71,8 @@ class EVSignal(BaseModel):
     model_config = ConfigDict(strict=True)
 
     ev_percentage: Annotated[Decimal, Field(gt=Decimal("0"))]
+    # Legacy ev_percentage is probability edge, not return on stake.
+    expected_return: Optional[Decimal] = None
     true_probability: Decimal
     implied_probability: Decimal
     kelly_fraction: Annotated[

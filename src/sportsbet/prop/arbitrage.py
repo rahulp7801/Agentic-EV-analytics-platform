@@ -25,7 +25,7 @@ from typing import Any, Optional
 
 import structlog
 
-from sportsbet.arbitrage.ev import build_trade_plan, compute_ev_percentage
+from sportsbet.arbitrage.ev import compute_ev_percentage, compute_expected_return, quote_terms
 from sportsbet.arbitrage.kelly import fractional_kelly
 from sportsbet.config import settings as _settings
 from sportsbet.graph.models import EVSignal, NBAContextSignals, PropResult
@@ -261,7 +261,9 @@ def make_prop_arbitrage_agent(
                     not target_player
                     or target_player.lower() in snap.player_name.lower()
                 )
-                if type_match and line_match and player_match:
+                # PropResult is P(Over); never compare it to an Under quote.
+                side_match = snap.side in (None, "", "Over")
+                if type_match and line_match and player_match and side_match:
                     matched_snapshot = snap
                     break
 
@@ -269,6 +271,7 @@ def make_prop_arbitrage_agent(
         context_signals = state.get("context_signals")  # type: ignore[attr-defined]
         if matched_snapshot is not None:
             implied_prob: Decimal = matched_snapshot.implied_probability
+            american_odds = matched_snapshot.price
             market_type: str = matched_snapshot.prop_type
             injury_flags: dict[str, str] = (
                 context_signals.injury_flags
@@ -288,10 +291,16 @@ def make_prop_arbitrage_agent(
                 return _NO_SIGNAL
             snapshot = context_signals.odds_snapshot
             implied_prob = snapshot.implied_probability
+            american_odds = snapshot.american_odds
             market_type = snapshot.market_type
             injury_flags = context_signals.injury_flags
 
         true_prob: Decimal = prop_result.true_probability
+
+        try:
+            implied_prob, net_payout = quote_terms(american_odds, implied_prob)
+        except ValueError:
+            return _NO_SIGNAL
 
         # EV computation — floored at 0
         ev_pct = compute_ev_percentage(true_prob, implied_prob)
@@ -324,7 +333,7 @@ def make_prop_arbitrage_agent(
         # Kelly sizing — Decimal(str(...)) pattern locked in Phase 2
         kelly_frac = fractional_kelly(
             p=true_prob,
-            b=Decimal("1.0"),
+            b=net_payout,
             fraction=Decimal(str(cfg.max_kelly_fraction)),
         )
 
@@ -353,6 +362,7 @@ def make_prop_arbitrage_agent(
 
         signal = EVSignal(
             ev_percentage=ev_pct,
+            expected_return=compute_expected_return(true_prob, net_payout),
             true_probability=true_prob,
             implied_probability=implied_prob,
             kelly_fraction=kelly_frac,

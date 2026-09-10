@@ -33,6 +33,8 @@ from sportsbet.ingestion.free_odds import PrizePicksPoller, ESPNPropsPoller
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.config import settings
+from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
+from sportsbet.arbitrage.kelly import fractional_kelly
 
 # ── Under signal support ──────────────────────────────────────────────────────
 from dataclasses import dataclass, field as _field
@@ -51,10 +53,8 @@ class _SyntheticSignal:
 
 def _under_kelly(true_prob: float, american_odds: int, fraction: float = 0.25) -> float:
     """Fractional Kelly for a bet at the given American odds."""
-    b = 100.0 / abs(american_odds) if american_odds < 0 else american_odds / 100.0
-    q = 1.0 - true_prob
-    full_k = (b * true_prob - q) / b
-    return max(0.0, full_k * fraction)
+    _, payout = quote_terms(american_odds, Decimal("0"))
+    return float(fractional_kelly(Decimal(str(true_prob)), payout, Decimal(str(fraction))))
 
 
 _LEAGUE_AVG_DEF = 115.0
@@ -493,7 +493,7 @@ async def run_ev_for_player(
              and s.prop_type == prop_type
              and s.side == "Over"
              and not _is_prizepicks_goblin(s)],
-            key=lambda s: abs(s.price),
+            key=lambda s: american_to_raw_prob(s.price),
         )
         if not snaps:
             continue
@@ -536,7 +536,8 @@ async def run_ev_for_player(
                         "sport": "nba",
                         "created_at": datetime.now(timezone.utc),
                         "request_type": "nba_prop_analysis",
-                        "player_prop_snapshots": all_snapshots,
+                        # Price and sportsbook exported below must be the quote evaluated.
+                        "player_prop_snapshots": [snap],
                         "situational_params": _situational if _situational else None,
                     },
                     config={"configurable": {"thread_id": f"{thread_id}-{prop_type}"}},
@@ -600,7 +601,7 @@ async def run_ev_for_player(
                  and s.prop_type == snap.prop_type
                  and s.line == snap.line
                  and s.side == "Under"],
-                key=lambda s: abs(s.price),
+                key=lambda s: american_to_raw_prob(s.price),
             )
             if under_snaps:
                 u_snap = under_snaps[0]
@@ -608,7 +609,7 @@ async def run_ev_for_player(
                 u_implied = float(american_to_raw_prob(int(u_snap.price)))
                 u_ev = u_true - u_implied
                 u_price = int(u_snap.price)
-                u_kelly = _under_kelly(u_true, u_price)
+                u_kelly = _under_kelly(u_true, u_price, settings.max_kelly_fraction)
                 # EV cap: mirror the _EV_CAP = 0.15 guard from prop_arbitrage_agent.
                 # Under signals bypass the LangGraph arbitrage node and must apply the
                 # same ceiling inline. Anything above 15% is almost certainly model
@@ -738,6 +739,10 @@ async def main():
                 "true_prob": float(_row["true_probability"]),
                 "implied_prob": float(_row["implied_probability"]),
                 "ev_pct": float(_row["ev_percentage"]),
+                "expected_return": float(compute_expected_return(
+                    Decimal(str(_row["true_probability"])),
+                    quote_terms(int(_row["american_odds"]), Decimal("0"))[1],
+                )),
                 "kelly_fraction": float(_row["kelly_fraction"]) if not _row.get("gated") else 0.0,
                 "american_odds": int(_row["american_odds"]),
                 "sportsbook": _row.get("sportsbook", "unknown"),
@@ -1102,6 +1107,9 @@ async def main():
             "true_prob":     float(sig.true_probability),
             "implied_prob":  float(sig.implied_probability),
             "ev_pct":        float(sig.ev_percentage),
+            "expected_return": float(compute_expected_return(
+                sig.true_probability, quote_terms(snap_price, Decimal("0"))[1],
+            )),
             "kelly_fraction": float(sig.kelly_fraction) if not r.get("gated") else 0.0,
             "american_odds": snap_price,
             "sportsbook":    r.get("snap_sportsbook", "unknown"),
@@ -1160,4 +1168,5 @@ async def main():
             pass  # encoding or other print error — cache already written, continue
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
