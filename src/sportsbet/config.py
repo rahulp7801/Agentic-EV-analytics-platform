@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings
 
 
@@ -18,8 +18,9 @@ class Settings(BaseSettings):
     odds_api_key: str | None = None
 
     # Risk management — Kelly Criterion configuration (Phase 5 agents read these)
-    bankroll_usd: float = 10000.0
-    max_kelly_fraction: float = 0.25
+    bankroll_usd: float = Field(default=10000.0, gt=0)
+    max_kelly_fraction: float = Field(default=0.25, ge=0, le=1)
+    experimental_probability_adjustments: bool = False
 
     # Vig removal method for devigging market odds (Phase 15 — QUANT-02)
     # "multiplicative": proportional normalization (standard, default)

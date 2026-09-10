@@ -81,9 +81,9 @@ _args, _unknown = _parser.parse_known_args()
 TARGET_DATE = _args.date or (datetime.now() + timedelta(days=1)).strftime("%Y%m%d")
 TEAM_A = _args.team_a
 TEAM_B = _args.team_b
-SEASON  = 2025
 FORCE   = _args.force
 TARGET_DATE_OBJ = datetime.strptime(TARGET_DATE, "%Y%m%d").date()
+SEASON = TARGET_DATE_OBJ.year if TARGET_DATE_OBJ.month >= 10 else TARGET_DATE_OBJ.year - 1
 
 _ESPN_NBA_SCOREBOARD = (
     "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
@@ -418,37 +418,25 @@ async def run_ev_for_player(
         "player_steals", "player_blocks", "player_pra",
     }
 
-    # PrizePicks-only goblin filter: -110 = easy "goblin" line with inflated hit rate.
-    # Real sportsbooks (DraftKings, FanDuel) price standard lines at -110 — that is NOT
-    # a goblin; it is the normal market vig. Only filter -110 for PrizePicks source.
-    def _is_prizepicks_goblin(s: PlayerPropSnapshotCreate) -> bool:
-        return s.sportsbook.lower() == "prizepicks" and int(s.price) == -110
-
-    prop_types = list({
-        s.prop_type for s in all_snapshots
-        if player_name.lower() in s.player_name.lower()
-        and s.side == "Over"
-        and s.prop_type in _SUPPORTED_PROP_TYPES
-        and not _is_prizepicks_goblin(s)
-    })
-
+    # Compare prices only within the same player/market/line. Evaluate both sides,
+    # including Under-only listings; a cheaper alternate line is a different bet.
+    player_quotes = [q for q in all_snapshots
+        if q.player_name.strip().casefold() == player_name.strip().casefold()
+        and q.prop_type in _SUPPORTED_PROP_TYPES and q.side in ("Over", "Under")
+        and q.sportsbook.lower() != "prizepicks"]
+    selections = sorted({(q.prop_type, q.line) for q in player_quotes})
     results = []
-    for prop_idx, prop_type in enumerate(prop_types, 1):
-        snaps = sorted(
-            [s for s in all_snapshots
-             if player_name.lower() in s.player_name.lower()
-             and s.prop_type == prop_type
-             and s.side == "Over"
-             and not _is_prizepicks_goblin(s)],
-            key=lambda s: american_to_raw_prob(s.price),
-        )
-        if not snaps:
-            continue
-        snap = snaps[0]
-        prop_line = float(snap.line)
+    for prop_idx, (prop_type, line) in enumerate(selections, 1):
+        quotes = {}
+        for side in ("Over", "Under"):
+            candidates = [q for q in player_quotes if q.prop_type == prop_type and q.line == line and q.side == side]
+            if candidates:
+                quotes[side] = min(candidates, key=lambda q: american_to_raw_prob(q.price))
+        snap = quotes.get("Over") or quotes["Under"]
+        prop_line = float(line)
 
         prop_label = prop_type.replace("player_", "").upper()
-        print(f"      [{prop_idx}/{len(prop_types)}] {prop_label} O{prop_line} — invoking graph...", flush=True)
+        print(f"      [{prop_idx}/{len(selections)}] {prop_label} O{prop_line} — invoking graph...", flush=True)
         t0 = time.perf_counter()
 
         # Build injury_flags for the arbitrage agent's bullet_3 — marks
@@ -486,6 +474,7 @@ async def run_ev_for_player(
                         "request_type": "nba_prop_analysis",
                         # Price and sportsbook exported below must be the quote evaluated.
                         "player_prop_snapshots": [snap],
+                        "prop_side": snap.side.lower(),
                         "situational_params": _situational if _situational else None,
                     },
                     config={"configurable": {"thread_id": f"{thread_id}-{prop_type}"}},
@@ -517,37 +506,16 @@ async def run_ev_for_player(
         else:
             print(f"        => no data  ({elapsed:.1f}s)", flush=True)
 
-        results.append({
-            "player":     player_name,
-            "prop_type":  prop_type,
-            "line":       prop_line,
-            "prop":       prop,
-            "ev":         ev,
-            "pending":    pending,
-            "context":    context,
-            "snap_price": int(snap.price),
-            "snap_sportsbook": snap.sportsbook,
-            "direction":  "over",
-            "quote": snap,
-            "gate_reason": state.get("gate_reason"),
-        })
-
-        # Evaluate Under through the identical pricing and sample gates.
-        under_snaps = sorted(
-            [q for q in all_snapshots if q.player_name.casefold() == snap.player_name.casefold()
-             and q.prop_type == snap.prop_type and q.line == snap.line and q.side == "Under"],
-            key=lambda q: american_to_raw_prob(q.price),
-        )
-        if under_snaps:
-            u_snap = under_snaps[0]
-            under = await make_prop_arbitrage_agent(sport="nba")({
-                **state, "prop_side": "under", "player_prop_snapshots": [u_snap],
+        for side, quote in quotes.items():
+            evaluated = state if quote is snap else await make_prop_arbitrage_agent(sport="nba")({
+                **state, "prop_side": side.lower(), "player_prop_snapshots": [quote],
             })
             results.append({
                 "player": player_name, "prop_type": prop_type, "line": prop_line,
-                "prop": prop, "ev": under.get("ev_signal"), "pending": [], "context": context,
-                "snap_price": int(u_snap.price), "snap_sportsbook": u_snap.sportsbook,
-                "direction": "under", "gate_reason": under.get("gate_reason"), "quote": u_snap,
+                "prop": prop, "ev": evaluated.get("ev_signal"),
+                "pending": evaluated.get("pending_signals") or [], "context": context,
+                "snap_price": int(quote.price), "snap_sportsbook": quote.sportsbook,
+                "direction": side.lower(), "gate_reason": evaluated.get("gate_reason"), "quote": quote,
             })
 
     return results
@@ -796,7 +764,7 @@ async def main():
                 reason = 'missing_start_time'
             elif datetime.now(timezone.utc) >= quote.game_start_time:
                 reason = 'game_started'
-            elif (datetime.now(timezone.utc) - quote.snapped_at).total_seconds() > 300:
+            elif not -60 <= (datetime.now(timezone.utc) - quote.snapped_at).total_seconds() <= 300:
                 reason = 'stale_quote'
             else:
                 accepted, reason = ledger.reserve(sig, r['line'])

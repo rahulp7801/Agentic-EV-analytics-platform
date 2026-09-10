@@ -85,6 +85,7 @@ def _make_nfl_state(
                     sport="nfl",
                     game_id="2024_01_KC_LV",
                     player_name="Patrick Mahomes",
+                    side="Over",
                     sportsbook="draftkings",
                     prop_type="player_pass_yds",  # Odds API market key format (corrected from player_pass_yards)
                     line=Decimal("250.5"),
@@ -114,6 +115,7 @@ def _make_nfl_state(
         "pending_signals": [],
         "cleared_signals": [],
         "prop_type": "pass_yds",
+        "player_name": "Patrick Mahomes",
         "prop_line": "250.5",
         "player_prop_snapshots": player_prop_snapshots,
     }
@@ -145,6 +147,7 @@ def _make_nba_state(
                     sport="nba",
                     game_id="2024_NBA_LAL_BOS",
                     player_name="LeBron James",
+                    side="Over",
                     sportsbook="draftkings",
                     prop_type="player_points",  # Odds API market key format
                     line=Decimal("22.5"),
@@ -174,6 +177,7 @@ def _make_nba_state(
         "pending_signals": [],
         "cleared_signals": [],
         "prop_type": "points",
+        "player_name": "LeBron James",
         "prop_line": "22.5",
         "player_prop_snapshots": player_prop_snapshots,
     }
@@ -359,6 +363,7 @@ class TestProp06PlayerPropSnapshot:
             sport="nfl",
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
+                    side="Over",
             sportsbook="draftkings",
             prop_type="player_pass_yds",  # corrected from player_pass_yards
             line=Decimal("250.5"),
@@ -402,6 +407,7 @@ class TestProp06PlayerPropSnapshot:
             sport="nfl",
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
+                    side="Over",
             sportsbook="draftkings",
             prop_type="player_pass_yds",  # Odds API format (corrected from player_pass_yards)
             line=Decimal("250.5"),
@@ -518,6 +524,7 @@ class TestProp06CommensurableEV:
             sport="nfl",
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
+                    side="Over",
             sportsbook="draftkings",
             prop_type="player_pass_yds",  # corrected from player_pass_yards
             line=Decimal("250.5"),
@@ -556,6 +563,7 @@ class TestProp06CommensurableEV:
             sport="nfl",
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
+                    side="Over",
             sportsbook="draftkings",
             prop_type="player_pass_yds",  # corrected from player_pass_yards
             line=Decimal("250.5"),
@@ -589,6 +597,7 @@ class TestProp06CommensurableEV:
             sport="nfl",
             game_id="2024_01_KC_LV",
             player_name="Patrick Mahomes",
+                    side="Over",
             sportsbook="draftkings",
             prop_type="player_pass_yds",  # corrected from player_pass_yards
             line=Decimal("250.5"),

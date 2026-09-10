@@ -85,7 +85,7 @@ def _build_prop_trade_plan(
         Bullet 3: Kelly sizing + injury flags.
 
     For NFL (nba_context=None):
-        Bullet 1: EV edge on the specific prop market.
+        Bullet 1: probability edge on the specific prop market.
         Bullet 2: Kelly sizing with sample_size and mean_stat from PropResult.
         Bullet 3: injury flags or clean bill of health.
 
@@ -118,10 +118,10 @@ def _build_prop_trade_plan(
     )
     kelly_str = f"Kelly: {float(kelly_frac):.1%} bankroll stake (fractional, not flat)"
 
-    if nba_context is not None:
+    if nba_context is not None and _settings.experimental_probability_adjustments:
         # Bullet 1: historical base + EV edge
         bullet_1 = (
-            f"+{float(ev_pct):.1%} EV edge on {market_type} | "
+            f"+{float(ev_pct):.1%} probability edge on {market_type} | "
             f"n={sample} games, mean={mean} historical"
         )
 
@@ -160,11 +160,11 @@ def _build_prop_trade_plan(
             flagged = ", ".join(f"{p} ({s})" for p, s in injury_flags.items())
             bullet_3 = f"{kelly_str} · Injury flags: {flagged}"
         else:
-            bullet_3 = f"{kelly_str} · No material injury flags"
+            bullet_3 = f"{kelly_str} · No verified injury flags supplied"
 
     else:
         # NFL path (no nba_context)
-        bullet_1 = f"+{float(ev_pct):.1%} EV edge on {market_type} prop market"
+        bullet_1 = f"+{float(ev_pct):.1%} probability edge on {market_type} prop market"
         bullet_2 = (
             f"Kelly sizing: {float(kelly_frac):.1%} fractional stake "
             f"(n={sample}, historical mean={mean}, bankroll-relative)"
@@ -173,7 +173,7 @@ def _build_prop_trade_plan(
             flagged = ", ".join(f"{p} ({s})" for p, s in injury_flags.items())
             bullet_3 = f"Material injury flags: {flagged}"
         else:
-            bullet_3 = "No material injury flags for this game"
+            bullet_3 = "No verified injury flags supplied for this game"
 
     return [bullet_1, bullet_2, bullet_3]
 
@@ -262,13 +262,9 @@ def make_prop_arbitrage_agent(
         if snapshots:
             for snap in snapshots:
                 type_match = snap.prop_type == normalized_prop_type
-                line_match = (target_line is None) or (snap.line == target_line)
-                player_match = (
-                    not target_player
-                    or target_player.lower() in snap.player_name.lower()
-                )
-                # PropResult is P(Over); never compare it to an Under quote.
-                side_match = snap.side == direction.title() or (direction == "over" and snap.side in (None, ""))
+                line_match = target_line is not None and snap.line == target_line
+                player_match = bool(target_player) and target_player.strip().casefold() == snap.player_name.strip().casefold()
+                side_match = (snap.side or "").casefold() == direction
                 if type_match and line_match and player_match and side_match:
                     matched_snapshot = snap
                     break
@@ -287,21 +283,8 @@ def make_prop_arbitrage_agent(
                 else {}
             )
         else:
-            # Guard 2b: fall back to context_signals.odds_snapshot (non-prop or snapshot-missing routes)
-            if context_signals is None or context_signals.odds_snapshot is None:
-                log.info(
-                    "prop_arbitrage_agent.no_prop_snapshot",
-                    sport=resolved_sport,
-                    prop_type=target_prop_type,
-                    prop_line=str(raw_line),
-                    reason="no matching PlayerPropSnapshot found in state and no odds_snapshot fallback",
-                )
-                return _NO_SIGNAL
-            snapshot = context_signals.odds_snapshot
-            implied_prob = snapshot.implied_probability
-            american_odds = snapshot.american_odds
-            market_type = snapshot.market_type
-            injury_flags = context_signals.injury_flags
+            # A game-moneyline quote cannot price a player prop. Fail closed.
+            return {**_NO_SIGNAL, "gate_reason": "missing_matching_prop_quote"}
 
         push_prob = prop_result.push_probability
         true_prob: Decimal = prop_result.true_probability if direction == "over" else Decimal("1") - prop_result.true_probability - push_prob
@@ -340,7 +323,7 @@ def make_prop_arbitrage_agent(
                 implied_prob=str(implied_prob),
                 reason="ev_pct > _EV_CAP — likely model overconfidence or easy/goblin line",
             )
-            return _NO_SIGNAL
+            return {**_NO_SIGNAL, "gate_reason": "edge_review_limit"}
 
         # Kelly sizing — Decimal(str(...)) pattern locked in Phase 2
         kelly_frac = fractional_kelly(
@@ -376,7 +359,9 @@ def make_prop_arbitrage_agent(
             ev_percentage=ev_pct,
             expected_return=compute_expected_return(true_prob, net_payout, push_prob),
             push_probability=push_prob,
-            confidence_interval=prop_result.confidence_interval if direction == "over" else None,
+            confidence_interval=(prop_result.confidence_interval if direction == "over" else
+                (tuple(Decimal("1") - x for x in reversed(prop_result.confidence_interval))
+                 if prop_result.confidence_interval is not None and push_prob == 0 else None)),
             sample_size=prop_result.sample_size,
             data_source=prop_result.data_source,
             game_id=state.get("game_id"),

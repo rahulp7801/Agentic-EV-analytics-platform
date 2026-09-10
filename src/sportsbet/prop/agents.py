@@ -26,6 +26,7 @@ State key contract (GraphState fields read by this agent):
 """
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from typing import Any, Callable, Coroutine, Optional
 
@@ -33,6 +34,7 @@ import asyncpg
 import structlog
 from pydantic import ValidationError
 
+from sportsbet.config import settings
 from sportsbet.graph.models import PropParams, PropResult
 from sportsbet.graph.state import GraphState
 from sportsbet.kinematic.models import KinematicAnalysis
@@ -90,14 +92,14 @@ def _apply_kinematic_adjustment(
         return result
     if prop_type not in RECEIVING_PROPS:
         return result
-    if result.true_probability is None:
+    if result.true_probability is None or result.push_probability > 0:
         return result
     if not kinematic.geometric_mismatch_flag:
         return result
 
     adjusted = result.true_probability + KINEMATIC_BOOST
     adjusted = max(Decimal("0.01"), min(Decimal("0.99"), adjusted))
-    return result.model_copy(update={"true_probability": adjusted, "data_source": "postgresql+kinematic"})
+    return result.model_copy(update={"true_probability": adjusted, "data_source": f"{result.data_source or 'unknown'}+kinematic", "confidence_interval": None})
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +166,10 @@ def make_prop_quant_agent(
                 game_id=game_id,
                 player_id=player_id,
                 season=season,
+                as_of_date=state.get("as_of_date") or date.today(),
+                opponent_team=state.get("opponent_team"),
+                home_away=state.get("home_away"),
+                last_n_games=state.get("last_n_games"),
                 sport="nfl",
                 prop_type=prop_type,  # type: ignore[arg-type]
                 line=line,
@@ -202,7 +208,8 @@ def make_prop_quant_agent(
                 session_id=session_id,
                 prop_type=params.prop_type,
             )
-        result = _apply_kinematic_adjustment(result, kinematic_result, params.prop_type)
+        if settings.experimental_probability_adjustments:
+            result = _apply_kinematic_adjustment(result, kinematic_result, params.prop_type)
 
         log.info(
             "prop_quant_agent_complete",

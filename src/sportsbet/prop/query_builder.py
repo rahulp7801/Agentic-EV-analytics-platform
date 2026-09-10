@@ -245,29 +245,25 @@ class PropQueryBuilder:
                 args.append(position)
                 next_idx += 2
 
-        # last_n_games filter — (season, week) IN subquery with ORDER BY + LIMIT $N
-        # Applied LAST so the subquery's opponent_team filter (if present) narrows
-        # the recency window correctly for "last N games vs opponent" queries.
-        # Uses (season, week) tuple as the stable composite key — existing player_stats
-        # rows have NULL game_id (game_id added as nullable in migration 0005).
+        if params.as_of_date is not None:
+            # Legacy player_stats rows lack game_id: match the player's own schedule,
+            # never the first game of the week (Thursday vs Sunday leakage).
+            sql += (
+                f"  AND EXISTS (SELECT 1 FROM games g WHERE g.season = player_stats.season"
+                f" AND g.week = player_stats.week"
+                f" AND (g.home_team = player_stats.team OR g.away_team = player_stats.team)"
+                f" AND g.game_date < ${next_idx})\n"
+            )
+            args.append(params.as_of_date)
+            next_idx += 1
+
         if params.last_n_games is not None:
-            subq_conditions = "player_id = $1 AND season >= $2"
-            # Reuse opponent_team filter in subquery if present
-            # opponent_team is always the first filter appended after base args (index 4)
-            # when no params.filters keys are present. Track its position via current args.
-            if params.opponent_team is not None:
-                # Find the index of opponent_team in args (1-indexed for asyncpg $N)
-                opp_arg_idx = args.index(params.opponent_team) + 1
-                subq_conditions += f" AND opponent_team = ${opp_arg_idx}"
-            sql = sql + (
-                f"  AND (season, week) IN (\n"
-                f"      SELECT season, week FROM player_stats\n"
-                f"      WHERE {subq_conditions}\n"
-                f"      ORDER BY season DESC, week DESC\n"
-                f"      LIMIT ${next_idx}\n"
-                f"  )\n"
+            # Select recent games AFTER every filter, including cutoff/location.
+            conditions = sql.split("WHERE ", 1)[1]
+            sql += (
+                f"  AND (season, week) IN (SELECT season, week FROM player_stats "
+                f"WHERE {conditions} ORDER BY season DESC, week DESC LIMIT ${next_idx})\n"
             )
             args.append(params.last_n_games)
-            next_idx += 1
 
         return sql, tuple(args)

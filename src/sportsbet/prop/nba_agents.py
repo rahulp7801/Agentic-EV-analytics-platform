@@ -40,6 +40,7 @@ import asyncpg
 import structlog
 from pydantic import ValidationError
 
+from sportsbet.config import settings
 from sportsbet.graph.models import NBAContextSignals, PropParams, PropResult
 from sportsbet.graph.state import GraphState
 from sportsbet.prop.nba_executor import (
@@ -247,7 +248,8 @@ def make_nba_quant_agent(
 
         # Apply contextual adjustments from NBAContextSignals in GraphState
         context_signals: Optional[NBAContextSignals] = state.get("nba_context_signals")  # type: ignore[union-attr]
-        result = _apply_nba_context_adjustments(result, context_signals, params.prop_type)
+        if settings.experimental_probability_adjustments:
+            result = _apply_nba_context_adjustments(result, context_signals, params.prop_type)
 
         log.info(
             "nba_quant_agent_complete",

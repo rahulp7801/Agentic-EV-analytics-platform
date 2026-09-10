@@ -302,7 +302,7 @@ class NBAQueryBuilder:
                     sql = sql + (
                         f"  AND NOT EXISTS (\n"
                         f"      SELECT 1 FROM nba_player_gamelogs gl2\n"
-                        f"      WHERE gl2.game_date = nba_player_gamelogs.game_date\n"
+                        f"      WHERE gl2.game_id = nba_player_gamelogs.game_id\n"
                         f"        AND gl2.player_name ILIKE ${next_idx}\n"
                         f"  )\n"
                     )
@@ -311,12 +311,7 @@ class NBAQueryBuilder:
 
             # last_n_games filter — game_id IN subquery (gamelogs have game_id)
             if params.last_n_games is not None:
-                subq_conditions = "player_id = $1 AND season >= $2"
-                if cutoff_idx is not None:
-                    subq_conditions += f" AND game_date < ${cutoff_idx}"
-                if params.opponent_team is not None:
-                    opp_arg_idx = args.index(params.opponent_team) + 1
-                    subq_conditions += f" AND opponent_team = ${opp_arg_idx}"
+                subq_conditions = sql.split("WHERE ", 1)[1]
                 sql = sql + (
                     f"  AND game_id IN (\n"
                     f"      SELECT game_id FROM nba_player_gamelogs\n"

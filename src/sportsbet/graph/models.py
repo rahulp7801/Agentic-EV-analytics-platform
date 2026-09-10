@@ -205,12 +205,12 @@ class PropParams(BaseModel):
     # Situational filter extensions (Phase 18 — SC-3)
     # All Optional with None defaults — backward compatible; existing callers unchanged.
     # ConfigDict(strict=True) accepts Optional[T] = None per Phase 9 locked decision.
-    last_n_games: Optional[int] = None
+    last_n_games: Optional[Annotated[int, Field(ge=1)]] = None
     teammate_out: Optional[list[str]] = None
     teammate_out_contexts: Optional[list[dict[str, str]]] = None
     opponent_team: Optional[str] = None
     home_away: Optional[Literal["home", "away"]] = None
-    # Exclusive NBA game-date cutoff; historical callers must set this explicitly.
+    # Exclusive game-date cutoff; historical callers must set this explicitly.
     as_of_date: Optional[date] = None
 
 

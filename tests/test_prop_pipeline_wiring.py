@@ -29,6 +29,7 @@ from sportsbet.graph.models import (
 )
 from sportsbet.graph.router import route_from_master
 from sportsbet.graph.graph import create_graph
+from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.graph.graph import make_correlation_guard_node, make_aggregator_node
 
@@ -97,6 +98,10 @@ def _make_base_state(**overrides) -> dict:  # type: ignore[type-arg]
         "prop_filters": None,
     }
     base.update(overrides)
+    base['player_name'] = 'Test Player'
+    base['player_prop_snapshots'] = [PlayerPropSnapshotCreate(sport='nba' if base['prop_type']=='points' else 'nfl',
+        player_name='Test Player',sportsbook='draftkings',prop_type='player_'+base['prop_type'],
+        side='Over',line=Decimal(base['prop_line']),price=100,implied_probability=Decimal('.5'))]
     return base
 
 

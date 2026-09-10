@@ -38,10 +38,12 @@ def alembic_cfg() -> Config:
 def pg_engine() -> Engine:  # type: ignore[return]
     """Synchronous SQLAlchemy engine for the test database.
 
-    Uses SPORTSBET_TEST_DATABASE_URL if set; falls back to settings.database_url.
+    Requires an explicit disposable SPORTSBET_TEST_DATABASE_URL.
     Skips automatically if PostgreSQL is not reachable.
     """
-    url = os.environ.get("SPORTSBET_TEST_DATABASE_URL", settings.database_url)
+    url = os.environ.get("SPORTSBET_TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("SPORTSBET_TEST_DATABASE_URL not set")
     try:
         # connect_args timeout ensures fast skip when PostgreSQL is not running.
         engine = sqlalchemy.create_engine(
@@ -53,7 +55,7 @@ def pg_engine() -> Engine:  # type: ignore[return]
             pass
         return engine
     except Exception as exc:  # noqa: BLE001
-        pytest.skip(f"PostgreSQL not reachable: {exc}")
+        pytest.skip(f"Test PostgreSQL unavailable ({type(exc).__name__})")
 
 
 @pytest.fixture
