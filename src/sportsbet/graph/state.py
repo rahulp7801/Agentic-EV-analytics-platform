@@ -13,7 +13,7 @@ Design notes (locked decisions from CONTEXT.md):
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Optional, TypedDict
 
 from sportsbet.graph.models import ContextSignals, NBAContextSignals, PropResult
@@ -133,6 +133,7 @@ class GraphState(TypedDict):
     session_id: str
     request_type: str
     created_at: datetime
+    as_of_date: date | None  # Exclusive history cutoff for NBA predictions.
     game_id: str
     season: int
     week: int

@@ -260,12 +260,13 @@ async def run_nba_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResu
     is_conditional = bool(
         params.last_n_games is not None
         or params.teammate_out
+        or params.teammate_out_contexts
         or params.opponent_team is not None
         or params.home_away is not None
     )
-    if is_conditional:
+    if params.as_of_date is not None or (is_conditional and params.prop_type != "double_double"):
         gamelog_result = await run_nba_gamelog_query(pool, params)
-        if gamelog_result.sample_size == 0 and gamelog_result.data_source == "insufficient_sample":
+        if is_conditional and gamelog_result.sample_size == 0 and gamelog_result.data_source == "insufficient_sample":
             log.info(
                 "nba_gamelog_fallback_to_season_aggregate",
                 prop_type=params.prop_type,
@@ -280,6 +281,13 @@ async def run_nba_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResu
                 "opponent_team": None,
                 "home_away": None,
             })
+            if params.as_of_date is not None:
+                # Season totals are not point-in-time data. Keep the cutoff when
+                # broadening sparse matchup filters, including the empty case.
+                fallback = await run_nba_gamelog_query(pool, params)
+                if fallback.true_probability is not None:
+                    fallback = fallback.model_copy(update={"data_source": "pregame_fallback"})
+                return fallback
         else:
             return gamelog_result
 

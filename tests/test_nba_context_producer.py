@@ -164,13 +164,7 @@ async def test_invalid_player_id_empty_string():
 
 
 async def test_decimal_wrapping_opponent_def_rating():
-    """Test 5: Decimal wrapping — opponent_def_rating must be a Decimal instance.
-
-    avg_pts_per_game=16.0, LEAGUE_AVG_PTS_PER_PLAYER=8.0.
-    normalized = 115.0 * (16.0 / 8.0) = 230.0, clamped to 140.0.
-    assert isinstance(signals.opponent_def_rating, Decimal) == True
-    assert signals.opponent_def_rating == Decimal("140")
-    """
+    """Defense stays neutral; offensive season averages must not adjust it."""
     target_date = date(2025, 1, 15)
     last_game_date = date(2025, 1, 14)
 
@@ -191,10 +185,9 @@ async def test_decimal_wrapping_opponent_def_rating():
     assert isinstance(signals.opponent_def_rating, Decimal), (
         f"opponent_def_rating must be Decimal, got {type(signals.opponent_def_rating)}"
     )
-    # 115.0 * (16.0/8.0) = 230.0, clamped to 140
-    assert signals.opponent_def_rating == Decimal("140"), (
-        f"Expected clamped Decimal('140'), got {signals.opponent_def_rating}"
-    )
+    assert signals.opponent_def_rating == LEAGUE_AVG_DEF_RATING
+    conn = pool.acquire.return_value.__aenter__.return_value
+    assert conn.fetchrow.await_count == 1  # only pre-game history, no season aggregate
 
 
 async def test_no_opponent_stats_falls_back_to_league_avg():

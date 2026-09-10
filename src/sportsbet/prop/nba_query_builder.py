@@ -182,7 +182,8 @@ WHERE player_id = $1
 def _is_conditional(params: "PropParams") -> bool:
     """Return True if any Phase 18 situational filter field is set."""
     return bool(
-        params.last_n_games is not None
+        params.as_of_date is not None
+        or params.last_n_games is not None
         or params.teammate_out
         or params.teammate_out_contexts
         or params.opponent_team is not None
@@ -244,12 +245,26 @@ class NBAQueryBuilder:
         # --- Phase 18: conditional gamelog path ---
         # Dispatch to nba_player_gamelogs when any situational filter is set.
         # double_double excluded: no per-game composite binary model in v1.
-        if _is_conditional(params) and params.prop_type != "double_double":
+        if _is_conditional(params) and (params.prop_type != "double_double" or params.as_of_date is not None):
             args: list[object] = [player_id_int, params.season, float(params.line)]
             next_idx = 4
 
             # Select gamelog template from static allowlist (not user input)
-            if params.prop_type == "pra":
+            if params.prop_type == "double_double":
+                # Actual per-game double-doubles, including steals and blocks.
+                categories = " + ".join(
+                    f"CASE WHEN {column} >= 10 THEN 1 ELSE 0 END"
+                    for column in ("points", "rebounds", "assists", "steals", "blocks")
+                )
+                sql = (
+                    "SELECT COUNT(*) AS total, "
+                    f"SUM(CASE WHEN ({categories}) >= 2 THEN 1 ELSE 0 END) AS successes, "
+                    "NULL AS mean_val FROM nba_player_gamelogs "
+                    "WHERE player_id = $1 AND season >= $2\n"
+                )
+                args = [player_id_int, params.season]
+                next_idx = 3
+            elif params.prop_type == "pra":
                 sql: str = _NBA_GAMELOG_PRA_TEMPLATE
             else:
                 col: str = NBA_GAMELOG_COLUMN_MAP[params.prop_type]  # type: ignore[index]
@@ -257,6 +272,13 @@ class NBAQueryBuilder:
 
             # Append situational filters — same security invariants as PropQueryBuilder:
             # column names from static allowlist; values in positional $N args only.
+
+            cutoff_idx = None
+            if params.as_of_date is not None:
+                cutoff_idx = next_idx
+                sql += f"  AND game_date < ${next_idx}\n"
+                args.append(params.as_of_date)
+                next_idx += 1
 
             # opponent_team filter
             if params.opponent_team is not None:
@@ -288,6 +310,8 @@ class NBAQueryBuilder:
             # last_n_games filter — game_id IN subquery (gamelogs have game_id)
             if params.last_n_games is not None:
                 subq_conditions = "player_id = $1 AND season >= $2"
+                if cutoff_idx is not None:
+                    subq_conditions += f" AND game_date < ${cutoff_idx}"
                 if params.opponent_team is not None:
                     opp_arg_idx = args.index(params.opponent_team) + 1
                     subq_conditions += f" AND opponent_team = ${opp_arg_idx}"

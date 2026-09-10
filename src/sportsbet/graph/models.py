@@ -12,7 +12,7 @@ Design contract:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Optional
 
@@ -201,6 +201,8 @@ class PropParams(BaseModel):
     teammate_out_contexts: Optional[list[dict[str, str]]] = None
     opponent_team: Optional[str] = None
     home_away: Optional[Literal["home", "away"]] = None
+    # Exclusive NBA game-date cutoff; historical callers must set this explicitly.
+    as_of_date: Optional[date] = None
 
 
 class PropResult(BaseModel):

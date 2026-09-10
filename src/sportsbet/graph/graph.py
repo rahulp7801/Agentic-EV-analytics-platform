@@ -452,7 +452,7 @@ async def create_graph_with_sqlite(
         from sportsbet.prop.nba_agents import make_nba_quant_agent
         from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
         prop_quant_node = make_prop_quant_agent(pool)
-        nba_quant_node = make_nba_quant_agent(pool)
+        nba_quant_node = make_nba_quant_agent(pool, target_date=target_date)
         prop_arbitrage_node = make_prop_arbitrage_agent(sport=None)  # auto-detect NFL/NBA from state (Phase 14 — PROP-06)
 
     # Phase 20 Plan 02: NBA context signals producer — gated on pool availability

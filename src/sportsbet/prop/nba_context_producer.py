@@ -2,14 +2,15 @@
 
 make_nba_context_signals_producer(pool, target_date=None) returns an async
 callable compatible with the LangGraph node interface. The returned node reads
-nba_player_gamelogs to compute rest_days and opponent_def_rating, then writes
+nba_player_gamelogs to compute rest_days and home/away, then writes
 NBAContextSignals into GraphState before make_nba_quant_agent runs.
 
 Purpose: INT-3 gap closure. nba_context_signals is always None in automated
 runs because no pipeline node sets it. The four-stage adjustment in
 _apply_nba_context_adjustments (pace, def_rating, rest, home) is fully
 implemented but receives context=None and returns immediately. This producer
-feeds it real data.
+feeds it game-log context. Defense and pace remain neutral constants until
+actual point-in-time team metrics are available.
 
 Design decisions (Phase 20 locked):
 - Module-level imports for patchability (Phase 8 pattern)
@@ -25,13 +26,11 @@ Design decisions (Phase 20 locked):
 
 SQL queries:
 - nba_player_gamelogs: get team_abbreviation + last game_date for player/season
-- nba_player_stats: get avg_pts_per_game for opponent's scoring proxy
 """
 from __future__ import annotations
 
 import structlog
 from datetime import date as date_cls
-from decimal import Decimal
 from typing import Any, Callable, Coroutine, Optional
 
 import asyncpg
@@ -45,8 +44,6 @@ log = structlog.get_logger()
 # Module constants
 # ---------------------------------------------------------------------------
 
-LEAGUE_AVG_PTS_PER_PLAYER: float = 11.0
-
 # SQL: most recent gamelog entry for player before the target game date.
 # Filtering by game_date < $2 (target date) instead of season = $2 avoids
 # season-numbering mismatches (2025 label vs 2026 label for the same NBA season)
@@ -58,15 +55,6 @@ _SQL_LAST_GAME = """
       AND game_date < $2
     ORDER BY game_date DESC
     LIMIT 1
-"""
-
-# SQL: opponent scoring proxy from nba_player_stats (season aggregate)
-# avg_pts_per_game approximates defensive rating via points allowed per player
-_SQL_OPP_DEF = """
-    SELECT AVG(CAST(points AS FLOAT) / NULLIF(games_played, 0)) AS avg_pts_per_game
-    FROM nba_player_stats
-    WHERE team_abbreviation = $1
-      AND season = $2
 """
 
 # ---------------------------------------------------------------------------
@@ -122,7 +110,7 @@ def make_nba_context_signals_producer(
     """
 
     async def producer(state: dict[str, Any]) -> dict[str, Any]:
-        today: date_cls = target_date or date_cls.today()
+        today: date_cls = state.get("as_of_date") or target_date or date_cls.today()
 
         # --- 1. Validate player_id ---
         player_id_raw: str = state.get("receiver_gsis_id", "")
@@ -168,24 +156,12 @@ def make_nba_context_signals_producer(
             is_home: bool = team_abbr == home_team
             opponent_abbr: str = away_team if is_home else home_team
 
-            # 2d. Opponent defensive rating proxy from nba_player_stats
-            opp_row = await conn.fetchrow(_SQL_OPP_DEF, opponent_abbr, season)
-
-        # --- 3. Compute opponent_def_rating ---
-        avg_pts_raw = opp_row["avg_pts_per_game"] if opp_row is not None else None
-        if avg_pts_raw is None:
-            # Fall back to league average when no opponent stats
-            normalized = LEAGUE_AVG_DEF_RATING
-        else:
-            avg_pts: float = float(avg_pts_raw)
-            ratio: float = avg_pts / LEAGUE_AVG_PTS_PER_PLAYER
-            normalized = LEAGUE_AVG_DEF_RATING * Decimal(str(round(ratio, 6)))
-            # Clamp to [90, 140]
-            normalized = max(Decimal("90"), min(Decimal("140"), normalized))
-
         # --- 4. Build signals ---
         signals = NBAContextSignals(
-            opponent_def_rating=normalized,
+            # Opponent points scored is not points allowed per possession.
+            # Keep neutral until timestamped team defense/pace data is ingested;
+            # season totals would also leak future games into historical scans.
+            opponent_def_rating=LEAGUE_AVG_DEF_RATING,
             pace_factor=LEAGUE_AVG_PACE,
             rest_days=rest_days,
             is_home=is_home,

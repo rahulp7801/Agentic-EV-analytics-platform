@@ -524,6 +524,7 @@ async def run_ev_for_player(
                         "session_id": "scan",
                         "game_id": f"{home_team.lower()}_{away_team.lower()}_{TARGET_DATE}",
                         "season": SEASON,
+                        "as_of_date": TARGET_DATE_OBJ,
                         "week": 1,
                         "home_team": home_team,
                         "away_team": away_team,

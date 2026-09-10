@@ -33,6 +33,7 @@ Request routing:
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import date
 from typing import Any, Callable, Coroutine, Optional
 
 import asyncpg
@@ -124,7 +125,10 @@ def _apply_nba_context_adjustments(
     # Stage 5: Clamp to valid probability domain
     prob = max(Decimal("0.01"), min(Decimal("0.99"), prob))
 
-    return result.model_copy(update={"true_probability": prob, "data_source": "postgresql+nba_context"})
+    return result.model_copy(update={
+        "true_probability": prob,
+        "data_source": f"{result.data_source or 'unknown'}+nba_context",
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +138,7 @@ def _apply_nba_context_adjustments(
 
 def make_nba_quant_agent(
     pool: asyncpg.Pool,
+    target_date: date | None = None,
 ) -> Callable[[GraphState], Coroutine[Any, Any, dict[str, Any]]]:
     """Return an async NBA prop quant agent node bound to the given asyncpg pool.
 
@@ -215,6 +220,7 @@ def make_nba_quant_agent(
                 teammate_out_contexts=teammate_out_contexts,
                 opponent_team=opponent_team,
                 home_away=home_away_param,  # type: ignore[arg-type]
+                as_of_date=state.get("as_of_date") or target_date or date.today(),
             )
         except ValidationError as exc:
             log.error(
