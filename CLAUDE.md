@@ -4,6 +4,7 @@
 
 - Canonical repository: https://github.com/rahulp7801/Agentic-EV-analytics-platform, origin/master. All commits, CI, and deployment integration belong here.
 - Make frequent verified commits. Do not add assistant co-author/contributor trailers. Keep this file current.
+- All changes must use a feature branch and PR; merge only after required checks pass. Never push directly to master or bypass its protection. Master requires up-to-date backend/frontend/PostgreSQL and all three CodeQL checks, including for admins; no force pushes/deletion. A PR is required but no second human approval is required (single-owner workflow).
 - User priorities: working model/LangGraph, accurate metrics, security, GitHub CI/CD, Vercel, NFL/NBA season readiness. Visual redesign is deferred.
 - Stay grounded in executed code. Never invent source data, model confidence, settled outcomes, performance, service health, or successful deployment.
 - Keep implementation details out of product-facing messages; retain actionable diagnostic detail in developer documentation without credentials.

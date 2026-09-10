@@ -136,25 +136,15 @@ def test_backtest_roi_calculation() -> None:
     assert report.roi == pytest.approx(0.1454, abs=1e-3)
 
 
-def test_backtest_cli_main_prints_output() -> None:
-    """main() prints 'hit_rate' and 'roi' to stdout without raising.
-
-    QUANT-04: python -m sportsbet.quant.backtest exits 0 with output.
-    main() must be importable and callable directly (not only via __main__).
-    Captures stdout via contextlib.redirect_stdout + io.StringIO.
-    """
-    import contextlib
-    import io
-
+def test_backtest_cli_requires_real_input(monkeypatch, capsys) -> None:
     from sportsbet.quant.backtest import main
-
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
+    monkeypatch.setattr("sys.argv", ["backtest"])
+    with pytest.raises(SystemExit) as error:
         main()
-
-    output = buf.getvalue()
-    assert "hit_rate" in output, f"'hit_rate' not found in output: {output!r}"
-    assert "roi" in output, f"'roi' not found in output: {output!r}"
+    assert error.value.code == 2
+    output = capsys.readouterr()
+    assert not output.out
+    assert "required" in output.err
 
 
 def test_backtest_skips_null_probability_signal(caplog: pytest.LogCaptureFixture) -> None:

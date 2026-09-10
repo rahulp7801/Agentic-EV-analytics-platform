@@ -73,7 +73,19 @@ uv run python -m sportsbet.ledger --recommendations-only
 
 ## Verification and deployment
 
-All commits and workflows belong to https://github.com/rahulp7801/Agentic-EV-analytics-platform on `master`.
+All commits and workflows belong to https://github.com/rahulp7801/Agentic-EV-analytics-platform. Work on feature branches, open a PR, then merge to `master` after required checks pass. Direct pushes and protection bypasses are prohibited. Production jobs only run from `master`.
+
+Historical quote replay requires explicit input; it never generates example wins or prices:
+
+```sh
+uv run python -m sportsbet.quant.backtest --snapshots-file quotes.json --outcomes-file outcomes.json
+# Or read recorded database quotes:
+uv run python -m sportsbet.quant.backtest --database --outcomes-file outcomes.json
+```
+
+Quote rows require unique `id`, `game_id`, `sportsbook`, `market_type`, `outcome_name`, `price` (American), and timezone-aware `snapped_at`/`game_start_time`. Props additionally require `player_name` and `line`. Outcomes map the earliest snapshot ID for each exact selection to `true`, `false`, `"push"`, `"void"`, or `null`. Optional `model_probability` requires a `model_version` and timezone-aware `model_generated_at` no later than the entry quote; include `push_probability` for push markets. Missing probabilities cannot produce calibration. Optional `stake` defaults to one unit.
+
+Reports include input hashes, sample coverage, and an explicit evaluation scope. Empty usable datasets exit unsuccessfully with null performance metrics. Replay evaluates the supplied selections; it does not rerun the current model historically or establish profitability. Unit-test fixtures verify arithmetic only.
 
 CI runs the Python suite, dependency audits, frontend metric/access tests, TypeScript/build checks, and an isolated PostgreSQL service for migrations, concurrency, stat upserts, and actual NFL/NBA graph SQL. Production deployment depends on these jobs. Vercel's root directory is `frontend`; automatic Git deployments are disabled so they cannot bypass CI. The CLI uses direct deployment because `vercel pull` currently rejects project-scoped tokens during team lookup.
 

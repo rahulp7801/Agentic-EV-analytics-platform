@@ -112,14 +112,8 @@ class BacktestEngine:
         return report
 
 def main() -> None:
-    from datetime import timezone
-    signals = [BacktestSignal(QuantResult(true_probability=Decimal("0.55")), Decimal("0.60"),
-        won, Decimal("100"), Decimal("1.909"), datetime(2024, 1, 14, 18, tzinfo=timezone.utc),
-        datetime(2024, 1, 14, 17, tzinfo=timezone.utc), datetime(2024, 1, 14, 12, tzinfo=timezone.utc))
-        for won in (True, True, True, False, False)]
-    report = BacktestEngine().run(signals)
-    for name in ("sample_size", "hit_rate", "roi", "clv_mean", "brier_score", "log_loss"):
-        print(f"{name}: {getattr(report, name)}")
+    from sportsbet.quant.backtest_replay import main as replay
+    replay()
 
 if __name__ == "__main__":
     main()
