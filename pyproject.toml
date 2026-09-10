@@ -9,6 +9,8 @@ description = "Quant-Sports Agentic Analytics Platform"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "langgraph>=1.0,<2",
+    "langgraph-checkpoint-sqlite>=3.0,<4",
     "alembic>=1.13",
     "sqlalchemy>=2.0",
     "asyncpg>=0.29",

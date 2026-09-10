@@ -1,5 +1,16 @@
 # Quant-Sports Agentic Analytics Platform (SaaS)
 
+## Maintained implementation notes
+
+- Make small, verified commits. Do not add assistant co-author/contributor trailers.
+- Update this section with important findings and validation as changes land.
+- Actual graph nodes are deterministic Python; no LLM API key is currently consumed.
+- Windows development: Python can be installed locally with uv; use `.venv/Scripts/python.exe` for tests. `.python/` and `.uv-cache/` are local tooling, not source.
+- Runtime imports require both `langgraph` and `langgraph-checkpoint-sqlite`; keep them in `pyproject.toml`.
+- Setup verified with workspace Python 3.12 and editable dev install. Initial graph/arbitrage/prop suite: 56 passed, one pre-existing alias test failure (NBA threes/steals/blocks incorrectly classified as NFL). New pricing tests separately reproduce even-money sizing defects.
+- Known measurement debt: `ev_percentage` currently means probability edge, not expected ROI. Backtest CLV conflates model and entry probabilities; replay compares a quote to itself. NBA probability SQL lacks prediction-date cutoffs. Frontend PropsAnalysis invents +/-5 percentage-point confidence intervals. Do not treat these as validated performance metrics.
+- Known modeling debt: opponent defense is an offensive scoring proxy, pace is constant, and scanner "inactives" are inferred from missing prop listings. Under signals bypass graph risk gates. These are not validated statistical features or consistent portfolio controls.
+
 ## 1. System Persona & Project Objective
 
 You are an expert quantitative developer, data engineer, and AI architect. We are building a low-latency, agentic sports analytics platform designed to identify mathematically profitable (+EV) discrepancies in NFL and NBA betting markets.
