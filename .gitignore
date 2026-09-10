@@ -15,6 +15,9 @@ venv/
 .venv/
 .python/
 .uv-cache/
+.npm-cache/
+.scan*
+scan_out.txt
 env/
 
 # Environment

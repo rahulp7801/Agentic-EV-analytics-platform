@@ -2,6 +2,9 @@
 
 ## Maintained implementation notes
 
+- Evaluation repair: backtests separate model probabilities from entry and closing prices. CLV is raw same-line price-probability movement and requires entry < closing quote < actual start. Replay groups exact outcome/book/line/player identities and keys settlements by entry snapshot ID. Legacy rows without outcome/start metadata are excluded, not guessed. Migration 0007 adds quote identity/start columns; run migrations before ingestion.
+- Pending, push, and void settlements are distinct. ROI excludes pending/void stakes; hit rate and Brier/log loss exclude pushes. Brier/log loss and calibration bins use model predictions only, never substitute bookmaker probabilities. Null-model records can still contribute to price and realized-return metrics. Offline replay supports --snapshots-file and --outcomes-file. Backtest/metrics/context tests: 27 passed.
+
 - Make small, verified commits. Do not add assistant co-author/contributor trailers.
 - Update this section with important findings and validation as changes land.
 - Actual graph nodes are deterministic Python; no LLM API key is currently consumed.

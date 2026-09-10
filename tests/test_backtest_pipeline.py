@@ -1,128 +1,34 @@
-"""Tests for QUANT-04 backtest_replay.py CLI pipeline.
-
-SC-6: odds_snapshots -> BacktestSignal -> BacktestReport pipeline.
-Tests cover CLV-only mode, full ROI mode, and empty snapshots.
-"""
-from __future__ import annotations
-
-from datetime import datetime, timezone
-
+﻿"""Quote replay contract: preserve missing data and selection-specific outcomes."""
+from datetime import datetime, timezone, timedelta
+from unittest.mock import AsyncMock
 import pytest
+from sportsbet.quant.backtest_replay import build_signals, load_snapshots
+from sportsbet.quant.backtest import BacktestEngine
 
-from sportsbet.quant.backtest_replay import build_signals, load_snapshots  # noqa: F401
+START = datetime(2024,1,14,18,tzinfo=timezone.utc)
+ROW = dict(id=1,game_id='game',sportsbook='book',market_type='h2h',outcome_name='KC',line=None,
+           price=-110, snapped_at=START-timedelta(hours=2),game_start_time=START)
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-FIXTURE_ROW = {
-    "id": 1,
-    "game_id": "2024_01_KC_DET",
-    "sportsbook": "fanduel",
-    "market_type": "h2h",
-    "line": None,
-    "price": -110,
-    "snapped_at": datetime(2024, 1, 14, 12, 0, 0, tzinfo=timezone.utc),
-    "game_start_time": datetime(2024, 1, 14, 18, 0, 0, tzinfo=timezone.utc),
-}
-
-FIXTURE_ROW_POSITIVE_ODDS = {
-    "id": 2,
-    "game_id": "2024_01_KC_DET",
-    "sportsbook": "draftkings",
-    "market_type": "h2h",
-    "line": None,
-    "price": 120,
-    "snapped_at": datetime(2024, 1, 14, 12, 30, 0, tzinfo=timezone.utc),
-    "game_start_time": datetime(2024, 1, 14, 18, 0, 0, tzinfo=timezone.utc),
-}
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
-def test_clv_only_mode() -> None:
-    """CLV-only mode: build_signals with no outcomes sets actual_outcome=False.
-
-    BacktestEngine.run() should produce a BacktestReport with clv_mean
-    populated (not None) since we have valid signals with true_probability set.
-    """
-    from sportsbet.quant.backtest import BacktestEngine
-
-    rows = [FIXTURE_ROW, FIXTURE_ROW_POSITIVE_ODDS]
-    signals = build_signals(rows, outcomes=None)
-
-    # All signals have actual_outcome=False in CLV-only mode
-    assert len(signals) == 2
-    for sig in signals:
-        assert sig.actual_outcome is False
-
-    # BacktestEngine produces a report with clv_mean populated
+def test_clv_only_mode():
+    signals = build_signals([ROW, ROW | dict(id=2,price=-120,snapped_at=START-timedelta(minutes=1))])
     report = BacktestEngine().run(signals)
-    assert report.sample_size == 2
-    assert report.clv_mean is not None, "clv_mean must be populated in CLV-only mode"
+    assert signals[0].actual_outcome is None
+    assert report.roi is None and report.hit_rate is None and report.brier_score is None
+    assert report.clv_mean > 0
 
+def test_outcomes_are_keyed_by_selection_entry_id():
+    signals = build_signals([ROW, ROW | dict(id=3,outcome_name='DET')], {'1':True,'3':False})
+    assert [s.actual_outcome for s in signals] == [True, False]
 
-def test_full_roi_mode() -> None:
-    """Full ROI mode: build_signals with outcomes dict sets actual_outcome from dict.
+def test_missing_outcomes_and_rows():
+    assert build_signals([]) == []
+    assert build_signals([ROW | dict(game_start_time=None)]) == []
+    assert build_signals([ROW], {'game':True})[0].actual_outcome is None
 
-    hit_rate should be populated in the report when actual outcomes are provided.
-    """
-    from sportsbet.quant.backtest import BacktestEngine
-
-    rows = [FIXTURE_ROW, FIXTURE_ROW_POSITIVE_ODDS]
-    outcomes = {"2024_01_KC_DET": True}  # win for this game_id
-    signals = build_signals(rows, outcomes=outcomes)
-
-    # actual_outcome pulled from outcomes dict for matching game_id
-    assert len(signals) == 2
-    for sig in signals:
-        assert sig.actual_outcome is True  # both rows share game_id "2024_01_KC_DET"
-
-    # BacktestEngine produces a report with hit_rate populated
-    report = BacktestEngine().run(signals)
-    assert report.sample_size == 2
-    assert report.hit_rate is not None, "hit_rate must be populated when outcomes provided"
-    assert report.hit_rate == 1.0  # all won
-
-
-def test_empty_snapshots() -> None:
-    """Empty input: build_signals([]) returns [] and BacktestEngine produces sample_size=0."""
-    from sportsbet.quant.backtest import BacktestEngine
-
-    signals = build_signals([])
-    assert signals == []
-
-    report = BacktestEngine().run(signals)
-    assert report.sample_size == 0
-    assert report.clv_mean is None
-
-
-FIXTURE_ROW_NULL_GAME = {
-    "id": 3,
-    "game_id": None,
-    "sportsbook": "betmgm",
-    "market_type": "h2h",
-    "line": None,
-    "price": -115,
-    "snapped_at": datetime(2024, 1, 14, 12, 0, 0, tzinfo=timezone.utc),
-    "game_start_time": None,   # LEFT JOIN produced NULL; SQL fix prevents this reaching Python
-}
-
-
-def test_null_game_id_row_not_silently_dropped() -> None:
-    """QUANT-04: NULL game_id rows in build_signals are explicitly skipped (not silently excluded).
-
-    The SQL fix (WHERE o.game_id IS NOT NULL) prevents NULL-game rows from reaching
-    build_signals in production. This test verifies the Python-layer guard in build_signals:
-    a row with game_start_time=None is skipped with logger.debug, returning 0 signals.
-    This prevents a silent TypeError on row["game_start_time"] and satisfies the explicit
-    handling requirement from the success criteria.
-    """
-    signals = build_signals([FIXTURE_ROW_NULL_GAME])
-    assert signals == [], (
-        "build_signals must return 0 signals for a row with game_start_time=None; "
-        "NULL game_id rows should never silently disappear or raise TypeError"
-    )
+async def test_loader_does_not_guess_start_time():
+    conn = AsyncMock()
+    conn.fetch.return_value = []
+    await load_snapshots(conn, 'game', 'h2h')
+    sql, *args = conn.fetch.call_args.args
+    assert '18 hours' not in sql and 'snapped_at < game_start_time' in sql
+    assert args == ['game','h2h']

@@ -12,6 +12,7 @@ Pydantic v2 ONLY: ConfigDict(strict=True) and @field_validator (no v1 patterns).
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import datetime
 from typing import Optional
 
 import sqlalchemy as sa
@@ -38,6 +39,8 @@ class OddsSnapshotCreate(BaseModel):
     market_type: str
     line: Optional[Decimal] = None
     price: Optional[int] = None  # American odds e.g. -110
+    outcome_name: Optional[str] = None
+    game_start_time: Optional[datetime] = None
 
     @field_validator("sportsbook", "market_type")
     @classmethod
@@ -84,6 +87,8 @@ def write_odds_snapshot(
                 market_type=snapshot.market_type,
                 line=snapshot.line,
                 price=snapshot.price,
+                outcome_name=snapshot.outcome_name,
+                game_start_time=snapshot.game_start_time,
             )
             .returning(OddsSnapshot.id)
         )

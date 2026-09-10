@@ -197,6 +197,8 @@ class OddsSnapshot(Base):
     market_type: Mapped[str] = mapped_column(String(30), nullable=False)
     line: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2))
     price: Mapped[Optional[int]] = mapped_column(SmallInteger)  # American odds e.g. -110
+    outcome_name: Mapped[Optional[str]] = mapped_column(String(100))
+    game_start_time: Mapped[Optional[datetime]] = mapped_column(TIMESTAMPTZ(timezone=True))
     snapped_at: Mapped[datetime] = mapped_column(
         TIMESTAMPTZ(timezone=True), nullable=False, server_default=func.now()
     )

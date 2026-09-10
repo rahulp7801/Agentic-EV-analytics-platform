@@ -49,6 +49,8 @@ def make_signals(n_wins: int, n_losses: int) -> list[BacktestSignal]:
                 payout_multiplier=Decimal("1.909"),
                 game_start_time=_GAME_START,
                 snapshot_time=_SNAPSHOT,
+                entry_time=_SNAPSHOT.replace(hour=10),
+                entry_implied_prob=Decimal("0.55"),
             )
         )
     for _ in range(n_losses):
@@ -61,6 +63,8 @@ def make_signals(n_wins: int, n_losses: int) -> list[BacktestSignal]:
                 payout_multiplier=Decimal("1.909"),
                 game_start_time=_GAME_START,
                 snapshot_time=_SNAPSHOT,
+                entry_time=_SNAPSHOT.replace(hour=10),
+                entry_implied_prob=Decimal("0.55"),
             )
         )
     return signals
@@ -165,6 +169,8 @@ def test_backtest_skips_null_probability_signal(caplog: pytest.LogCaptureFixture
         payout_multiplier=Decimal("1.909"),
         game_start_time=_GAME_START,
         snapshot_time=_SNAPSHOT,
+                entry_time=_SNAPSHOT.replace(hour=10),
+                entry_implied_prob=Decimal("0.55"),
     )
     valid_signals = make_signals(n_wins=2, n_losses=1)
     all_signals = [null_signal] + valid_signals
@@ -173,6 +179,7 @@ def test_backtest_skips_null_probability_signal(caplog: pytest.LogCaptureFixture
         report = BacktestEngine().run(all_signals)
 
     # Null signal excluded — only 3 valid signals processed
-    assert report.sample_size == 3
+    assert report.sample_size == 4
+    assert report.calibration_count == 3
     assert report.signals_df is not None
-    assert len(report.signals_df) == 3
+    assert len(report.signals_df) == 4

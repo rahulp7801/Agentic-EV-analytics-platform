@@ -304,6 +304,8 @@ def make_context_agent(
                     sportsbook=odds_snapshot.sportsbook,
                     market_type=odds_snapshot.market_type,
                     price=odds_snapshot.american_odds,  # non-null int for CLV tracking (GAP-3)
+                    outcome_name=odds_snapshot.outcome_name,
+                    game_start_time=odds_snapshot.game_start_time,
                 )
                 write_odds_snapshot(snap_create, engine=_sync_engine_cache[0])
                 log.info("context_agent_odds_persisted", game_id=game_id)
@@ -576,6 +578,8 @@ def _extract_odds_snapshot(
         implied_probability=fair_prob,
         snapped_at=datetime.now(timezone.utc),
         american_odds=prices[0],  # raw int for CLV persistence (GAP-3)
+        outcome_name=outcomes[0].get("name"),
+        game_start_time=datetime.fromisoformat(event["commence_time"].replace("Z", "+00:00")) if event.get("commence_time") else None,
     )
 
 

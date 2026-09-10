@@ -1,237 +1,125 @@
-"""Backtesting replay module for QUANT-04.
-
-BacktestEngine is a standalone offline module. It is never imported from within
-the LangGraph graph (graph.py) or any agent node. Run separately as a CLI or
-test fixture.
-
-Design contract:
-- Accepts a list of BacktestSignal records (historical QuantResult signals
-  paired with actual outcomes and closing lines).
-- Returns a BacktestReport with ROI, hit-rate, and CLV metrics computed via
-  vectorized pandas operations.
-- Degrades gracefully on empty input or all-null-probability input.
-
-Closing line note (Pitfall 6 from RESEARCH.md):
-    snapshot_time < game_start_time is the **caller's responsibility**.
-    BacktestEngine does not have DB access and cannot enforce this constraint.
-    Callers must use odds_snapshots WHERE snapped_at < game_start_time when
-    constructing BacktestSignal.closing_implied_prob to avoid in-play price
-    contamination.
-"""
+﻿"""Offline evaluation with separate model, entry-price and closing-price metrics."""
 from __future__ import annotations
-
-import logging
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
-
+from typing import Literal
 import pandas as pd
-import structlog
-
 from sportsbet.graph.models import QuantResult
 
-logger = structlog.get_logger(__name__)
-
+Outcome = bool | Literal["push", "void"] | None
 
 @dataclass
 class BacktestSignal:
-    """One historical signal record for backtesting replay.
-
-    Fields:
-        quant_result: The Quant Agent's probability estimate at signal time.
-        closing_implied_prob: Fair closing-line probability (post-devig via
-            vig.py). Caller must ensure this was snapped before game_start_time.
-        actual_outcome: True = bet won, False = bet lost.
-        stake: Notional stake for this signal (e.g. Decimal("100")).
-        payout_multiplier: Decimal odds payout (e.g. Decimal("1.909") for -110).
-        game_start_time: Kick-off / tip-off time. Used only for documentation;
-            BacktestEngine does not enforce the snapshot_time < game_start_time
-            constraint — callers are responsible for this guard.
-        snapshot_time: Time when closing_implied_prob was observed. Must be <
-            game_start_time per closing-line convention (caller enforces).
-    """
-
     quant_result: QuantResult
-    closing_implied_prob: Decimal
-    actual_outcome: bool
+    closing_implied_prob: Decimal | None
+    actual_outcome: Outcome
     stake: Decimal
-    payout_multiplier: Decimal
+    payout_multiplier: Decimal  # gross decimal payout at entry
     game_start_time: datetime
-    snapshot_time: datetime
-
+    snapshot_time: datetime  # closing quote time
+    entry_time: datetime | None = None
+    entry_implied_prob: Decimal | None = None
+    push_probability: Decimal = Decimal("0")
 
 @dataclass
 class BacktestReport:
-    """Aggregated metrics from a backtesting run.
+    roi: float | None = None
+    hit_rate: float | None = None
+    clv_mean: float | None = None
+    sample_size: int = 0
+    signals_df: pd.DataFrame | None = None
+    settled_count: int = 0
+    decided_count: int = 0
+    pending_count: int = 0
+    void_count: int = 0
+    clv_count: int = 0
+    calibration_count: int = 0
+    brier_score: float | None = None
+    log_loss: float | None = None
+    calibration: list[dict] = field(default_factory=list)
+    closing_line_note: str = "CLV is same-line raw implied-probability movement; requires entry < close < start."
 
-    Fields:
-        roi: sum(profit) / sum(stake); None if sample_size == 0.
-        hit_rate: wins / total_bets; None if sample_size == 0.
-        clv_mean: mean(closing_implied_prob - signal_implied_prob); None if
-            sample_size == 0. Positive CLV = signal was priced more favorably
-            than the closing line (good leading indicator of edge).
-        sample_size: Number of valid signals processed (excludes signals where
-            quant_result.true_probability is None).
-        signals_df: Enriched DataFrame with one row per valid signal and columns
-            [signal_implied_prob, closing_implied_prob, raw_clv, profit, stake,
-            actual_outcome, payout_multiplier]; None if sample_size == 0.
-        closing_line_note: Documents the pre-game snapshot constraint.
-    """
-
-    roi: Optional[float]
-    hit_rate: Optional[float]
-    clv_mean: Optional[float]
-    sample_size: int
-    signals_df: Optional[pd.DataFrame]
-    closing_line_note: str = field(
-        default="snapshot_time < game_start_time is caller's responsibility"
-    )
-
+def _probability(value: Decimal | None) -> float | None:
+    if value is None:
+        return None
+    if not value.is_finite() or not 0 <= value <= 1:
+        raise ValueError("Probability must be finite and within [0, 1]")
+    return float(value)
 
 class BacktestEngine:
-    """Offline backtesting engine for QuantResult signals.
-
-    Replay historical signals against actual outcomes and closing lines.
-    Computes ROI, hit-rate, and CLV using vectorized pandas operations.
-
-    Usage:
-        engine = BacktestEngine()
-        report = engine.run(signals)
-
-    Isolation guarantee:
-        BacktestEngine is never imported from within the LangGraph graph
-        (graph.py) or any agent node. It is a standalone offline module.
-    """
-
     def run(self, signals: list[BacktestSignal]) -> BacktestReport:
-        """Run backtesting replay on a list of historical signals.
-
-        Args:
-            signals: List of BacktestSignal records. Empty list returns a
-                BacktestReport with sample_size=0 and all None metrics.
-
-        Returns:
-            BacktestReport with ROI, hit_rate, clv_mean, sample_size,
-            and an enriched signals_df DataFrame.
-
-        Notes:
-            Signals where quant_result.true_probability is None are skipped.
-            A structlog warning is emitted for each skipped signal.
-            If all signals are skipped, returns sample_size=0 with all None.
-
-            snapshot_time < game_start_time is the caller's responsibility —
-            this method does not validate timestamps.
-        """
-        if not signals:
-            return BacktestReport(
-                roi=None,
-                hit_rate=None,
-                clv_mean=None,
-                sample_size=0,
-                signals_df=None,
-            )
-
-        # Filter out signals with null true_probability
-        valid_signals: list[BacktestSignal] = []
-        for s in signals:
-            if s.quant_result.true_probability is None:
-                logger.warning(
-                    "skipping_null_probability_signal",
-                    game_start_time=str(s.game_start_time),
-                )
-            else:
-                valid_signals.append(s)
-
-        if not valid_signals:
-            return BacktestReport(
-                roi=None,
-                hit_rate=None,
-                clv_mean=None,
-                sample_size=0,
-                signals_df=None,
-            )
-
-        # Build DataFrame from valid signals
+        report = BacktestReport(sample_size=len(signals))
         rows = []
-        for s in valid_signals:
-            rows.append(
-                {
-                    "signal_implied_prob": float(s.quant_result.true_probability),
-                    "closing_implied_prob": float(s.closing_implied_prob),
-                    "actual_outcome": s.actual_outcome,
-                    "stake": float(s.stake),
-                    "payout_multiplier": float(s.payout_multiplier),
-                    "game_start_time": s.game_start_time,
-                    "snapshot_time": s.snapshot_time,
-                }
-            )
-
-        df = pd.DataFrame(rows)
-
-        # CLV: positive = signal was priced more favorably than close
-        df["raw_clv"] = df["closing_implied_prob"] - df["signal_implied_prob"]
-
-        # Profit: win = stake * (payout_multiplier - 1), loss = -stake
-        df["profit"] = df.apply(
-            lambda r: r["stake"] * (r["payout_multiplier"] - 1)
-            if r["actual_outcome"]
-            else -r["stake"],
-            axis=1,
-        )
-
-        roi = float(df["profit"].sum() / df["stake"].sum())
-        hit_rate = float(df["actual_outcome"].mean())
-        clv_mean = float(df["raw_clv"].mean())
-
-        return BacktestReport(
-            roi=roi,
-            hit_rate=hit_rate,
-            clv_mean=clv_mean,
-            sample_size=len(df),
-            signals_df=df,
-        )
-
-
-# ---------------------------------------------------------------------------
-# CLI entry point — python -m sportsbet.quant.backtest
-# ---------------------------------------------------------------------------
+        predictions: list[tuple[float, int]] = []
+        profits, stakes, clvs, wins = [], [], [], []
+        for s in signals:
+            outcome = s.actual_outcome
+            if outcome is not None and type(outcome) is not bool and outcome not in ("push", "void"):
+                raise ValueError("Outcome must be true, false, push, void, or null")
+            if not s.stake.is_finite() or s.stake < 0 or not s.payout_multiplier.is_finite() or s.payout_multiplier <= 1:
+                raise ValueError("Stake must be nonnegative and gross payout greater than one")
+            timestamps = [s.game_start_time, s.snapshot_time] + ([s.entry_time] if s.entry_time else [])
+            if any(t.tzinfo is None or t.utcoffset() is None for t in timestamps):
+                raise ValueError("Evaluation timestamps must include a timezone")
+            if s.entry_time is not None and s.entry_time >= s.game_start_time:
+                raise ValueError("Prediction/entry must precede game start")
+            p = _probability(s.quant_result.true_probability)
+            push = _probability(s.push_probability)
+            if p is not None and p + push > 1.00000001:
+                raise ValueError("Win and push probability exceed one")
+            entry = _probability(s.entry_implied_prob if s.entry_implied_prob is not None else 1 / s.payout_multiplier)
+            close = _probability(s.closing_implied_prob)
+            clv = None
+            if close is not None and s.entry_time is not None and s.entry_time < s.snapshot_time < s.game_start_time:
+                clv = close - entry
+                clvs.append(clv)
+            profit = None
+            if outcome is None:
+                report.pending_count += 1
+            elif outcome == "void":
+                report.void_count += 1
+            else:
+                report.settled_count += 1
+                profit = float(s.stake * (s.payout_multiplier - 1)) if outcome is True else (-float(s.stake) if outcome is False else 0.0)
+                profits.append(profit)
+                stakes.append(float(s.stake))
+                if type(outcome) is bool:
+                    wins.append(int(outcome))
+                    if p is not None and push < 1:
+                        predictions.append((p / (1 - push), int(outcome)))
+            rows.append(dict(model_probability=p, signal_implied_prob=entry, closing_implied_prob=close,
+                actual_outcome=outcome, profit=profit, stake=float(s.stake), raw_clv=clv,
+                payout_multiplier=float(s.payout_multiplier), game_start_time=s.game_start_time,
+                snapshot_time=s.snapshot_time, entry_time=s.entry_time))
+        report.signals_df = pd.DataFrame(rows) if rows else None
+        report.decided_count = len(wins)
+        report.clv_count = len(clvs)
+        report.calibration_count = len(predictions)
+        report.roi = sum(profits) / sum(stakes) if sum(stakes) > 0 else None
+        report.hit_rate = sum(wins) / len(wins) if wins else None
+        report.clv_mean = sum(clvs) / len(clvs) if clvs else None
+        if predictions:
+            report.brier_score = sum((p - y) ** 2 for p, y in predictions) / len(predictions)
+            report.log_loss = -sum(y * math.log(max(1e-15, p)) + (1-y) * math.log(max(1e-15, 1-p)) for p, y in predictions) / len(predictions)
+            for bucket in range(10):
+                group = [(p, y) for p, y in predictions if min(int(p * 10), 9) == bucket]
+                if group:
+                    report.calibration.append(dict(lower=bucket / 10, upper=(bucket + 1) / 10,
+                        count=len(group), predicted=sum(p for p, _ in group) / len(group),
+                        observed=sum(y for _, y in group) / len(group)))
+        return report
 
 def main() -> None:
-    """Run BacktestEngine against a fixture dataset and print ROI, hit-rate, CLV.
-
-    Fixture: 3 wins + 2 losses at -110 (-0.1 payout ratio per loss, +0.909 per win).
-    Use as a smoke test that BacktestEngine is importable and functional.
-    """
-    from datetime import datetime, timezone
-
-    _GAME_START = datetime(2024, 1, 14, 18, 0, 0, tzinfo=timezone.utc)
-    _SNAPSHOT = datetime(2024, 1, 14, 12, 0, 0, tzinfo=timezone.utc)
-
-    fixture_signals: list[BacktestSignal] = [
-        BacktestSignal(
-            quant_result=QuantResult(true_probability=Decimal("0.55")),
-            closing_implied_prob=Decimal("0.60"),
-            actual_outcome=won,
-            stake=Decimal("100"),
-            payout_multiplier=Decimal("1.909"),
-            game_start_time=_GAME_START,
-            snapshot_time=_SNAPSHOT,
-        )
-        for won in [True, True, True, False, False]
-    ]
-
-    report = BacktestEngine().run(fixture_signals)
-    print(f"sample_size : {report.sample_size}")
-    if report.roi is not None:
-        print(f"hit_rate    : {report.hit_rate:.4f}")
-        print(f"roi         : {report.roi:.4f}")
-        print(f"clv_mean    : {report.clv_mean:.4f}")
-    else:
-        print("No valid signals to report.")
-
+    from datetime import timezone
+    signals = [BacktestSignal(QuantResult(true_probability=Decimal("0.55")), Decimal("0.60"),
+        won, Decimal("100"), Decimal("1.909"), datetime(2024, 1, 14, 18, tzinfo=timezone.utc),
+        datetime(2024, 1, 14, 17, tzinfo=timezone.utc), datetime(2024, 1, 14, 12, tzinfo=timezone.utc))
+        for won in (True, True, True, False, False)]
+    report = BacktestEngine().run(signals)
+    for name in ("sample_size", "hit_rate", "roi", "clv_mean", "brier_score", "log_loss"):
+        print(f"{name}: {getattr(report, name)}")
 
 if __name__ == "__main__":
-    import sys
     main()
-    sys.exit(0)
