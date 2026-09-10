@@ -146,4 +146,3 @@ export default function Sidebar({ activeView, onViewChange, sport, onSportChange
     </aside>
   );
 }
-

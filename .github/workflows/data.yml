@@ -1,0 +1,58 @@
+name: Market data
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [scan, refresh, backfill]
+        default: scan
+      sport:
+        type: choice
+        options: [both, nfl, nba]
+        default: both
+  schedule:
+    - cron: '17 13 * * *'
+    - cron: '7,37 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: market-data
+  cancel-in-progress: false
+jobs:
+  update:
+    # Enable only after database migration/backfill and provider-budget verification.
+    if: github.event_name == 'workflow_dispatch' || vars.DATA_PIPELINE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
+      ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      SPORT: ${{ inputs.sport || 'both' }}
+      OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'refresh' || 'scan') }}
+      DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '25' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: pip install uv==0.11.32
+      - run: uv sync --locked
+      - name: Check worker configuration
+        run: |
+          test -n "$DATABASE_URL" && test -n "$DATABASE_URL_ASYNC" && test -n "$ODDS_API_KEY" || {
+            echo 'Configure the database and odds repository secrets before running market updates.'
+            exit 1
+          }
+      - name: Update market data
+        run: |
+          case "$OPERATION" in
+            scan) uv run --locked python -m sportsbet.scan --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
+            refresh) uv run --locked python -m sportsbet.refresh --sport "$SPORT" ;;
+            backfill) uv run --locked python -m sportsbet.refresh --sport "$SPORT" --backfill ;;
+            *) exit 1 ;;
+          esac

@@ -26,6 +26,7 @@ jobs:
       - run: pip install uv==0.11.32
       - run: uv sync --locked --extra dev
       - run: uv run --locked pytest -q
+      - run: uv tool run pip-audit==2.10.1 --path .venv/lib/python3.12/site-packages --skip-editable
       - run: uv run --locked alembic upgrade head --sql > /tmp/migrations.sql
   frontend:
     runs-on: ubuntu-latest

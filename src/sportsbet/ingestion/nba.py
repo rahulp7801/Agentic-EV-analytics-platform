@@ -129,7 +129,7 @@ def ingest_nba_seasons(
             log.warning(
                 "nba_ingestion.season_skipped",
                 season=season_str,
-                error=str(exc),
+                error_type=type(exc).__name__,
             )
             gc.collect()
             continue

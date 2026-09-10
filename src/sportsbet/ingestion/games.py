@@ -59,7 +59,7 @@ def ingest_games_seasons(
         try:
             df: pl.DataFrame = nfl.load_schedules([season])
         except Exception as exc:
-            log.warning("games_load_failed", season=season, error=str(exc))
+            log.warning("games_load_failed", season=season, error_type=type(exc).__name__)
             gc.collect()
             continue
 

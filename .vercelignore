@@ -5,4 +5,5 @@ frontend/.env*
 frontend/.vercel
 frontend/.next
 frontend/node_modules
+frontend/public/signals_cache.json
 .git

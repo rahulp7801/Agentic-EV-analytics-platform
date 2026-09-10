@@ -1,102 +1,72 @@
-# Quant-Sports Agentic Analytics Platform (SaaS)
+# Maintained implementation knowledge
 
-## Maintained implementation notes
+## Working agreement
 
-- First full CI/CD success: run 34538930708 at eb728ef passed backend, frontend, real PostgreSQL graph/upsert/migration/concurrency tests, and production Vercel deployment using the project-scoped token. Runtime database is still unreachable and Vercel DATABASE_URL is not configured; deployment success does not establish live-data/model readiness.
-- Removed public scan subprocess execution entirely (including the spoofable local Host check) and UI scan controls; paid scans must run through the authenticated worker. Removed fabricated infrastructure health labels. NBA/NFL selections now filter dashboard/EV alerts and schedule requests. Dollar expected profit now multiplies stake by payout-based expected_return; the old edge-times-stake bug is covered by a Node regression test, as is the forbidden scan endpoint.
+- Canonical repository: https://github.com/rahulp7801/Agentic-EV-analytics-platform, origin/master. All commits, CI, and deployment integration belong here.
+- Make frequent verified commits. Do not add assistant co-author/contributor trailers. Keep this file current.
+- User priorities: working model/LangGraph, accurate metrics, security, GitHub CI/CD, Vercel, NFL/NBA season readiness. Visual redesign is deferred.
+- Stay grounded in executed code. Never invent source data, model confidence, settled outcomes, performance, service health, or successful deployment.
+- Keep implementation details out of product-facing messages; retain actionable diagnostic detail in developer documentation without credentials.
+- Preserve parameterized SQL, validated inputs, stale-data gates, and exposure limits. Never trade security/correctness for a shorter implementation.
 
-- Vercel CLI 59.15.1 `pull` asks for team metadata and rejects project-scoped tokens even when the project API succeeds (upstream issue vercel/vercel#17506). Direct `vercel deploy --yes --prod` supports owner-lookup fallback; CI now uses that path after all checks, retaining restricted token permissions. Vercel performs the hosted build; `.vercelignore` limits uploads to frontend sources and excludes local environment/build files. Await a successful deployment before marking hosted readiness.
+## Runtime and development
 
-- Hosted worker now evaluates both NBA/NFL through the actual LangGraph, preserving the 40-game recent window and exclusive target-date cutoff in GraphState. Exact player identity and line/side quotes are required; quote freshness is rechecked after computation. Provider credit reservations are durable and conservative (migration 0011). Stat writes use upserts so repeated refreshes apply corrections instead of failing unique constraints. Full local suite: 289 passed, 15 DB skips, 2 pre-existing expected failures; new real-PostgreSQL graph/upsert checks are in CI. Installed Python dependency audit found no known vulnerabilities.
+- Python 3.12, uv 0.11.32, Node 24, Next.js 16.3.4, PostgreSQL 16. Python dependencies are locked in uv.lock; npm in frontend/package-lock.json.
+- Graph nodes are deterministic Python, not LLM calls. No OpenAI/Anthropic key is consumed. Runtime requires langgraph and langgraph-checkpoint-sqlite.
+- Windows: use .venv/Scripts/python.exe and npm.cmd. Sandbox pytest needs --basetemp=.test-tmp-<task>. Local tooling/cache files are ignored.
+- Read frontend/AGENTS.md and relevant installed Next documentation before frontend edits.
+- Tests must opt into SPORTSBET_TEST_DATABASE_URL pointing to a disposable DB; never fall back to runtime credentials.
+- Alembic respects explicit test URLs and escapes percent characters. Async DB factory preserves exact provider host/user/password/SSL mode; no guessed pooler or region rewrite.
 
-- GitHub run 34537470956 passed backend, frontend and real PostgreSQL migration/concurrency checks. VERCEL_TOKEN is now present as a repository Actions secret; the deployment retry received it but could not retrieve project settings. Project/team IDs were verified against authenticated Vercel CLI. Direct authenticated project access passed in run 34538582689; the token works, while Vercel CLI pull still fails. Investigate CLI team scoping; do not request another token or claim deployment succeeded. CI now checks project access with sanitized HTTP status before build. `.env.example` documents the actual Python settings and distinguishes platform deployment secrets.
+## Deployment and credentials
 
-- Shared prop policy now evaluates both Over and Under via the same agent, requires >=20 games, rejects synthetic PrizePicks pricing, and handles integer-line pushes separately. Confidence intervals are dropped when heuristic adjustments change the estimated probability. Missing prop listings no longer imply injuries; historical dates cannot be scanned against live quotes.
-- Runtime scanner uses `.checkpoints/analytics.sqlite` for append-only prediction audit and atomic daily recommendation exposure reservations. Repeated scans do not reset the budget; duplicate selections are idempotent and one exposure per player/game prevents correlated/opposite selections. Both graph runtime and scanner share this ledger; in-memory factories remain available for isolated tests. This is recommended exposure, not settled P&L/drawdown.
-- Every successfully evaluated scanner selection is audited, including rejected/nonpositive estimates. Ledger reporting deduplicates rescans and supports all-prediction vs accepted-recommendation cohorts, explicit settlements keyed by prediction ID, and last observed pre-game quote CLV. No settled outcomes are inferred from missing data. Prediction IDs are exported to UI cache. CLI: `.venv/Scripts/python.exe -m sportsbet.ledger --settlements outcomes.json`; omit settlements for read-only reporting.
-- Fresh recommendations require actual start time and quote age <=5 minutes; DB historical signals are not reused as live quotes. Migrations 0008/0009 preserve prop quote metadata and move ev_signals DDL out of runtime. Backend checks: 87 passed/1 live-DB test skipped, plus 16 scanner/ledger/prop-wiring tests passed including concurrent reservations and restart persistence. Use `--basetemp=.test-tmp-<task>` on this Windows sandbox.
+- Production URL: https://agentic-ev-analytics-platform.vercel.app.
+- Vercel project agentic-ev-analytics-platform under rahulp7801s-projects; rootDirectory frontend. IDs are repository Actions variables; VERCEL_TOKEN is a repository secret.
+- Project-scoped token works. Vercel CLI 59.15.1 pull fails during team metadata lookup (vercel/vercel#17506); direct deploy --yes --prod supports owner-lookup fallback. Do not request a broader token or export/reuse interactive OAuth credentials.
+- CI deploy depends on backend, frontend and isolated PostgreSQL checks. Automatic Vercel git deployments disabled in frontend/vercel.json. Vercel performs the hosted build. .vercelignore limits uploads to frontend sources, excluding environment files, build outputs and legacy signal cache.
+- First full deployment success: GitHub run 34538930708 (eb728ef). Run 34539302175 (bdadfa1) also passed. Verified homepage 200, security headers, public scan POST 403, sanitized signals/metrics 503 while DB is unconfigured.
+- Runtime database from local .env remains unreachable (previous DNS failures; latest connection OperationalError). Odds API catalog probe previously passed HTTP 200. Never print secret values. Vercel production DATABASE_URL still needs a reachable dedicated read-only role.
+- Worker needs repository secrets DATABASE_URL, DATABASE_URL_ASYNC, ODDS_API_KEY. ANALYTICS_DATABASE_URL uses writable DATABASE_URL in Actions. .env.example and README distinguish Python, Vercel and GitHub settings.
+- GitHub secret scanning and push protection enabled. Dependabot security updates enabled. CodeQL extended default setup requested for Python, JS/TS and Actions; inspect completed analysis before claiming it is clean.
 
+## Data and orchestration
 
-- Evaluation repair: backtests separate model probabilities from entry and closing prices. CLV is raw same-line price-probability movement and requires entry < closing quote < actual start. Replay groups exact outcome/book/line/player identities and keys settlements by entry snapshot ID. Legacy rows without outcome/start metadata are excluded, not guessed. Migration 0007 adds quote identity/start columns; run migrations before ingestion.
-- Pending, push, and void settlements are distinct. ROI excludes pending/void stakes; hit rate and Brier/log loss exclude pushes. Brier/log loss and calibration bins use model predictions only, never substitute bookmaker probabilities. Null-model records can still contribute to price and realized-return metrics. Offline replay supports --snapshots-file and --outcomes-file. Backtest/metrics/context tests: 27 passed.
+- Hosted dashboard reads dashboard_snapshots via server-only PostgreSQL. Python publishes snapshots; no local subprocesses/files are relied upon on Vercel.
+- Public scan POST is always forbidden, including local mode: Host header checks were spoofable. Only authenticated CLI/Actions workers spend provider credits and write audit data.
+- sportsbet.scan routes NBA/NFL through the actual LangGraph, passes exclusive as_of_date and last_n_games=40. GraphState must declare these fields or LangGraph silently drops them.
+- Quotes match event/player/market/line/side exactly; evaluate alternate lines separately and support Under-only listings. Resolve exact distinct player identity; unknown/ambiguous names skip instead of borrowing history.
+- Require provider quote timestamps and actual start times. Recheck quote age after model computation. No recommendations after start or quote age >5 minutes. Synthetic PrizePicks pricing is rejected. Missing prop listings do not imply injury.
+- Stat upserts apply provider corrections and make repeat refreshes safe. Migration 0011 adds NFL player_name and analytics.api_usage. Exact NFL names are sourced from player_display_name.
+- sportsbet.refresh --backfill loads NFL current/prior two season years, NBA current/prior. Daily refresh loads current season. NFL schedules are required for cutoffs. Root scan_game_ev.py remains a local NBA scanner, not the hosted worker.
+- Market data Actions workflow supports scan/refresh/backfill. Scheduled refresh daily and scan every30min remain disabled unless DATA_PIPELINE_ENABLED=true. Do not enable until reachable DB, migrations, backfill, provider budget and live output are verified.
+- Persistent API budget default25 credits/day is a ceiling, not complete slate coverage. It reserves before a request, does not refund failed calls, and stops additional events when exhausted. Choose coverage/budget deliberately before enabling.
 
-- Make small, verified commits. Do not add assistant co-author/contributor trailers.
-- Update this section with important findings and validation as changes land.
-- Actual graph nodes are deterministic Python; no LLM API key is currently consumed.
-- Windows development: Python can be installed locally with uv; use `.venv/Scripts/python.exe` for tests. `.python/` and `.uv-cache/` are local tooling, not source.
-- Runtime imports require both `langgraph` and `langgraph-checkpoint-sqlite`; keep them in `pyproject.toml`.
-- Setup verified with workspace Python 3.12 and editable dev install. Initial graph/arbitrage/prop suite: 56 passed, one pre-existing alias test failure (NBA threes/steals/blocks incorrectly classified as NFL). New pricing tests separately reproduce even-money sizing defects.
-- Metric names: `ev_percentage`/`ev_pct` are legacy probability edge (percentage points), while `expected_return` is net return per unit staked at the actual payout, including push refunds. Do not label edge as ROI.
-- Remaining modeling limitations: defense/pace are neutral placeholders; optional home/rest and NFL kinematic adjustments are unvalidated heuristics and disabled by default. Settled outcomes and timestamped roster/injury history are required to establish predictive performance.
-- Pricing correction: actual American price determines break-even, expected return and Kelly. Legacy low-level callers can infer payout from implied probability when raw price is absent. Scanner uses selected prop quotes and the shared agent for both sides; live scans never reuse cached DB sizing.
-- Pricing verification: 75 graph, prop, arbitrage, scanner-helper, and pricing tests pass. At p=0.60, quarter Kelly is 0.04 at -110 (previously 0.05) and 0.066667 at +120. Broader context integration tests stalled during external/DB work and were interrupted; do not claim the complete suite passes.
-- NBA temporal contract: `PropParams.as_of_date` is an exclusive game-date cutoff. Scanner supplies the target date; NBA graph factory forwards its `target_date` to both context and quant nodes; explicit state `as_of_date` takes precedence, otherwise the NBA agent defaults to today. Historical direct executor callers MUST supply `as_of_date`; undated low-level queries retain legacy season-aggregate behavior.
-- Dated NBA probability queries use game logs, including unconditional and double-double queries. Apply the cutoff before the recent-game LIMIT. Empty situational samples broaden to pre-game logs, never season totals; `pregame_fallback` provenance survives context adjustment. Empty history remains insufficient. This removes target/future-game contamination from these queries, but is not a full point-in-time backtester: historical injury/roster snapshots and settled outcomes still need work.
-- Removed the offensive-scoring "defensive rating" proxy and its season-total query. Context now uses pre-game logs for rest/home and neutral defense/pace values. Real timestamped team defensive efficiency is still needed; experimental home/rest adjustments remain heuristics and default off.
-- Date-cutoff verification: new fixtures first reproduced four failures (future games counted, future recent-game selection, unsafe aggregate fallback, missing agent cutoff). Combined targeted suite now has 120 passing tests. SQL row-selection fixtures execute with SQLite after normalizing PostgreSQL casts; actual PostgreSQL execution and live model accuracy are NOT validated by these tests.
+## Model and pricing contracts
 
-- Frontend uses `/api/signals` to validate freshness/start time/model version/sample/price/stake on every read. Stale, legacy and synthetic prices cannot recommend stakes. UI preserves Under, removes invented confidence intervals and strength ratings, and distinguishes probability edge from expected return. `/api/metrics` reads ledger evaluation with settled/pending/calibration/CLV denominators. Parlay calculator takes an explicit gross payout and reports independence scenarios plus dependence bounds; it no longer claims an optimal joint probability or recommends parlay Kelly stakes.
-- Frontend Python routes resolve the workspace `.venv` executable; game-log requests are asynchronous, and scan lock acquisition is exclusive. Existing caches remain visible but gated by freshness during rescans. Node built-in test runner verifies metric semantics (5 tests); TypeScript check and Next.js production build pass. Scan route accepts compact or ISO dates and normalizes to the scanner YYYYMMDD contract. User supplied all three required `.env` keys; settings validation passes but database hostname fails DNS resolution, before authentication. Never print environment values.
+- Dated NBA queries count pre-game logs, excluding target/future dates before taking recent games. Empty situational samples broaden to pre-game logs, never season totals. Actual double-double counts include steals/blocks.
+- NFL cutoff matches each player's own team/week schedule, not the earliest game in the week. Latest-N queries apply situational filters before LIMIT.
+- Unfitted home/rest/pace/defense/kinematic adjustments default off. Experimental changes discard incompatible CIs and do not adjust push markets. Neutral defense/pace are placeholders, not measured features.
+- Shared prop policy requires >=20 games and exact matched odds. Legacy unconditional NFL executor has a30-game gate; conditional paths report intervals before shared policy gates. The 15pp edge cap is an operational review gate, not calibrated evidence.
+- Generic NFL QuantResult measures play_success; arbitrage rejects it without explicit market_outcome scope. Do not treat pass/play success as game-win probability.
+- American price determines break-even, payout, expected_return and fractional Kelly. ev_pct/ev_percentage retain legacy probability-edge semantics (percentage points). Dollar expected profit = stake * expected_return, never stake * edge.
+- Pushes are separate: pUnder=1-pOver-pPush, expected return=win*payout-loss, Kelly conditional on nonpush. Complement Under CI only when push=0; do not invent push-market intervals.
 
-- Prop pricing now requires exact player/market/line/side identity and fails closed instead of falling back to game moneyline odds. Scanner evaluates every offered line and Under-only listings, rather than selecting across incomparable lines. Non-push Under confidence intervals complement the reported Over interval; no push-market Under interval is fabricated.
-- NFL agents now supply an exclusive as-of cutoff, matching each player's own team/week schedule before taking recent games. NBA/NFL recent windows apply all filters first. NBA teammate absence uses game identity rather than date alone. Unfitted home/rest/pace/kinematic probability adjustments default OFF; enable `EXPERIMENTAL_PROBABILITY_ADJUSTMENTS=true` only for controlled comparisons. Explicit experimental adjustments discard invalidated confidence intervals and do not alter push markets.
-- Latest verification: 85 backend tests passed / 1 live-DB skip plus 28 pricing/scanner/wiring tests passed. New executed SQL fixtures cover NFL Thursday-vs-Sunday leakage and NBA last-N home windows; scanner tests cover alternate lines and Under-only listings. The Odds API key passed a read-only catalog check (HTTP 200). All live DB verification remains blocked by DNS. Tests must explicitly opt into a disposable database; never fall back to the user's runtime database.
+## Audit, exposure and evaluation
 
-- Deployment/security scope: user explicitly requested GitHub CI/CD, Vercel deployment, NFL/NBA season readiness, and security hardening; prioritize actual model/LangGraph correctness over design. GitHub account has admin access; Vercel device login completed. Frontend subprocess/local-file routes must become hosted data reads before production.
-- Generic NFL quant output measures play success, NOT game-win/prop probability. `prediction_target` now distinguishes this; generic arbitrage rejects results without explicit market-outcome scope. Production prop paths retain their own outcome estimator. Async DB connections no longer guess a Supabase region or rewrite host/user/password; configure the exact reachable endpoint and SSL mode. Alembic respects an explicit test URL and safely escapes URL percent characters.
-- Full backend regression suite: 283 passed, 11 skipped (DB unavailable), 2 pre-existing expected failures. Fixture-only injury feeds are now mocked so integration unit tests do not contact live endpoints. Next.js dependency audit found critical issues in 16.2.1; upgrade and rerun production checks before deploying.
+- Ledger uses local .checkpoints/analytics.sqlite by default; ANALYTICS_DATABASE_URL switches default-path storage to PostgreSQL analytics schema (migration0010).
+- Immutable per-scan prediction IDs, append-only quotes, explicit settlements. Every successfully evaluated selection is recorded, including rejected/nonpositive estimates. Missing model results are skipped.
+- Atomic recommendation exposure default5% per UTC day; rescans idempotent, one exposure per player/game blocks conflicting/correlated selections. PostgreSQL advisory transaction lock preserves cross-process limits. This is recommended exposure, not executed bets or drawdown.
+- Reports deduplicate selections, separate all-prediction and accepted-recommendation cohorts. CLV is raw same-book/same-line implied probability movement, requiring entry < last observed closing quote < actual start.
+- ROI excludes pending/void stakes; pushes refund. Hit rate, Brier/log loss exclude pushes. Calibration uses model probabilities only. No settlement is inferred from absent records.
+- CLI sportsbet.ledger --list exports IDs; --settlements accepts ID->true/false/push/void/null. Hosted metrics snapshots update on the next successful worker run.
+- Frontend signalMetrics revalidates model version, probabilities, price, sample, stake, freshness and start time. Legacy/stale/synthetic estimates cannot recommend. No invented CI, strength rating or service health.
+- Parlay calculator uses user-supplied gross payout, independent scenarios and dependence bounds; no fitted joint probability or Kelly recommendation. NBA/NFL filtering is wired to dashboard/EV alerts; Under is preserved.
 
-- Hosted architecture: Vercel serves read-only results from `dashboard_snapshots`; GitHub Actions owns scans. Public hosted scan POST is forbidden. `ANALYTICS_DATABASE_URL` switches the shared ledger to PostgreSQL (migration 0010, analytics schema); advisory transaction locking preserves exposure limits across workers. SQLite remains the offline default. `sportsbet.ledger --list` exports prediction IDs for explicit settlement.
-- CI uses immutable action revisions, locked Python/npm dependencies, full unit tests, production frontend build/audit, and isolated PostgreSQL migration/concurrency checks. No production credentials are used in CI. Next.js upgraded to 16.3.4; npm audit now reports 0 vulnerabilities. Readonly database role for Vercel is preferred; server errors must not expose connection strings or internal paths.
+## Verification and remaining gaps
 
-- Canonical repository is https://github.com/rahulp7801/Agentic-EV-analytics-platform (origin, master). All commits/workflows/deployment integration belong here. Vercel project `agentic-ev-analytics-platform` under `rahulp7801s-projects`, rootDirectory `frontend`. Automatic git deployments disabled in vercel.json; production deploy job depends on backend/frontend/PostgreSQL CI checks. Vercel CLI OAuth sign-in cannot mint a CI token (provider returned 403); a dedicated VERCEL_TOKEN repository secret was added and direct project access verified. Do not reuse/export the interactive OAuth credential as a CI secret.
-- Hosted implementation validation: full suite 285 passed, 12 live-DB skips, 2 pre-existing expected failures; five frontend metric tests pass, TypeScript and production build pass on Next.js 16.3.4. Migration 0010 generates offline SQL; actual PostgreSQL contract verification is delegated to the disposable CI service, not claimed from SQLite tests.
-
-## 1. System Persona & Project Objective
-
-You are an expert quantitative developer, data engineer, and AI architect. We are building a low-latency, agentic sports analytics platform designed to identify mathematically profitable (+EV) discrepancies in NFL and NBA betting markets.
-
-This is not a simple web scraper. It is a multi-agent orchestration system that treats sports betting exactly like algorithmic futures trading. The system processes unstructured qualitative context (injuries, weather) and heavily structured quantitative data (AWS Next Gen Stats, relational box scores) to execute dynamic probability queries and flag market inefficiencies before retail sportsbooks adjust. The final output is a professional-grade, public-facing SaaS terminal.
-
-## 2. Core Tech Stack
-
-- **Language & Backend:** Python (strictly typed).
-- **Agent Orchestration:** LangGraph.
-- **Data Validation:** Pydantic (non-negotiable for all LLM outputs).
-- **Database:** PostgreSQL (Supabase or local).
-- **Data Ingestion:** `nflreadpy` (NFL), asynchronous Playwright/BeautifulSoup scrapers, The Odds API.
-- **Frontend:** Next.js / TypeScript.
-
-## 3. The Agentic Architecture (LangGraph Nodes)
-
-The system operates as a directed graph of specialized sub-agents managed by a Master routing node.
-
-- **The Context Agent:** Monitors real-time qualitative streams (X/Twitter APIs, Reddit, RSS). Identifies binary state changes (e.g., "Starting PG is ruled Out") and updates the global game state JSON.
-- **The Quant Agent:** The mathematical engine. Constructs and executes dynamic SQL queries against historical data based on the precise parameters defined by the Context Agent.
-- **The Arbitrage Agent:** Monitors live odds asynchronously. Compares the Quant Agent's true probability model against implied sportsbook probabilities to flag +EV discrepancies.
-- **The Kinematic Agent (NFL Specific):** Queries advanced tracking data (separation, time-to-throw, press-man coverage rates) to find geometric matchup exploits rather than relying on historical box scores.
-- **The Synthetic Parlay Builder:** Identifies highly correlated events (e.g., heavy rain + Under passing yards + Over rushing attempts) to build mathematically sound derivative bets.
-
-## 4. Strict Engineering & Coding Standards
-
-### A. Algorithmic Efficiency & State Management
-
-- **Graph Traversal:** The LangGraph state machine must be highly optimized. Treat the agent loop with the strict time-complexity optimization of formal graph algorithms. Avoid infinite loops or redundant node visits.
-- **Query Optimization:** We are processing massive, multi-year datasets. SQL queries must use proper indexing. Never use $O(N^2)$ table scans.
-- **Memory Management:** When pulling gigabytes of Pandas dataframes via `nflreadpy`, enforce strict memory management. Drop unused columns immediately and utilize Python generators to prevent memory leaks.
-
-### B. Risk Management & Mathematical Rigor (Prop Firm Rules)
-
-- **Never Output Static Bet Sizes:** The system must never recommend a flat monetary bet. It must strictly calculate and output the exact Fractional Kelly Criterion sizing based on the perceived mathematical edge.
-- **Capital Preservation:** Treat betting output parameters with the exact same strictness as a funded prop firm's daily drawdown limit.
-- **Correlation Hard-Stops:** The agent logic must include hardcoded validation to prevent conflicting market exposures (e.g., advising an Over on passing yards while simultaneously advising an Under on total team points).
-
-### C. LLM Hallucination Prevention
-
-- **Zero Stat Hallucinations:** The LLM is an orchestration engine, not a database. It must never be allowed to guess a player's stats or historical performance. All numbers must be pulled directly from PostgreSQL or the dataframes.
-- **Strict Pydantic Typing:** Every single output from an agent that interacts with the database, an API, or the frontend must be strictly typed and validated using Pydantic models. If an agent extracts variables to build a SQL query, it must pass Pydantic validation before the SQL executes.
-
-### D. Frontend UX/UI Philosophy
-
-- **Professional Terminal Interface:** The SaaS frontend must resemble a professional quantitative trading terminal (dark mode, high-density data tables, modular widgets, live data streams). Do not use consumer-style casino/sportsbook UI paradigms.
-- **Actionable Theses:** Outputs must include the raw +EV percentage alongside a strict, concise "Trade Plan" thesis (maximum 3 bullet points) explaining the mathematical and contextual logic behind the flagged edge.
+- Latest local full Python suite:290 passed,15 DB skips,2 pre-existing expected failures. Real PostgreSQL CI passed model SQL through both graphs, target-game exclusion, repeatable upserts, migrations and concurrent exposure reservation. Seven frontend metric/access tests, TypeScript and production build passed.
+- npm audit zero vulnerabilities; pip-audit2.10.1 found no known Python vulnerabilities and is now a CI gate. Passing audits cannot prove all security gaps closed.
+- Need reachable production DB, migration/backfill, read-only Vercel role, worker secrets and measured quota/coverage before live readiness. Do not claim season readiness from deployment alone.
+- Automatic settlement and out-of-sample calibration/profitability remain incomplete. Historical injury/roster conditioning is not fully point-in-time; current hosted baseline does not apply it. Legacy undated NBA aggregate estimates remain low-level paths.
+- Generic context odds extraction still needs explicit event/selection matching beyond the play_success gate. NFL schedule ingestion ignores corrections, and home_away enrichment remains incomplete. NFL game-log UI is still unavailable.
+- Two expected-failure gamelog/injury tests import obsolete modules; replace with real-builder regression coverage rather than hiding failures. Ledger malformed/naive timestamp validation and reporting by model-version cohort still need hardening.

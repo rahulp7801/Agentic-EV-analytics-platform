@@ -139,6 +139,9 @@ def main():
     parser.add_argument('--sport',choices=['nba','nfl','both'],default='both')
     parser.add_argument('--daily-credit-limit',type=int,default=25)
     args=parser.parse_args()
-    asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.daily_credit_limit))
+    try:
+        asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.daily_credit_limit))
+    except Exception as exc:
+        raise SystemExit(f'Market update failed ({type(exc).__name__})') from None
 
 if __name__=='__main__': main()
