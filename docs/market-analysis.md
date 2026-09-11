@@ -128,6 +128,21 @@ using a generic payout table. PrizePicks Team/Culture contracts are a separate p
 
 ## Runtime boundaries and remaining work
 
+The read-only `sportsbet.market_watch` collector now publishes source status and
+price-screening comparisons to `/api/markets`. It archives the source evidence
+before publication and supports hash-checked offline observation replay. This
+screening stage does not supply invented fees, capacities, or settlement payouts
+to the optimizer. Reviewed payoff candidates still use the existing LangGraph
+analysis route. Source failures are independent and visible.
+
+Kalshi [milestones and structured targets](https://docs.kalshi.com/getting_started/targets_and_milestones)
+provide start times and team identities. A live probe found the documented
+`competition=Pro Football` example returned no milestones while `competition=NFL`
+returned31; the reader uses league codes and validates the returned league.
+Exact captured team-directory aliases and start times produced real cross-venue
+matches. No ticker-date parsing, fuzzy name matching, or close-time-as-kickoff
+substitution is used. Matching events still require separate settlement review.
+
 Research agents may eventually propose mappings and summarize rules with source
 references. They must not invent prices, probability calibration, fills, or
 settlement equivalence. The current graph uses deterministic Python specialists,

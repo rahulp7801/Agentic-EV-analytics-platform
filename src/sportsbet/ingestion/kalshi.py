@@ -11,6 +11,7 @@ import time
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+from uuid import UUID
 
 import httpx
 from cryptography.hazmat.primitives import hashes, serialization
@@ -101,6 +102,20 @@ class KalshiReader:
 
     async def series(self, series: str) -> dict:
         return (await self._get('/series/'+ticker_path(series)))['series']
+
+    async def milestones(self, sport: str, start: datetime, *, limit: int = 100) -> dict:
+        if sport not in ('nba', 'nfl') or start.tzinfo is None or not 1 <= limit <= 500:
+            raise ValueError('Invalid milestone query')
+        return await self._get('/milestones', params=dict(limit=limit, category='Sports',
+            # Actual API accepts NFL/NBA; the prose examples returned empty NFL data.
+            competition=sport.upper(),
+            minimum_start_date=start.isoformat()))
+
+    async def event(self, ticker: str) -> dict:
+        return await self._get('/events/'+ticker_path(ticker))
+
+    async def target(self, target_id: str) -> dict:
+        return (await self._get('/structured_targets/'+str(UUID(target_id))))['structured_target']
 
     async def snapshot(self, ticker: str) -> dict:
         ticker = ticker_path(ticker)

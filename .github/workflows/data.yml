@@ -4,7 +4,7 @@ on:
     inputs:
       operation:
         type: choice
-        options: [scan, refresh, backfill]
+        options: [scan, watch, refresh, backfill]
         default: scan
       sport:
         type: choice
@@ -52,7 +52,19 @@ jobs:
         run: |
           case "$OPERATION" in
             scan) uv run --locked python -m sportsbet.scan --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
+            watch) uv run --locked python -m sportsbet.market_watch --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" --publish ;;
             refresh) uv run --locked python -m sportsbet.refresh --sport "$SPORT" ;;
             backfill) uv run --locked python -m sportsbet.refresh --sport "$SPORT" --backfill ;;
             *) exit 1 ;;
           esac
+      - name: Retain public market evidence for replay
+        if: always() && env.OPERATION == 'watch'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: market-evidence-${{ github.run_id }}
+          path: |
+            .local/market-watch/*.json
+            .local/prizepicks/*.json
+          include-hidden-files: true
+          retention-days: 90
+          if-no-files-found: warn
