@@ -82,3 +82,59 @@ def test_rolling_credit_limit_includes_previous_days_and_survives_restart(monkey
     assert sum(results)==1
     assert not Ledger(path).reserve_api_credits(1,25)
     assert not ledger.reserve_api_credits(True,25)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('mode',['public_daily','public_monitor'])
+async def test_public_modes_use_real_graph_and_collector_without_paid_or_prop_calls(monkeypatch,tmp_path,mode):
+    from sportsbet import market_watch
+    stored={}; refreshed=[]
+    monkeypatch.chdir(tmp_path)
+    for module in (daily,refresh_module,market_watch):
+        monkeypatch.setattr(module,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    def refresh(sport,day,backfill=False):
+        refreshed.append(sport)
+        return {'provider':'fixture'}
+    monkeypatch.setattr(refresh_module,'refresh',refresh)
+    def unexpected_read(*args):raise AssertionError('Public monitor must not load history or spend credits')
+    monkeypatch.setattr(daily,'load_snapshot',unexpected_read)
+    monkeypatch.setattr(Ledger,'reserve_api_credits',unexpected_read)
+    books=AsyncMock();prizepicks=AsyncMock();props=AsyncMock()
+    monkeypatch.setattr(market_watch,'sportsbooks',books)
+    monkeypatch.setattr(market_watch,'capture_projections',prizepicks)
+    monkeypatch.setattr(daily,'scan',props)
+    kalshi=AsyncMock(return_value={'status':'observed','games':[],'partial_coverage':True})
+    monkeypatch.setattr(market_watch,'kalshi_games',kalshi)
+    result=await daily.run(['nfl','nba'],mode,25)
+    assert result['status']=='observed' and result['execution_ready'] is False
+    assert 'Public-only' in result['scope']
+    assert refreshed==(['nfl','nba'] if mode=='public_daily' else [])
+    assert kalshi.await_count==2
+    books.assert_not_called();prizepicks.assert_not_called();props.assert_not_called()
+    assert all(value['status']=='not_requested' for value in result['props'].values())
+    assert not any(key.startswith('scan:') for key in stored)
+    assert {'schedule:nfl','schedule:nba','markets:nfl','markets:nba','pipeline:'+mode}<=set(stored)
+    for sport in ('nfl','nba'):
+        assert result['markets'][sport]['sources']['kalshi']['partial_coverage'] is True
+        assert result['markets'][sport]['sources']['sportsbook']['status']=='not_requested'
+    assert len(list((tmp_path/'.local/market-watch').glob('*.json')))==2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('failed_stage',['markets','schedules','histories'])
+async def test_public_failure_is_visible_without_suppressing_other_stages(monkeypatch,failed_stage):
+    stored={}
+    monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    monkeypatch.setattr(daily,'refresh_history',lambda *args:{'status':'failed' if failed_stage=='histories' else 'complete'})
+    monkeypatch.setattr(daily,'collect_schedule',AsyncMock(return_value={
+        'status':'unavailable' if failed_stage=='schedules' else 'complete','captured_at':datetime.now(timezone.utc).isoformat()}))
+    watch=AsyncMock(return_value=({'sources':{'kalshi':{'status':'unavailable' if failed_stage=='markets' else 'observed',
+        'partial_coverage':True}},'captured_at':datetime.now(timezone.utc).isoformat()},None))
+    monkeypatch.setattr(daily,'watch',watch)
+    props=AsyncMock();monkeypatch.setattr(daily,'scan',props)
+    result=await daily.run(['nfl','nba'],'public_daily',25)
+    assert result['status']=='degraded'
+    assert watch.await_count==2
+    assert set(result['schedules'])==set(result['histories'])=={'nfl','nba'}
+    props.assert_not_called()
+    assert stored['pipeline:public_daily']['status']=='degraded'
