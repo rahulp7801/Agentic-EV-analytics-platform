@@ -10,6 +10,35 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install checksum-pinned secret scanner
+        run: |
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$RUNNER_TEMP/gitleaks.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+      - name: Scan tracked tree and every incoming commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir "$RUNNER_TEMP/tracked-source"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/tracked-source"
+          "$RUNNER_TEMP/gitleaks" dir "$RUNNER_TEMP/tracked-source" --config .gitleaks.toml --redact=100 --no-banner
+          if [[ -n "$BASE_SHA" && "$BASE_SHA" != 0000000000000000000000000000000000000000 ]]; then
+            range="$BASE_SHA..$HEAD_SHA"
+          else
+            range="-1 $HEAD_SHA"
+          fi
+          "$RUNNER_TEMP/gitleaks" git . --log-opts="$range" --config .gitleaks.toml --redact=100 --no-banner
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -77,7 +106,7 @@ jobs:
       - run: uv run --locked pytest tests/test_schema.py tests/test_hosted_storage.py tests/test_worker_postgres.py tests/test_db_access.py -q
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: [backend, frontend, postgres]
+    needs: [secrets, backend, frontend, postgres]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production

@@ -1,0 +1,11 @@
+title = "Provider credentials and default Gitleaks rules"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "provider-hex-key"
+description = "32-character provider credentials, including keys in prose"
+regex = '''(?i)(?:key|token|secret|password)[^\r\n]{0,80}?\b([a-f0-9]{32})\b'''
+secretGroup = 1
+keywords = ["key", "token", "secret", "password"]
