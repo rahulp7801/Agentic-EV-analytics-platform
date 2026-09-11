@@ -15,7 +15,7 @@ def evidence():
     event = dict(id='game',home_team='Home',away_team='Away',commence_time='2026-09-13T17:00:00Z',
         bookmakers=[dict(key='book',last_update=NOW.isoformat(),markets=[dict(key='h2h',outcomes=[
             dict(name='Home',price=110),dict(name='Away',price=110)])])])
-    return dict(sport='nfl',captured_at=NOW.isoformat(),sources={'sportsbook':{'events':[event]}})
+    return dict(schema_version=2,sport='nfl',captured_at=NOW.isoformat(),sources={'sportsbook':{'events':[event]}})
 
 
 def test_gross_price_gap_never_becomes_profit_or_verified_arbitrage():
@@ -111,12 +111,22 @@ def test_captured_event_fees_change_pair_and_cross_venue_costs_without_claiming_
     pair=next(r for r in rows if r['kind']=='kalshi_pair')
     assert Decimal(pair['gross_cost'])<1
     assert Decimal(pair['exchange_fee_scenarios']['combined_cost']['direct'])>1
+    assert [case['contracts_per_kalshi_leg'] for case in pair['depth_fee_scenarios']['cases']]==[1,10]
+    assert all(Decimal(case['combined_cost']['direct'])>case['contracts_per_kalshi_leg']
+        for case in pair['depth_fee_scenarios']['cases'])
     cross=[r for r in rows if r['kind']=='kalshi_sportsbook']
     assert len(cross)==2 and all('exchange_fee_scenarios' in r for r in cross)
+    for row in cross:
+        case=row['depth_fee_scenarios']['cases'][1]
+        leg=next(iter(case['legs'].values()))
+        assert Decimal(case['combined_cost']['direct'])==Decimal(leg['direct']['total_cost'])+10*Decimal(row['legs'][1]['cost'])
+    legacy=deepcopy(data);legacy['schema_version']=1
+    assert all('depth_fee_scenarios' not in r for r in comparisons(legacy))
     assert all(r['fee_adjusted_profit'] is None and r['execution_ready'] is False for r in rows)
     # An incomplete fee history must preserve gross observations but omit fee scenarios.
     fees['event_changes']['cursor']='more'
     assert all('exchange_fee_scenarios' not in r for r in comparisons(data))
+    assert all('depth_fee_scenarios' not in r for r in comparisons(data))
     fees['event_changes']['cursor']=''
     market['fee_waiver_expiration_time']='2026-09-12T00:00:00Z'
     assert all('exchange_fee_scenarios' not in r for r in comparisons(data))
@@ -124,6 +134,12 @@ def test_captured_event_fees_change_pair_and_cross_venue_costs_without_claiming_
     snap['yes_asks']=[('0.48','0.5')]
     pair=next(r for r in comparisons(data) if r['kind']=='kalshi_pair')
     assert 'exchange_fee_scenarios' not in pair  # Cannot price a whole contract beyond displayed depth.
+    assert pair['depth_fee_scenarios']['cases']==[]
+    snap['yes_asks'].append(('0.6','10'))
+    pair=next(r for r in comparisons(data) if r['kind']=='kalshi_pair')
+    case=pair['depth_fee_scenarios']['cases'][0]
+    assert len(case['legs']['yes']['direct']['modeled_fills'])==2
+    assert Decimal(case['legs']['yes']['direct']['principal'])==Decimal('.54')
 
 
 @pytest.mark.asyncio

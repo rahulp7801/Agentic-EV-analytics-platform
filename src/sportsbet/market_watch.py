@@ -19,7 +19,7 @@ from sportsbet.ingestion.prizepicks import capture as capture_projections
 from sportsbet.ledger import Ledger
 from sportsbet.scan import SPORT_KEYS, timestamp
 from sportsbet.quant.vig import american_to_raw_prob
-from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost
+from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost, taker_depth_cost
 
 
 def digest(value) -> str:
@@ -112,6 +112,9 @@ def book_quotes(event: dict, now: datetime) -> list[dict]:
 
 def comparisons(evidence: dict) -> list[dict]:
     """Binary win-only algebra, deliberately blocked pending full settlement review."""
+    version=evidence.get('schema_version',1)
+    if version not in (1,2):
+        raise ValueError('Unsupported market evidence version')
     now = timestamp(evidence['captured_at'])
     rows = []
     events = evidence['sources'].get('sportsbook', {}).get('events', [])
@@ -152,6 +155,7 @@ def comparisons(evidence: dict) -> list[dict]:
                 continue
             base_reasons = ['Fees unverified; displayed depth does not establish a fill.']
             fee_scenarios=None
+            sized_orders={}
             try:
                 context=game['fee_context']
                 if market.get('status')!='active' or market.get('market_type')!='binary':
@@ -168,6 +172,14 @@ def comparisons(evidence: dict) -> list[dict]:
                 fee_scenarios={side:{label:taker_buy_cost(Decimal(snap[side+'_asks'][0][0]),Decimal(1),multiplier,precision)
                     for label,precision in (('direct',Decimal('.0001')),('non_direct',Decimal('.01')))}
                     for side in ('yes','no') if snap[side+'_asks'] and Decimal(snap[side+'_asks'][0][1])>=1}
+                for count in ((1,10,100) if version==2 else ()):
+                    sized_orders[count]={}
+                    for side in ('yes','no'):
+                        try:
+                            sized_orders[count][side]={label:taker_depth_cost(snap[side+'_asks'],Decimal(count),multiplier,precision)
+                                for label,precision in (('direct',Decimal('.0001')),('non_direct',Decimal('.01')))}
+                        except (ValueError,ArithmeticError):
+                            pass  # Insufficient or invalid depth cannot support this requested size.
             except (KeyError,ValueError,TypeError,ArithmeticError):
                 pass
             if snap['same_contract_pair']:
@@ -176,6 +188,8 @@ def comparisons(evidence: dict) -> list[dict]:
                 row=price_row('kalshi_pair', market['ticker'], market['title'], legs, base_reasons)
                 if fee_scenarios and set(fee_scenarios)=={'yes','no'}:
                     row['exchange_fee_scenarios']=fee_cost_scenarios(fee_scenarios)
+                if sized_orders:
+                    row['depth_fee_scenarios']=depth_cost_scenarios(sized_orders,('yes','no'))
                 rows.append(row)
             if len(matched) != 1:
                 continue
@@ -195,6 +209,8 @@ def comparisons(evidence: dict) -> list[dict]:
                     base_reasons+['Team/time match only. Tie, postponement, cancellation and account limits need review.'])
                 if fee_scenarios and side in fee_scenarios:
                     row['exchange_fee_scenarios']=fee_cost_scenarios({side:fee_scenarios[side]},Decimal(quote['cost']))
+                if sized_orders:
+                    row['depth_fee_scenarios']=depth_cost_scenarios(sized_orders,(side,),Decimal(quote['cost']))
                 rows.append(row)
     return sorted(rows, key=lambda r:Decimal(r['gross_gap_to_one_dollar']), reverse=True)
 
@@ -205,6 +221,20 @@ def fee_cost_scenarios(legs: dict, other_principal: Decimal=Decimal(0)) -> dict:
             for label in ('direct','non_direct')},
         schedule_ref='https://kalshi.com/docs/kalshi-fee-schedule.pdf',schedule_effective_date='2026-07-07',
         scope='One contract per Kalshi leg, one taker fill per leg, zero prior fee accumulator; July 7, 2026 quadratic formula with captured fee multipliers. Excludes sportsbook/FCM, funding and exceptional settlement charges. Not a fill or profit bound.')
+
+
+def depth_cost_scenarios(orders: dict, sides: tuple, sportsbook_per_unit: Decimal=Decimal(0)) -> dict:
+    cases=[]
+    for count,available in orders.items():
+        if not all(side in available for side in sides):
+            continue
+        legs={side:available[side] for side in sides}
+        cases.append(dict(contracts_per_kalshi_leg=count,legs=legs,
+            combined_cost={label:str(sportsbook_per_unit*count+sum(
+                (Decimal(leg[label]['total_cost']) for leg in legs.values()),Decimal(0)))
+                for label in ('direct','non_direct')}))
+    return dict(cases=cases,
+        scope='Hypothetical orders consuming displayed price levels, one taker fill per level and separate fee accumulators per leg. Only sizes covered by captured Kalshi depth are shown. Actual fill fragmentation, quote changes, sportsbook limits, FCM/funding and exceptional settlement charges are not modeled. Not a fill or profit bound.')
 
 
 def price_row(kind, identity, title, legs, reasons):
@@ -231,9 +261,9 @@ async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: boo
         sources[name] = dict(status='unavailable', error_type=type(result).__name__) if isinstance(result,Exception) else result
         if name=='prizepicks' and not isinstance(result,Exception):
             sources[name]['status']='observed'
-    evidence = dict(schema_version=1, sport=sport, captured_at=datetime.now(timezone.utc).isoformat(), sources=sources)
+    evidence = dict(schema_version=2, sport=sport, captured_at=datetime.now(timezone.utc).isoformat(), sources=sources)
     rows = comparisons(evidence)
-    summary = dict(schema_version=1, sport=sport, captured_at=evidence['captured_at'], evidence_sha256=digest(evidence),
+    summary = dict(schema_version=2, sport=sport, captured_at=evidence['captured_at'], evidence_sha256=digest(evidence),
         sources={name:dict(status=source['status'], count=len(source.get('events',source.get('games',source.get('projections',[])))),
             partial_coverage=source.get('partial_coverage',True)) for name,source in sources.items()},
         comparisons=rows, execution_ready=False, realized_profit=None,

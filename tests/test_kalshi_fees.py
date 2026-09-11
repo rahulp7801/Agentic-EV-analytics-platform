@@ -5,7 +5,7 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from sportsbet.arbitrage.kalshi_fees import fee_terms,taker_buy_cost
+from sportsbet.arbitrage.kalshi_fees import fee_terms,taker_buy_cost,taker_order_cost,taker_depth_cost
 from sportsbet.ingestion.kalshi import KalshiReader
 
 NOW=datetime(2026,9,11,12,tzinfo=timezone.utc)
@@ -84,3 +84,37 @@ async def test_fee_readers_use_public_get_and_preserve_incomplete_history():
         await reader.series_fee_changes('KXNFLGAME')
         assert (await reader.event_fee_changes('EVENT'))['cursor']=='next'
     assert paths==['/trade-api/v2/series/fee_changes','/trade-api/v2/events/fee_changes']
+
+
+def test_order_accumulator_rebates_rounding_across_fills_and_caps_each_rebate():
+    result=taker_order_cost([(Decimal('.5'),Decimal(1))]*4,Decimal(1),Decimal('.01'))
+    assert Decimal(result['rebate'])==Decimal('.01')
+    assert Decimal(result['total_cost'])==Decimal('2.07')
+    assert Decimal(result['fee_accumulator'])==0
+    assert Decimal(result['total_cost'])<4*Decimal(taker_buy_cost(Decimal('.5'),Decimal(1),Decimal(1),Decimal('.01'))['total_cost'])
+    # Tiny fills can accumulate more than a cent without enough fee for a rebate.
+    fills=[(Decimal('.99'),Decimal('.01'))]*200
+    capped=taker_order_cost(fills,Decimal(1),Decimal('.01'))
+    assert Decimal(capped['fee_accumulator'])==Decimal('.018600')
+    assert Decimal(capped['rebate'])==0
+    released=taker_order_cost(fills+[(Decimal('.5'),Decimal(1))],Decimal(1),Decimal('.01'))
+    assert Decimal(released['modeled_fills'][-1]['rebate'])==Decimal('.02')
+    assert Decimal(released['modeled_fills'][-1]['exchange_fee'])==0
+    assert Decimal(released['fee_accumulator'])==Decimal('.001100')
+    for report in (result,capped,released):
+        assert Decimal(report['exchange_fee'])==Decimal(report['trade_fee'])+Decimal(report['rounding_fee'])-Decimal(report['rebate'])
+        assert Decimal(report['total_cost'])==Decimal(report['principal'])+Decimal(report['exchange_fee'])
+        assert all(Decimal(fill['exchange_fee'])>=0 for fill in report['modeled_fills'])
+
+
+@pytest.mark.parametrize('precision',[Decimal('.01'),Decimal('.0001')])
+def test_depth_scenarios_consume_actual_levels_without_inventing_capacity(precision):
+    asks=[('0.4','0.5'),('0.5','1.5'),('0.6','20')]
+    result=taker_depth_cost(asks,Decimal(3),Decimal(1),precision)
+    assert Decimal(result['principal'])==Decimal('1.55')
+    assert [fill['contracts'] for fill in result['modeled_fills']]==['0.5','1.5','1.0']
+    assert Decimal(result['total_cost'])%precision==0
+    with pytest.raises(ValueError,match='Insufficient'):taker_depth_cost(asks,Decimal(23),Decimal(1),precision)
+    for invalid in ([('0.5','1'),('0.4','1')],[('0.5','1'),('0.5','1')],[('NaN','1')],[('0.5','-1')]):
+        with pytest.raises(ValueError):taker_depth_cost(invalid,Decimal(1),Decimal(1),precision)
+    with pytest.raises(ValueError):taker_order_cost([],Decimal(1),precision)

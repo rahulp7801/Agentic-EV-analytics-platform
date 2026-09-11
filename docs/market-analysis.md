@@ -151,6 +151,23 @@ using a generic payout table. PrizePicks Team/Culture contracts are a separate p
 
 ## Runtime boundaries and remaining work
 
+Version-2 market-watch captures include size scenarios for 1, 10 and 100
+contracts per Kalshi leg. The calculation consumes the captured asks from best
+to worse prices and omits any size without enough displayed depth. Each consumed
+level is modeled as one taker fill. The exchange's
+[order-wide fee accumulator](https://docs.kalshi.com/getting_started/fee_rounding)
+carries rounding overpayment between fills; rebates are limited by each fill's
+fees. Each leg has a separate accumulator, initially zero. Direct and non-direct
+balance precision remain separate scenarios, not an inferred account setting.
+
+These are conditional cost simulations. Actual fill fragmentation can change
+fees even at the same price; displayed depth is not a fill commitment. Sportsbook
+prices are scaled to the comparison's payoff size without asserting available
+limits. FCM/funding fees and exceptional settlement charges are excluded. Do not
+pass these costs to the optimizer as guaranteed fee bounds or report them as
+realized profit. Version-1 captures retain their original comparison behavior
+for reproducible replay.
+
 The read-only `sportsbet.market_watch` collector now publishes source status and
 price-screening comparisons to `/api/markets`. It archives the source evidence
 before publication and supports hash-checked offline observation replay. This

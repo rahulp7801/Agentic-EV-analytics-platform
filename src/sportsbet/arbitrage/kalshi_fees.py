@@ -1,6 +1,6 @@
 """Observed fee precedence and single-fill exchange cost scenarios, never fills."""
 from datetime import datetime
-from decimal import Decimal, ROUND_CEILING
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 
 
 def timestamp(value: str) -> datetime:
@@ -82,3 +82,49 @@ def taker_buy_cost(price: Decimal, count: Decimal, multiplier: Decimal, precisio
     rounding=total-principal-trade
     return {'principal':str(principal),'trade_fee':str(trade),'rounding_fee':str(rounding),
         'exchange_fee':str(total-principal),'total_cost':str(total),'balance_precision':str(precision)}
+
+
+def taker_order_cost(fills: list[tuple[Decimal, Decimal]], multiplier: Decimal, precision: Decimal) -> dict:
+    """Simulate a new buy order with explicit taker fills and an initially empty accumulator.
+
+    This is exact for the supplied fill sequence and fee model, not a prediction
+    of how an order will fill. Rebates cannot make any fill's net fee negative.
+    """
+    if not 1<=len(fills)<=1000:
+        raise ValueError('Supply between one and 1000 modeled fills')
+    accumulator=Decimal(0)
+    totals={key:Decimal(0) for key in ('principal','trade_fee','rounding_fee','rebate','exchange_fee','total_cost')}
+    modeled=[]
+    for price,count in fills:
+        fill=taker_buy_cost(price,count,multiplier,precision)
+        accumulator+=Decimal(fill['rounding_fee'])
+        rebate=min(accumulator,Decimal(fill['exchange_fee']))/precision
+        rebate=rebate.to_integral_value(rounding=ROUND_FLOOR)*precision
+        accumulator-=rebate
+        fill.update(price=str(price),contracts=str(count),rebate=str(rebate),fee_accumulator=str(accumulator),
+            exchange_fee=str(Decimal(fill['exchange_fee'])-rebate),total_cost=str(Decimal(fill['total_cost'])-rebate))
+        for key in totals:totals[key]+=Decimal(fill[key])
+        modeled.append(fill)
+    return {key:str(value) for key,value in totals.items()}|dict(
+        balance_precision=str(precision),fee_accumulator=str(accumulator),modeled_fills=modeled)
+
+
+def taker_depth_cost(asks: list, count: Decimal, multiplier: Decimal, precision: Decimal) -> dict:
+    """Consume observed price levels in order, modeling one taker fill per level."""
+    if not count.is_finite() or not 0<count<=1_000_000 or not 1<=len(asks)<=1000:
+        raise ValueError('Invalid requested size or depth')
+    remaining=count
+    fills=[]
+    previous=Decimal(0)
+    for raw_price,raw_available in asks:
+        price,available=Decimal(raw_price),Decimal(raw_available)
+        if not price.is_finite() or not available.is_finite() or not previous<price<1 or available<=0:
+            raise ValueError('Invalid or unordered observed depth')
+        previous=price
+        if remaining:
+            quantity=min(remaining,available)
+            fills.append((price,quantity))
+            remaining-=quantity
+    if remaining:
+        raise ValueError('Insufficient observed depth')
+    return taker_order_cost(fills,multiplier,precision)|dict(contracts=str(count))

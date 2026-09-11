@@ -8,7 +8,8 @@ interface Observation {
   sources: Record<string,{status:string;count:number;partial_coverage:boolean}>;
   comparisons: {identity:string;kind:string;title:string;gross_cost:string;gross_gap_to_one_dollar:string;
     reasons:string[];legs:{book:string;team:string;cost:string;observed_at:string}[];
-    exchange_fee_scenarios?:{combined_cost:{direct:string;non_direct:string};scope:string; schedule_effective_date:string}}[];
+    exchange_fee_scenarios?:{combined_cost:{direct:string;non_direct:string};scope:string; schedule_effective_date:string};
+    depth_fee_scenarios?:{cases:{contracts_per_kalshi_leg:number;combined_cost:{direct:string;non_direct:string}}[];scope:string}}[];
 }
 
 export default function MarketWatch({sport}:{sport:Sport}) {
@@ -54,6 +55,14 @@ export default function MarketWatch({sport}:{sport:Sport}) {
           <p>Cost including modeled exchange fees: ${Number(row.exchange_fee_scenarios.combined_cost.direct).toFixed(4)} for a direct account;
             {' '}${Number(row.exchange_fee_scenarios.combined_cost.non_direct).toFixed(4)} for a non-direct account.</p>
           <p>{row.exchange_fee_scenarios.scope}</p>
+        </>}
+        {row.depth_fee_scenarios && <>
+          <p>Modeled cost at displayed depth:</p>
+          {row.depth_fee_scenarios.cases.length ? <ul>{row.depth_fee_scenarios.cases.map(scenario=><li key={scenario.contracts_per_kalshi_leg}>
+            {scenario.contracts_per_kalshi_leg} contracts per Kalshi leg: ${Number(scenario.combined_cost.direct).toFixed(4)} direct;
+            {' '}${Number(scenario.combined_cost.non_direct).toFixed(4)} non-direct (combined cost of all legs).
+          </li>)}</ul> : <p>Insufficient displayed depth for the requested sizes.</p>}
+          <p>{row.depth_fee_scenarios.scope}</p>
         </>}
         <p>{row.reasons.join(' ')}</p>
       </article>)}
