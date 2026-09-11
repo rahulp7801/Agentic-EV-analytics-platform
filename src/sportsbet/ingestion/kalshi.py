@@ -11,13 +11,13 @@ import time
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from uuid import uuid4
 
 import httpx
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from sportsbet.config import settings
+from sportsbet.ingestion.archive import write_archive
 
 
 def ticker_path(ticker: str) -> str:
@@ -123,17 +123,6 @@ class KalshiReader:
             sha256=hashlib.sha256(json.dumps(dict(market=market,orderbook=book),sort_keys=True).encode()).hexdigest())
 
 
-def write_archive(report: dict, output: Path | None = None) -> Path:
-    if output is None:
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
-        output = Path('.local/kalshi') / f'{timestamp}-{uuid4().hex}.json'
-    output.parent.mkdir(parents=True, exist_ok=True)
-    # Exclusive creation protects historical observations, including concurrent captures.
-    with output.open('x', encoding='utf-8') as handle:
-        json.dump(report, handle, indent=2)
-    return output
-
-
 async def run(series: str, limit: int, output: Path | None, demo: bool, check_auth: bool):
     async with KalshiReader(demo=demo) as reader:
         if check_auth:
@@ -147,7 +136,7 @@ async def run(series: str, limit: int, output: Path | None, demo: bool, check_au
         report = dict(series=series, environment='demo' if demo else 'production',
             series_metadata=metadata, snapshots=snapshots, next_cursor=page.get('cursor'),
             scope='Market observations only; no arbitrage, fill or profit is inferred.')
-        write_archive(report, output)
+        write_archive(report, output, directory=Path('.local/kalshi'))
         print(json.dumps(dict(markets=len(snapshots),partial_coverage=bool(page.get('cursor')),scope=report['scope'])))
 
 

@@ -11,7 +11,7 @@ from sportsbet.config import settings
 from sportsbet.dashboard import publish_snapshot
 from sportsbet.db.connection import create_async_pool
 from sportsbet.graph.graph import create_graph
-from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
+from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_quotes
 from sportsbet.ledger import Ledger
 from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.nba_agents import make_nba_quant_agent
@@ -29,27 +29,7 @@ def timestamp(value: str) -> datetime:
     return result
 
 def quotes_from_event(event: dict, sport: str) -> list[PlayerPropSnapshotCreate]:
-    start=timestamp(event['commence_time'])
-    quotes=[]
-    for book in event.get('bookmakers',[]):
-        if book.get('key','').lower()=='prizepicks':
-            continue
-        for market in book.get('markets',[]):
-            if market.get('key') not in MARKETS[sport]:
-                continue
-            updated=market.get('last_update') or book.get('last_update')
-            if not updated:
-                continue
-            for outcome in market.get('outcomes',[]):
-                if outcome.get('name') not in ('Over','Under') or not outcome.get('description') or outcome.get('point') is None:
-                    continue
-                price=outcome.get('price')
-                if type(price) is not int or abs(price)<100:
-                    continue
-                quotes.append(PlayerPropSnapshotCreate(sport=sport,game_id=event['id'],player_name=outcome['description'],
-                    sportsbook=book['key'],prop_type=market['key'],side=outcome['name'],line=Decimal(str(outcome['point'])),
-                    price=price,implied_probability=american_to_raw_prob(price),snapped_at=timestamp(updated),game_start_time=start))
-    return quotes
+    return parse_event_quotes(event, sport, set(MARKETS[sport]))
 
 async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id: str) -> dict:
     start=timestamp(event['commence_time'])

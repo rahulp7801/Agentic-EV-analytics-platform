@@ -87,19 +87,22 @@ def _context_agent_state(sport: str | None = None) -> dict[str, Any]:
     return state
 
 
-def _raw_props_fixture(game_id: str = "test-game-123") -> list[dict]:
+def _raw_props_fixture(game_id: str = "2024_01_KC_LV") -> list[dict]:
     return [
         {
             "id": game_id,
+            "commence_time": "2024-09-08T17:00:00Z",
             "bookmakers": [
                 {
                     "key": "draftkings",
+                    "last_update": "2024-09-08T16:00:00Z",
                     "markets": [
                         {
                             "key": "player_points",
                             "outcomes": [
                                 {
-                                    "name": "LeBron James",
+                                    "name": "Over",
+                                    "description": "LeBron James",
                                     "price": -110,
                                     "point": 25.5,
                                 }

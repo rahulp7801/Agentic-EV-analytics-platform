@@ -30,7 +30,8 @@ from sportsbet.graph.models import (
 # Test 1: PROP-01 — context_agent persists player prop snapshots
 # ---------------------------------------------------------------------------
 
-def test_context_agent_calls_write_player_prop_snapshot() -> None:
+@pytest.mark.parametrize("requested_game, expected_count", [("2024_01_KC_LV", 1), ("unmatched-game", 0)])
+def test_context_agent_calls_write_player_prop_snapshot(requested_game, expected_count) -> None:
     """Patch write_player_prop_snapshot at the agents module level.
 
     Confirms that make_context_agent, when OddsAPIPoller.fetch_player_props
@@ -45,16 +46,19 @@ def test_context_agent_calls_write_player_prop_snapshot() -> None:
     # Minimal raw props event — one bookmaker, one market, one outcome
     raw_props_fixture = [
         {
-            "id": "test-game-123",
+            "id": "2024_01_KC_LV",
+            "commence_time": "2024-09-08T17:00:00Z",
             "bookmakers": [
                 {
                     "key": "draftkings",
+                    "last_update": "2024-09-08T16:00:00Z",
                     "markets": [
                         {
                             "key": "player_pass_yds",
                             "outcomes": [
                                 {
-                                    "name": "Patrick Mahomes",
+                                    "name": "Over",
+                                    "description": "Patrick Mahomes",
                                     "price": -115,
                                     "point": 275.5,
                                 },
@@ -76,7 +80,7 @@ def test_context_agent_calls_write_player_prop_snapshot() -> None:
         "session_id": str(uuid.uuid4()),
         "request_type": "context_update",
         "created_at": datetime.now(timezone.utc),
-        "game_id": "2024_01_KC_LV",
+        "game_id": requested_game,
         "season": 2024,
         "week": 1,
         "home_team": "KC",
@@ -136,10 +140,13 @@ def test_context_agent_calls_write_player_prop_snapshot() -> None:
                 )
                 asyncio.run(agent(initial_state))
 
-    assert mock_write_snap.called, (
-        "write_player_prop_snapshot was NOT called after make_context_agent "
-        "processed fetch_player_props data. PROP-01 gap not yet closed."
-    )
+    assert mock_write_snap.call_count == expected_count
+    if expected_count:
+        snapshot = mock_write_snap.call_args.args[0]
+        assert snapshot.snapped_at == datetime(2024, 9, 8, 16, tzinfo=timezone.utc)
+        assert snapshot.game_start_time == datetime(2024, 9, 8, 17, tzinfo=timezone.utc)
+        assert snapshot.side == 'Over'
+
 
 
 # ---------------------------------------------------------------------------

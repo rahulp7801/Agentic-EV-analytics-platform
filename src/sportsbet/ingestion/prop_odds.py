@@ -55,6 +55,51 @@ class PlayerPropSnapshotCreate(BaseModel):
     side: Optional[str] = None  # "Over" | "Under" — in-memory only, not persisted to DB
 
 
+def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None = None) -> list[PlayerPropSnapshotCreate]:
+    """Normalize observed sportsbook quotes without inventing timestamps or prices."""
+    from sportsbet.quant.vig import american_to_raw_prob
+
+    def timestamp(raw):
+        parsed = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+        if parsed.tzinfo is None:
+            raise ValueError('Provider timestamp requires a timezone')
+        return parsed
+
+    if sport not in ('nba', 'nfl') or not isinstance(event.get('id'), str) or not event['id'].strip():
+        return []
+    try:
+        start = timestamp(event['commence_time'])
+    except (KeyError, AttributeError, TypeError, ValueError):
+        return []
+    quotes = []
+    for book in event.get('bookmakers', []):
+        if not book.get('key') or book['key'].lower() == 'prizepicks':
+            continue  # A whole-entry payout cannot become an American single-leg price.
+        for market in book.get('markets', []):
+            key = market.get('key')
+            if not key or (allowed_markets is not None and key not in allowed_markets):
+                continue
+            try:
+                observed = timestamp(market.get('last_update') or book.get('last_update'))
+            except (AttributeError, TypeError, ValueError):
+                continue
+            for outcome in market.get('outcomes', []):
+                price, player, side = outcome.get('price'), outcome.get('description'), outcome.get('name')
+                if type(price) is not int or abs(price) < 100 or not isinstance(player, str) or not player.strip() or side not in ('Over', 'Under'):
+                    continue
+                try:
+                    line = Decimal(str(outcome['point']))
+                    if not line.is_finite() or line < 0:
+                        continue
+                except (KeyError, ArithmeticError, ValueError):
+                    continue
+                quotes.append(PlayerPropSnapshotCreate(sport=sport, game_id=event['id'],
+                    player_name=player, sportsbook=book['key'], prop_type=key, side=side,
+                    line=line, price=price, implied_probability=american_to_raw_prob(price),
+                    snapped_at=observed, game_start_time=start))
+    return quotes
+
+
 def write_player_prop_snapshot(
     snapshot: PlayerPropSnapshotCreate,
     engine: sa.Engine | None = None,
