@@ -19,6 +19,7 @@ from sportsbet.ingestion.prizepicks import capture as capture_projections
 from sportsbet.ledger import Ledger
 from sportsbet.scan import SPORT_KEYS, timestamp
 from sportsbet.quant.vig import american_to_raw_prob
+from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost
 
 
 def digest(value) -> str:
@@ -42,6 +43,11 @@ async def sportsbooks(sport: str, daily_credit_limit: int) -> dict:
 async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
     series = 'KXNFLGAME' if sport == 'nfl' else 'KXNBAGAME'
     async with KalshiReader() as reader:
+        # Missing fee data must not discard otherwise valid price observations.
+        try:
+            series_data,series_changes=await asyncio.gather(reader.series(series),reader.series_fee_changes(series))
+        except Exception:
+            series_data=series_changes=None
         page = await reader.milestones(sport, now)
         eligible = [m for m in page['milestones'] if now < timestamp(m['start_date']) <= now+timedelta(days=7)
             and m.get('details', {}).get('league') == sport.upper()
@@ -52,12 +58,20 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
         for milestone in eligible[:limit]:
             details = milestone['details']
             event = await reader.event(details['main_game_event_ticker'])
+            fee_context={'status':'unavailable'}
+            if series_data is not None and series_changes is not None:
+                try:
+                    changes=await reader.event_fee_changes(details['main_game_event_ticker'])
+                    fee_context=dict(status='observed',series=series_data,series_changes=series_changes,
+                        event_changes=changes,received_at=datetime.now(timezone.utc).isoformat())
+                except Exception:
+                    pass
             for side in ('home', 'away'):
                 target_id = details[side+'_team_id']
                 if target_id not in targets:
                     targets[target_id] = await reader.target(target_id)
             snapshots = [await reader.snapshot(m['ticker']) for m in event['markets'][:3] if m['status']=='active']
-            games.append(dict(milestone=milestone, event=event, snapshots=snapshots))
+            games.append(dict(milestone=milestone, event=event, snapshots=snapshots,fee_context=fee_context))
     teams = None
     try:
         path = 'football/nfl' if sport=='nfl' else 'basketball/nba'
@@ -137,10 +151,32 @@ def comparisons(evidence: dict) -> list[dict]:
             if market.get('notional_value_dollars') != '1.0000':
                 continue
             base_reasons = ['Fees unverified; displayed depth does not establish a fill.']
+            fee_scenarios=None
+            try:
+                context=game['fee_context']
+                if market.get('status')!='active' or market.get('market_type')!='binary':
+                    raise ValueError('Fee scenario requires an active binary market')
+                if market.get('fee_waiver_expiration_time') and timestamp(market['fee_waiver_expiration_time'])>now:
+                    raise ValueError('Active market fee waiver requires separate review')
+                if timestamp(context['received_at'])>timestamp(snap['received_at']):
+                    raise ValueError('Fee context was unavailable at the quote observation')
+                if context['series']['ticker']!=game['event']['event']['series_ticker']:
+                    raise ValueError('Series fee identity mismatch')
+                if market['event_ticker']!=details['main_game_event_ticker']:
+                    raise ValueError('Market fee identity mismatch')
+                _,multiplier=fee_terms(context,market['event_ticker'],now)
+                fee_scenarios={side:{label:taker_buy_cost(Decimal(snap[side+'_asks'][0][0]),Decimal(1),multiplier,precision)
+                    for label,precision in (('direct',Decimal('.0001')),('non_direct',Decimal('.01')))}
+                    for side in ('yes','no') if snap[side+'_asks'] and Decimal(snap[side+'_asks'][0][1])>=1}
+            except (KeyError,ValueError,TypeError,ArithmeticError):
+                pass
             if snap['same_contract_pair']:
                 legs = [dict(book='kalshi', team=side.upper(), cost=snap[side+'_asks'][0][0],
                     displayed_size=snap[side+'_asks'][0][1], observed_at=snap['received_at']) for side in ('yes','no')]
-                rows.append(price_row('kalshi_pair', market['ticker'], market['title'], legs, base_reasons))
+                row=price_row('kalshi_pair', market['ticker'], market['title'], legs, base_reasons)
+                if fee_scenarios and set(fee_scenarios)=={'yes','no'}:
+                    row['exchange_fee_scenarios']=fee_cost_scenarios(fee_scenarios)
+                rows.append(row)
             if len(matched) != 1:
                 continue
             event, quotes = matched[0]
@@ -155,9 +191,20 @@ def comparisons(evidence: dict) -> list[dict]:
                 quote = min(opposite,key=lambda q:Decimal(q['cost']))
                 legs = [dict(book='kalshi', team=side.upper()+' '+team, cost=snap[side+'_asks'][0][0],
                     displayed_size=snap[side+'_asks'][0][1], observed_at=snap['received_at']), quote]
-                rows.append(price_row('kalshi_sportsbook', market['ticker']+':'+side, milestone['title'], legs,
-                    base_reasons+['Team/time match only. Tie, postponement, cancellation and account limits need review.']))
+                row=price_row('kalshi_sportsbook', market['ticker']+':'+side, milestone['title'], legs,
+                    base_reasons+['Team/time match only. Tie, postponement, cancellation and account limits need review.'])
+                if fee_scenarios and side in fee_scenarios:
+                    row['exchange_fee_scenarios']=fee_cost_scenarios({side:fee_scenarios[side]},Decimal(quote['cost']))
+                rows.append(row)
     return sorted(rows, key=lambda r:Decimal(r['gross_gap_to_one_dollar']), reverse=True)
+
+
+def fee_cost_scenarios(legs: dict, other_principal: Decimal=Decimal(0)) -> dict:
+    return dict(legs=legs,
+        combined_cost={label:str(other_principal+sum((Decimal(leg[label]['total_cost']) for leg in legs.values()),Decimal(0)))
+            for label in ('direct','non_direct')},
+        schedule_ref='https://kalshi.com/docs/kalshi-fee-schedule.pdf',schedule_effective_date='2026-07-07',
+        scope='One contract per Kalshi leg, one taker fill per leg, zero prior fee accumulator; July 7, 2026 quadratic formula with captured fee multipliers. Excludes sportsbook/FCM, funding and exceptional settlement charges. Not a fill or profit bound.')
 
 
 def price_row(kind, identity, title, legs, reasons):
