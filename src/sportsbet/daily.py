@@ -63,21 +63,20 @@ def create_daily_graph():
     async def markets(state):
         results={}
         public=state['mode'].startswith('public_')
-        if state['mode']!='monitor':
-            for sport in state['sports']:
-                try:
-                    summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,**({'provider':'kalshi'} if public else {}))
-                    complete = bool(summary['sources']) and all(
-                        source['status']=='observed' and not source.get('partial_coverage',True)
-                        for source in summary['sources'].values()
-                    )
-                    status='complete' if complete else 'degraded'
-                    if public:
-                        status='observed' if summary['sources'].get('kalshi',{}).get('status')=='observed' else 'degraded'
-                    results[sport]=dict(status=status,
-                        sources=summary['sources'],captured_at=summary['captured_at'])
-                except Exception as exc:
-                    results[sport]=dict(status='failed',error_type=type(exc).__name__)
+        for sport in state['sports']:
+            try:
+                summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,**({'provider':'kalshi'} if public else {}))
+                complete = bool(summary['sources']) and all(
+                    source['status']=='observed' and not source.get('partial_coverage',True)
+                    for source in summary['sources'].values()
+                )
+                status='complete' if complete else 'degraded'
+                if public:
+                    status='observed' if summary['sources'].get('kalshi',{}).get('status')=='observed' else 'degraded'
+                results[sport]=dict(status=status,
+                    sources=summary['sources'],captured_at=summary['captured_at'])
+            except Exception as exc:
+                results[sport]=dict(status='failed',error_type=type(exc).__name__)
         return {'markets':results}
 
     async def props(state):
@@ -124,7 +123,7 @@ def create_daily_graph():
     graph.add_edge(START,'histories')
     graph.add_edge(START,'markets')
     graph.add_edge(START,'schedules')
-    # Collect daily market prices before props compete for the remaining paid allowance.
+    # Collect market prices before props compete for the remaining paid allowance.
     graph.add_edge(['histories','markets','schedules'],'props')
     graph.add_edge('props','report')
     graph.add_edge('report',END)

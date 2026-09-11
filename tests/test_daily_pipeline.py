@@ -51,22 +51,70 @@ async def test_monitor_cannot_use_old_failed_incomplete_or_future_refreshes(monk
     monkeypatch.setattr(daily,'load_snapshot',lambda key:dict(status=status,
         finished_at=(datetime.now(timezone.utc)-timedelta(hours=hours)).isoformat()))
     monkeypatch.setattr(daily,'publish_snapshot',lambda *args:None)
-    scan=AsyncMock();watch=AsyncMock()
+    scan=AsyncMock();watch=AsyncMock(return_value=({'sources':{'kalshi':{'status':'observed','partial_coverage':False}},
+        'captured_at':datetime.now(timezone.utc).isoformat()},None))
     monkeypatch.setattr(daily,'scan',scan);monkeypatch.setattr(daily,'watch',watch)
     result=await daily.run(['nfl'],'monitor',25)
     assert result['props']['nfl']['status']=='blocked'
-    scan.assert_not_called();watch.assert_not_called()
+    scan.assert_not_called()
+    watch.assert_awaited_once_with('nfl',25,daily.DEFAULT_GAME_LIMIT,True)
 
 
 @pytest.mark.asyncio
-async def test_monitor_uses_recent_history_without_paid_market_recollection(monkeypatch):
+async def test_monitor_uses_recent_history_and_refreshes_markets_before_props(monkeypatch):
     monkeypatch.setattr(daily,'load_snapshot',lambda key:dict(status='complete',finished_at=datetime.now(timezone.utc).isoformat()))
     monkeypatch.setattr(daily,'publish_snapshot',lambda *args:None)
-    scan=AsyncMock(return_value={'nba':{'status':'complete'}})
-    watch=AsyncMock()
+    watch=AsyncMock(return_value=({'sources':{'kalshi':{'status':'observed','partial_coverage':False}},
+        'captured_at':datetime.now(timezone.utc).isoformat()},None))
+    async def scan_ready(sports,limit):
+        watch.assert_awaited_once_with('nba',25,daily.DEFAULT_GAME_LIMIT,True)
+        return {'nba':{'status':'complete'}}
+    scan=AsyncMock(side_effect=scan_ready)
     monkeypatch.setattr(daily,'scan',scan);monkeypatch.setattr(daily,'watch',watch)
     assert (await daily.run(['nba'],'monitor',25))['status']=='complete'
-    scan.assert_awaited_once_with(['nba'],25);watch.assert_not_called()
+    scan.assert_awaited_once_with(['nba'],25)
+
+
+@pytest.mark.asyncio
+async def test_full_monitor_real_collector_shares_budget_and_preserves_other_venues(monkeypatch,tmp_path):
+    import json
+    import httpx
+    from sportsbet import market_watch
+    ledger=Ledger(tmp_path/'credits.sqlite')
+    stored={};requests=[]
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(settings,'odds_api_key','fixture')
+    monkeypatch.setattr(market_watch,'Ledger',lambda:ledger)
+    monkeypatch.setattr(daily,'load_snapshot',lambda key:dict(status='complete',finished_at=datetime.now(timezone.utc).isoformat()))
+    for module in (daily,market_watch):
+        monkeypatch.setattr(module,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    def provider(request):
+        assert request.method=='GET' and request.url.host=='api.the-odds-api.com'
+        requests.append(request)
+        return httpx.Response(200,json=[])
+    client=httpx.AsyncClient
+    transport=httpx.MockTransport(provider)
+    monkeypatch.setattr(httpx,'AsyncClient',lambda *args,**kwargs:client(*args,**(kwargs|{'transport':transport})))
+    kalshi=AsyncMock(return_value={'status':'observed','games':[],'partial_coverage':False})
+    prizepicks=AsyncMock(return_value={'projections':[],'partial_coverage':True})
+    monkeypatch.setattr(market_watch,'kalshi_games',kalshi)
+    monkeypatch.setattr(market_watch,'capture_projections',prizepicks)
+    async def scan(sports,limit):
+        assert len(requests)==1 and kalshi.await_count==prizepicks.await_count==2
+        assert not ledger.reserve_api_credits(1,limit)  # Prop scans share the spent ceiling.
+        return {sport:{'status':'budget_exhausted'} for sport in sports}
+    monkeypatch.setattr(daily,'scan',scan)
+    result=await daily.run(['nfl','nba'],'monitor',1)
+    assert result['status']=='degraded' and len(requests)==1
+    assert result['markets']['nfl']['sources']['sportsbook']['status']=='observed'
+    assert result['markets']['nba']['sources']['sportsbook']['status']=='budget_exhausted'
+    assert all(result['markets'][sport]['sources']['kalshi']['status']=='observed' for sport in ('nfl','nba'))
+    archives=list((tmp_path/'.local/market-watch').glob('*.json'))
+    assert len(archives)==2
+    for path in archives:
+        archive=json.loads(path.read_text())
+        assert archive['summary']==stored['markets:'+archive['summary']['sport']]
+        assert market_watch.comparisons(archive['evidence'])==archive['summary']['comparisons']
 
 
 def test_rolling_credit_limit_includes_previous_days_and_survives_restart(monkeypatch,tmp_path):
