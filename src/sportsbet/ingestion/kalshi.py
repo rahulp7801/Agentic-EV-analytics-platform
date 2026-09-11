@@ -11,6 +11,7 @@ import time
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
 from cryptography.hazmat.primitives import hashes, serialization
@@ -122,7 +123,18 @@ class KalshiReader:
             sha256=hashlib.sha256(json.dumps(dict(market=market,orderbook=book),sort_keys=True).encode()).hexdigest())
 
 
-async def run(series: str, limit: int, output: Path, demo: bool, check_auth: bool):
+def write_archive(report: dict, output: Path | None = None) -> Path:
+    if output is None:
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+        output = Path('.local/kalshi') / f'{timestamp}-{uuid4().hex}.json'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    # Exclusive creation protects historical observations, including concurrent captures.
+    with output.open('x', encoding='utf-8') as handle:
+        json.dump(report, handle, indent=2)
+    return output
+
+
+async def run(series: str, limit: int, output: Path | None, demo: bool, check_auth: bool):
     async with KalshiReader(demo=demo) as reader:
         if check_auth:
             print(json.dumps(await reader.check_credentials()))
@@ -135,8 +147,7 @@ async def run(series: str, limit: int, output: Path, demo: bool, check_auth: boo
         report = dict(series=series, environment='demo' if demo else 'production',
             series_metadata=metadata, snapshots=snapshots, next_cursor=page.get('cursor'),
             scope='Market observations only; no arbitrage, fill or profit is inferred.')
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(report,indent=2),encoding='utf-8')
+        write_archive(report, output)
         print(json.dumps(dict(markets=len(snapshots),partial_coverage=bool(page.get('cursor')),scope=report['scope'])))
 
 
@@ -144,7 +155,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--series', required=True)
     parser.add_argument('--limit', type=int, default=5)
-    parser.add_argument('--output', type=Path, default=Path('.local/kalshi/observations.json'))
+    parser.add_argument('--output', type=Path, help='New archive path; default is a unique file under .local/kalshi/')
     parser.add_argument('--demo', action='store_true')
     parser.add_argument('--check-auth', action='store_true')
     args = parser.parse_args()
