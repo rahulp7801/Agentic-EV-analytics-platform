@@ -10,6 +10,8 @@ export default function Performance() {
     {metrics?.error ? <p>{String(metrics.error)}</p> : <>
       <p>Settled: {metrics?.settled_count ?? 0} · Pending: {metrics?.pending_count ?? 0} · Calibration sample: {metrics?.calibration_count ?? 0}</p>
       <p>ROI: {value('roi', true)} · Hit rate: {value('hit_rate', true)} · Brier: {value('brier_score')} · Log loss: {value('log_loss')}</p>
+      <p>Brier benchmarks: always predict loss {value('baseline_zero_brier')} · 50/50 {value('baseline_50_brier')} · always predict win {value('baseline_one_brier')}.</p>
+      <p>Scored outcomes: {typeof metrics?.calibration_positive_count === 'number' ? metrics.calibration_positive_count : 'Unavailable'} wins among {metrics?.calibration_count ?? 0} forecasts. Lower Brier is better. Benchmarks use the same sample, excluding pushes, voids, pending outcomes and missing forecasts.</p>
       <p>CLV: {value('clv_mean', true, 'pp')} ({metrics?.clv_count ?? 0} matched quotes). Missing outcomes remain unsettled.</p>
     </>}
   </section>;

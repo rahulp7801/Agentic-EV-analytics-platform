@@ -18,6 +18,8 @@ def test_metrics_separate_price_model_and_outcome():
     report = BacktestEngine().run([signal(), signal(actual_outcome=False)])
     assert report.clv_mean == pytest.approx(0.05)
     assert report.brier_score == pytest.approx(0.26)
+    assert report.calibration_positive_count == 1
+    assert (report.baseline_zero_brier,report.baseline_50_brier,report.baseline_one_brier)==(.5,.25,.5)
     assert report.log_loss == pytest.approx(-math.log(0.6 * 0.4) / 2)
     assert report.roi == 0
     assert report.calibration == [dict(lower=0.6, upper=0.7, count=2, predicted=0.6, observed=0.5)]
@@ -30,12 +32,27 @@ def test_pending_push_and_void_are_not_losses():
     assert report.roi == 0.5
     assert report.hit_rate == 1
     assert (report.settled_count, report.pending_count, report.void_count, report.calibration_count) == (2,1,1,1)
+    assert report.calibration_positive_count==1
+    assert (report.baseline_zero_brier,report.baseline_50_brier,report.baseline_one_brier)==(1,.25,0)
     assert BacktestEngine().run([signal(actual_outcome=None)]).roi is None
 
 def test_zero_stake_and_missing_model_do_not_invent_metrics():
     report = BacktestEngine().run([signal(stake=Decimal(0), quant_result=QuantResult())])
     assert report.roi is None and report.brier_score is None
+    assert report.calibration_positive_count==0
+    assert report.baseline_zero_brier is report.baseline_50_brier is report.baseline_one_brier is None
     assert report.clv_mean == pytest.approx(0.05)
+
+
+def test_fixed_brier_baselines_use_model_scored_cohort_not_all_settlements():
+    signals=[signal(actual_outcome=False,quant_result=QuantResult(true_probability=Decimal('.2'))) for _ in range(6)]
+    signals += [signal(quant_result=QuantResult(true_probability=Decimal('.8'))) for _ in range(2)]
+    signals.append(signal(quant_result=QuantResult()))  # A settled win without a forecast is excluded.
+    report=BacktestEngine().run(signals)
+    assert report.decided_count==9 and report.calibration_count==8
+    assert report.calibration_positive_count==2 and report.hit_rate==pytest.approx(3/9)
+    assert report.brier_score==pytest.approx(.04)
+    assert (report.baseline_zero_brier,report.baseline_50_brier,report.baseline_one_brier)==(.25,.25,.75)
 
 @pytest.mark.parametrize('close', [START, START+timedelta(minutes=1), START-timedelta(hours=2)])
 def test_inplay_or_same_quote_has_no_clv(close):
