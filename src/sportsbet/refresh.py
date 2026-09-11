@@ -1,6 +1,7 @@
 """Refresh the historical game samples used by the scheduled prop worker."""
 import argparse
 from datetime import date
+from requests.exceptions import RequestException
 
 from sportsbet.db.connection import get_sync_engine
 from sportsbet.ingestion.games import ingest_games_seasons
@@ -19,7 +20,14 @@ def refresh(sport: str, today: date, backfill: bool = False):
             ingest_player_stats_seasons(years, engine)
         else:
             for season in years:
-                ingest_nba_gamelogs_season(season, engine)
+                try:
+                    ingest_nba_gamelogs_season(season, engine)
+                except RequestException:
+                    if backfill:
+                        raise  # Bounded recent updates cannot substitute for a full backfill.
+                    from sportsbet.ingestion.nba_espn import refresh_recent
+                    return refresh_recent(season,today,engine)
+        return {'provider':'nba' if sport=='nba' else 'nflverse'}
     finally:
         engine.dispose()
 

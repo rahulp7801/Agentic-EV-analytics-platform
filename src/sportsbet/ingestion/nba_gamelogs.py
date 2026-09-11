@@ -25,6 +25,7 @@ during tests or module-level imports.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import gc
 from sportsbet.ingestion.upsert import upsert_rows
 import sys
@@ -134,6 +135,9 @@ def ingest_nba_gamelogs_season(
 
     # Add season year as integer column for partitioning and queries.
     df["season"] = season
+    df['source_provider'] = 'nba'
+    df['source_sha256'] = None
+    df['source_observed_at'] = datetime.now(timezone.utc)
 
     # Convert game_date string to Python date objects.
     df["game_date"] = pd.to_datetime(df["game_date"]).dt.date

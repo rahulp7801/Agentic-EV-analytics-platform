@@ -356,6 +356,9 @@ class NBAPlayerGameLog(Base):
     threes_made: Mapped[Optional[int]] = mapped_column(SmallInteger)
     steals: Mapped[Optional[int]] = mapped_column(SmallInteger)
     blocks: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    source_provider: Mapped[str] = mapped_column(String, nullable=False, server_default='nba')
+    source_sha256: Mapped[Optional[str]] = mapped_column(String(64))
+    source_observed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMPTZ(timezone=True))
 
     __table_args__ = (
         UniqueConstraint("player_id", "game_id", name="uq_nba_gamelog_player_game"),
