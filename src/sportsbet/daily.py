@@ -45,8 +45,8 @@ def create_daily_graph():
             if state['mode']=='daily':
                 publish_snapshot('refresh:'+sport,dict(status='running',started_at=now.isoformat()))
                 try:
-                    await asyncio.to_thread(refresh,sport,now.date())
-                    result=dict(status='complete',finished_at=datetime.now(timezone.utc).isoformat())
+                    coverage=await asyncio.to_thread(refresh,sport,now.date())
+                    result=dict(status='complete',finished_at=datetime.now(timezone.utc).isoformat(),coverage=coverage)
                 except Exception as exc:
                     result=dict(status='failed',finished_at=datetime.now(timezone.utc).isoformat(),error_type=type(exc).__name__)
                 publish_snapshot('refresh:'+sport,result)

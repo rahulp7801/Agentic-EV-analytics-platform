@@ -60,13 +60,14 @@ jobs:
             *) exit 1 ;;
           esac
       - name: Retain public market evidence for replay
-        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily')
+        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'refresh')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: market-evidence-${{ github.run_id }}
           path: |
             .local/market-watch/*.json
             .local/prizepicks/*.json
+            .local/nba-refresh/*.json
           include-hidden-files: true
           retention-days: 90
           if-no-files-found: warn

@@ -20,6 +20,40 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def test_nba_fallback_protects_official_rows_and_applies_corrections_atomically():
+    from sportsbet.ingestion.nba_espn import store_rows
+    engine=sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
+    game=uuid.uuid4().hex[:18]
+    now=datetime.now(timezone.utc)
+    rows=[dict(player_id=i,game_id=game,player_name='Fallback fixture',season=2025,
+        points=10,source_provider='espn',source_sha256='a'*64,source_observed_at=now) for i in (1,2)]
+    try:
+        with engine.begin() as conn:
+            conn.execute(sa.text("INSERT INTO nba_player_gamelogs(player_id,game_id,season,points) VALUES (1,:game,2025,20)"),{'game':game})
+        store_rows(engine,rows)
+        store_rows(engine,[r|{'points':11} for r in rows])
+        with engine.connect() as conn:
+            actual=conn.execute(sa.text('SELECT player_id,points,source_provider FROM nba_player_gamelogs WHERE game_id=:game ORDER BY player_id'),{'game':game}).all()
+            assert [tuple(r) for r in actual]==[(1,20,'nba'),(2,11,'espn')]
+        # Removing a participant cannot leave stale data while claiming refresh success.
+        with pytest.raises(ValueError,match='reconciliation required'): store_rows(engine,rows[:1])
+        # A later official correction takes priority, including resetting provenance.
+        with engine.begin() as conn:
+            pd.DataFrame([rows[1]|dict(points=15,source_provider='nba',source_sha256=None)]).to_sql(
+                'nba_player_gamelogs',conn,if_exists='append',index=False,method=upsert_rows(['player_id','game_id']))
+        store_rows(engine,rows)
+        with engine.connect() as conn:
+            actual=conn.execute(sa.text('SELECT points,source_provider,source_sha256 FROM nba_player_gamelogs WHERE game_id=:game AND player_id=2'),{'game':game}).one()
+            assert tuple(actual)==(15,'nba',None)
+        # Constraint failure rolls back the other rows in the same batch.
+        with pytest.raises(sa.exc.IntegrityError): store_rows(engine,[rows[0]|dict(player_id=3),rows[1]|dict(player_id=4,source_provider='unknown')])
+        with engine.connect() as conn:
+            assert conn.execute(sa.text('SELECT count(*) FROM nba_player_gamelogs WHERE game_id=:game'),{'game':game}).scalar_one()==2
+    finally:
+        with engine.begin() as conn: conn.execute(sa.text('DELETE FROM nba_player_gamelogs WHERE game_id=:game'),{'game':game})
+        engine.dispose()
+
+
 def test_dashboard_game_logs_expose_stats_and_reject_ambiguous_nfl_games():
     engine=sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
     name='View '+uuid.uuid4().hex[:12]
