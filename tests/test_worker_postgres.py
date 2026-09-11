@@ -26,19 +26,20 @@ def test_nfl_refresh_applies_schedule_corrections_and_clears_ambiguous_context()
     engine = sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
     identity = uuid.uuid4().hex[:19]
     game = dict(game_id=identity,season=2026,week=1,home_team='ZZ1',away_team='ZZ2',gameday='2026-09-10')
-    stat = dict(player_id=identity,player_display_name='Fixture',season=2026,week=1,team='ZZ1',passing_yards=200,season_type='REG')
+    stat = dict(player_id=identity,player_display_name='Fixture',season=2026,week=1,team='ZZ1',passing_yards=200,passing_interceptions=2,season_type='REG')
     try:
         for corrected in (False, True):
             if corrected:
                 game.update(home_team='ZZ2',away_team='ZZ1',gameday='2026-09-12')
                 stat['passing_yards'] = 225
             with patch('sportsbet.ingestion.games.nfl.load_schedules',return_value=pl.DataFrame([game])), \
-                 patch('sportsbet.ingestion.player_stats.nfl.load_player_stats',return_value=pl.DataFrame([stat])):
+                 patch('sportsbet.ingestion.player_stats.nfl.load_player_stats',return_value=pl.DataFrame([stat, stat | dict(player_id=None,player_display_name=None)])):
                 ingest_games_seasons([2026],engine)
                 ingest_player_stats_seasons([2026],engine)
             with engine.connect() as conn:
                 row = conn.execute(sa.text('SELECT passing_yards,opponent_team,home_away FROM player_stats WHERE player_id=:id'),{'id':identity}).one()
                 assert tuple(row) == (225 if corrected else 200,'ZZ2','away' if corrected else 'home')
+                assert conn.execute(sa.text('SELECT interceptions FROM player_stats WHERE player_id=:id'),{'id':identity}).scalar_one() == 2
                 stored_date=conn.execute(sa.text('SELECT game_date FROM games WHERE game_id=:id'),{'id':identity}).scalar_one()
                 assert stored_date.isoformat() == game['gameday']
         # Multiple schedule matches must not silently choose an opponent or retain obsolete context.

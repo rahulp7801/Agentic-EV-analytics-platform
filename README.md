@@ -101,6 +101,15 @@ PostgreSQL tests require `SPORTSBET_TEST_DATABASE_URL` pointing to a **disposabl
 
 ## Readiness still requiring evidence
 
-The site and CI/CD deploy successfully. Live-data readiness requires a reachable production database, migrated/backfilled data, the Vercel read-only URL, and worker secrets. At the last verification the supplied runtime database was unreachable; data APIs correctly returned a generic unavailable response.
+Free historical outcomes can be collected and used to verify the actual graph:
+
+```sh
+uv run python -m sportsbet.ingestion.espn_history --sport nba --start 2026-01-28 --end 2026-01-28 --output .local/history/nba
+uv run python -m sportsbet.quant.walkforward --dataset .local/history/nba/dataset.json --prop points --threshold 20.5 --output .local/history/nba-report.json
+```
+
+The collector caches ESPN final box scores with source URLs, retrieval times and hashes; requests cover at most31 days at a time. `walkforward` requires the corresponding PostgreSQL history and runs the same LangGraph quant nodes used by scans. Its threshold is an explicit research benchmark, not an invented sportsbook line. It reports excluded identities/small samples, calibration, dataset/code hashes, and null ROI/CLV. A small pilot is not proof of an edge.
+
+The site and CI/CD deploy successfully. Supabase is now reachable and migrated, with NBA history preserved and2023-2025 NFL stats backfilled. Live-data readiness still requires the Vercel read-only URL, worker secrets, current refreshes and verified coverage. Public data APIs report unavailability until configured; a successful web deployment does not establish data readiness.
 
 Automatic settlement, robust historical injury/roster context, NFL game-log presentation, full-slate refresh coverage, and out-of-sample calibration/profitability remain unfinished. A green deployment or unit test is not evidence of model accuracy. Maintain current findings and constraints in `CLAUDE.md`.
