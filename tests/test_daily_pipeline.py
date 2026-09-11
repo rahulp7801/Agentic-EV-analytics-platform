@@ -9,6 +9,12 @@ from sportsbet.ledger import Ledger
 from sportsbet.config import settings
 
 
+@pytest.fixture(autouse=True)
+def schedule_source(monkeypatch):
+    monkeypatch.setattr(daily,'collect_schedule',AsyncMock(return_value={
+        'status':'complete','captured_at':datetime.now(timezone.utc).isoformat()}))
+
+
 @pytest.mark.asyncio
 async def test_actual_daily_graph_isolates_refresh_failure_and_orders_paid_stages(monkeypatch):
     stored={}; calls=[]

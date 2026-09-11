@@ -54,7 +54,7 @@ export interface GameLog {
   opponent: string;
   sport: Sport;
   date: string;
-  home_away: 'home' | 'away';
+  home_away?: 'home' | 'away';
   result?: 'W' | 'L';
   // NBA
   points?: number;
