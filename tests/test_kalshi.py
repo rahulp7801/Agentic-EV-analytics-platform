@@ -85,3 +85,16 @@ async def test_snapshot_preserves_evidence_and_observation_interval():
     assert len(snapshot['sha256']) == 64
     assert 'quote_updated_at' not in snapshot
     assert snapshot['same_contract_pair'] is None  # One empty side cannot be hedged.
+
+
+def test_repeated_captures_never_overwrite_prior_evidence(tmp_path, monkeypatch):
+    import json
+    from sportsbet.ingestion.kalshi import write_archive
+    monkeypatch.chdir(tmp_path)
+    first = write_archive({'capture': 1})
+    second = write_archive({'capture': 2})
+    assert first != second
+    with pytest.raises(FileExistsError):
+        write_archive({'capture': 3}, first)
+    assert json.loads(first.read_text()) == {'capture': 1}
+    assert json.loads(second.read_text()) == {'capture': 2}

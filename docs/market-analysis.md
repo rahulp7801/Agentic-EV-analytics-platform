@@ -26,7 +26,9 @@ See [Kalshi authentication](https://docs.kalshi.com/getting_started/api_keys) an
 .venv/Scripts/python.exe -m sportsbet.ingestion.kalshi --series KXNFLGAME --limit 5 --check-auth
 ```
 
-Output defaults to ignored `.local/kalshi/observations.json`. This is a bounded
+Output defaults to a unique timestamped archive under ignored `.local/kalshi/`.
+Explicit output paths must be new files; repeated captures never overwrite history.
+This is a bounded
 sample, not complete coverage, a historical replay, or evidence of an executable hedge.
 
 ## Implemented specialist route
