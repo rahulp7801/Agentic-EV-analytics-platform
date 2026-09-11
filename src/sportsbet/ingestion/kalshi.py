@@ -103,6 +103,22 @@ class KalshiReader:
     async def series(self, series: str) -> dict:
         return (await self._get('/series/'+ticker_path(series)))['series']
 
+    async def settled_markets(self, tickers: list[str], *, historical: bool) -> dict:
+        if not 1 <= len(tickers) <= 20 or len(set(tickers)) != len(tickers):
+            raise ValueError('Request 1..20 distinct market tickers')
+        params = dict(tickers=','.join(ticker_path(t) for t in tickers), limit=1000)
+        if not historical:
+            params['status'] = 'settled'
+        return await self._get('/historical/markets' if historical else '/markets', params=params)
+
+    async def minute_candles(self, ticker: str, *, historical: bool, start_ts: int, end_ts: int) -> dict:
+        ticker = ticker_path(ticker)
+        if type(start_ts) is not int or type(end_ts) is not int or not 0 < end_ts-start_ts <= 3600:
+            raise ValueError('Request a positive candle window of at most one hour')
+        prefix = '/historical' if historical else '/series/'+ticker.split('-', 1)[0]
+        return await self._get(prefix+'/markets/'+ticker+'/candlesticks',
+            params=dict(start_ts=start_ts, end_ts=end_ts, period_interval=1))
+
     async def series_fee_changes(self, series: str) -> dict:
         return await self._get('/series/fee_changes',params={'series_ticker':ticker_path(series),'show_historical':'true'})
 
