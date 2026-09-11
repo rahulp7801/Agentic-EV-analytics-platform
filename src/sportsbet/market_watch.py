@@ -266,12 +266,21 @@ def main():
             positive_gross_gaps=sum(Decimal(r['gross_gap_to_one_dollar'])>0 for r in rows),
             realized_profit=None, execution_ready=False)))
         return
+    failed=False
     for sport in (['nfl','nba'] if args.sport=='both' else [args.sport]):
         try:
             summary,_ = asyncio.run(run(sport,args.daily_credit_limit,args.game_limit,args.publish,args.provider))
-            print(json.dumps(dict(sport=sport,sources=summary['sources'],comparisons=len(summary['comparisons']),execution_ready=False)))
+            unavailable=not summary['sources'] or any(source['status'] not in ('observed','not_requested')
+                for source in summary['sources'].values())
+            failed=failed or unavailable
+            print(json.dumps(dict(sport=sport,status='degraded' if unavailable else 'observed',
+                sources=summary['sources'],comparisons=len(summary['comparisons']),execution_ready=False)))
         except Exception as exc:
-            raise SystemExit(f'Market observation failed ({type(exc).__name__})') from None
+            failed=True
+            # A failed league must not suppress the other league; never expose exception text.
+            print(json.dumps(dict(sport=sport,status='failed',error_type=type(exc).__name__,execution_ready=False)))
+    if failed:
+        raise SystemExit(2)
 
 
 if __name__=='__main__':
