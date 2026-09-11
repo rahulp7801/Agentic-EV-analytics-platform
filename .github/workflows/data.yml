@@ -4,8 +4,8 @@ on:
     inputs:
       operation:
         type: choice
-        options: [scan, watch, refresh, backfill]
-        default: scan
+        options: [daily, monitor, scan, watch, refresh, backfill]
+        default: daily
       sport:
         type: choice
         options: [both, nfl, nba]
@@ -31,8 +31,9 @@ jobs:
       ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
       SPORT: ${{ inputs.sport || 'both' }}
-      OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'refresh' || 'scan') }}
+      OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'daily' || 'monitor') }}
       DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '25' }}
+      ODDS_ROLLING_CREDIT_LIMIT: ${{ vars.ODDS_ROLLING_CREDIT_LIMIT || '450' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,6 +52,7 @@ jobs:
       - name: Update market data
         run: |
           case "$OPERATION" in
+            daily|monitor) uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
             scan) uv run --locked python -m sportsbet.scan --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
             watch) uv run --locked python -m sportsbet.market_watch --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" --publish ;;
             refresh) uv run --locked python -m sportsbet.refresh --sport "$SPORT" ;;
@@ -58,7 +60,7 @@ jobs:
             *) exit 1 ;;
           esac
       - name: Retain public market evidence for replay
-        if: always() && env.OPERATION == 'watch'
+        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: market-evidence-${{ github.run_id }}

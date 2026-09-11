@@ -138,6 +138,28 @@ empty slate differs from a failed or interrupted scan. The dashboard marks old
 scan reports stale and refreshes the signal ticker every30 seconds. This is
 budgeted coverage, not a promise that every available market is scanned.
 
+GitHub's **Market data → daily** operation runs a deterministic LangGraph workflow:
+history refresh and market collection run independently, then eligible prop scans
+run after both finish. A failed history refresh blocks that league's prop scan.
+The half-hourly `monitor` operation requires a successful refresh within36 hours
+and does not repeat the paid game-market collection. Interrupted refreshes remain
+blocked. A completed refresh records a successful ingestion attempt; it does not
+prove that the upstream provider has supplied every recently completed game.
+
+Run it locally with `uv run python -m sportsbet.daily --sport both --mode daily`.
+Per-stage results are persisted for diagnosis; degraded coverage makes the worker
+exit unsuccessfully. Manual `scan` remains a maintenance operation that bypasses
+the refresh-age gate. Scheduled daily/monitor runs remain disabled until hosted
+database access and a manual production run are verified.
+
+Paid requests share both a daily ceiling and `ODDS_ROLLING_CREDIT_LIMIT` (default450
+credits across31 UTC dates), enforced atomically in the persistent ledger. This
+counts this application's reservations, including failed requests, not usage by
+other clients of the same API key or the provider's billing cycle. The free plan's
+500 monthly credits cannot provide continuous full-slate prop coverage; see the
+[provider's plans](https://the-odds-api.com/). Set limits deliberately for the
+subscribed plan and measured coverage. Never clear usage records to reset a budget.
+
 GitHub's **Market data → watch** operation publishes snapshots and retains public
 evidence artifacts for90 days. Download archives for longer retention. Replay
 checks the capture hash and recomputes the same comparisons without network

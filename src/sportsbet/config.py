@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     postgres_db: str = "sportsbet"
     log_level: str = "INFO"
     odds_api_key: str | None = None
+    # Conservative application allowance across any 31 UTC dates, independent of billing reset day.
+    odds_rolling_credit_limit: int = Field(default=450, ge=1, le=100_000_000)
     analytics_database_url: str | None = None
     # Reserved for read-only market research and separate demo integration.
     # Private key contents stay in ignored files, never in frontend settings.

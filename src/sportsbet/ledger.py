@@ -6,7 +6,7 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from sportsbet.config import settings
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from decimal import Decimal
 from sportsbet.graph.models import EVSignal, QuantResult
@@ -87,13 +87,19 @@ class Ledger:
         return True, 'accepted'
 
     def reserve_api_credits(self, cost: int, limit: int = 25) -> bool:
-        if cost < 1 or limit < 1:
+        if type(cost) is not int or type(limit) is not int or cost < 1 or limit < 1:
             return False
-        day = datetime.now(timezone.utc).date().isoformat()
+        today = datetime.now(timezone.utc).date()
+        day = today.isoformat()
+        window_start = (today-timedelta(days=30)).isoformat()
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT credits FROM api_usage WHERE risk_day=?', (day,)).fetchone()
             if (row[0] if row else 0) + cost > limit:
+                return False
+            rolling = db.execute('SELECT COALESCE(SUM(credits),0) FROM api_usage WHERE risk_day>=? AND risk_day<=?',
+                (window_start,day)).fetchone()[0]
+            if rolling + cost > settings.odds_rolling_credit_limit:
                 return False
             db.execute('INSERT INTO api_usage VALUES (?,?) ON CONFLICT(risk_day) DO UPDATE SET credits=api_usage.credits+excluded.credits', (day,cost))
         return True

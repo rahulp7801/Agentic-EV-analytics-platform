@@ -12,6 +12,8 @@ test('scan health distinguishes missing, partial, empty and stale evidence',()=>
   assert.equal(scanStatus({...completed,coverage:{}},now).state,'no_quotes');
   assert.equal(scanStatus({...completed,eligible_events:0,completed_events:0,coverage:{}},now).state,'no_games');
   assert.equal(scanStatus({...completed,failures:[{}]},now).state,'degraded');
+  assert.equal(scanStatus({...completed,status:'blocked'},now).state,'blocked');
+  assert.equal(scanStatus({...completed,status:'failed'},now).state,'failed');
   assert.equal(scanStatus(completed,now+46*60000).state,'stale');
   assert.equal(scanStatus({...completed,finished_at:'invalid'},now).state,'unknown');
 });
