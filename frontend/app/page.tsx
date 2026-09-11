@@ -6,6 +6,7 @@ import EVDashboard from '@/components/EVDashboard';
 import PropsAnalysis from '@/components/PropsAnalysis';
 import GameLogs from '@/components/GameLogs';
 import MarketWatch from '@/components/MarketWatch';
+import ScanStatus from '@/components/ScanStatus';
 import ParlayBuilder from '@/components/ParlayBuilder';
 import KellyCalc from '@/components/KellyCalc';
 import type { Sport } from '@/lib/types';
@@ -60,6 +61,7 @@ export default function Home() {
           </div>
 
           {/* View content */}
+          <ScanStatus />
           <div style={{ flex: 1, overflow: 'hidden' }}>
             {view === 'dashboard' && <EVDashboard sport={sport} onAddToParlay={addToParlay} parlayIds={new Set(parlayLegs.map(s => s.id))} />}
             {view === 'props'     && <PropsAnalysis sport={sport} />}

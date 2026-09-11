@@ -17,8 +17,19 @@ export default function TopBar() {
   }, []);
 
   const [signals, setSignals] = useState<{ player: string; prop_type: string; line: number; ev_pct: number; direction: string; sport: string; gated?: boolean }[]>([]);
+  const [available,setAvailable]=useState(false);
   useEffect(() => {
-    fetch('/api/signals', { cache: 'no-store' }).then(r => r.json()).then(d => setSignals((d.signals || []).filter((s: {gated?: boolean}) => !s.gated))).catch(() => {});
+    const controller=new AbortController();
+    async function load() {
+      try {
+        const response=await fetch('/api/signals',{cache:'no-store',signal:controller.signal});
+        if (!response.ok) throw new Error('Unavailable');
+        const data=await response.json();
+        setSignals((data.signals || []).filter((s:{gated?:boolean})=>!s.gated));setAvailable(true);
+      } catch {if (!controller.signal.aborted) {setSignals([]);setAvailable(false);}}
+    }
+    void load();const timer=setInterval(()=>void load(),30000);
+    return ()=>{controller.abort();clearInterval(timer);};
   }, []);
   const tickerItems = [...signals, ...signals];
 
@@ -32,7 +43,7 @@ export default function TopBar() {
     }}>
       {/* Left: status */}
       <div className="topbar-item" style={{ gap: 8, minWidth: 160 }}>
-        <span className="live-dot" style={{ width: 8, height: 8 }} />
+        <span style={{ width: 8, height: 8, borderRadius:'50%', background:available && signals.length ? 'var(--accent-mint)' : 'var(--text-muted)' }} />
         <span style={{ color: 'var(--accent-mint)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em' }}>
           MARKET ESTIMATES
         </span>
@@ -62,7 +73,7 @@ export default function TopBar() {
       <div className="topbar-item" style={{ gap: 6 }}>
         <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>SIGNALS</span>
         <span style={{ color: 'var(--accent-mint)', fontSize: 11, fontWeight: 600 }}>
-          {signals.length}
+          {available ? signals.length : '—'}
         </span>
       </div>
       <div className="topbar-item" style={{ gap: 8, borderRight: 'none' }}>

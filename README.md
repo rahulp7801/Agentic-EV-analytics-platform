@@ -130,6 +130,14 @@ exclude fees and tie/void scenarios; all comparisons remain unverified and no
 orders are supported. PrizePicks HTTP403 remains an access limitation, never a
 reason to substitute synthetic odds.
 
+Daily prop scans publish per-league coverage at `/api/scans`: attempted/completed
+games, missing estimates, budget exclusions, failures, and completion time. A
+provider/model failure is isolated so other games and the other league continue.
+Saved attempt times rotate limited credits across games and leagues; a successful
+empty slate differs from a failed or interrupted scan. The dashboard marks old
+scan reports stale and refreshes the signal ticker every30 seconds. This is
+budgeted coverage, not a promise that every available market is scanned.
+
 GitHub's **Market data → watch** operation publishes snapshots and retains public
 evidence artifacts for90 days. Download archives for longer retention. Replay
 checks the capture hash and recomputes the same comparisons without network

@@ -40,6 +40,10 @@
 
 ## Data and orchestration
 
+- Daily scanner reliability: source failures isolated per league/event; exact discovered ID/home/away/start must match returned quotes. Attempts persist before paid I/O, rotate least-recently attempted games, and alternate leagues by last attempt. Every scan publishes scan:nfl/scan:nba with bounded current-event attempt history, coverage/skip counts, failures, and completion timestamps. Graph errors propagate to event failures; no successful-empty status for a failed model. Dashboard scan status distinguishes missing, stale, interrupted, no-games, no-quotes and quota-limited runs. TopBar polls every30seconds and clears unavailable/stale recommendations via server gates.
+- Actual restricted-worker readiness run at2026-09-11T18:55Z successfully published both league reports:0games in next24hours,0paid prop requests. This is verified empty coverage, not full-slate/season readiness. Supabase still uses the IPv6 direct host; exact Session pooler hostname remains needed for Vercel/GitHub. Local suite336passed/17disposable-DBskipped before final model-error regression; frontend11tests and TypeScript passed.
+- Final focused daily-scan tests8passed, including actual graph SQL-failure propagation. Production frontend build passed. Local production Next server with restricted reader role returned actual no_games status for both leagues from /api/scans; existing mutation controls still passed. No live provider price or result was invented for this verification.
+
 - NFL schedules now upsert corrections instead of ignoring existing games; provider failures stop refreshes. Weekly stat refresh writes rows and derives opponent/home-away from a unique team/season/week schedule in one transaction; missing or ambiguous matches clear old context instead of reusing it. CLI loads schedules before player stats. Regression coverage includes rescheduled dates, venue swaps, corrected yardage and ambiguous-match clearing in real PostgreSQL CI.
 
 - Hosted dashboard reads dashboard_snapshots via server-only PostgreSQL. Python publishes snapshots; no local subprocesses/files are relied upon on Vercel.

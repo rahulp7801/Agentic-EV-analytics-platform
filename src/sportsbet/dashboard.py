@@ -3,6 +3,15 @@ import json
 from sqlalchemy import text
 from sportsbet.db.connection import get_sync_engine
 
+def load_snapshot(key: str) -> dict | None:
+    engine = get_sync_engine()
+    try:
+        with engine.connect() as conn:
+            return conn.execute(text('SELECT payload FROM dashboard_snapshots WHERE snapshot_key=:key'),
+                {'key':key}).scalar_one_or_none()
+    finally:
+        engine.dispose()
+
 def publish_snapshot(key: str, payload: dict) -> None:
     engine = get_sync_engine()
     try:
