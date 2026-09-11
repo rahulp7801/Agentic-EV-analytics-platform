@@ -100,7 +100,7 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         async with pool.acquire() as conn:
             for i in range(count+1):
                 game_date = target-timedelta(days=count-i)
-                stat = 30 if i < 24 or i == count else 10
+                stat = 30 if i < 24 or i == count else 20
                 if sport == 'nba':
                     await conn.execute('INSERT INTO nba_player_gamelogs(player_id,player_name,game_id,game_date,season,points) VALUES($1,$2,$3,$4,$5,$6)',
                         player_id,player,f'{identity}{i:02}',game_date,season-1,stat)
@@ -114,10 +114,15 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         predictions = ledger.predictions()
         assert len(predictions) == 1
         assert predictions[0]['model_probability'] == pytest.approx(24/count, abs=1e-6)
+        assert predictions[0]['push_probability'] == 0  # Integer stats cannot push at20.5.
         # NBA's 60% vs 50% quote passes policy; NFL's larger edge remains audited even if capped.
         if sport == 'nba':
             assert result['signals'][0]['sample_size'] == count
             assert result['signals'][0]['direction'] == 'over'
+        event['bookmakers'][0]['markets'][0]['outcomes'][0]['point'] = 20
+        await evaluate_event(pool,event,sport,ledger,identity+'integer')
+        integer = next(p for p in ledger.predictions() if p['line'] == 20)
+        assert integer['push_probability'] == pytest.approx((count-24)/count, abs=1e-6)
     finally:
         async with pool.acquire() as conn:
             await conn.execute(f'DELETE FROM {table} WHERE player_id=$1',player_id)

@@ -94,15 +94,16 @@ PROP_COLUMN_MAP: dict[str, str] = {
 # Static SQL template
 # $1 = player_id  (str)
 # $2 = season     (int)
-# $3 = line       (float — cast to float to avoid asyncpg NUMERIC/SMALLINT ambiguity)
+# $3 explicitly uses double precision: otherwise PostgreSQL infers the stat's
+# integer type and asyncpg truncates half-lines, inventing push outcomes.
 # {col} substituted from PROP_COLUMN_MAP[params.prop_type] — allowlist only, never user input
 # ---------------------------------------------------------------------------
 
 _NFL_PROP_TEMPLATE = """\
 SELECT
     COUNT(*) AS total,
-    SUM(CASE WHEN {col} > $3 THEN 1 ELSE 0 END) AS successes,
-    SUM(CASE WHEN {col} = $3 THEN 1 ELSE 0 END) AS pushes,
+    SUM(CASE WHEN {col} > $3::double precision THEN 1 ELSE 0 END) AS successes,
+    SUM(CASE WHEN {col} = $3::double precision THEN 1 ELSE 0 END) AS pushes,
     AVG({col}::float) AS mean_val
 FROM player_stats
 WHERE player_id = $1
@@ -143,9 +144,8 @@ class PropQueryBuilder:
 
         Notes
         -----
-        args[2] = float(params.line): asyncpg requires a Python float for comparison
-        against integer/smallint stat columns — Decimal triggers NUMERIC vs SMALLINT
-        operator ambiguity error in PostgreSQL.
+        args[2] = float(params.line), bound to the explicit double-precision
+        SQL parameter rather than the integer stat type; half-lines stay fractional.
 
         Phase 18 situational filters are appended after the base filters loop.
         Append order: opponent_team -> home_away -> teammate_out -> last_n_games.

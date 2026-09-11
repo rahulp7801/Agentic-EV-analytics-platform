@@ -158,8 +158,8 @@ WHERE player_id = $1
 _NBA_GAMELOG_SINGLE_TEMPLATE = """\
 SELECT
     COUNT(*) AS total,
-    SUM(CASE WHEN {col} > $3 THEN 1 ELSE 0 END) AS successes,
-    SUM(CASE WHEN {col} = $3 THEN 1 ELSE 0 END) AS pushes,
+    SUM(CASE WHEN {col} > $3::double precision THEN 1 ELSE 0 END) AS successes,
+    SUM(CASE WHEN {col} = $3::double precision THEN 1 ELSE 0 END) AS pushes,
     AVG({col}::float) AS mean_val
 FROM nba_player_gamelogs
 WHERE player_id = $1
@@ -171,8 +171,8 @@ WHERE player_id = $1
 _NBA_GAMELOG_PRA_TEMPLATE = """\
 SELECT
     COUNT(*) AS total,
-    SUM(CASE WHEN (points + rebounds + assists) > $3 THEN 1 ELSE 0 END) AS successes,
-    SUM(CASE WHEN (points + rebounds + assists) = $3 THEN 1 ELSE 0 END) AS pushes,
+    SUM(CASE WHEN (points + rebounds + assists) > $3::double precision THEN 1 ELSE 0 END) AS successes,
+    SUM(CASE WHEN (points + rebounds + assists) = $3::double precision THEN 1 ELSE 0 END) AS pushes,
     AVG((points + rebounds + assists)::float) AS mean_val
 FROM nba_player_gamelogs
 WHERE player_id = $1
