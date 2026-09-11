@@ -156,6 +156,8 @@ def comparisons(evidence: dict) -> list[dict]:
                 context=game['fee_context']
                 if market.get('status')!='active' or market.get('market_type')!='binary':
                     raise ValueError('Fee scenario requires an active binary market')
+                if market.get('fee_waiver_expiration_time') and timestamp(market['fee_waiver_expiration_time'])>now:
+                    raise ValueError('Active market fee waiver requires separate review')
                 if timestamp(context['received_at'])>timestamp(snap['received_at']):
                     raise ValueError('Fee context was unavailable at the quote observation')
                 if context['series']['ticker']!=game['event']['event']['series_ticker']:

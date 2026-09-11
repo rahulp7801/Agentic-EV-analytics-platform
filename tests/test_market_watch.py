@@ -118,6 +118,9 @@ def test_captured_event_fees_change_pair_and_cross_venue_costs_without_claiming_
     fees['event_changes']['cursor']='more'
     assert all('exchange_fee_scenarios' not in r for r in comparisons(data))
     fees['event_changes']['cursor']=''
+    market['fee_waiver_expiration_time']='2026-09-12T00:00:00Z'
+    assert all('exchange_fee_scenarios' not in r for r in comparisons(data))
+    del market['fee_waiver_expiration_time']
     snap['yes_asks']=[('0.48','0.5')]
     pair=next(r for r in comparisons(data) if r['kind']=='kalshi_pair')
     assert 'exchange_fee_scenarios' not in pair  # Cannot price a whole contract beyond displayed depth.
