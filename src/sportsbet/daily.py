@@ -10,7 +10,7 @@ from typing import TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from sportsbet.dashboard import load_snapshot, publish_snapshot
-from sportsbet.market_watch import run as watch
+from sportsbet.market_watch import run as watch, DEFAULT_GAME_LIMIT
 from sportsbet.refresh import refresh_history
 from sportsbet.scan import run as scan, timestamp
 from sportsbet.schedules import collect as collect_schedule
@@ -66,7 +66,7 @@ def create_daily_graph():
         if state['mode']!='monitor':
             for sport in state['sports']:
                 try:
-                    summary,_=await watch(sport,state['daily_credit_limit'],5,True,**({'provider':'kalshi'} if public else {}))
+                    summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,**({'provider':'kalshi'} if public else {}))
                     complete = bool(summary['sources']) and all(
                         source['status']=='observed' and not source.get('partial_coverage',True)
                         for source in summary['sources'].values()

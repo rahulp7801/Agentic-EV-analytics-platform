@@ -5,7 +5,8 @@ import type { Sport } from '@/lib/types';
 interface Observation {
   captured_at: string;
   scope: string;
-  sources: Record<string,{status:string;count:number;partial_coverage:boolean}>;
+  sources: Record<string,{status:string;count:number;partial_coverage:boolean;
+    coverage?:{discovery_complete:boolean;discovered_games:number;attempted_games:number;observed_games:number;quoted_games:number;failed_games:number;omitted_markets:number}}>;
   comparisons: {identity:string;kind:string;title:string;gross_cost:string;gross_gap_to_one_dollar:string;
     reasons:string[];legs:{book:string;team:string;cost:string;observed_at:string}[];
     exchange_fee_scenarios?:{combined_cost:{direct:string;non_direct:string};scope:string; schedule_effective_date:string};
@@ -33,7 +34,6 @@ export default function MarketWatch({sport}:{sport:Sport}) {
     const timer=setInterval(()=>void load(),30000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[sport]);
-  const age=data ? (now-Date.parse(data.captured_at))/1000 : null;
   return <section style={{padding:16,height:'100%',overflow:'auto'}}>
     <h2>Market comparisons</h2>
     <p>Sportsbooks · Kalshi · PrizePicks — observation and research only</p>
@@ -41,14 +41,21 @@ export default function MarketWatch({sport}:{sport:Sport}) {
     {!data && !error && <p>Loading observations…</p>}
     {data && <>
       <p>{data.scope}</p>
-      <p>Captured {new Date(data.captured_at).toLocaleString()} · {age!==null && Number.isFinite(age) && age>=0 && age<=30 ? 'Recent observation' : 'Stale observation — refresh required'}</p>
+      <p>Collection finished {new Date(data.captured_at).toLocaleString()}. Quote freshness is shown for each comparison.</p>
       <ul>{Object.entries(data.sources).map(([name,source])=><li key={name}>
         {name}: {source.status} · {source.count} source records{source.partial_coverage ? ' · partial coverage' : ''}
+        {source.coverage && <span> · {source.coverage.observed_games}/{source.coverage.discovered_games} discovered games inspected,
+          {' '}{source.coverage.quoted_games} with quotes, {source.coverage.failed_games} with collection failures
+          {!source.coverage.discovery_complete && ' · discovery incomplete'}
+          {source.coverage.omitted_markets>0 && ` · ${source.coverage.omitted_markets} markets omitted`}</span>}
       </li>)}</ul>
       <p>Positive gross gaps are screening leads, not profit. PrizePicks requires a complete entry payout; projection lines alone cannot establish an arbitrage.</p>
       {data.comparisons.length===0 && <p>No comparisons could be built from this capture.</p>}
-      {data.comparisons.map(row=><article className="card" key={row.kind+row.identity} style={{padding:12,marginBottom:10}}>
+      {data.comparisons.map(row=>{
+        const age=now-Math.min(...row.legs.map(leg=>Date.parse(leg.observed_at)));
+        return <article className="card" key={row.kind+row.identity} style={{padding:12,marginBottom:10}}>
         <strong>{row.title}</strong> · {row.kind.replaceAll('_',' ')} · Unverified
+        <p>{Number.isFinite(age) && age>=0 && age<=30000 ? 'Recent observations' : 'Stale observations — refresh required'}</p>
         <p>Cost per $1 binary payoff: ${Number(row.gross_cost).toFixed(4)} · gross gap: ${Number(row.gross_gap_to_one_dollar).toFixed(4)}</p>
         <ul>{row.legs.map((leg,index)=><li key={index}>{leg.book}: {leg.team} · ${Number(leg.cost).toFixed(4)} · observed {new Date(leg.observed_at).toLocaleTimeString()}</li>)}</ul>
         {row.exchange_fee_scenarios && <>
@@ -65,7 +72,7 @@ export default function MarketWatch({sport}:{sport:Sport}) {
           <p>{row.depth_fee_scenarios.scope}</p>
         </>}
         <p>{row.reasons.join(' ')}</p>
-      </article>)}
+      </article>;})}
     </>}
   </section>;
 }
