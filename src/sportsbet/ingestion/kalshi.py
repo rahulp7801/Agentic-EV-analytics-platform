@@ -103,6 +103,13 @@ class KalshiReader:
     async def series(self, series: str) -> dict:
         return (await self._get('/series/'+ticker_path(series)))['series']
 
+    async def series_fee_changes(self, series: str) -> dict:
+        return await self._get('/series/fee_changes',params={'series_ticker':ticker_path(series),'show_historical':'true'})
+
+    async def event_fee_changes(self, event: str) -> dict:
+        # A remaining cursor is retained and blocks fee calculations.
+        return await self._get('/events/fee_changes',params={'event_ticker':ticker_path(event),'limit':1000})
+
     async def milestones(self, sport: str, start: datetime, *, limit: int = 100) -> dict:
         if sport not in ('nba', 'nfl') or start.tzinfo is None or not 1 <= limit <= 500:
             raise ValueError('Invalid milestone query')

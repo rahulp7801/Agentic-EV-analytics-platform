@@ -104,6 +104,29 @@ Its centicent rounding text and cent-rounded example tables warrant explicit
 verification before implementing exact fee accounting. The reader records live
 series fee metadata; it does not infer zero fees or use one universal constant.
 
+September 11 follow-up: the official [fee rounding guide](https://docs.kalshi.com/getting_started/fee_rounding)
+explains the difference: direct accounts align balances to $0.0001; non-direct
+accounts align to $0.01. The trade fee first rounds upward to six decimal dollars,
+then the total signed balance change is aligned. An order accumulator rebates
+rounding across fills. The dashboard now shows separate single-fill exchange-cost
+scenarios for both account types, with zero prior accumulator, one contract per
+Kalshi leg and sufficient displayed depth. These use the documented July 7
+quadratic taker formula. They exclude sportsbook, FCM, funding and exceptional
+settlement charges and are not profit bounds or inputs to the optimizer's
+`fee_per_unit_bound`. Multi-fill execution needs actual accumulator evidence.
+
+[Event fee overrides](https://docs.kalshi.com/api-reference/events/get-event-fee-changes)
+take precedence over series metadata. The collector captures public series fee
+history and event changes; a remaining event-history cursor, conflicting changes,
+stale/future context or an unknown fee model disables the scenario. A latest
+effective null/null event change clears the override. Future changes cannot be
+applied early, and a series transition during collection requires a refresh.
+Current fee metadata is not historical evidence for old quotes. The scenario
+declares the formula's effective date; formula changes need a reviewed code update.
+Direct retrieval of the PDF returned HTTP429 during this check; no access-control
+bypass or invented document hash was used. The current PDF and rounding rules
+were readable through the public documentation browser.
+
 PrizePicks Player Picks are whole entries, not independently priced sportsbook
 legs. Require the actual entry payout schedule, product, selection types, rules,
 and observation time. [Current potential outcomes](https://www.prizepicks.com/help-center/potential-outcomes)

@@ -7,7 +7,8 @@ interface Observation {
   scope: string;
   sources: Record<string,{status:string;count:number;partial_coverage:boolean}>;
   comparisons: {identity:string;kind:string;title:string;gross_cost:string;gross_gap_to_one_dollar:string;
-    reasons:string[];legs:{book:string;team:string;cost:string;observed_at:string}[]}[];
+    reasons:string[];legs:{book:string;team:string;cost:string;observed_at:string}[];
+    exchange_fee_scenarios?:{combined_cost:{direct:string;non_direct:string};scope:string; schedule_effective_date:string}}[];
 }
 
 export default function MarketWatch({sport}:{sport:Sport}) {
@@ -49,6 +50,11 @@ export default function MarketWatch({sport}:{sport:Sport}) {
         <strong>{row.title}</strong> · {row.kind.replaceAll('_',' ')} · Unverified
         <p>Cost per $1 binary payoff: ${Number(row.gross_cost).toFixed(4)} · gross gap: ${Number(row.gross_gap_to_one_dollar).toFixed(4)}</p>
         <ul>{row.legs.map((leg,index)=><li key={index}>{leg.book}: {leg.team} · ${Number(leg.cost).toFixed(4)} · observed {new Date(leg.observed_at).toLocaleTimeString()}</li>)}</ul>
+        {row.exchange_fee_scenarios && <>
+          <p>Cost including modeled exchange fees: ${Number(row.exchange_fee_scenarios.combined_cost.direct).toFixed(4)} for a direct account;
+            {' '}${Number(row.exchange_fee_scenarios.combined_cost.non_direct).toFixed(4)} for a non-direct account.</p>
+          <p>{row.exchange_fee_scenarios.scope}</p>
+        </>}
         <p>{row.reasons.join(' ')}</p>
       </article>)}
     </>}

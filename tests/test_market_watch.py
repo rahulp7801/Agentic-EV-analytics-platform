@@ -90,3 +90,34 @@ async def test_unavailable_source_is_retained_without_discarding_other_evidence(
     assert report['sources']['sportsbook']['status']=='observed'
     assert report['sources']['prizepicks']['status']=='unavailable'
     assert 'secrets' not in path.read_text()
+
+
+def test_captured_event_fees_change_pair_and_cross_venue_costs_without_claiming_profit():
+    data=evidence()
+    market=dict(ticker='KX-TEST-H',title='Home wins',event_ticker='EVENT',notional_value_dollars='1.0000',
+        custom_strike={'football_team':'home'},status='active',market_type='binary')
+    snap=dict(market=market,same_contract_pair={'ask_cost':'0.96'},received_at=NOW.isoformat(),
+        yes_asks=[('0.48','20')],no_asks=[('0.48','20')])
+    fees=dict(status='observed',received_at=NOW.isoformat(),series=dict(ticker='KXNFLGAME',
+        fee_type='quadratic',fee_multiplier=1,last_updated_ts=NOW.isoformat()),
+        series_changes={'series_fee_change_arr':[]},event_changes={'cursor':'','event_fee_changes':[
+            dict(event_ticker='EVENT',series_ticker='KXNFLGAME',fee_type_override='quadratic',fee_multiplier_override=2,
+                scheduled_ts=NOW.isoformat())]})
+    game=dict(event={'event':{'series_ticker':'KXNFLGAME'}},fee_context=fees,
+        milestone=dict(title='Home vs Away',start_date='2026-09-13T17:00:00Z',details={
+            'main_game_event_ticker':'EVENT','home_team_id':'home','away_team_id':'away'}),snapshots=[snap])
+    data['sources']['kalshi']=dict(targets={'home':{'name':'Home'},'away':{'name':'Away'}},games=[game])
+    rows=comparisons(data)
+    pair=next(r for r in rows if r['kind']=='kalshi_pair')
+    assert Decimal(pair['gross_cost'])<1
+    assert Decimal(pair['exchange_fee_scenarios']['combined_cost']['direct'])>1
+    cross=[r for r in rows if r['kind']=='kalshi_sportsbook']
+    assert len(cross)==2 and all('exchange_fee_scenarios' in r for r in cross)
+    assert all(r['fee_adjusted_profit'] is None and r['execution_ready'] is False for r in rows)
+    # An incomplete fee history must preserve gross observations but omit fee scenarios.
+    fees['event_changes']['cursor']='more'
+    assert all('exchange_fee_scenarios' not in r for r in comparisons(data))
+    fees['event_changes']['cursor']=''
+    snap['yes_asks']=[('0.48','0.5')]
+    pair=next(r for r in comparisons(data) if r['kind']=='kalshi_pair')
+    assert 'exchange_fee_scenarios' not in pair  # Cannot price a whole contract beyond displayed depth.
