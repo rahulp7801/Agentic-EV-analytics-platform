@@ -16,6 +16,13 @@ keys in prose. Findings are redacted; scanner reports and private diagnostics
 must not be uploaded as public artifacts. GitHub secret scanning and push
 protection provide additional checks, but no scanner detects every secret.
 
+Before uploading public Actions evidence, the worker stages only the three
+approved JSON archive directories. It checks raw and decoded JSON against its
+configured credentials (including decoded database passwords and URL-encoded
+forms), then runs the same redacted Gitleaks rules. Either failure blocks the
+entire upload. Private directories and scanner reports are never staged. This
+gate also applies when collection fails and partial evidence is retained.
+
 ## Public repository audit, 2026-09-11
 
 The audit covered fetched branches and public pull-request heads (345 commits,

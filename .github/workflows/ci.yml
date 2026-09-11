@@ -19,12 +19,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install checksum-pinned secret scanner
-        run: |
-          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
-            --output "$RUNNER_TEMP/gitleaks.tar.gz"
-          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+        uses: ./.github/actions/install-gitleaks
       - name: Scan tracked tree and every incoming commit
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -32,13 +27,13 @@ jobs:
         run: |
           mkdir "$RUNNER_TEMP/tracked-source"
           git archive HEAD | tar -x -C "$RUNNER_TEMP/tracked-source"
-          "$RUNNER_TEMP/gitleaks" dir "$RUNNER_TEMP/tracked-source" --config .gitleaks.toml --redact=100 --no-banner
+          gitleaks dir "$RUNNER_TEMP/tracked-source" --config .gitleaks.toml --redact=100 --no-banner
           if [[ -n "$BASE_SHA" && "$BASE_SHA" != 0000000000000000000000000000000000000000 ]]; then
             range="$BASE_SHA..$HEAD_SHA"
           else
             range="-1 $HEAD_SHA"
           fi
-          "$RUNNER_TEMP/gitleaks" git . --log-opts="$range" --config .gitleaks.toml --redact=100 --no-banner
+          gitleaks git . --log-opts="$range" --config .gitleaks.toml --redact=100 --no-banner
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
