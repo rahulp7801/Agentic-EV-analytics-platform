@@ -67,9 +67,14 @@ To export prediction IDs or record independently verified settlements:
 uv run python -m sportsbet.ledger --list
 uv run python -m sportsbet.ledger --settlements outcomes.json
 uv run python -m sportsbet.ledger --recommendations-only
+uv run python -m sportsbet.ledger --model-version empirical-v2
 ```
 
 `outcomes.json` maps prediction IDs to `true`, `false`, `"push"`, `"void"`, or `null`. Hosted metrics snapshots refresh on the next successful worker run.
+Reports retain the earliest eligible prediction per selection within the chosen
+cohort. Audit timestamps require explicit timezones; conflicting retries cannot
+replace recorded predictions. ROI is hypothetical recorded-stake replay, not
+realized account profit. Model-version filtering keeps comparisons reproducible.
 
 ## Verification and deployment
 
