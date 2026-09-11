@@ -53,3 +53,14 @@ def test_unusable_evidence_is_excluded_from_metrics(tmp_path,changes):
     report=ledger.report()
     assert report['sample_size']==0 and report['excluded_missing_metadata']==1
     assert report['roi'] is None and report['brier_score'] is None
+
+
+def test_invalid_legacy_closing_quote_cannot_crash_or_fabricate_clv(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    ledger.record('s',payload())
+    with ledger.connect() as db:
+        db.execute('INSERT INTO quotes VALUES (?,?,?)',
+            (ledger.quote_identity(payload()),'2026-01-01T16:00:00',.6))
+    report=ledger.report()
+    assert report['sample_size']==1 and report['pending_count']==1
+    assert report['clv_mean'] is None and report['excluded_closing_quotes']==1

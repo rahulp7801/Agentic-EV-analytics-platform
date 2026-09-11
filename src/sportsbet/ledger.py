@@ -149,6 +149,7 @@ class Ledger:
         signals = []
         excluded = 0
         duplicate = 0
+        invalid_closing = 0
         seen = set()
         parsed = []
         versions = set()
@@ -197,19 +198,30 @@ class Ledger:
             with self.connect() as db:
                 closing = db.execute('SELECT captured_at,probability FROM quotes WHERE identity=? AND captured_at>? AND captured_at<? ORDER BY captured_at DESC LIMIT 1',
                     (self.quote_identity(p), entered.astimezone(timezone.utc).isoformat(),start.astimezone(timezone.utc).isoformat())).fetchone()
-            close = closing[1] if closing else None
+            close = None
+            closing_time = entered
+            if closing:
+                try:
+                    closing_time = utc_timestamp(closing[0])
+                    close = Decimal(str(closing[1]))
+                    if not close.is_finite() or not 0 <= close <= 1 or not entered < closing_time < start:
+                        raise ValueError('Invalid closing quote')
+                except (ValueError, TypeError, ArithmeticError):
+                    close, closing_time = None, entered
+                    invalid_closing += 1
             signals.append(BacktestSignal(
                 QuantResult(true_probability=Decimal(str(p['model_probability']))),
-                Decimal(str(close)) if close is not None else None,
+                close,
                 json.loads(outcome) if outcome is not None else None,
                 Decimal(str(p.get('stake_fraction',0))) if recommendations_only else Decimal('1'),
                 quote_terms(p['american_odds'],Decimal(0))[1]+1, start,
-                datetime.fromisoformat(closing[0] if closing else p['captured_at']), entered,
+                closing_time, entered,
                 push_probability=Decimal(str(p.get('push_probability',0))),
             ))
         report = BacktestEngine().run(signals)
         return {**{f.name:getattr(report,f.name) for f in fields(report) if f.name!='signals_df'},
                 'excluded_missing_metadata':excluded, 'duplicate_predictions':duplicate,
+                'excluded_closing_quotes':invalid_closing,
                 'cohort':'recommendations' if recommendations_only else 'all_predictions',
                 'model_version':model_version, 'available_model_versions':sorted(versions),
                 'selection_policy':'Earliest eligible prediction per game/player/market/side/line within the selected cohort.',
