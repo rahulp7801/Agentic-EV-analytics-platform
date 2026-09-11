@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from sportsbet import daily
+from sportsbet import refresh as refresh_module
 from sportsbet.ledger import Ledger
 from sportsbet.config import settings
 
@@ -19,7 +20,8 @@ def schedule_source(monkeypatch):
 async def test_actual_daily_graph_isolates_refresh_failure_and_orders_paid_stages(monkeypatch):
     stored={}; calls=[]
     monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
-    def refresh(sport,day):
+    monkeypatch.setattr(refresh_module,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    def refresh(sport,day,backfill=False):
         calls.append(('refresh',sport))
         if sport=='nfl': raise RuntimeError('provider URL with secret')
     async def watch(sport,limit,count,publish):
@@ -30,7 +32,7 @@ async def test_actual_daily_graph_isolates_refresh_failure_and_orders_paid_stage
         assert ('watch','nba') in calls and ('refresh','nba') in calls
         calls.append(('scan','nba'))
         return {'nba':{'status':'complete'}}
-    monkeypatch.setattr(daily,'refresh',refresh)
+    monkeypatch.setattr(refresh_module,'refresh',refresh)
     monkeypatch.setattr(daily,'watch',watch)
     monkeypatch.setattr(daily,'scan',scan)
     report=await daily.run(['nfl','nba'],'daily',25)

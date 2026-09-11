@@ -11,7 +11,7 @@ from langgraph.graph import END, START, StateGraph
 
 from sportsbet.dashboard import load_snapshot, publish_snapshot
 from sportsbet.market_watch import run as watch
-from sportsbet.refresh import refresh
+from sportsbet.refresh import refresh_history
 from sportsbet.scan import run as scan, timestamp
 from sportsbet.schedules import collect as collect_schedule
 
@@ -43,13 +43,7 @@ def create_daily_graph():
         for sport in state['sports']:
             now=datetime.now(timezone.utc)
             if state['mode']=='daily':
-                publish_snapshot('refresh:'+sport,dict(status='running',started_at=now.isoformat()))
-                try:
-                    coverage=await asyncio.to_thread(refresh,sport,now.date())
-                    result=dict(status='complete',finished_at=datetime.now(timezone.utc).isoformat(),coverage=coverage)
-                except Exception as exc:
-                    result=dict(status='failed',finished_at=datetime.now(timezone.utc).isoformat(),error_type=type(exc).__name__)
-                publish_snapshot('refresh:'+sport,result)
+                result=await asyncio.to_thread(refresh_history,sport,now.date())
             else:
                 result=load_snapshot('refresh:'+sport) or {'status':'not_run'}
                 try:
