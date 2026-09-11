@@ -26,19 +26,20 @@ def test_nfl_refresh_applies_schedule_corrections_and_clears_ambiguous_context()
     engine = sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
     identity = uuid.uuid4().hex[:19]
     game = dict(game_id=identity,season=2026,week=1,home_team='ZZ1',away_team='ZZ2',gameday='2026-09-10')
-    stat = dict(player_id=identity,player_display_name='Fixture',season=2026,week=1,team='ZZ1',passing_yards=200,season_type='REG')
+    stat = dict(player_id=identity,player_display_name='Fixture',season=2026,week=1,team='ZZ1',passing_yards=200,passing_interceptions=2,season_type='REG')
     try:
         for corrected in (False, True):
             if corrected:
                 game.update(home_team='ZZ2',away_team='ZZ1',gameday='2026-09-12')
                 stat['passing_yards'] = 225
             with patch('sportsbet.ingestion.games.nfl.load_schedules',return_value=pl.DataFrame([game])), \
-                 patch('sportsbet.ingestion.player_stats.nfl.load_player_stats',return_value=pl.DataFrame([stat])):
+                 patch('sportsbet.ingestion.player_stats.nfl.load_player_stats',return_value=pl.DataFrame([stat, stat | dict(player_id=None,player_display_name=None)])):
                 ingest_games_seasons([2026],engine)
                 ingest_player_stats_seasons([2026],engine)
             with engine.connect() as conn:
                 row = conn.execute(sa.text('SELECT passing_yards,opponent_team,home_away FROM player_stats WHERE player_id=:id'),{'id':identity}).one()
                 assert tuple(row) == (225 if corrected else 200,'ZZ2','away' if corrected else 'home')
+                assert conn.execute(sa.text('SELECT interceptions FROM player_stats WHERE player_id=:id'),{'id':identity}).scalar_one() == 2
                 stored_date=conn.execute(sa.text('SELECT game_date FROM games WHERE game_id=:id'),{'id':identity}).scalar_one()
                 assert stored_date.isoformat() == game['gameday']
         # Multiple schedule matches must not silently choose an opponent or retain obsolete context.
@@ -99,7 +100,7 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         async with pool.acquire() as conn:
             for i in range(count+1):
                 game_date = target-timedelta(days=count-i)
-                stat = 30 if i < 24 or i == count else 10
+                stat = 30 if i < 24 or i == count else 20
                 if sport == 'nba':
                     await conn.execute('INSERT INTO nba_player_gamelogs(player_id,player_name,game_id,game_date,season,points) VALUES($1,$2,$3,$4,$5,$6)',
                         player_id,player,f'{identity}{i:02}',game_date,season-1,stat)
@@ -113,10 +114,15 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         predictions = ledger.predictions()
         assert len(predictions) == 1
         assert predictions[0]['model_probability'] == pytest.approx(24/count, abs=1e-6)
+        assert predictions[0]['push_probability'] == 0  # Integer stats cannot push at20.5.
         # NBA's 60% vs 50% quote passes policy; NFL's larger edge remains audited even if capped.
         if sport == 'nba':
             assert result['signals'][0]['sample_size'] == count
             assert result['signals'][0]['direction'] == 'over'
+        event['bookmakers'][0]['markets'][0]['outcomes'][0]['point'] = 20
+        await evaluate_event(pool,event,sport,ledger,identity+'integer')
+        integer = next(p for p in ledger.predictions() if p['line'] == 20)
+        assert integer['push_probability'] == pytest.approx((count-24)/count, abs=1e-6)
     finally:
         async with pool.acquire() as conn:
             await conn.execute(f'DELETE FROM {table} WHERE player_id=$1',player_id)

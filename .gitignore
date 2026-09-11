@@ -43,3 +43,8 @@ Thumbs.db
 .vercel/
 .local/
 .pytest_cache/
+*.pem
+*.key
+kalshi_key.txt
+
+kalshi_key.txt

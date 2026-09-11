@@ -48,6 +48,24 @@ def _probability(value: Decimal | None) -> float | None:
         raise ValueError("Probability must be finite and within [0, 1]")
     return float(value)
 
+
+def calibration_metrics(predictions: list[tuple[float, int]]) -> dict:
+    """Probability scoring shared by priced replay and unpriced forecast checks."""
+    if any(not math.isfinite(p) or not 0 <= p <= 1 or y not in (0, 1) for p, y in predictions):
+        raise ValueError('Calibration needs finite probabilities and binary outcomes')
+    result = dict(calibration_count=len(predictions), brier_score=None, log_loss=None, calibration=[])
+    if not predictions:
+        return result
+    result['brier_score'] = sum((p-y)**2 for p, y in predictions) / len(predictions)
+    result['log_loss'] = -sum(y*math.log(max(1e-15,p)) + (1-y)*math.log(max(1e-15,1-p)) for p,y in predictions) / len(predictions)
+    for bucket in range(10):
+        group = [(p,y) for p,y in predictions if min(int(p*10),9) == bucket]
+        if group:
+            result['calibration'].append(dict(lower=bucket/10, upper=(bucket+1)/10,
+                count=len(group), predicted=sum(p for p,_ in group)/len(group),
+                observed=sum(y for _,y in group)/len(group)))
+    return result
+
 class BacktestEngine:
     def run(self, signals: list[BacktestSignal]) -> BacktestReport:
         report = BacktestReport(sample_size=len(signals))
@@ -100,26 +118,13 @@ class BacktestEngine:
         report.roi = sum(profits) / sum(stakes) if sum(stakes) > 0 else None
         report.hit_rate = sum(wins) / len(wins) if wins else None
         report.clv_mean = sum(clvs) / len(clvs) if clvs else None
-        if predictions:
-            report.brier_score = sum((p - y) ** 2 for p, y in predictions) / len(predictions)
-            report.log_loss = -sum(y * math.log(max(1e-15, p)) + (1-y) * math.log(max(1e-15, 1-p)) for p, y in predictions) / len(predictions)
-            for bucket in range(10):
-                group = [(p, y) for p, y in predictions if min(int(p * 10), 9) == bucket]
-                if group:
-                    report.calibration.append(dict(lower=bucket / 10, upper=(bucket + 1) / 10,
-                        count=len(group), predicted=sum(p for p, _ in group) / len(group),
-                        observed=sum(y for _, y in group) / len(group)))
+        for name, value in calibration_metrics(predictions).items():
+            setattr(report, name, value)
         return report
 
 def main() -> None:
-    from datetime import timezone
-    signals = [BacktestSignal(QuantResult(true_probability=Decimal("0.55")), Decimal("0.60"),
-        won, Decimal("100"), Decimal("1.909"), datetime(2024, 1, 14, 18, tzinfo=timezone.utc),
-        datetime(2024, 1, 14, 17, tzinfo=timezone.utc), datetime(2024, 1, 14, 12, tzinfo=timezone.utc))
-        for won in (True, True, True, False, False)]
-    report = BacktestEngine().run(signals)
-    for name in ("sample_size", "hit_rate", "roi", "clv_mean", "brier_score", "log_loss"):
-        print(f"{name}: {getattr(report, name)}")
+    from sportsbet.quant.backtest_replay import main as replay
+    replay()
 
 if __name__ == "__main__":
     main()

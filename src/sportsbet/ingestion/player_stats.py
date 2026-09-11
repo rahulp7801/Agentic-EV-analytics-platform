@@ -36,6 +36,7 @@ PLAYER_STATS_COLUMNS: list[str] = [
     "passing_yards",
     "passing_tds",
     "interceptions",
+    "passing_interceptions",
     "carries",
     "rushing_yards",
     "rushing_tds",
@@ -51,6 +52,7 @@ PLAYER_STATS_COLUMNS: list[str] = [
 _COLUMN_RENAMES: dict[str, str] = {
     "recent_team": "team",
     "player_display_name": "player_name",
+    "passing_interceptions": "interceptions",
 }
 
 
@@ -77,8 +79,19 @@ def ingest_player_stats_seasons(
 
         if "season_type" in df.columns:
             df = df.filter(pl.col("season_type") == "REG")
+        # nflverse also includes unattributed team plays with no player ID.
+        # They cannot be assigned to a player and must not abort the season load.
+        before = df.height
+        df = df.filter(pl.col("player_id").is_not_null() & (pl.col("player_id").str.strip_chars() != ""))
+        if df.height != before:
+            log.warning("player_stats_unattributed_rows_skipped", season=season, rows=before-df.height)
+        if df.is_empty():
+            log.warning("player_stats_no_identified_players", season=season)
+            continue
         if "team" in df.columns and "recent_team" in df.columns:
             df = df.drop("recent_team")
+        if "passing_interceptions" in df.columns and "interceptions" in df.columns:
+            df = df.drop("interceptions")
 
         # Available-only filter — prevents KeyError if a season lacks a column.
         available: list[str] = [c for c in PLAYER_STATS_COLUMNS if c in df.columns]

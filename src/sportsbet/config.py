@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     odds_api_key: str | None = None
     analytics_database_url: str | None = None
+    # Reserved for read-only market research and separate demo integration.
+    # Private key contents stay in ignored files, never in frontend settings.
+    kalshi_api_key_id: str | None = None
+    kalshi_private_key_path: str | None = None
+    kalshi_demo_api_key_id: str | None = None
+    kalshi_demo_private_key_path: str | None = None
 
     # Risk management — Kelly Criterion configuration (Phase 5 agents read these)
     bankroll_usd: float = Field(default=10000.0, gt=0)

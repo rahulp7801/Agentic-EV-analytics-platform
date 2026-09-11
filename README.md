@@ -73,7 +73,19 @@ uv run python -m sportsbet.ledger --recommendations-only
 
 ## Verification and deployment
 
-All commits and workflows belong to https://github.com/rahulp7801/Agentic-EV-analytics-platform on `master`.
+All commits and workflows belong to https://github.com/rahulp7801/Agentic-EV-analytics-platform. Work on feature branches, open a PR, then merge to `master` after required checks pass. Direct pushes and protection bypasses are prohibited. Production jobs only run from `master`.
+
+Historical quote replay requires explicit input; it never generates example wins or prices:
+
+```sh
+uv run python -m sportsbet.quant.backtest --snapshots-file quotes.json --outcomes-file outcomes.json
+# Or read recorded database quotes:
+uv run python -m sportsbet.quant.backtest --database --outcomes-file outcomes.json
+```
+
+Quote rows require unique `id`, `game_id`, `sportsbook`, `market_type`, `outcome_name`, `price` (American), and timezone-aware `snapped_at`/`game_start_time`. Props additionally require `player_name` and `line`. Outcomes map the earliest snapshot ID for each exact selection to `true`, `false`, `"push"`, `"void"`, or `null`. Optional `model_probability` requires a `model_version` and timezone-aware `model_generated_at` no later than the entry quote; include `push_probability` for push markets. Missing probabilities cannot produce calibration. Optional `stake` defaults to one unit.
+
+Reports include input hashes, sample coverage, and an explicit evaluation scope. Empty usable datasets exit unsuccessfully with null performance metrics. Replay evaluates the supplied selections; it does not rerun the current model historically or establish profitability. Unit-test fixtures verify arithmetic only.
 
 CI runs the Python suite, dependency audits, frontend metric/access tests, TypeScript/build checks, and an isolated PostgreSQL service for migrations, concurrency, stat upserts, and actual NFL/NBA graph SQL. Production deployment depends on these jobs. Vercel's root directory is `frontend`; automatic Git deployments are disabled so they cannot bypass CI. The CLI uses direct deployment because `vercel pull` currently rejects project-scoped tokens during team lookup.
 
@@ -89,6 +101,15 @@ PostgreSQL tests require `SPORTSBET_TEST_DATABASE_URL` pointing to a **disposabl
 
 ## Readiness still requiring evidence
 
-The site and CI/CD deploy successfully. Live-data readiness requires a reachable production database, migrated/backfilled data, the Vercel read-only URL, and worker secrets. At the last verification the supplied runtime database was unreachable; data APIs correctly returned a generic unavailable response.
+Free historical outcomes can be collected and used to verify the actual graph:
+
+```sh
+uv run python -m sportsbet.ingestion.espn_history --sport nba --start 2026-01-28 --end 2026-01-28 --output .local/history/nba
+uv run python -m sportsbet.quant.walkforward --dataset .local/history/nba/dataset.json --prop points --threshold 20.5 --output .local/history/nba-report.json
+```
+
+The collector caches ESPN final box scores with source URLs, retrieval times and hashes; requests cover at most31 days at a time. `walkforward` requires the corresponding PostgreSQL history and runs the same LangGraph quant nodes used by scans. Its threshold is an explicit research benchmark, not an invented sportsbook line. It reports excluded identities/small samples, calibration, dataset/code hashes, and null ROI/CLV. A small pilot is not proof of an edge.
+
+The site and CI/CD deploy successfully. Supabase is now reachable and migrated, with NBA history preserved and2023-2025 NFL stats backfilled. Live-data readiness still requires the Vercel read-only URL, worker secrets, current refreshes and verified coverage. Public data APIs report unavailability until configured; a successful web deployment does not establish data readiness.
 
 Automatic settlement, robust historical injury/roster context, NFL game-log presentation, full-slate refresh coverage, and out-of-sample calibration/profitability remain unfinished. A green deployment or unit test is not evidence of model accuracy. Maintain current findings and constraints in `CLAUDE.md`.
