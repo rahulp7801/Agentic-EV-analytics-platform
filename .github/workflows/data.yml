@@ -10,6 +10,11 @@ on:
         type: choice
         options: [both, nfl, nba]
         default: both
+      provider:
+        description: 'Provider for watch only; leave all for other operations'
+        type: choice
+        options: [all, sportsbook, kalshi, prizepicks]
+        default: all
   schedule:
     - cron: '17 13 * * *'
     - cron: '7,37 * * * *'
@@ -29,9 +34,11 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
       ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      # Public-only collection and stat refreshes do not receive the paid-provider key.
+      ODDS_API_KEY: ${{ inputs.operation != 'refresh' && inputs.operation != 'backfill' && inputs.provider != 'kalshi' && inputs.provider != 'prizepicks' && secrets.ODDS_API_KEY || '' }}
       SPORT: ${{ inputs.sport || 'both' }}
       OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'daily' || 'monitor') }}
+      PROVIDER: ${{ inputs.provider || 'all' }}
       DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '25' }}
       ODDS_ROLLING_CREDIT_LIMIT: ${{ vars.ODDS_ROLLING_CREDIT_LIMIT || '450' }}
     steps:
@@ -45,16 +52,24 @@ jobs:
       - run: uv sync --locked
       - name: Check worker configuration
         run: |
-          test -n "$DATABASE_URL" && test -n "$DATABASE_URL_ASYNC" && test -n "$ODDS_API_KEY" || {
-            echo 'Configure the database and odds repository secrets before running market updates.'
+          test -n "$DATABASE_URL" && test -n "$DATABASE_URL_ASYNC" || {
+            echo 'Configure the database repository secrets before running market updates.'
             exit 1
           }
+          if [ "$PROVIDER" != all ] && [ "$OPERATION" != watch ]; then
+            echo 'Provider selection is supported only for watch operations.'
+            exit 1
+          fi
+          case "$OPERATION:$PROVIDER" in
+            daily:*|monitor:*|scan:*|watch:all|watch:sportsbook)
+              test -n "$ODDS_API_KEY" || { echo 'Configure the odds repository secret for this operation.'; exit 1; } ;;
+          esac
       - name: Update market data
         run: |
           case "$OPERATION" in
             daily|monitor) uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
             scan) uv run --locked python -m sportsbet.scan --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
-            watch) uv run --locked python -m sportsbet.market_watch --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" --publish ;;
+            watch) uv run --locked python -m sportsbet.market_watch --sport "$SPORT" --provider "$PROVIDER" --daily-credit-limit "$DAILY_CREDIT_LIMIT" --publish ;;
             refresh) uv run --locked python -m sportsbet.refresh --sport "$SPORT" ;;
             backfill) uv run --locked python -m sportsbet.refresh --sport "$SPORT" --backfill ;;
             *) exit 1 ;;
