@@ -74,7 +74,7 @@ jobs:
       - run: uv sync --locked --extra dev
       - run: uv run --locked pytest tests/test_migrations.py -q
       - run: uv run --locked alembic upgrade head
-      - run: uv run --locked pytest tests/test_schema.py tests/test_hosted_storage.py tests/test_worker_postgres.py -q
+      - run: uv run --locked pytest tests/test_schema.py tests/test_hosted_storage.py tests/test_worker_postgres.py tests/test_db_access.py -q
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: [backend, frontend, postgres]
