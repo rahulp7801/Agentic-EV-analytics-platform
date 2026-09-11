@@ -5,7 +5,7 @@ import TopBar from '@/components/TopBar';
 import EVDashboard from '@/components/EVDashboard';
 import PropsAnalysis from '@/components/PropsAnalysis';
 import GameLogs from '@/components/GameLogs';
-import Arbitrage from '@/components/Arbitrage';
+import MarketWatch from '@/components/MarketWatch';
 import ParlayBuilder from '@/components/ParlayBuilder';
 import KellyCalc from '@/components/KellyCalc';
 import type { Sport } from '@/lib/types';
@@ -64,7 +64,7 @@ export default function Home() {
             {view === 'dashboard' && <EVDashboard sport={sport} onAddToParlay={addToParlay} parlayIds={new Set(parlayLegs.map(s => s.id))} />}
             {view === 'props'     && <PropsAnalysis sport={sport} />}
             {view === 'gamelogs' && <GameLogs sport={sport} />}
-            {view === 'arbitrage' && <Arbitrage sport={sport} />}
+            {view === 'arbitrage' && <MarketWatch sport={sport} />}
             {view === 'parlay'    && <ParlayBuilder externalLegs={parlayLegs} onRemoveExternal={(id) => setParlayLegs(p => p.filter(s => s.id !== id))} />}
             {view === 'kelly'     && <KellyCalc />}
           </div>

@@ -107,6 +107,38 @@ PostgreSQL tests require `SPORTSBET_TEST_DATABASE_URL` pointing to a **disposabl
 
 ## Readiness still requiring evidence
 
+Read-only market monitoring and reproducible observation replay:
+
+```sh
+uv run python -m sportsbet.market_watch --sport nfl --game-limit 5 --publish
+uv run python -m sportsbet.market_watch --replay .local/market-watch/CAPTURE.json
+uv run python -m sportsbet.ingestion.prizepicks --sport nba
+```
+
+The dashboard's Arbitrage view reads published market observations. The monitor
+captures one US sportsbook h2h request per sport (one budgeted Odds API credit),
+up to five Kalshi games within seven days, and one PrizePicks projection page.
+It records source failures and incomplete coverage. Team matching uses captured
+Kalshi structured targets, an ESPN team directory, and exact home/away/start
+agreement. Matching names does not establish settlement equivalence. Gross gaps
+exclude fees and tie/void scenarios; all comparisons remain unverified and no
+orders are supported. PrizePicks HTTP403 remains an access limitation, never a
+reason to substitute synthetic odds.
+
+GitHub's **Market data → watch** operation publishes snapshots and retains public
+evidence artifacts for90 days. Download archives for longer retention. Replay
+checks the capture hash and recomputes the same comparisons without network
+access; it does not infer fills or returns. Scheduled watch polling is not yet
+enabled. The existing30-minute schedule is unsuitable for short-lived arbitrage.
+
+Hosted credentials must use restricted roles from `python -m sportsbet.db.access`:
+the dashboard receives only the reader's `DATABASE_URL`; the worker receives
+its own `DATABASE_URL` and `DATABASE_URL_ASYNC` as repository secrets. Keep owner
+credentials local. For IPv4-only Vercel/GitHub runners, use the provider's exact
+Supabase **Session pooler** host and role/project username, with verified TLS;
+the local direct IPv6 endpoint cannot serve these runners. Never commit generated
+credentials or private keys.
+
 Free historical outcomes can be collected and used to verify the actual graph:
 
 ```sh
