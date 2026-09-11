@@ -165,3 +165,11 @@ Free ESPN data provides outcomes, not historical player-prop prices. Current rea
 walk-forward pilots exercise the actual model graph at explicitly chosen research
 thresholds. They have no priced ROI or CLV. Build forward timestamped quote history
 and evaluate genuinely held-out dates before any profitability claim.
+
+Additional unchanged-model check: free ESPN final box scores for NFL2025-09-14
+contained13 games and348 stat records. At the previously specified200.5 passing
+yard threshold,16 of32 cases had sufficient prior history. Brier was0.2373145728
+and log loss0.6686442102. The combined33 evaluated cases across the two pilot
+dates still perform worse than a constant50% Brier baseline. This is a small,
+dependent cohort with16 exclusions on the new date, not priced betting evidence.
+No parameters were tuned against these outcomes; ROI and CLV remain null.
