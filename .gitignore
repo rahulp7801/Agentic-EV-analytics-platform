@@ -47,4 +47,7 @@ Thumbs.db
 *.key
 kalshi_key.txt
 
+# Generated legacy scan output is local data, never repository source.
+frontend/public/signals_cache.json
+
 kalshi_key.txt

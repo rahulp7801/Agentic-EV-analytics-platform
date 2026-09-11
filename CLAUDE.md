@@ -2,6 +2,9 @@
 
 ## Working agreement
 
+- PUBLIC REPOSITORY INCIDENT (2026-09-11): exact configured ODDS_API_KEY found in SESSION_2026_03_27.md, introduced at c3b823f; note falsely suggested expired/invalid. Current file redacted but old Git history still exposes it. User asked to revoke/regenerate and update local .env + GitHub secret; rotation NOT verified. Do not make paid-provider calls or enable scheduled collection until replacement is verified. Never print the old/new values. Private audit evidence lives in ignored .local/security-audit/; SECURITY.md records scope without credentials. No history force-push or protection bypass is authorized.
+- Security audit: default Gitleaks 8.30.1 found no secrets across 345 public commits. Exact comparison of 1,072 file objects found one exposed credential. All 106 retained workflow logs, one artifact and repository comments were scanned without another configured-secret match. Extended provider-hex-key rule independently reproduces the historical exposure. CI scans the full tracked tree plus each incoming commit with redaction and a checksum-pinned binary; deployment depends on it. Removed tracked generated signals_cache.json (backup in ignored .local/). Do not claim the entire history is clean or rotation complete.
+
 - Canonical repository: https://github.com/rahulp7801/Agentic-EV-analytics-platform, origin/master. All commits, CI, and deployment integration belong here.
 - Make frequent verified commits. Do not add assistant co-author/contributor trailers. Keep this file current.
 - All changes must use a feature branch and PR; merge only after required checks pass. Never push directly to master or bypass its protection. Master requires up-to-date backend/frontend/PostgreSQL and all three CodeQL checks, including for admins; no force pushes/deletion. A PR is required but no second human approval is required (single-owner workflow).
