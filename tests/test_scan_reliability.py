@@ -85,3 +85,33 @@ async def test_mismatched_quote_response_is_rejected_and_next_event_continues(mo
     assert evaluated==['nba1'] and report['completed_events']==1
     assert report['failures'][0]['event_id']=='nba0'
     assert 'nba0' in report['attempts']
+
+
+@pytest.mark.parametrize('mode',['budget_exhausted','empty','provider_failure'])
+def test_cli_status_matches_actual_scan_coverage(monkeypatch,worker,capsys,mode):
+    import json
+    stored,events,evaluated,pool=worker
+    requests=[]
+    def handle(request):
+        requests.append(request)
+        assert request.method=='GET' and request.url.path.endswith('/events')
+        sport='nba' if 'basketball' in request.url.path else 'nfl'
+        if mode=='provider_failure' and sport=='nfl':return httpx.Response(401)
+        return httpx.Response(200,json=events[sport] if mode=='budget_exhausted' else [])
+    transport(monkeypatch,handle)
+    monkeypatch.setattr('sys.argv',['scan','--sport','both','--daily-credit-limit','1'])
+    if mode=='empty':scan.main()
+    else:
+        with pytest.raises(SystemExit) as error:scan.main()
+        assert error.value.code==2
+    output=capsys.readouterr().out
+    assert 'test-key' not in output
+    reports=json.loads(output)
+    assert len(requests)==2 and not evaluated
+    for sport,report in reports.items():
+        assert report['status']==stored['scan:'+sport]['status']
+        if mode=='budget_exhausted':
+            assert report['budget_skipped_events']==2 and report['failures']==[]
+        elif mode=='empty':
+            assert report['status']=='complete' and report['eligible_events']==0
+    pool.close.assert_awaited_once()
