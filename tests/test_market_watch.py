@@ -145,3 +145,45 @@ async def test_selected_provider_does_not_call_or_invent_coverage_for_others(mon
             assert report['sources'][name]['status']=='not_requested'
             assert report['sources'][name]['partial_coverage'] is True
     with pytest.raises(ValueError):await market_watch.run('nfl',25,1,False,'unknown')
+
+
+@pytest.mark.parametrize('provider_status',['unavailable','budget_exhausted'])
+def test_cli_reports_provider_failures_without_discarding_archives(monkeypatch,tmp_path,capsys,provider_status):
+    import json
+    from unittest.mock import AsyncMock
+    from sportsbet import market_watch
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr('sys.argv',['market_watch','--sport','both','--provider','kalshi'])
+    source=AsyncMock(return_value={'status':provider_status,'games':[]})
+    monkeypatch.setattr(market_watch,'kalshi_games',source)
+    with pytest.raises(SystemExit) as error:market_watch.main()
+    assert error.value.code==2 and source.await_count==2
+    reports=[json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [r['sport'] for r in reports]==['nfl','nba']
+    assert all(r['status']=='degraded' and r['comparisons']==0 for r in reports)
+    assert len(list((tmp_path/'.local/market-watch').glob('*.json')))==2
+
+
+def test_cli_distinguishes_valid_empty_coverage_and_isolates_league_errors(monkeypatch,tmp_path,capsys):
+    import json
+    from unittest.mock import AsyncMock
+    from sportsbet import market_watch
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr('sys.argv',['market_watch','--sport','both','--provider','kalshi'])
+    source=AsyncMock(return_value={'status':'observed','games':[],'partial_coverage':False})
+    monkeypatch.setattr(market_watch,'kalshi_games',source)
+    market_watch.main()  # Valid empty observations and intentionally unrequested sources succeed.
+    reports=[json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert len(reports)==2 and all(r['status']=='observed' for r in reports)
+    original=market_watch.run
+    async def interrupted(sport,*args):
+        if sport=='nfl':raise RuntimeError('database URL with a secret')
+        return await original(sport,*args)
+    monkeypatch.setattr(market_watch,'run',interrupted)
+    with pytest.raises(SystemExit) as error:market_watch.main()
+    assert error.value.code==2
+    output=capsys.readouterr().out
+    assert 'secret' not in output
+    reports=[json.loads(line) for line in output.splitlines()]
+    assert reports[0]['status']=='failed' and reports[0]['error_type']=='RuntimeError'
+    assert reports[1]['sport']=='nba' and reports[1]['status']=='observed'
