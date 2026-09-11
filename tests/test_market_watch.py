@@ -124,3 +124,24 @@ def test_captured_event_fees_change_pair_and_cross_venue_costs_without_claiming_
     snap['yes_asks']=[('0.48','0.5')]
     pair=next(r for r in comparisons(data) if r['kind']=='kalshi_pair')
     assert 'exchange_fee_scenarios' not in pair  # Cannot price a whole contract beyond displayed depth.
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('provider',['sportsbook','kalshi','prizepicks'])
+async def test_selected_provider_does_not_call_or_invent_coverage_for_others(monkeypatch,tmp_path,provider):
+    from unittest.mock import AsyncMock
+    from sportsbet import market_watch
+    names={'sportsbook':'sportsbooks','kalshi':'kalshi_games','prizepicks':'capture_projections'}
+    mocks={name:AsyncMock(return_value={'status':'observed','events':[],'games':[],'projections':[]}) for name in names}
+    for name,attribute in names.items():monkeypatch.setattr(market_watch,attribute,mocks[name])
+    monkeypatch.chdir(tmp_path)
+    report,_=await market_watch.run('nfl',25,1,False,provider)
+    for name,mock in mocks.items():
+        if name==provider:
+            mock.assert_awaited_once()
+            assert report['sources'][name]['status']=='observed'
+        else:
+            mock.assert_not_called()
+            assert report['sources'][name]['status']=='not_requested'
+            assert report['sources'][name]['partial_coverage'] is True
+    with pytest.raises(ValueError):await market_watch.run('nfl',25,1,False,'unknown')

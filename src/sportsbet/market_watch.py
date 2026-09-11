@@ -217,13 +217,17 @@ def price_row(kind, identity, title, legs, reasons):
         fee_adjusted_profit=None, realized_profit=None, execution_ready=False)
 
 
-async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: bool):
+async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: bool, provider: str='all'):
+    if sport not in ('nba','nfl') or provider not in ('all','sportsbook','kalshi','prizepicks') or not 1<=game_limit<=10 or daily_credit_limit<1:
+        raise ValueError('Invalid market collection request')
     now = datetime.now(timezone.utc)
-    sources = {}
+    collectors={'sportsbook':lambda:sportsbooks(sport,daily_credit_limit),
+        'kalshi':lambda:kalshi_games(sport,now,game_limit),'prizepicks':lambda:capture_projections(sport)}
+    selected=list(collectors) if provider=='all' else [provider]
+    sources = {name:dict(status='not_requested',partial_coverage=True) for name in collectors if name not in selected}
     # Independent source failures are retained; a blocked endpoint is not an empty successful scan.
-    results = await asyncio.gather(sportsbooks(sport,daily_credit_limit),
-        kalshi_games(sport,now,game_limit), capture_projections(sport), return_exceptions=True)
-    for name, result in zip(('sportsbook','kalshi','prizepicks'),results):
+    results = await asyncio.gather(*(collectors[name]() for name in selected),return_exceptions=True)
+    for name, result in zip(selected,results):
         sources[name] = dict(status='unavailable', error_type=type(result).__name__) if isinstance(result,Exception) else result
         if name=='prizepicks' and not isinstance(result,Exception):
             sources[name]['status']='observed'
@@ -246,6 +250,8 @@ def main():
     parser.add_argument('--daily-credit-limit', type=int, default=25)
     parser.add_argument('--game-limit', type=int, choices=range(1,11), default=5)
     parser.add_argument('--publish', action='store_true')
+    parser.add_argument('--provider',choices=['all','sportsbook','kalshi','prizepicks'],default='all',
+        help='Collect one provider independently; others are explicitly marked not_requested')
     parser.add_argument('--replay', type=Path, help='Recompute comparisons from an immutable capture; no network or publishing')
     args=parser.parse_args()
     if args.replay:
@@ -262,7 +268,7 @@ def main():
         return
     for sport in (['nfl','nba'] if args.sport=='both' else [args.sport]):
         try:
-            summary,_ = asyncio.run(run(sport,args.daily_credit_limit,args.game_limit,args.publish))
+            summary,_ = asyncio.run(run(sport,args.daily_credit_limit,args.game_limit,args.publish,args.provider))
             print(json.dumps(dict(sport=sport,sources=summary['sources'],comparisons=len(summary['comparisons']),execution_ready=False)))
         except Exception as exc:
             raise SystemExit(f'Market observation failed ({type(exc).__name__})') from None
