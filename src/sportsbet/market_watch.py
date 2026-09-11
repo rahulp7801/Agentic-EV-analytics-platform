@@ -113,7 +113,7 @@ def book_quotes(event: dict, now: datetime) -> list[dict]:
 def comparisons(evidence: dict) -> list[dict]:
     """Binary win-only algebra, deliberately blocked pending full settlement review."""
     version=evidence.get('schema_version',1)
-    if version not in (1,2):
+    if type(version) is not int or version not in (1,2):
         raise ValueError('Unsupported market evidence version')
     now = timestamp(evidence['captured_at'])
     rows = []

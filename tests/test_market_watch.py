@@ -26,6 +26,12 @@ def test_gross_price_gap_never_becomes_profit_or_verified_arbitrage():
     assert 'tie/void' in row['reasons'][0]
 
 
+@pytest.mark.parametrize('version',[0,3,True,'2'])
+def test_unknown_or_malformed_evidence_version_is_not_reinterpreted(version):
+    with pytest.raises(ValueError,match='Unsupported market evidence version'):
+        comparisons(evidence()|{'schema_version':version})
+
+
 def test_h2h_quotes_require_complete_teams_observation_time_and_current_window():
     event = evidence()['sources']['sportsbook']['events'][0]
     assert len(book_quotes(event,NOW))==2
