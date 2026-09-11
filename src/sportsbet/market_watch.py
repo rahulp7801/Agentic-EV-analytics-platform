@@ -21,6 +21,9 @@ from sportsbet.scan import SPORT_KEYS, timestamp
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost, taker_depth_cost
 
+DEFAULT_GAME_LIMIT=20
+MAX_GAME_LIMIT=40
+
 
 def digest(value) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, allow_nan=False).encode()).hexdigest()
@@ -40,7 +43,53 @@ async def sportsbooks(sport: str, daily_credit_limit: int) -> dict:
         events=response.json(), response_sha256=hashlib.sha256(response.content).hexdigest())
 
 
+async def discover_kalshi_games(reader: KalshiReader, sport: str, now: datetime):
+    """Bound discovery to three 500-record pages; never assume provider sort order."""
+    series='KXNFLGAME' if sport=='nfl' else 'KXNBAGAME'
+    pages=[];failures=[];eligible={};conflicts=set();seen_cursors=set();cursor=None
+    for _ in range(3):
+        try:
+            page=await reader.milestones(sport,now,limit=500,cursor=cursor)
+            pages.append(page)
+            if not isinstance(page.get('milestones'),list):raise ValueError('Invalid discovery page')
+        except Exception as exc:
+            failures.append(dict(stage='discovery',error_type=type(exc).__name__))
+            break
+        for milestone in page['milestones']:
+            try:
+                details=milestone.get('details',{})
+                event=details.get('main_game_event_ticker','')
+                if details.get('league')!=sport.upper() or not event.startswith(series+'-'):continue
+                start=timestamp(milestone['start_date'])
+                if not now<start<=now+timedelta(days=7):continue
+                identity=(start,details['home_team_id'],details['away_team_id'])
+                if not all(identity[1:]) or identity[1]==identity[2]:raise ValueError('Invalid teams')
+                if event in conflicts:continue
+                if event in eligible:
+                    prior=eligible[event]
+                    if identity!=(timestamp(prior['start_date']),prior['details']['home_team_id'],prior['details']['away_team_id']):
+                        del eligible[event]
+                        conflicts.add(event)
+                        raise ValueError('Conflicting milestone identity')
+                else:eligible[event]=milestone
+            except (ValueError,KeyError,TypeError,AttributeError) as exc:
+                failures.append(dict(stage='milestone',error_type=type(exc).__name__))
+        cursor=page.get('cursor')
+        if cursor is not None and not isinstance(cursor,str):
+            failures.append(dict(stage='discovery',error_type='InvalidCursor'))
+            break
+        if not cursor:break
+        if cursor in seen_cursors:
+            failures.append(dict(stage='discovery',error_type='InvalidCursor'))
+            break
+        seen_cursors.add(cursor)
+    ordered=sorted(eligible.values(),key=lambda m:(timestamp(m['start_date']),m['details']['main_game_event_ticker']))
+    return ordered,pages,failures,not cursor and not failures
+
+
 async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
+    if sport not in ('nfl','nba') or now.utcoffset() is None or type(limit) is not int or not 1<=limit<=MAX_GAME_LIMIT:
+        raise ValueError('Invalid Kalshi collection request')
     series = 'KXNFLGAME' if sport == 'nfl' else 'KXNBAGAME'
     async with KalshiReader() as reader:
         # Missing fee data must not discard otherwise valid price observations.
@@ -48,16 +97,28 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
             series_data,series_changes=await asyncio.gather(reader.series(series),reader.series_fee_changes(series))
         except Exception:
             series_data=series_changes=None
-        page = await reader.milestones(sport, now)
-        eligible = [m for m in page['milestones'] if now < timestamp(m['start_date']) <= now+timedelta(days=7)
-            and m.get('details', {}).get('league') == sport.upper()
-            and m.get('details', {}).get('main_game_event_ticker', '').startswith(series+'-')]
-        eligible.sort(key=lambda m: m['start_date'])
+        eligible,pages,failures,discovery_complete=await discover_kalshi_games(reader,sport,now)
         games = []
         targets = {}
+        failed_games=set();omitted_markets=0
         for milestone in eligible[:limit]:
             details = milestone['details']
-            event = await reader.event(details['main_game_event_ticker'])
+            identity=details['main_game_event_ticker']
+            try:
+                event = await reader.event(identity)
+                if event['event']['event_ticker']!=identity or event['event']['series_ticker']!=series:
+                    raise ValueError('Returned event identity mismatch')
+                active=[m for m in event['markets'] if m['status']=='active']
+                if any(m['event_ticker']!=identity for m in active) or len({m['ticker'] for m in active})!=len(active):
+                    raise ValueError('Invalid event markets')
+                for side in ('home', 'away'):
+                    target_id = details[side+'_team_id']
+                    if target_id not in targets:
+                        targets[target_id] = await reader.target(target_id)
+            except Exception as exc:
+                failures.append(dict(stage='event',event_ticker=identity,error_type=type(exc).__name__))
+                failed_games.add(identity)
+                continue
             fee_context={'status':'unavailable'}
             if series_data is not None and series_changes is not None:
                 try:
@@ -66,11 +127,18 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
                         event_changes=changes,received_at=datetime.now(timezone.utc).isoformat())
                 except Exception:
                     pass
-            for side in ('home', 'away'):
-                target_id = details[side+'_team_id']
-                if target_id not in targets:
-                    targets[target_id] = await reader.target(target_id)
-            snapshots = [await reader.snapshot(m['ticker']) for m in event['markets'][:3] if m['status']=='active']
+            snapshots=[]
+            omitted_markets+=max(0,len(active)-3)
+            for market in active[:3]:
+                try:
+                    snapshot=await reader.snapshot(market['ticker'])
+                    if snapshot['market'].get('event_ticker')!=identity:
+                        raise ValueError('Snapshot event identity mismatch')
+                    if snapshot['market'].get('status')!='active':continue
+                    snapshots.append(snapshot)
+                except Exception as exc:
+                    failures.append(dict(stage='market',event_ticker=identity,market_ticker=market['ticker'],error_type=type(exc).__name__))
+                    failed_games.add(identity)
             games.append(dict(milestone=milestone, event=event, snapshots=snapshots,fee_context=fee_context))
     teams = None
     try:
@@ -81,9 +149,12 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
             teams = response.json()
     except (httpx.HTTPError, ValueError):
         pass  # Same-contract observations remain valid; cross-venue identity stays unmatched.
-    return dict(status='observed', games=games, targets=targets, discovery_page=page, team_directory=teams,
-        partial_coverage=bool(page.get('cursor')) or len(eligible)>limit,
-        eligible_on_page=len(eligible), sampled_games=len(games))
+    return dict(status='degraded' if failures else 'observed', games=games, targets=targets,
+        discovery_pages=pages,team_directory=teams,failures=failures,
+        partial_coverage=not discovery_complete or len(eligible)>limit or bool(failed_games) or bool(omitted_markets),
+        coverage=dict(discovery_complete=discovery_complete,discovered_games=len(eligible),
+            attempted_games=min(limit,len(eligible)),observed_games=len(games),failed_games=len(failed_games),
+            quoted_games=sum(bool(game['snapshots']) for game in games),omitted_markets=omitted_markets))
 
 
 def book_quotes(event: dict, now: datetime) -> list[dict]:
@@ -248,7 +319,7 @@ def price_row(kind, identity, title, legs, reasons):
 
 
 async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: bool, provider: str='all'):
-    if sport not in ('nba','nfl') or provider not in ('all','sportsbook','kalshi','prizepicks') or not 1<=game_limit<=10 or daily_credit_limit<1:
+    if sport not in ('nba','nfl') or provider not in ('all','sportsbook','kalshi','prizepicks') or type(game_limit) is not int or not 1<=game_limit<=MAX_GAME_LIMIT or daily_credit_limit<1:
         raise ValueError('Invalid market collection request')
     now = datetime.now(timezone.utc)
     collectors={'sportsbook':lambda:sportsbooks(sport,daily_credit_limit),
@@ -265,7 +336,7 @@ async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: boo
     rows = comparisons(evidence)
     summary = dict(schema_version=2, sport=sport, captured_at=evidence['captured_at'], evidence_sha256=digest(evidence),
         sources={name:dict(status=source['status'], count=len(source.get('events',source.get('games',source.get('projections',[])))),
-            partial_coverage=source.get('partial_coverage',True)) for name,source in sources.items()},
+            partial_coverage=source.get('partial_coverage',True),**({'coverage':source['coverage']} if 'coverage' in source else {})) for name,source in sources.items()},
         comparisons=rows, execution_ready=False, realized_profit=None,
         scope='Observed prices only. Gross gaps exclude fees and full settlement states; they are not verified arbitrage or backtest returns.')
     archive = write_archive(dict(evidence=evidence, summary=summary),directory=Path('.local/market-watch'))
@@ -278,7 +349,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport', choices=['nba','nfl','both'], default='both')
     parser.add_argument('--daily-credit-limit', type=int, default=25)
-    parser.add_argument('--game-limit', type=int, choices=range(1,11), default=5)
+    parser.add_argument('--game-limit', type=int, choices=range(1,MAX_GAME_LIMIT+1), default=DEFAULT_GAME_LIMIT)
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--provider',choices=['all','sportsbook','kalshi','prizepicks'],default='all',
         help='Collect one provider independently; others are explicitly marked not_requested')

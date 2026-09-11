@@ -110,13 +110,16 @@ class KalshiReader:
         # A remaining cursor is retained and blocks fee calculations.
         return await self._get('/events/fee_changes',params={'event_ticker':ticker_path(event),'limit':1000})
 
-    async def milestones(self, sport: str, start: datetime, *, limit: int = 100) -> dict:
+    async def milestones(self, sport: str, start: datetime, *, limit: int = 100, cursor: str | None = None) -> dict:
         if sport not in ('nba', 'nfl') or start.tzinfo is None or not 1 <= limit <= 500:
             raise ValueError('Invalid milestone query')
-        return await self._get('/milestones', params=dict(limit=limit, category='Sports',
+        params=dict(limit=limit, category='Sports',
             # Actual API accepts NFL/NBA; the prose examples returned empty NFL data.
             competition=sport.upper(),
-            minimum_start_date=start.isoformat()))
+            type='football_game' if sport=='nfl' else 'basketball_game',
+            minimum_start_date=start.isoformat())
+        if cursor:params['cursor']=cursor
+        return await self._get('/milestones',params=params)
 
     async def event(self, ticker: str) -> dict:
         return await self._get('/events/'+ticker_path(ticker))
@@ -128,6 +131,8 @@ class KalshiReader:
         ticker = ticker_path(ticker)
         started = datetime.now(timezone.utc)
         market, book = await asyncio.gather(self._get('/markets/'+ticker), self._get('/markets/'+ticker+'/orderbook'))
+        if market['market'].get('ticker')!=ticker:
+            raise ValueError('Returned market identity does not match the request')
         received = datetime.now(timezone.utc)
         yes_asks, no_asks = ask_levels(book, 'yes'), ask_levels(book, 'no')
         pair = None

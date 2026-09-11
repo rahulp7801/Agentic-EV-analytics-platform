@@ -116,15 +116,20 @@ PostgreSQL tests require `SPORTSBET_TEST_DATABASE_URL` pointing to a **disposabl
 Read-only market monitoring and reproducible observation replay:
 
 ```sh
-uv run python -m sportsbet.market_watch --sport nfl --game-limit 5 --publish
+uv run python -m sportsbet.market_watch --sport nfl --game-limit 20 --publish
 uv run python -m sportsbet.market_watch --replay .local/market-watch/CAPTURE.json
 uv run python -m sportsbet.ingestion.prizepicks --sport nba
 ```
 
 The dashboard's Arbitrage view reads published market observations. The monitor
 captures one US sportsbook h2h request per sport (one budgeted Odds API credit),
-up to five Kalshi games within seven days, and one PrizePicks projection page.
-It records source failures and incomplete coverage. Team matching uses captured
+up to 20 Kalshi games within seven days by default (configurable up to 40), and
+one PrizePicks projection page. Kalshi discovery follows at most three pages of
+500 milestones, then inspects at most three active markets per selected game.
+Coverage reports discovered, inspected, quoted and failed games; discovery or
+sampling limits remain explicit. A failed event or market preserves other valid
+observations. Quote freshness uses each comparison's oldest leg, not collection
+completion time. Team matching uses captured
 Kalshi structured targets, an ESPN team directory, and exact home/away/start
 agreement. Matching names does not establish settlement equivalence. Gross gaps
 exclude fees and tie/void scenarios; all comparisons remain unverified and no
