@@ -32,8 +32,10 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
         with psycopg.connect(dsn, user=READER, password=passwords[READER], autocommit=True) as reader:
             assert reader.execute('SELECT count(*) FROM dashboard_snapshots WHERE snapshot_key=%s', (key,)).fetchone()[0] == 1
             assert reader.execute('SHOW default_transaction_read_only').fetchone()[0] == 'on'
+            reader.execute('SELECT payload FROM dashboard_gamelogs LIMIT 1')
             reader.execute('SET default_transaction_read_only=off')
             for statement in ('DELETE FROM dashboard_snapshots WHERE false', 'SELECT * FROM analytics.predictions',
+                              'SELECT * FROM nba_player_gamelogs',
                               'SELECT * FROM player_stats', 'CREATE TABLE public.forbidden_test(id int)'):
                 with pytest.raises(psycopg.errors.InsufficientPrivilege):
                     reader.execute(statement)

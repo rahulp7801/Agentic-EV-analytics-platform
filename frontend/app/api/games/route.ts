@@ -13,6 +13,16 @@ function etDateStr(offsetDays: number): string {
 export async function GET(request: Request) {
   const sport = new URL(request.url).searchParams.get('sport') ?? 'nba';
   if (sport !== 'nba' && sport !== 'nfl') return Response.json({error:'Invalid sport'}, {status:400});
+  if (process.env.VERCEL==='1') {
+    try {
+      const { snapshot }=await import('@/lib/database');
+      const { scheduleSnapshot }=await import('@/lib/scheduleStatus');
+      const result=scheduleSnapshot(await snapshot('schedule:'+sport));
+      return Response.json(result.body,{status:result.status,headers:{'Cache-Control':'no-store'}});
+    } catch {
+      return Response.json({games:[],partial:true,error:'Schedules are temporarily unavailable.'},{status:503});
+    }
+  }
   const scoreboard = `https://site.api.espn.com/apis/site/v2/sports/${SCOREBOARDS[sport]}/scoreboard`;
   const dates = [etDateStr(-1), etDateStr(0), etDateStr(1)];
   const labels = ['Yesterday', 'Today', 'Tomorrow'];

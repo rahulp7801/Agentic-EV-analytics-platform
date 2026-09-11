@@ -174,6 +174,18 @@ Supabase **Session pooler** host and role/project username, with verified TLS;
 the local direct IPv6 endpoint cannot serve these runners. Never commit generated
 credentials or private keys.
 
+The hosted game-log browser reads `dashboard_gamelogs`, a restricted view of public
+NBA/NFL statistics (migration0012). It cannot read the underlying stat tables or
+prediction audit. Local Next.js development also requires a database URL with
+permission to read this view. Displayed over frequency excludes missing stats and
+ties and applies only to the shown rows; it is not a model performance metric.
+
+Hosted schedules come from worker-published ESPN snapshots, refreshed by daily
+and monitor operations. Missing, failed, wrong-date or older-than90-minute
+snapshots return unavailable status. The browser does not rely on Vercel reaching
+the upstream schedule service. NBA history refresh currently times out from
+GitHub; that league's prop evaluation stays blocked until refreshed successfully.
+
 Free historical outcomes can be collected and used to verify the actual graph:
 
 ```sh

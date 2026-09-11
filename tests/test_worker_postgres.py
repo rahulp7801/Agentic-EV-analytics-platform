@@ -20,6 +20,31 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def test_dashboard_game_logs_expose_stats_and_reject_ambiguous_nfl_games():
+    engine=sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
+    name='View '+uuid.uuid4().hex[:12]
+    identity=uuid.uuid4().hex[:18]
+    try:
+        with engine.begin() as conn:
+            conn.execute(sa.text("INSERT INTO nba_player_gamelogs(player_id,player_name,game_id,game_date,season,points) VALUES (1,:name,:id,'2026-01-01',2025,0)"),{'name':name,'id':identity})
+            conn.execute(sa.text("INSERT INTO player_stats(player_id,player_name,team,season,week,passing_yards) VALUES (:id,:name,'VV1',2026,1,210)"),{'name':name,'id':identity})
+            conn.execute(sa.text("INSERT INTO games(game_id,season,week,home_team,away_team,game_date) VALUES (:id,2026,1,'VV1','VV2','2026-09-10')"),{'id':identity})
+            rows=conn.execute(sa.text('SELECT sport,payload FROM dashboard_gamelogs WHERE player_name=:name'),{'name':name}).all()
+            result=dict(rows)
+            assert result['nba']['points']==0 and result['nba']['rebounds'] is None
+            assert result['nfl']['pass_yds']==210 and result['nfl']['is_home'] is True
+            assert result['nfl']['opponent']=='VV2'
+            assert 'player_id' not in result['nfl']
+            conn.execute(sa.text("INSERT INTO games(game_id,season,week,home_team,away_team,game_date) VALUES (:id,2026,1,'VV1','VV3','2026-09-11')"),{'id':identity+'x'})
+            assert conn.execute(sa.text("SELECT count(*) FROM dashboard_gamelogs WHERE sport='nfl' AND player_name=:name"),{'name':name}).scalar_one()==0
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text('DELETE FROM nba_player_gamelogs WHERE game_id=:id'),{'id':identity})
+            conn.execute(sa.text('DELETE FROM player_stats WHERE player_id=:id'),{'id':identity})
+            conn.execute(sa.text('DELETE FROM games WHERE game_id IN (:id,:other)'),{'id':identity,'other':identity+'x'})
+        engine.dispose()
+
+
 def test_nfl_refresh_applies_schedule_corrections_and_clears_ambiguous_context():
     from sportsbet.ingestion.games import ingest_games_seasons
     from sportsbet.ingestion.player_stats import ingest_player_stats_seasons

@@ -13,6 +13,7 @@ from sportsbet.dashboard import load_snapshot, publish_snapshot
 from sportsbet.market_watch import run as watch
 from sportsbet.refresh import refresh
 from sportsbet.scan import run as scan, timestamp
+from sportsbet.schedules import collect as collect_schedule
 
 
 class DailyState(TypedDict, total=False):
@@ -21,12 +22,21 @@ class DailyState(TypedDict, total=False):
     daily_credit_limit: int
     histories: dict
     markets: dict
+    schedules: dict
     props: dict
     report: dict
 
 
 def create_daily_graph():
     graph=StateGraph(DailyState)
+
+    async def schedules(state):
+        results={}
+        for sport in state['sports']:
+            result=await collect_schedule(sport)
+            publish_snapshot('schedule:'+sport,result)
+            results[sport]={'status':result['status'],'captured_at':result['captured_at']}
+        return {'schedules':results}
 
     async def histories(state):
         results={}
@@ -88,22 +98,24 @@ def create_daily_graph():
         return {'props':results}
 
     def report(state):
-        healthy=all(r['status']=='complete' for group in ('histories','markets','props') for r in state[group].values())
+        healthy=all(r['status']=='complete' for group in ('histories','markets','props','schedules') for r in state[group].values())
         result=dict(mode=state['mode'],finished_at=datetime.now(timezone.utc).isoformat(),
             status='complete' if healthy else 'degraded',execution_ready=False,
-            histories=state['histories'],markets=state['markets'],
+            histories=state['histories'],markets=state['markets'],schedules=state['schedules'],
             props={s:{k:v for k,v in r.items() if k not in ('attempts','coverage')} for s,r in state['props'].items()})
         publish_snapshot('pipeline:'+state['mode'],result)
         return {'report':result}
 
     graph.add_node('histories',histories)
     graph.add_node('markets',markets)
+    graph.add_node('schedules',schedules)
     graph.add_node('props',props)
     graph.add_node('report',report)
     graph.add_edge(START,'histories')
     graph.add_edge(START,'markets')
+    graph.add_edge(START,'schedules')
     # Collect daily market prices before props compete for the remaining paid allowance.
-    graph.add_edge(['histories','markets'],'props')
+    graph.add_edge(['histories','markets','schedules'],'props')
     graph.add_edge('props','report')
     graph.add_edge('report',END)
     return graph.compile()

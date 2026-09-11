@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import type { Sport, GameLog } from '@/lib/types';
+import { gameLog, overFrequency } from '@/lib/gameLogMetrics';
 
 interface GameLogsProps { sport: Sport; }
 
@@ -9,7 +10,7 @@ const NFL_COLS = ['pass_yds', 'pass_tds', 'rush_yds', 'rec_yds', 'receptions'] a
 
 function StatCell({ value, prop, line }: { value?: number; prop: string; line?: number }) {
   if (value === undefined) return <td style={{ color: 'var(--text-dim)' }}>—</td>;
-  const beat = line !== undefined ? value > line : undefined;
+  const beat = line !== undefined && value !== line ? value > line : undefined;
   return (
     <td style={{
       color: beat === true ? 'var(--accent-mint)' : beat === false ? 'var(--accent-red)' : 'var(--text-primary)',
@@ -25,52 +26,43 @@ export default function GameLogs({ sport }: GameLogsProps) {
   const [playerFilter, setPlayerFilter] = useState('');
   const [activeProp, setActiveProp] = useState<string>('points');
   const [activeLine, setActiveLine] = useState<string>('30.5');
-  const [selectedSport, setSelectedSport] = useState<'nba' | 'nfl'>('nba');
+  const [selectedSport, setSelectedSport] = useState<Sport>(sport);
   const [allLogs, setAllLogs] = useState<GameLog[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const fetchLogs = useCallback(async () => {
+  useEffect(()=>{setSelectedSport(sport);},[sport]);
+  useEffect(()=>{setActiveProp(selectedSport==='nba' ? 'points' : 'pass_yds');},[selectedSport]);
+
+  const fetchLogs = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
+    setAllLogs([]);setError('');
     try {
       const params = new URLSearchParams({ sport: selectedSport, limit: '40' });
       if (playerFilter) params.set('player', playerFilter);
-      const res = await fetch(`/api/gamelogs?${params}`, { cache: 'no-store' });
+      const res = await fetch(`/api/gamelogs?${params}`, { cache: 'no-store', signal });
       const data = await res.json();
-      // Map DB row format → GameLog
-      const logs: GameLog[] = (data.logs || []).map((r: Record<string, unknown>, i: number) => ({
-        id: String(i),
-        player: String(r.player ?? ''),
-        team: String(r.team ?? ''),
-        opponent: String(r.opponent ?? ''),
-        sport: selectedSport,
-        date: String(r.date ?? ''),
-        home_away: r.is_home ? 'home' : 'away',
-        result: r.result === 'W' || r.result === 'L' ? r.result : undefined,
-        points: r.points != null ? Number(r.points) : undefined,
-        rebounds: r.rebounds != null ? Number(r.rebounds) : undefined,
-        assists: r.assists != null ? Number(r.assists) : undefined,
-        threes: r.threes != null ? Number(r.threes) : undefined,
-        steals: r.steals != null ? Number(r.steals) : undefined,
-        blocks: r.blocks != null ? Number(r.blocks) : undefined,
-        minutes: r.minutes != null ? Number(r.minutes) : undefined,
-      }));
+      if (!res.ok) throw new Error(data.error || 'Game logs unavailable');
+      const logs: GameLog[] = data.logs.map((row: Record<string, unknown>, i: number)=>gameLog(row,selectedSport,String(i)));
+      if (signal.aborted) return;
       setAllLogs(logs);
-    } catch { setAllLogs([]); }
-    finally { setLoading(false); }
+    } catch (error) { if (!signal.aborted) {setAllLogs([]);setError(error instanceof Error ? error.message : 'Game logs unavailable');} }
+    finally { if (!signal.aborted) setLoading(false); }
   }, [selectedSport, playerFilter]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => {
+    const controller=new AbortController();
+    const timer=setTimeout(()=>void fetchLogs(controller.signal),250);
+    return ()=>{controller.abort();clearTimeout(timer);};
+  }, [fetchLogs]);
 
   const cols = selectedSport === 'nba' ? NBA_COLS : NFL_COLS;
   const logs = allLogs;
 
-  const lineVal = parseFloat(activeLine) || undefined;
-  const hitRate = lineVal && logs.length > 0
-    ? logs.filter(g => {
-        const stat = g[activeProp as keyof GameLog] as number | undefined;
-        return stat !== undefined && stat > lineVal;
-      }).length / logs.length
-    : null;
+  const numericLine=activeLine.trim()==='' ? NaN : Number(activeLine);
+  const lineVal=Number.isFinite(numericLine) && numericLine>=0 ? numericLine : undefined;
+  const frequency=overFrequency(logs,activeProp,lineVal);
+  const hitRate=frequency?.rate ?? null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -114,23 +106,22 @@ export default function GameLogs({ sport }: GameLogsProps) {
           />
           {hitRate !== null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 8, borderLeft: '1px solid var(--border-dim)' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>HIT RATE</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>OVER RATE</span>
               <span style={{
                 fontWeight: 700, fontSize: 14,
                 color: hitRate >= 0.6 ? 'var(--accent-mint)' : hitRate >= 0.5 ? 'var(--accent-amber)' : 'var(--accent-red)',
               }}>
                 {(hitRate * 100).toFixed(0)}%
               </span>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>({logs.filter(g => {
-                const s = g[activeProp as keyof GameLog] as number | undefined;
-                return s !== undefined && s > (lineVal || 0);
-              }).length}/{logs.length})</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>({frequency?.wins}/{frequency?.decided} decided)</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Table */}
+      {error && <p role="alert" style={{padding:'0 14px'}}>{error}</p>}
+      {frequency && <p style={{padding:'0 14px',fontSize:11}}>Shown rows only: {frequency.pushes} ties and {frequency.missing} missing stats excluded. This is historical frequency, not a model forecast.</p>}
       <div style={{ flex: 1, overflow: 'auto' }}>
         <table className="data-table">
           <thead>
@@ -160,12 +151,12 @@ export default function GameLogs({ sport }: GameLogsProps) {
                 </td>
                 <td>
                   <span className={`badge ${log.home_away === 'home' ? 'badge-blue' : 'badge-dim'}`}>
-                    {log.home_away === 'home' ? 'HOME' : 'AWAY'}
+                    {log.home_away === 'home' ? 'HOME' : log.home_away === 'away' ? 'AWAY' : '—'}
                   </span>
                 </td>
                 <td>
                   <span className={`badge ${log.result === 'W' ? 'badge-mint' : 'badge-red'}`}>
-                    {log.result}
+                    {log.result ?? '—'}
                   </span>
                 </td>
                 {cols.map(c => (
@@ -181,7 +172,7 @@ export default function GameLogs({ sport }: GameLogsProps) {
             {logs.length === 0 && (
               <tr>
                 <td colSpan={12} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
-                  No game logs found
+                  {loading ? 'Loading game logs…' : error ? 'Game logs unavailable' : 'No game logs found'}
                 </td>
               </tr>
             )}

@@ -128,7 +128,8 @@ jobs:
           await check('/.env', [404]);
           await check('/signals_cache.json', [404]);
           const required = process.env.DATA_PIPELINE_ENABLED === 'true';
-          for (const path of ['/api/signals', '/api/metrics', '/api/scans', '/api/markets?sport=nfl', '/api/markets?sport=nba']) {
+          for (const path of ['/api/signals', '/api/metrics', '/api/scans', '/api/markets?sport=nfl', '/api/markets?sport=nba',
+            '/api/games?sport=nfl', '/api/games?sport=nba', '/api/gamelogs?sport=nfl', '/api/gamelogs?sport=nba']) {
             const response = await check(path, required ? [200] : [200, 503]);
             if (response.status === 503) console.log(`::warning::${path} unavailable; deployment is not live-data ready`);
           }
