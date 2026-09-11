@@ -152,9 +152,14 @@ budgeted coverage, not a promise that every available market is scanned.
 GitHub's **Market data → daily** operation runs a deterministic LangGraph workflow:
 history refresh and market collection run independently, then eligible prop scans
 run after both finish. A failed history refresh blocks that league's prop scan.
-The half-hourly `monitor` operation requires a successful refresh within36 hours
-and does not repeat the paid game-market collection. Interrupted refreshes remain
-blocked. A completed refresh records a successful ingestion attempt; it does not
+The half-hourly `monitor` operation refreshes market observations and requires a
+successful history refresh within36 hours before running props. Market collection
+continues when history is unavailable; interrupted refreshes still block props.
+Each full run requests one budgeted sportsbook h2h snapshot per league before
+props use the remaining daily/rolling allowance. Kalshi and PrizePicks collection
+continue when that allowance is exhausted, and budget omissions remain degraded.
+Both daily and monitor evidence archives pass the same secret gate before upload.
+A completed refresh records a successful ingestion attempt; it does not
 prove that the upstream provider has supplied every recently completed game.
 
 Run it locally with `uv run python -m sportsbet.daily --sport both --mode daily`.

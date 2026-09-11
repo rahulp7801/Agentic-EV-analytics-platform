@@ -76,7 +76,7 @@ jobs:
             *) exit 1 ;;
           esac
       - name: Stage public evidence without configured credentials
-        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'public_daily' || env.OPERATION == 'public_monitor' || env.OPERATION == 'refresh')
+        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'public_daily' || env.OPERATION == 'public_monitor' || env.OPERATION == 'refresh')
         id: evidence
         run: uv run --locked python -m sportsbet.ingestion.public_artifacts --output "$RUNNER_TEMP/public-evidence"
       - name: Install checksum-pinned secret scanner
