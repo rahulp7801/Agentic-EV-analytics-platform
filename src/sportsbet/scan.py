@@ -174,8 +174,8 @@ def main():
     try:
         reports=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.daily_credit_limit))
         print(json.dumps({s:{k:v for k,v in r.items() if k not in ('attempts','coverage')} for s,r in reports.items()}))
-        if any(r['failures'] for r in reports.values()):
-            raise SystemExit(1)
+        if not reports or any(r['status']!='complete' for r in reports.values()):
+            raise SystemExit(2)
     except Exception as exc:
         raise SystemExit(f'Market update failed ({type(exc).__name__})') from None
 
