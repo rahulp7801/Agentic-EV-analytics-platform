@@ -7,6 +7,7 @@
 - All changes must use a feature branch and PR; merge only after required checks pass. Never push directly to master or bypass its protection. Master requires up-to-date backend/frontend/PostgreSQL and all three CodeQL checks, including for admins; no force pushes/deletion. A PR is required but no second human approval is required (single-owner workflow).
 - User priorities: working model/LangGraph, accurate metrics, security, GitHub CI/CD, Vercel, NFL/NBA season readiness. Visual redesign is deferred.
 - Added scope: Kalshi NFL/NBA market research and arbitrage detection, first Kalshi versus sportsbooks, then related Kalshi contracts. Sportsbook arbitrage and PrizePicks remain in scope. User prioritizes a sturdy agentic software platform; backtesting is supporting validation, not the whole product. Production key ID/file are configured; moved root kalshi_key.txt to ignored .local/secrets/kalshi-production.pem and updated .env. Demo credentials not supplied yet. Four KALSHI_* ID/path settings are accepted but no integration/order execution exists yet. Do not place live orders without separate explicit authorization. Fees, executable depth, settlement equivalence and partial-fill exposure must be validated before claiming arbitrage.
+- User explicitly reaffirmed: data analysis/backtesting and a profitable comparison dashboard only; DO NOT execute orders. Read-only Kalshi integration is implemented. Keep ingestion, evidence review, scenario analysis, and order execution separate; the last remains absent.
 - Stay grounded in executed code. Never invent source data, model confidence, settled outcomes, performance, service health, or successful deployment.
 - Keep implementation details out of product-facing messages; retain actionable diagnostic detail in developer documentation without credentials.
 - Preserve parameterized SQL, validated inputs, stale-data gates, and exposure limits. Never trade security/correctness for a shorter implementation.
@@ -23,6 +24,8 @@
 - Alembic respects explicit test URLs and escapes percent characters. Async DB factory preserves exact provider host/user/password/SSL mode; no guessed pooler or region rewrite.
 
 ## Deployment and credentials
+
+- Local Supabase URL resolves only to IPv6. Supabase documents GitHub Actions/Vercel as IPv6-incompatible; need the exact Session pooler hostname, not a guessed region/index. Requested only that non-secret hostname from user. Authenticated Vercel CLI works with explicit --project/--scope; production currently has no environment variables. New db/access.py provisions separate read-only snapshot and ingestion roles, with RLS and limited grants; no owner credentials should be exported.
 
 - User explicitly approved exporting the local ODDS_API_KEY to this repository. It was successfully stored as an encrypted GitHub Actions repository secret and its presence verified without displaying the value. Worker database secrets and reachable production database setup remain outstanding; scheduled scans stay disabled until readiness checks pass.
 
