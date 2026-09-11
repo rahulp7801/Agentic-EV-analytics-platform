@@ -15,6 +15,8 @@ from sportsbet.refresh import refresh_history
 from sportsbet.scan import run as scan, timestamp
 from sportsbet.schedules import collect as collect_schedule
 
+MODES=('daily','monitor','public_daily','public_monitor')
+
 
 class DailyState(TypedDict, total=False):
     sports: list[str]
@@ -40,9 +42,11 @@ def create_daily_graph():
 
     async def histories(state):
         results={}
+        if state['mode']=='public_monitor':
+            return {'histories':{sport:{'status':'not_requested'} for sport in state['sports']}}
         for sport in state['sports']:
             now=datetime.now(timezone.utc)
-            if state['mode']=='daily':
+            if state['mode'] in ('daily','public_daily'):
                 result=await asyncio.to_thread(refresh_history,sport,now.date())
             else:
                 result=load_snapshot('refresh:'+sport) or {'status':'not_run'}
@@ -58,21 +62,27 @@ def create_daily_graph():
 
     async def markets(state):
         results={}
-        if state['mode']=='daily':
+        public=state['mode'].startswith('public_')
+        if state['mode']!='monitor':
             for sport in state['sports']:
                 try:
-                    summary,_=await watch(sport,state['daily_credit_limit'],5,True)
+                    summary,_=await watch(sport,state['daily_credit_limit'],5,True,**({'provider':'kalshi'} if public else {}))
                     complete = bool(summary['sources']) and all(
                         source['status']=='observed' and not source.get('partial_coverage',True)
                         for source in summary['sources'].values()
                     )
-                    results[sport]=dict(status='complete' if complete else 'degraded',
+                    status='complete' if complete else 'degraded'
+                    if public:
+                        status='observed' if summary['sources'].get('kalshi',{}).get('status')=='observed' else 'degraded'
+                    results[sport]=dict(status=status,
                         sources=summary['sources'],captured_at=summary['captured_at'])
                 except Exception as exc:
                     results[sport]=dict(status='failed',error_type=type(exc).__name__)
         return {'markets':results}
 
     async def props(state):
+        if state['mode'].startswith('public_'):
+            return {'props':{sport:{'status':'not_requested','reason':'public_only_collection'} for sport in state['sports']}}
         ready=[s for s in state['sports'] if state['histories'][s]['status']=='complete']
         results={}
         for sport in set(state['sports'])-set(ready):
@@ -92,11 +102,17 @@ def create_daily_graph():
         return {'props':results}
 
     def report(state):
-        healthy=all(r['status']=='complete' for group in ('histories','markets','props','schedules') for r in state[group].values())
+        public=state['mode'].startswith('public_')
+        groups=('markets','schedules') if public else ('histories','markets','props','schedules')
+        if state['mode']=='public_daily':groups+=('histories',)
+        accepted=('complete','observed') if public else ('complete',)
+        healthy=all(r['status'] in accepted for group in groups for r in state[group].values())
         result=dict(mode=state['mode'],finished_at=datetime.now(timezone.utc).isoformat(),
-            status='complete' if healthy else 'degraded',execution_ready=False,
+            status=('observed' if public else 'complete') if healthy else 'degraded',execution_ready=False,
             histories=state['histories'],markets=state['markets'],schedules=state['schedules'],
             props={s:{k:v for k,v in r.items() if k not in ('attempts','coverage')} for s,r in state['props'].items()})
+        if public:
+            result['scope']='Public-only scheduled observation: Kalshi markets and ESPN schedules; daily NBA/NFL history refresh. Sportsbooks, PrizePicks and prop recommendations are not requested. Partial market sampling is retained explicitly. This is periodic collection, not continuous arbitrage monitoring.'
         publish_snapshot('pipeline:'+state['mode'],result)
         return {'report':result}
 
@@ -116,7 +132,7 @@ def create_daily_graph():
 
 
 async def run(sports: list[str], mode: str, daily_credit_limit: int):
-    if not sports or len(sports)!=len(set(sports)) or any(s not in ('nba','nfl') for s in sports) or mode not in ('daily','monitor') or daily_credit_limit<1:
+    if not sports or len(sports)!=len(set(sports)) or any(s not in ('nba','nfl') for s in sports) or mode not in MODES or daily_credit_limit<1:
         raise ValueError('Invalid pipeline request')
     return (await create_daily_graph().ainvoke(dict(sports=sports,mode=mode,daily_credit_limit=daily_credit_limit)))['report']
 
@@ -124,14 +140,14 @@ async def run(sports: list[str], mode: str, daily_credit_limit: int):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport',choices=['nba','nfl','both'],default='both')
-    parser.add_argument('--mode',choices=['daily','monitor'],default='daily')
+    parser.add_argument('--mode',choices=MODES,default='daily')
     parser.add_argument('--daily-credit-limit',type=int,default=25)
     args=parser.parse_args()
     try:
         report=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.mode,args.daily_credit_limit))
         print(json.dumps(report))
         # Degraded provider coverage must remain visible as a failed scheduled run.
-        if report['status']!='complete':
+        if report['status'] not in ('complete','observed'):
             raise SystemExit(2)
     except Exception as exc:
         raise SystemExit(f'Daily pipeline unavailable ({type(exc).__name__})') from None

@@ -30,11 +30,12 @@ On Windows use `npm.cmd` if PowerShell blocks npm.ps1. Backend commands run from
 | `VERCEL_TOKEN` | GitHub Actions repository secret | Project-scoped deployment token |
 | `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | GitHub Actions repository variables | Vercel team/project identifiers |
 | `DATA_PIPELINE_ENABLED` | GitHub Actions repository variable | Set `true` only after migration, backfill, and live-data checks |
+| `PUBLIC_DATA_PIPELINE_ENABLED` | GitHub Actions repository variable | Enable verified public-only Kalshi/schedule collection and daily stat refresh without supplying `ODDS_API_KEY` |
 | `ODDS_DAILY_CREDIT_LIMIT` | GitHub Actions repository variable | Persistent provider credit ceiling; default 25 |
 
 Optional Python settings are documented in `.env.example`: bankroll, Kelly multiplier, vig method, and experimental adjustments (off by default). Never use `NEXT_PUBLIC_` for credentials. Local `.env` files are not automatically uploaded to GitHub or Vercel.
 
-The Vercel role needs SELECT on `dashboard_snapshots` and the game-log tables exposed by read routes; it does not need write or migration privileges. Create/configure that role through your database provider. Keep the migration/worker credential separate.
+The Vercel role needs SELECT only on `dashboard_snapshots` and the `dashboard_gamelogs` view; access to underlying game-log tables is denied. It does not need write or migration privileges. Keep owner/migration, restricted worker and read-only dashboard credentials separate.
 
 ## Data operations
 
@@ -151,6 +152,23 @@ Per-stage results are persisted for diagnosis; degraded coverage makes the worke
 exit unsuccessfully. Manual `scan` remains a maintenance operation that bypasses
 the refresh-age gate. Scheduled daily/monitor runs remain disabled until hosted
 database access and a manual production run are verified.
+
+The independent `public_daily` and `public_monitor` operations use the same graph
+without sportsbook requests or prop recommendations. Both publish ESPN schedules
+and bounded public Kalshi observations; `public_daily` also refreshes NBA/NFL
+history. Unrequested venues and partial sampling remain explicit. An `observed`
+public run means the requested collection succeeded, not full market coverage or
+season readiness. Provider failures still exit unsuccessfully.
+
+After both manual public operations pass, set the repository variable
+`PUBLIC_DATA_PIPELINE_ENABLED=true` to run `public_daily` at 13:17 UTC and
+`public_monitor` at :07/:37 each hour. These jobs receive restricted database
+credentials but no Odds API or Kalshi trading key. Full collection takes
+precedence if `DATA_PIPELINE_ENABLED=true`; the public flag does not enable
+sportsbook, PrizePicks or prop scans. Clear the public flag to stop its schedule.
+Clean evidence passes the credential/secret scan before public artifact upload.
+GitHub's periodic schedule is not continuous or low-latency arbitrage monitoring;
+the dashboard continues to identify stale quotes between captures.
 
 Paid requests share both a daily ceiling and `ODDS_ROLLING_CREDIT_LIMIT` (default450
 credits across31 UTC dates), enforced atomically in the persistent ledger. This

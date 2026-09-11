@@ -4,7 +4,7 @@ on:
     inputs:
       operation:
         type: choice
-        options: [daily, monitor, scan, watch, refresh, backfill]
+        options: [daily, monitor, public_daily, public_monitor, scan, watch, refresh, backfill]
         default: daily
       sport:
         type: choice
@@ -26,7 +26,7 @@ concurrency:
 jobs:
   update:
     # Enable only after database migration/backfill and provider-budget verification.
-    if: github.ref == 'refs/heads/master' && (github.event_name == 'workflow_dispatch' || vars.DATA_PIPELINE_ENABLED == 'true')
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'workflow_dispatch' || vars.DATA_PIPELINE_ENABLED == 'true' || vars.PUBLIC_DATA_PIPELINE_ENABLED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -35,9 +35,10 @@ jobs:
       DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
       ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # Public-only collection and stat refreshes do not receive the paid-provider key.
-      ODDS_API_KEY: ${{ inputs.operation != 'refresh' && inputs.operation != 'backfill' && inputs.provider != 'kalshi' && inputs.provider != 'prizepicks' && secrets.ODDS_API_KEY || '' }}
+      ODDS_API_KEY: ${{ ((github.event_name == 'schedule' && vars.DATA_PIPELINE_ENABLED == 'true') || inputs.operation == 'daily' || inputs.operation == 'monitor' || inputs.operation == 'scan' || (inputs.operation == 'watch' && (inputs.provider == 'all' || inputs.provider == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
       SPORT: ${{ inputs.sport || 'both' }}
-      OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'daily' || 'monitor') }}
+      # Full collection takes precedence if both scheduler flags are enabled.
+      OPERATION: ${{ inputs.operation || (vars.DATA_PIPELINE_ENABLED == 'true' && (github.event.schedule == '17 13 * * *' && 'daily' || 'monitor') || (github.event.schedule == '17 13 * * *' && 'public_daily' || 'public_monitor')) }}
       PROVIDER: ${{ inputs.provider || 'all' }}
       DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '25' }}
       ODDS_ROLLING_CREDIT_LIMIT: ${{ vars.ODDS_ROLLING_CREDIT_LIMIT || '450' }}
@@ -67,7 +68,7 @@ jobs:
       - name: Update market data
         run: |
           case "$OPERATION" in
-            daily|monitor) uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
+            daily|monitor|public_daily|public_monitor) uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
             scan) uv run --locked python -m sportsbet.scan --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
             watch) uv run --locked python -m sportsbet.market_watch --sport "$SPORT" --provider "$PROVIDER" --daily-credit-limit "$DAILY_CREDIT_LIMIT" --publish ;;
             refresh) uv run --locked python -m sportsbet.refresh --sport "$SPORT" ;;
@@ -75,7 +76,7 @@ jobs:
             *) exit 1 ;;
           esac
       - name: Stage public evidence without configured credentials
-        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'refresh')
+        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'public_daily' || env.OPERATION == 'public_monitor' || env.OPERATION == 'refresh')
         id: evidence
         run: uv run --locked python -m sportsbet.ingestion.public_artifacts --output "$RUNNER_TEMP/public-evidence"
       - name: Install checksum-pinned secret scanner
