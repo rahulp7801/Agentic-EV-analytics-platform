@@ -60,6 +60,7 @@ The public website only reads results. It cannot start scans or spend provider c
 - Fractional Kelly uses the actual price. Exposure reservations are durable, atomic, and capped across rescans; recommendations are not executed bets.
 - Every successfully evaluated selection is audited, including rejected estimates. Missing samples, expired quotes, started events, and risk gates cannot recommend stakes.
 - ROI, hit rate, Brier score, log loss, calibration bins and CLV use explicit denominators and real settlements. No result is inferred from missing data. Pending, push and void outcomes are distinct.
+- Brier reports include fixed 0%, 50%, and 100% probability benchmarks plus the positive-outcome count on exactly the model-scored cohort. These expose class imbalance without fitting a reference to held-out labels. In unpriced Over-threshold checks, 0% means always Under and 100% means always Over. No scored forecasts means unavailable benchmarks, not zero error.
 - Generic NFL play-success probability cannot be substituted for game-win probability. Experimental pace/rest/kinematic adjustments default off.
 
 To export prediction IDs or record independently verified settlements:

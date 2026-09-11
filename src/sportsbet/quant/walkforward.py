@@ -79,11 +79,12 @@ async def evaluate(dataset: dict, prop: str, threshold: Decimal) -> dict:
     return dict(sport=sport, prop_type=prop, research_threshold=str(threshold), model_version='empirical-v2',
         candidate_count=len(rows), evaluated_count=len(scored), skipped=dict(skipped),
         **calibration_metrics(predictions),
-        baseline_50_brier=0.25 if predictions else None, roi=None, clv=None,
+        roi=None, clv=None,
         records=scored, limitations=[
             'Fixed user-specified research threshold, not a historical sportsbook line; no priced betting result.',
             'Actual LangGraph quant nodes, exclusive game-date cutoff, last 40 games, minimum 20 observations.',
             'Participating-player outcome cohort; missing identities and small samples are reported, not filled.',
+            'Brier baselines use fixed 0%, 50%, and 100% Over probabilities on the same scored non-push outcomes; none is fitted to this holdout.',
             'Historical stats include later provider corrections. No historical injury/roster adjustment.',
             'Multiple players share games; samples are not independent. Small pilot results do not establish an edge.'])
 

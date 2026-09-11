@@ -36,8 +36,12 @@ class BacktestReport:
     void_count: int = 0
     clv_count: int = 0
     calibration_count: int = 0
+    calibration_positive_count: int = 0
     brier_score: float | None = None
     log_loss: float | None = None
+    baseline_zero_brier: float | None = None
+    baseline_50_brier: float | None = None
+    baseline_one_brier: float | None = None
     calibration: list[dict] = field(default_factory=list)
     closing_line_note: str = "CLV is same-line raw implied-probability movement; requires entry < close < start."
 
@@ -53,10 +57,18 @@ def calibration_metrics(predictions: list[tuple[float, int]]) -> dict:
     """Probability scoring shared by priced replay and unpriced forecast checks."""
     if any(not math.isfinite(p) or not 0 <= p <= 1 or y not in (0, 1) for p, y in predictions):
         raise ValueError('Calibration needs finite probabilities and binary outcomes')
-    result = dict(calibration_count=len(predictions), brier_score=None, log_loss=None, calibration=[])
+    result = dict(calibration_count=len(predictions), calibration_positive_count=0,
+        brier_score=None, log_loss=None, calibration=[],
+        baseline_zero_brier=None, baseline_50_brier=None, baseline_one_brier=None)
     if not predictions:
         return result
     result['brier_score'] = sum((p-y)**2 for p, y in predictions) / len(predictions)
+    # Fixed probabilities, never fitted to held-out labels. Score the exact same
+    # decided, model-covered cohort; hit_rate may include additional observations.
+    positives=sum(y for _,y in predictions)
+    result.update(calibration_positive_count=positives,
+        baseline_zero_brier=positives/len(predictions),baseline_50_brier=0.25,
+        baseline_one_brier=(len(predictions)-positives)/len(predictions))
     result['log_loss'] = -sum(y*math.log(max(1e-15,p)) + (1-y)*math.log(max(1e-15,1-p)) for p,y in predictions) / len(predictions)
     for bucket in range(10):
         group = [(p,y) for p,y in predictions if min(int(p*10),9) == bucket]
