@@ -12,6 +12,8 @@ export function scanStatus(data: Record<string, unknown> | null, now = Date.now(
       state=age>20*60000 ? 'interrupted' : 'running';
       label=state==='interrupted' ? 'Scan overdue' : 'Scanning';
     } else if (age>45*60000) {state='stale';label='Scan is stale';}
+    else if (data.status==='blocked') {state='blocked';label='Waiting for refreshed history';}
+    else if (data.status==='failed') {state='failed';label='Scan failed';}
     else if (Array.isArray(data.failures) && data.failures.length) {state='degraded';label='Scan had failures';}
     else if (deferred && deferred>0) {state='partial';label='Budget limited coverage';}
     else if (data.status==='complete' && eligible===0) {state='no_games';label='No games in next 24 hours';}

@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from sportsbet.ledger import Ledger
 from sportsbet.graph.models import EVSignal
+from sportsbet.config import settings
 
 pytestmark = pytest.mark.skipif(not os.environ.get('SPORTSBET_TEST_DATABASE_URL'),reason='Disposable test database required')
 
@@ -28,3 +29,28 @@ def test_postgres_audit_and_concurrent_budget():
         return Ledger(database_url=url).reserve(signal,20.5,risk_day=group)[0]
     with ThreadPoolExecutor(max_workers=6) as pool:
         assert sum(pool.map(reserve,range(12)))==2
+
+
+def test_postgres_rolling_api_budget_is_atomic_across_connections(monkeypatch):
+    import sportsbet.ledger as ledger_module
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2020, 1, 2, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(ledger_module, 'datetime', Clock)
+    monkeypatch.setattr(settings, 'odds_rolling_credit_limit', 6)
+    url = os.environ['SPORTSBET_TEST_DATABASE_URL']
+    ledger = Ledger(database_url=url)
+    with ledger.connect() as db:
+        db.execute('INSERT INTO api_usage VALUES (?,?)', ('2020-01-01', 5))
+    try:
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(pool.map(lambda _: Ledger(database_url=url).reserve_api_credits(1, 25), range(12)))
+        assert sum(results) == 1
+        assert not Ledger(database_url=url).reserve_api_credits(1, 25)
+    finally:
+        # This module only runs against the explicitly configured disposable test DB.
+        with ledger.connect() as db:
+            db.execute('DELETE FROM api_usage WHERE risk_day IN (?,?)', ('2020-01-01', '2020-01-02'))
