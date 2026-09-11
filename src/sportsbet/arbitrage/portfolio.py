@@ -4,9 +4,16 @@ from __future__ import annotations
 from decimal import Decimal
 from math import inf
 from typing import Annotated, Literal
+import warnings
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from scipy.optimize import Bounds, LinearConstraint, milp
+
+# SciPy intentionally forwards native HiGHS options but warns about them.
+# Suppress only this exact, intentional option notice, not solver diagnostics.
+warnings.filterwarnings('ignore',
+    message=r"^Unrecognized options detected: \{'threads'\}\. These will be passed to HiGHS verbatim\.$",
+    category=RuntimeWarning, module=r'^sportsbet\.arbitrage\.portfolio$')
 
 Positive = Annotated[Decimal, Field(gt=0, le=1_000_000, allow_inf_nan=False)]
 Nonnegative = Annotated[Decimal, Field(ge=0, le=1_000_000, allow_inf_nan=False)]
@@ -129,7 +136,10 @@ def analyze_candidate(candidate: PayoffCandidate, request: MarketAnalysisRequest
     solution = milp(c=[0.0]*count + [-1.0], integrality=[1]*count + [0],
         bounds=Bounds([0.0]*(count+1), capacities + [inf]),
         constraints=LinearConstraint(rows, -inf, [float(request.budget)] + [0.0]*len(profits)),
-        options={'time_limit': 2.0, 'mip_rel_gap': 0.0})
+        # HiGHS otherwise creates a native scheduler sized from the host CPU.
+        # Specialists already run concurrently; nested native pools stalled
+        # repeated graph/CLI use on Windows. SciPy forwards this HiGHS option.
+        options={'time_limit': 2.0, 'mip_rel_gap': 0.0, 'threads': 1})
     if not solution.success:
         result['reasons'] = ['optimizer_incomplete']
         return result

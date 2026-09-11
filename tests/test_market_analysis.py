@@ -8,6 +8,9 @@ from pydantic import ValidationError
 from sportsbet.arbitrage.portfolio import MarketAnalysisRequest, PayoffCandidate, analyze_candidate
 from sportsbet.graph.graph import create_graph
 
+pytestmark = pytest.mark.filterwarnings(
+    r"ignore:Unrecognized options detected.*'threads'.*passed to HiGHS verbatim:RuntimeWarning")
+
 NOW = datetime(2026, 9, 10, 12, tzinfo=timezone.utc)
 
 
@@ -109,3 +112,25 @@ async def test_replay_uses_same_graph_and_requires_explicit_settlement():
     assert result['realized_roi'] is None
     with pytest.raises(ValueError, match='Unknown settlement'):
         await analyze(request, {'unknown': {}})
+
+
+def test_repeated_native_solver_workers_finish_in_a_bounded_subprocess():
+    import subprocess
+    import sys
+
+    request = MarketAnalysisRequest.model_validate(dict(as_of=NOW, budget='1', candidates=[candidate()]))
+    script = '''
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from sportsbet.arbitrage.portfolio import MarketAnalysisRequest, analyze_candidate
+r = MarketAnalysisRequest.model_validate_json(sys.stdin.read())
+def solve(_):
+    assert analyze_candidate(r.candidates[0], r)['status'] == 'scenario_edge'
+for cycle in range(20):
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        list(pool.map(solve, range(3)))
+    solve(None)
+'''
+    completed = subprocess.run([sys.executable, '-c', script], input=request.model_dump_json(),
+        text=True, capture_output=True, timeout=30)
+    assert completed.returncode == 0, completed.stderr

@@ -44,6 +44,12 @@ input contract supports unit steps of at least 0.0001, with bounded amounts and
 at most 16 legs / 256 states per candidate to constrain solver resource use. The
 two-second solver deadline fails closed. Decimal recomputation checks the returned
 budget, depth, and payoffs. There is no assumed short sale or reuse of capital.
+Each solve uses one native HiGHS thread: the graph already parallelizes independent
+work. Default native scheduling stalled repeated mixed graph/direct calls on
+Windows; 60 graph invocations / 200 mixed solves completed after this change.
+A subprocess regression bounds repeated worker lifecycles. This follows the
+[HiGHS parallelism guidance](https://ergo-code.github.io/HiGHS/dev/parallel/);
+it does not claim the solver's own time limit can interrupt every native failure.
 
 Each leg requires venue/account/quote identity, source hash, rule reference,
 observation and availability times, actual event start, cost, unit step, and a
