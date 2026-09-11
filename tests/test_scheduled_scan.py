@@ -34,8 +34,18 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     assert len(result['signals'])==2
     assert {s['direction'] for s in result['signals']}=={'over','under'}
     assert len(ledger.predictions())==2
+    assert result['coverage']['counts']['evaluated_selections']==2
     assert all(call.args[1].last_n_games==40 for call in quant.call_args_list)
     assert all(call.args[1].as_of_date is not None for call in quant.call_args_list)
+
+
+async def test_graph_query_failure_cannot_be_reported_as_successful_empty_scan(tmp_path):
+    conn=AsyncMock();conn.fetch.return_value=[{'player_id':1}]
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    with patch('sportsbet.prop.nba_agents.run_nba_prop_query',side_effect=RuntimeError('unavailable')):
+        with pytest.raises(RuntimeError,match='Model evaluation failed'):
+            await evaluate_event(pool,event(), 'nba', Ledger(tmp_path/'audit.sqlite'),'scan')
 
 def test_api_budget_survives_restart(tmp_path):
     path=tmp_path/'budget.sqlite'
