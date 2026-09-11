@@ -1,5 +1,6 @@
 """Refresh the historical game samples used by the scheduled prop worker."""
 import argparse
+import json
 from datetime import date
 from requests.exceptions import RequestException
 
@@ -39,7 +40,8 @@ def main():
     args = parser.parse_args()
     try:
         for sport in ['nfl','nba'] if args.sport == 'both' else [args.sport]:
-            refresh(sport, date.today(), args.backfill)
+            coverage=refresh(sport, date.today(), args.backfill)
+            print(json.dumps({'sport':sport,'coverage':coverage}))
     except Exception as exc:
         # Provider/DB exception text can contain URLs with credentials.
         raise SystemExit(f'Stat refresh failed ({type(exc).__name__})') from None
