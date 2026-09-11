@@ -32,8 +32,8 @@ from sportsbet.graph.graph import create_graph
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
-from sportsbet.ingestion.free_odds import PrizePicksPoller, ESPNPropsPoller
-from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
+from sportsbet.ingestion.free_odds import ESPNPropsPoller
+from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_quotes
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.config import settings
 from sportsbet.ledger import Ledger
@@ -168,30 +168,7 @@ def _normalize_raw_events(
     sport: str,
 ) -> list[PlayerPropSnapshotCreate]:
     """Convert raw Odds API-compatible event dicts into PlayerPropSnapshotCreate objects."""
-    snapshots: list[PlayerPropSnapshotCreate] = []
-    for event in raw_events:
-        for bookmaker in event.get("bookmakers", []):
-            for market in bookmaker.get("markets", []):
-                for outcome in market.get("outcomes", []):
-                    price = outcome.get("price")
-                    point = outcome.get("point")
-                    if price is None or point is None:
-                        continue
-                    raw_prob = american_to_raw_prob(int(price))
-                    snapshots.append(PlayerPropSnapshotCreate(
-                        sport=sport,
-                        game_id=event.get("id"),
-                        player_name=outcome.get("description") or outcome.get("name", "Unknown"),
-                        sportsbook=bookmaker.get("key", "unknown"),
-                        prop_type=market.get("key", "unknown"),
-                        line=Decimal(str(point)),
-                        price=int(price),
-                        implied_probability=Decimal(str(round(float(raw_prob), 6))),
-                        side=outcome.get("name", ""),
-                        game_start_time=datetime.fromisoformat(event["commence_time"].replace("Z", "+00:00")) if event.get("commence_time") else None,
-                        snapped_at=datetime.fromisoformat(bookmaker["last_update"].replace("Z", "+00:00")) if bookmaker.get("last_update") else datetime.now(timezone.utc),
-                    ))
-    return snapshots
+    return [quote for event in raw_events for quote in parse_event_quotes(event, sport)]
 
 
 _ODDS_API_PLAYER_MARKETS = ",".join([
@@ -208,8 +185,8 @@ async def _fetch_odds_api_snapshots(sport: str = "nba") -> list[PlayerPropSnapsh
     """Fetch player prop lines from The Odds API (keyed, paid source — most reliable).
 
     Uses the per-event /events/{id}/odds endpoint because the top-level /odds
-    endpoint does not support player prop markets.  Consumes 1 API credit per
-    event (not per market), so for a typical 7-game slate this costs ~7 credits.
+    endpoint does not support player prop markets.  Consumes one API credit per requested market and region per event.
+    Use sportsbet.scan for persistent daily credit budgeting.
     """
     if not settings.odds_api_key:
         print("  [!] odds_api_key not set — skipping Odds API source.")
@@ -227,7 +204,7 @@ async def _fetch_odds_api_snapshots(sport: str = "nba") -> list[PlayerPropSnapsh
             )
             resp.raise_for_status()
         except httpx.HTTPError as exc:
-            print(f"  [!] Odds API events list unreachable: {exc}")
+            print(f"  [!] Odds API events list unreachable: {type(exc).__name__}")
             return []
 
         events = resp.json()
@@ -237,7 +214,7 @@ async def _fetch_odds_api_snapshots(sport: str = "nba") -> list[PlayerPropSnapsh
         if not events:
             return []
 
-        # Step 2: fetch player props for each event in parallel (1 credit each)
+        # Step 2: fetch player props for each event (charged per requested market/region)
         async def fetch_event_props(event: dict) -> list[dict]:
             eid = event.get("id", "")
             try:
@@ -271,33 +248,11 @@ async def _fetch_odds_api_snapshots(sport: str = "nba") -> list[PlayerPropSnapsh
 
 
 async def fetch_all_snapshots(sport: str = "nba") -> list[PlayerPropSnapshotCreate]:
-    """Fetch player props with a cascade: Odds API → PrizePicks → empty list.
-
-    Sources are tried in order of reliability.  An empty result from any source
-    falls through to the next rather than causing a hard abort — the caller is
-    responsible for deciding whether to continue with an empty slate.
-    """
-    # ── Source 1: The Odds API (paid, keyed, most reliable) ──────────────────
-    print("  Trying Odds API...", end=" ", flush=True)
+    """Read actual sportsbook quotes; projection tiers are not single-pick odds."""
     snapshots = await _fetch_odds_api_snapshots(sport)
     if snapshots:
         return snapshots
-    print("  Odds API returned 0 props — trying PrizePicks fallback...", flush=True)
-
-    # ── Source 2: PrizePicks public API (may be blocked by bot protection) ───
-    try:
-        async with PrizePicksPoller() as pp:
-            raw_events = await pp.fetch_player_props(sport)
-        if raw_events:
-            snapshots = _normalize_raw_events(raw_events, sport)
-            print(f"  PrizePicks: {len(snapshots)} prop outcomes")
-            return snapshots
-        print("  PrizePicks: 0 props returned.")
-    except Exception as exc:
-        print(f"  [!] PrizePicks unavailable: {type(exc).__name__}: {exc}")
-
-    # ── Source 3: ESPN Bet props (free, no auth, limited coverage) ───────────
-    print("  PrizePicks returned 0 props — trying ESPN fallback...", flush=True)
+    print("  Odds API returned 0 props; trying ESPN.", flush=True)
     try:
         async with ESPNPropsPoller() as espn:
             raw_events = await espn.fetch_player_props(sport)

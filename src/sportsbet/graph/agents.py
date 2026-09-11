@@ -37,9 +37,9 @@ from sportsbet.db.connection import get_sync_engine
 from sportsbet.graph.models import EVSignal, QuantParams, QuantResult
 from sportsbet.graph.state import GraphState
 from sportsbet.ingestion.odds import OddsSnapshotCreate, write_odds_snapshot
-from sportsbet.ingestion.free_odds import DraftKingsPoller, ESPNOddsPoller, ESPNPropsPoller, PrizePicksPoller
+from sportsbet.ingestion.free_odds import DraftKingsPoller, ESPNOddsPoller, ESPNPropsPoller
 from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
-from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot
+from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot, parse_event_quotes
 from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
 from sportsbet.ingestion.sleeper import fetch_sleeper_team_injuries as _fetch_sleeper_injuries
 
@@ -136,7 +136,7 @@ def make_quant_agent(
             log.error(
                 "quant_agent_error",
                 session_id=session_id,
-                error=str(exc),
+                error_type=type(exc).__name__,
                 exc_info=True,
             )
             return {
@@ -257,21 +257,21 @@ def make_context_agent(
                     raw_odds = await poller.fetch_nfl_odds()
             odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
         except BudgetExhaustedError as exc:
-            log.warning("context_agent_budget_exhausted_trying_espn", session_id=session_id, error=str(exc))
+            log.warning("context_agent_budget_exhausted_trying_espn", session_id=session_id, error_type=type(exc).__name__)
             try:
                 raw_odds = await ESPNOddsPoller().fetch_h2h_odds(sport)
                 odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
                 log.info("context_agent_espn_h2h_fallback_ok", session_id=session_id)
             except Exception as espn_exc:
-                log.warning("context_agent_espn_fallback_failed", error=str(espn_exc))
+                log.warning("context_agent_espn_fallback_failed", error_type=type(espn_exc).__name__)
         except Exception as exc:
-            log.error("context_agent_odds_error", session_id=session_id, error=str(exc))
+            log.error("context_agent_odds_error", session_id=session_id, error_type=type(exc).__name__)
             try:
                 raw_odds = await ESPNOddsPoller().fetch_h2h_odds(sport)
                 odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
                 log.info("context_agent_espn_h2h_fallback_ok", session_id=session_id)
             except Exception as espn_exc:
-                log.warning("context_agent_espn_fallback_failed", error=str(espn_exc))
+                log.warning("context_agent_espn_fallback_failed", error_type=type(espn_exc).__name__)
 
         # --- Step 1 (continued): Staleness gate (CTXT-02) ---
         if odds_snapshot is not None:
@@ -310,7 +310,7 @@ def make_context_agent(
                 write_odds_snapshot(snap_create, engine=_sync_engine_cache[0])
                 log.info("context_agent_odds_persisted", game_id=game_id)
             except Exception as exc:
-                log.warning("context_agent_odds_persist_error", error=str(exc))
+                log.warning("context_agent_odds_persist_error", error_type=type(exc).__name__)
 
         # --- Step 1c: Fetch and persist player prop snapshots (PROP-01, sport-routed) ---
         # sport variable resolved at line 187; "nba" routes NBA prop markets, "nfl" routes NFL markets.
@@ -327,7 +327,7 @@ def make_context_agent(
             except Exception as odds_api_exc:
                 log.warning(
                     "context_agent_odds_api_props_failed_trying_dk",
-                    error=str(odds_api_exc),
+                    error_type=type(odds_api_exc).__name__,
                 )
                 try:
                     async with DraftKingsPoller() as dk:
@@ -336,7 +336,7 @@ def make_context_agent(
                 except Exception as dk_exc:
                     log.warning(
                         "context_agent_dk_props_failed_trying_espn",
-                        error=str(dk_exc),
+                        error_type=type(dk_exc).__name__,
                     )
                     try:
                         async with ESPNPropsPoller() as espn:
@@ -344,12 +344,10 @@ def make_context_agent(
                         log.info("context_agent_props_source", source="espn_fallback")
                     except Exception as espn_exc:
                         log.warning(
-                            "context_agent_espn_props_failed_trying_prizepicks",
-                            error=str(espn_exc),
+                            "context_agent_sportsbook_props_unavailable",
+                            error_type=type(espn_exc).__name__,
                         )
-                        async with PrizePicksPoller() as pp:
-                            raw_props = await pp.fetch_player_props(sport)
-                        log.info("context_agent_props_source", source="prizepicks_fallback")
+                        raw_props = []
             if not _sync_engine_cache:
                 import sqlalchemy as _sa
                 from sportsbet.config import settings as _settings_inner
@@ -361,41 +359,20 @@ def make_context_agent(
                         connect_args={"connect_timeout": 5},
                     )
                 )
-            from sportsbet.quant.vig import american_to_raw_prob as _atrp
-            from decimal import Decimal as _Dec
             for event_data in raw_props:
-                for bookmaker in event_data.get("bookmakers", []):
-                    for market in bookmaker.get("markets", []):
-                        for outcome in market.get("outcomes", []):
-                            price = outcome.get("price")
-                            if price is None:
-                                continue
-                            try:
-                                raw_prob = _atrp(int(price))
-                                implied_prob = _Dec(str(round(float(raw_prob), 6)))
-                                point = outcome.get("point")
-                                snap = PlayerPropSnapshotCreate(
-                                    sport=sport,
-                                    game_id=event_data.get("id"),
-                                    player_name=outcome.get("description") or outcome.get("name", "Unknown"),
-                                    sportsbook=bookmaker.get("key", "unknown"),
-                                    prop_type=market.get("key", "unknown"),
-                                    line=_Dec(str(point)) if point is not None else None,
-                                    price=int(price),
-                                    implied_probability=implied_prob,
-                                    side=outcome.get("name", ""),
-                                )
-                                # Collect snap BEFORE writing — ensures _prop_snapshots is
-                                # populated even if write_player_prop_snapshot raises (Phase 23)
-                                _prop_snapshots.append(snap)
-                                write_player_prop_snapshot(snap, engine=_sync_engine_cache[0])
-                            except Exception as snap_exc:
-                                log.warning("prop_snapshot_write_error", error=str(snap_exc))
+                if event_data.get('id') != game_id:
+                    continue
+                for snap in parse_event_quotes(event_data, sport):
+                    _prop_snapshots.append(snap)
+                    try:
+                        write_player_prop_snapshot(snap, engine=_sync_engine_cache[0])
+                    except Exception as snap_exc:
+                        log.warning('prop_snapshot_write_error', error_type=type(snap_exc).__name__)
             log.info("context_agent_props_persisted", game_id=game_id)
         except BudgetExhaustedError as exc:
-            log.warning("context_agent_prop_budget_exhausted", error=str(exc))
+            log.warning("context_agent_prop_budget_exhausted", error_type=type(exc).__name__)
         except Exception as exc:
-            log.warning("context_agent_prop_fetch_error", error=str(exc))
+            log.warning("context_agent_prop_fetch_error", error_type=type(exc).__name__)
 
         # --- Step 2: Fetch injury reports ---
         injury_flags: dict[str, str] = {}
@@ -468,9 +445,9 @@ def make_context_agent(
                                     "status": status,
                                 })
                 except Exception as sleeper_exc:
-                    log.warning("context_agent_sleeper_supplement_failed", error=str(sleeper_exc))
+                    log.warning("context_agent_sleeper_supplement_failed", error_type=type(sleeper_exc).__name__)
         except Exception as exc:
-            log.error("context_agent_scraper_error", session_id=session_id, error=str(exc))
+            log.error("context_agent_scraper_error", session_id=session_id, error_type=type(exc).__name__)
 
         # --- Step 3: Build ContextSignals and return ---
         signals = ContextSignals(
@@ -829,7 +806,7 @@ def make_kinematic_agent(
             log.error(
                 "kinematic_agent_error",
                 session_id=session_id,
-                error=str(exc),
+                error_type=type(exc).__name__,
                 exc_info=True,
             )
             return {"kinematic_result": None, "error": str(exc)}
