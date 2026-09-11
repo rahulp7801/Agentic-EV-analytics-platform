@@ -31,6 +31,8 @@ dependencies = [
     "playwright>=1.44",
     "beautifulsoup4>=4.12",
     "lxml>=5.2",
+    "cryptography>=50.0.1",
+    "scipy>=1.17,<2",
 ]
 
 [project.optional-dependencies]

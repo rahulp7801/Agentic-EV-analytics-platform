@@ -131,6 +131,8 @@ class GraphState(TypedDict):
     """
 
     session_id: str
+    market_request: dict[str, Any]
+    market_report: dict[str, Any]
     outcome_name: str | None
     request_type: str
     created_at: datetime

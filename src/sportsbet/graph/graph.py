@@ -271,6 +271,8 @@ def create_graph(
     builder.add_node("arbitrage_agent", active_arbitrage_node)
     builder.add_node("context_agent", active_context_node)
     builder.add_node("kinematic_agent", active_kinematic_node)
+    from sportsbet.graph.market_analysis import make_market_analysis_node
+    builder.add_node("market_analysis", make_market_analysis_node())
 
     # Register Phase 13 prop pipeline nodes
     builder.add_node("prop_quant_agent", active_prop_quant_node)
@@ -296,12 +298,14 @@ def create_graph(
             "prop_quant_agent": "prop_quant_agent",
             "nba_quant_agent": "nba_context_producer",
             "prop_arbitrage_agent": "prop_arbitrage_agent",
+            "market_analysis": "market_analysis",
             "end": END,
         },
     )
 
     # quant_agent and context_agent always terminate at END
     builder.add_edge("quant_agent", END)
+    builder.add_edge("market_analysis", END)
     # ARBT-01 quant->arbitrage two-invocation checkpoint pattern.
     # arbitrage_agent reads quant_result from state. When using request_type="arbitrage_analysis"
     # directly (without a prior quant step in the same pipeline invocation), callers must
