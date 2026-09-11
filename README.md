@@ -121,6 +121,11 @@ uv run python -m sportsbet.market_watch --replay .local/market-watch/CAPTURE.jso
 uv run python -m sportsbet.ingestion.prizepicks --sport nba
 ```
 
+Replay checks the evidence digest and recomputes comparisons without network
+requests or publishing. A comparison mismatch exits with code2; preserve the
+original archive and investigate the computation version before using that
+report as validation evidence.
+
 The dashboard's Arbitrage view reads published market observations. The monitor
 captures one US sportsbook h2h request per sport (one budgeted Odds API credit),
 up to 20 Kalshi games within seven days by default (configurable up to 40), and

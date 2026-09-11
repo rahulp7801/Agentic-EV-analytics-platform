@@ -209,3 +209,31 @@ def test_cli_distinguishes_valid_empty_coverage_and_isolates_league_errors(monke
     reports=[json.loads(line) for line in output.splitlines()]
     assert reports[0]['status']=='failed' and reports[0]['error_type']=='RuntimeError'
     assert reports[1]['sport']=='nba' and reports[1]['status']=='observed'
+
+
+@pytest.mark.parametrize('mode',['match','mismatch','corrupt','publish'])
+def test_replay_exit_status_rejects_mismatch_corruption_and_publishing(monkeypatch,tmp_path,capsys,mode):
+    import json
+    from sportsbet import market_watch
+    evidence=dict(schema_version=2,sport='nfl',captured_at='2026-09-11T00:00:00Z',sources={})
+    archive=dict(evidence=evidence,summary=dict(evidence_sha256=market_watch.digest(evidence),comparisons=[]))
+    if mode=='mismatch':archive['summary']['comparisons']=[{'invalid':'saved result'}]
+    if mode=='corrupt':archive['evidence']['sport']='nba'
+    path=tmp_path/'capture.json'
+    original=json.dumps(archive)
+    path.write_text(original)
+    def forbidden(*args,**kwargs):raise AssertionError('Replay must stay offline and preserve evidence')
+    for name in ('run','publish_snapshot','write_archive'):
+        monkeypatch.setattr(market_watch,name,forbidden)
+    monkeypatch.setattr('sys.argv',['market_watch','--replay',str(path)]+(['--publish'] if mode=='publish' else []))
+    if mode=='match':
+        market_watch.main()
+        assert json.loads(capsys.readouterr().out)['matches_archived_comparisons'] is True
+    else:
+        with pytest.raises(SystemExit) as error:market_watch.main()
+        assert error.value.code!=0
+        if mode=='mismatch':
+            report=json.loads(capsys.readouterr().out)
+            assert error.value.code==2 and report['matches_archived_comparisons'] is False
+            assert report['execution_ready'] is False and report['realized_profit'] is None
+    assert path.read_text()==original

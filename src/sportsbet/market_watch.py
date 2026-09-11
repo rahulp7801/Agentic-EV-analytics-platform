@@ -362,10 +362,13 @@ def main():
         if digest(archived['evidence']) != archived['summary']['evidence_sha256']:
             raise SystemExit('Capture integrity check failed')
         rows=comparisons(archived['evidence'])
+        matches=rows==archived['summary']['comparisons']
         print(json.dumps(dict(mode='observation_replay', comparisons=len(rows),
-            matches_archived_comparisons=rows==archived['summary']['comparisons'],
+            matches_archived_comparisons=matches,
             positive_gross_gaps=sum(Decimal(r['gross_gap_to_one_dollar'])>0 for r in rows),
             realized_profit=None, execution_ready=False)))
+        if not matches:
+            raise SystemExit(2)
         return
     failed=False
     for sport in (['nfl','nba'] if args.sport=='both' else [args.sport]):
