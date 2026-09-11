@@ -34,7 +34,8 @@ class PayoffLeg(BaseModel):
     unit_cost: Positive
     fee_per_unit_bound: Nonnegative | None = None
     max_units: Positive | None = None
-    unit_step: Positive
+    # Bound integer lot counts and floating solver precision at the input boundary.
+    unit_step: Positive = Field(ge=Decimal('0.0001'))
     payouts: dict[Identifier, Nonnegative] = Field(min_length=2, max_length=256)
 
     @model_validator(mode='after')

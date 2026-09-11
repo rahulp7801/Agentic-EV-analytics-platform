@@ -91,6 +91,10 @@ def test_contract_schema_rejects_incomplete_states_and_duplicate_liquidity():
     data['legs'][0]['fee_per_unit_bound'] = 'NaN'
     with pytest.raises(ValidationError):
         PayoffCandidate.model_validate(data)
+    data = candidate()
+    data['legs'][0]['unit_step'] = '1e-100'
+    with pytest.raises(ValidationError):
+        PayoffCandidate.model_validate(data)
 
 
 @pytest.mark.asyncio

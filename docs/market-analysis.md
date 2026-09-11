@@ -40,6 +40,8 @@ portfolios. These are deterministic specialists, not autonomous LLM traders.
 `arbitrage/portfolio.py` solves a bounded long-only integer-lot payoff problem with
 SciPy/HiGHS. It maximizes the minimum supplied-state profit under the candidate
 budget, per-tranche capacity, unit steps, and explicit fee upper bounds. The
+input contract supports unit steps of at least 0.0001, with bounded amounts and
+at most 16 legs / 256 states per candidate to constrain solver resource use. The
 two-second solver deadline fails closed. Decimal recomputation checks the returned
 budget, depth, and payoffs. There is no assumed short sale or reuse of capital.
 
