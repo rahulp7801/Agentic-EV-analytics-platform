@@ -4,6 +4,28 @@ from unittest.mock import MagicMock, patch
 from sportsbet.refresh import refresh
 
 
+def test_manual_refresh_publishes_failure_then_recovery_without_error_text(monkeypatch,capsys):
+    import sys
+    import pytest
+    from sportsbet import refresh as module
+    stored=[]
+    monkeypatch.setattr(module,'publish_snapshot',lambda key,value:stored.append((key,value)))
+    monkeypatch.setattr(sys,'argv',['refresh','--sport','both'])
+    def provider(sport,day,backfill):
+        if sport=='nfl': raise RuntimeError('private-provider-credential')
+        return {'provider':'espn','rows':0}
+    monkeypatch.setattr(module,'refresh',provider)
+    with pytest.raises(SystemExit) as exc: module.main()
+    assert exc.value.code==1
+    assert [(key,value['status']) for key,value in stored]==[
+        ('refresh:nfl','running'),('refresh:nfl','failed'),('refresh:nba','running'),('refresh:nba','complete')]
+    assert 'private-provider-credential' not in capsys.readouterr().out
+    assert stored[1][1]['error_type']=='RuntimeError'
+    assert stored[-1][1]['coverage']=={'provider':'espn','rows':0}
+    monkeypatch.setattr(module,'refresh',lambda *args:{'provider':'nflverse'})
+    assert module.refresh_history('nfl',date(2026,9,11))['status']=='complete'
+
+
 def test_opening_season_backfill_and_daily_refresh():
     engine = MagicMock()
     with patch('sportsbet.refresh.get_sync_engine', return_value=engine), \
