@@ -141,10 +141,12 @@ def analyze_candidate(candidate: PayoffCandidate, request: MarketAnalysisRequest
         # repeated graph/CLI use on Windows. SciPy forwards this HiGHS option.
         options={'time_limit': 2.0, 'mip_rel_gap': 0.0, 'threads': 1})
     if not solution.success:
+        result['status']='failed'
         result['reasons'] = ['optimizer_incomplete']
         return result
     lots = [round(float(n)) for n in solution.x[:count]]
     if any(abs(float(raw)-n) > 1e-5 for raw, n in zip(solution.x[:count], lots)):
+        result['status']='failed'
         result['reasons'] = ['invalid_optimizer_rounding']
         return result
     # Recompute all money with Decimal; never trust a solver's floating tolerance
@@ -153,6 +155,7 @@ def analyze_candidate(candidate: PayoffCandidate, request: MarketAnalysisRequest
     state_profits = {state: sum((n*p for n, p in zip(lots, row)), Decimal(0))
                      for state, row in zip(candidate.states, profits)}
     if cost > request.budget or any(n < 0 or n > cap for n, cap in zip(lots, capacities)):
+        result['status']='failed'
         result['reasons'] = ['invalid_optimizer_capacity']
         return result
     worst = min(state_profits.values())

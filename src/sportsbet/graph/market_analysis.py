@@ -28,8 +28,19 @@ def create_market_graph():
     for venue in ('sportsbook', 'kalshi', 'prizepicks'):
         def evaluate(state, venue=venue):
             request = state['request']
-            return {venue: [analyze_candidate(candidate, request) for candidate in request.candidates
-                            if specialist(candidate) == venue]}
+            results=[]
+            for candidate in request.candidates:
+                if specialist(candidate)!=venue:continue
+                try:
+                    result=analyze_candidate(candidate,request)
+                except Exception as exc:
+                    # One failed solver must not discard other candidates or
+                    # expose input documents/account details through exception text.
+                    result=dict(candidate_id=candidate.candidate_id,specialist=venue,
+                        status='failed',reasons=['analysis_failed'],error_type=type(exc).__name__,
+                        units={},cost=None,state_profits={},worst_profit=None,execution_ready=False)
+                results.append(result)
+            return {venue:results}
         graph.add_node(venue, evaluate)
         graph.add_edge('validate', venue)
 
@@ -37,9 +48,10 @@ def create_market_graph():
         request = state['request']
         results = sorted(state['sportsbook'] + state['kalshi'] + state['prizepicks'],
                          key=lambda result: result['candidate_id'])
+        failed=sum(result['status']=='failed' for result in results)
         return {'report': dict(schema_version=1, as_of=request.as_of.isoformat(),
             input_sha256=hashlib.sha256(request.model_dump_json().encode()).hexdigest(),
-            results=results, execution_ready=False,
+            results=results, status='degraded' if failed else 'complete',failed_count=failed,execution_ready=False,
             scope='Independent candidate scenarios, not a funded portfolio, fills, or realized profit. '
                   'Coverage review and fee bounds are caller-supplied evidence, not automatically verified.')}
 

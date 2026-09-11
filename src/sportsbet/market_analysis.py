@@ -5,6 +5,8 @@ import argparse
 import asyncio
 import hashlib
 import json
+import sys
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -73,13 +75,18 @@ def main():
         if request.as_of > datetime.now(timezone.utc):
             raise ValueError('Cannot replay future observations')
         settlement_raw = args.settlements.read_bytes() if args.settlements else None
-        report = asyncio.run(analyze(request, json.loads(settlement_raw) if settlement_raw else None))
+        # CLI owns this process: keep graph/library diagnostics off the JSON channel.
+        with redirect_stdout(sys.stderr):
+            report = asyncio.run(analyze(request, json.loads(settlement_raw) if settlement_raw else None))
         report.update(mode='replay' if args.replay else 'observation',
             input_file_sha256=hashlib.sha256(raw).hexdigest(),
             settlements_sha256=hashlib.sha256(settlement_raw).hexdigest() if settlement_raw else None)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2), encoding='utf-8')
-        print(json.dumps(dict(candidates=len(report['results']), mode=report['mode'], execution_ready=False)))
+        print(json.dumps(dict(candidates=len(report['results']),mode=report['mode'],
+            status=report['status'],failed_count=report['failed_count'],execution_ready=False)))
+        if report['status']!='complete':
+            raise SystemExit(2)
     except Exception as exc:
         # Avoid echoing source documents, account identifiers, or file contents.
         raise SystemExit(f'Market analysis failed ({type(exc).__name__})') from None

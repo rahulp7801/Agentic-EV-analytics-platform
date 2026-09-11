@@ -134,3 +134,53 @@ for cycle in range(20):
     completed = subprocess.run([sys.executable, '-c', script], input=request.model_dump_json(),
         text=True, capture_output=True, timeout=30)
     assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.parametrize('failure',['exception','incomplete','rounding','capacity'])
+def test_cli_preserves_other_candidates_and_fails_on_solver_errors(monkeypatch,tmp_path,capsys,failure):
+    import json
+    from types import SimpleNamespace
+    from sportsbet import market_analysis
+    from sportsbet.arbitrage import portfolio
+    original=portfolio.milp
+    def solver(**kwargs):
+        # Only the first fixture has this cost. Other candidates use the real solver.
+        if kwargs['constraints'].A[0][0]==.44:
+            if failure=='exception':raise RuntimeError('private account secret must not appear')
+            if failure=='incomplete':return SimpleNamespace(success=False)
+            return SimpleNamespace(success=True,x=[.25,1,0] if failure=='rounding' else [11,11,0])
+        return original(**kwargs)
+    monkeypatch.setattr(portfolio,'milp',solver)
+    broken=candidate(candidate_id='broken')
+    broken['legs'][0]['unit_cost']='.44'
+    data=dict(as_of=NOW.isoformat(),budget='100',candidates=[broken,
+        candidate(candidate_id='same-specialist'),candidate('kalshi'),candidate('prizepicks')])
+    source=tmp_path/'input.json';output=tmp_path/'report.json'
+    source.write_text(MarketAnalysisRequest.model_validate(data).model_dump_json())
+    monkeypatch.setattr('sys.argv',['market_analysis','--input',str(source),'--output',str(output),'--replay'])
+    with pytest.raises(SystemExit) as error:market_analysis.main()
+    assert error.value.code==2
+    report=json.loads(output.read_text())
+    assert report['status']=='degraded' and report['failed_count']==1
+    results={row['candidate_id']:row for row in report['results']}
+    assert len(results)==4 and results['broken']['status']=='failed'
+    assert results['broken']['units']=={} and results['broken']['worst_profit'] is None
+    assert all(row['status']=='scenario_edge' for key,row in results.items() if key!='broken')
+    assert all(row['execution_ready'] is False for row in results.values())
+    console=capsys.readouterr()
+    assert 'secret' not in output.read_text()+console.out+console.err
+    assert json.loads(console.out)['failed_count']==1
+
+
+def test_cli_completes_explicit_blocked_analysis_without_claiming_profit(monkeypatch,tmp_path,capsys):
+    import json
+    from sportsbet import market_analysis
+    source=tmp_path/'input.json';output=tmp_path/'report.json'
+    source.write_text(MarketAnalysisRequest.model_validate(dict(as_of=NOW,budget='100',candidates=[candidate(coverage_review_ref=None)])).model_dump_json())
+    monkeypatch.setattr('sys.argv',['market_analysis','--input',str(source),'--output',str(output),'--replay'])
+    market_analysis.main()
+    report=json.loads(output.read_text())
+    assert report['status']=='complete' and report['failed_count']==0
+    assert report['results'][0]['status']=='blocked'
+    assert report['results'][0]['worst_profit'] is None and report['realized_roi'] is None
+    assert json.loads(capsys.readouterr().out)['status']=='complete'

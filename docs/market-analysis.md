@@ -39,6 +39,13 @@ parallel, then joins their reports. Each candidate belongs to exactly one specia
 mixed PrizePicks entries take priority, then Kalshi comparisons, then sportsbook-only
 portfolios. These are deterministic specialists, not autonomous LLM traders.
 
+Candidate failures are isolated within each specialist. An optimizer exception,
+incomplete solve, or invalid returned solution marks that candidate failed and
+the report degraded, while preserving other candidates. The CLI writes the
+partial report and exits2 for technical failures; stdout contains the JSON status
+and graph diagnostics go to stderr. Missing fees/capacity or settlement review
+are explicit blocked analyses, not technical failures or zero-profit estimates.
+
 `arbitrage/portfolio.py` solves a bounded long-only integer-lot payoff problem with
 SciPy/HiGHS. It maximizes the minimum supplied-state profit under the candidate
 budget, per-tranche capacity, unit steps, and explicit fee upper bounds. The
