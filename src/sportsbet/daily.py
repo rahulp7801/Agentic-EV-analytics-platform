@@ -43,7 +43,8 @@ def create_daily_graph():
             else:
                 result=load_snapshot('refresh:'+sport) or {'status':'not_run'}
                 try:
-                    age=now-timestamp(result['finished_at'])
+                    # Compare after the read: a concurrent refresh may finish during I/O.
+                    age=datetime.now(timezone.utc)-timestamp(result['finished_at'])
                     if result['status']!='complete' or not timedelta(0)<=age<=timedelta(hours=36):
                         result={'status':'stale'}
                 except (KeyError,ValueError,TypeError,AttributeError):
