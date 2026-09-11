@@ -77,6 +77,8 @@ def route_from_master(state: GraphState) -> str:
         return "nba_quant_agent"
     elif request_type == "prop_arbitrage_analysis":
         return "prop_arbitrage_agent"
+    elif request_type == "market_analysis":
+        return "market_analysis"
     else:
         # Unknown request_type — set error in state via a state update mechanism.
         # Note: conditional edge functions cannot mutate state directly in LangGraph.

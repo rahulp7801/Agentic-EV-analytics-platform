@@ -84,3 +84,4 @@ async def test_snapshot_preserves_evidence_and_observation_interval():
     assert snapshot['request_started_at'] <= snapshot['received_at']
     assert len(snapshot['sha256']) == 64
     assert 'quote_updated_at' not in snapshot
+    assert snapshot['same_contract_pair'] is None  # One empty side cannot be hedged.

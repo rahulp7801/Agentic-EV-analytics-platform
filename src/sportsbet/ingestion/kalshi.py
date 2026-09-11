@@ -106,11 +106,19 @@ class KalshiReader:
         started = datetime.now(timezone.utc)
         market, book = await asyncio.gather(self._get('/markets/'+ticker), self._get('/markets/'+ticker+'/orderbook'))
         received = datetime.now(timezone.utc)
+        yes_asks, no_asks = ask_levels(book, 'yes'), ask_levels(book, 'no')
+        pair = None
+        if yes_asks and no_asks:
+            pair = dict(ask_cost=str(yes_asks[0][0]+no_asks[0][0]),
+                gross_gap_to_one_dollar=str(1-yes_asks[0][0]-no_asks[0][0]),
+                displayed_size=str(min(yes_asks[0][1], no_asks[0][1])),
+                fee_adjusted_profit=None, execution_ready=False)
         # This is an observation interval, not an invented provider quote-update time.
         return dict(venue='kalshi', request_started_at=started.isoformat(), received_at=received.isoformat(),
             market=market['market'], orderbook=book,
-            yes_asks=[(str(p),str(n)) for p,n in ask_levels(book,'yes')],
-            no_asks=[(str(p),str(n)) for p,n in ask_levels(book,'no')],
+            yes_asks=[(str(p),str(n)) for p,n in yes_asks],
+            no_asks=[(str(p),str(n)) for p,n in no_asks],
+            same_contract_pair=pair,
             sha256=hashlib.sha256(json.dumps(dict(market=market,orderbook=book),sort_keys=True).encode()).hexdigest())
 
 

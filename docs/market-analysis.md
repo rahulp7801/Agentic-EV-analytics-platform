@@ -29,6 +29,43 @@ See [Kalshi authentication](https://docs.kalshi.com/getting_started/api_keys) an
 Output defaults to ignored `.local/kalshi/observations.json`. This is a bounded
 sample, not complete coverage, a historical replay, or evidence of an executable hedge.
 
+## Implemented specialist route
+
+`request_type="market_analysis"` on the existing graph validates a
+`MarketAnalysisRequest`, runs sportsbook, Kalshi, and PrizePicks specialists in
+parallel, then joins their reports. Each candidate belongs to exactly one specialist;
+mixed PrizePicks entries take priority, then Kalshi comparisons, then sportsbook-only
+portfolios. These are deterministic specialists, not autonomous LLM traders.
+
+`arbitrage/portfolio.py` solves a bounded long-only integer-lot payoff problem with
+SciPy/HiGHS. It maximizes the minimum supplied-state profit under the candidate
+budget, per-tranche capacity, unit steps, and explicit fee upper bounds. The
+two-second solver deadline fails closed. Decimal recomputation checks the returned
+budget, depth, and payoffs. There is no assumed short sale or reuse of capital.
+
+Each leg requires venue/account/quote identity, source hash, rule reference,
+observation and availability times, actual event start, cost, unit step, and a
+payout for every supplied settlement state. Unknown fees, capacity, or coverage
+review block analysis. So do stale/future quotes, excessive time skew, and started
+events. A coverage reference is trusted caller evidence, **not automatic proof**
+of complete rules. Independent candidate results cannot be summed into portfolio
+profit. Even a positive `scenario_edge` always has `execution_ready=false`.
+
+```powershell
+# Explicit, locally reviewed payoff inputs; current-clock freshness checks:
+.venv/Scripts/python.exe -m sportsbet.market_analysis --input .local/candidates.json
+# Same graph, archived clock and explicit outcome evidence:
+.venv/Scripts/python.exe -m sportsbet.market_analysis --input .local/candidates.json --replay --settlements .local/settlements.json
+```
+
+The input schema is `MarketAnalysisRequest` in `arbitrage/portfolio.py`. Settlements
+map candidate IDs to `state`, `source_ref`, and timezone-aware `resolved_at`. The
+replay reports individual simulated payoff bounds, source/code hashes, and missing
+settlements; realized ROI remains null. It does not invent fills or execution latency.
+Synthetic test fixtures validate arithmetic and graph routing only. Automatic
+conversion of live sportsbook/Kalshi/PrizePicks feeds to reviewed candidates is
+not yet implemented; raw Kalshi archives must not be described as executable inputs.
+
 ## Research that changes implementation
 
 | Primary source | Finding and engineering consequence |

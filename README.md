@@ -73,6 +73,12 @@ uv run python -m sportsbet.ledger --recommendations-only
 
 ## Verification and deployment
 
+Kalshi, sportsbook hedge, and PrizePicks entry analysis now share a separate
+`market_analysis` LangGraph route with explicit payoff states, fee/capacity gates,
+and bounded integer-lot optimization. See [market analysis architecture and research](docs/market-analysis.md)
+for the read-only Kalshi collector, typed input contract, replay commands, and
+remaining integration limits. These scenario results are not executed bets.
+
 All commits and workflows belong to https://github.com/rahulp7801/Agentic-EV-analytics-platform. Work on feature branches, open a PR, then merge to `master` after required checks pass. Direct pushes and protection bypasses are prohibited. Production jobs only run from `master`.
 
 Historical quote replay requires explicit input; it never generates example wins or prices:
