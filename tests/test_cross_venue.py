@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
 from sportsbet.market_watch import digest
-from sportsbet.prop.cross_venue import screen
+from sportsbet.prop.cross_venue import screen, screen_sportsbooks
 from sportsbet.quant.vig import american_to_raw_prob
 
 
@@ -115,3 +115,30 @@ def test_malformed_target_or_quote_blocks_the_entire_screen():
     changed = handoff(); changed['evidence']['player_targets']['player']['team_target_id'] = 'away'
     result = screen(event(), 'nfl', [book()], rehash(changed), NOW)
     assert result['status'] == 'unavailable' and result['reason'] == 'invalid_quote_evidence'
+
+
+def test_distinct_sportsbooks_can_produce_only_an_unverified_exact_prop_gap():
+    over=book(side='Over');over.sportsbook='over-book';over.price=200
+    over.implied_probability=american_to_raw_prob(200)
+    under=book(side='Under');under.sportsbook='under-book';under.price=200
+    under.implied_probability=american_to_raw_prob(200)
+    result=screen_sportsbooks(event(),'nfl',[over,under],NOW)
+    row,=result['comparisons']
+    assert row['kind']=='sportsbook_sportsbook_prop'
+    assert {leg['side'] for leg in row['legs']}=={'Over','Under'}
+    assert row['gross_cost_to_one_dollar']==str(2*american_to_raw_prob(200))
+    assert row['settlement_equivalent'] is False and row['execution_ready'] is False
+    assert row['fee_adjusted_profit'] is None and row['realized_profit'] is None
+
+
+def test_sportsbook_screen_requires_distinct_books_half_line_freshness_and_real_price():
+    over=book(side='Over');under=book(side='Under')
+    same=screen_sportsbooks(event(),'nfl',[over,under],NOW)
+    assert same['comparisons']==[]
+    under.sportsbook='other';under.line=Decimal('250')
+    assert screen_sportsbooks(event(),'nfl',[over,under],NOW)['comparisons']==[]
+    under.line=Decimal('249.5');under.snapped_at=NOW-timedelta(seconds=301)
+    assert screen_sportsbooks(event(),'nfl',[over,under],NOW)['comparisons']==[]
+    under.snapped_at=NOW;under.implied_probability=Decimal('.01')
+    result=screen_sportsbooks(event(),'nfl',[over,under],NOW)
+    assert result['comparisons']==[] and result['coverage']['rejected']['sportsbook_price']==1

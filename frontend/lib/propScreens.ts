@@ -57,11 +57,14 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
   const coverage=record(data.coverage);
   const events=count(coverage.events), observed=count(coverage.observed_events);
   const unavailable=count(coverage.unavailable_events), positive=count(coverage.positive_gross_gaps);
-  if (observed+unavailable !== events || positive !== data.comparisons.length) throw new Error('Invalid prop screen');
+  const sportsbook=count(coverage.sportsbook_gaps), kalshi=count(coverage.kalshi_sportsbook_gaps);
+  if (observed+unavailable !== events || positive !== data.comparisons.length
+      || positive !== sportsbook+kalshi) throw new Error('Invalid prop screen');
   const generated=timestamp(data.generated_at);
   const comparisons=data.comparisons.map(value => {
       const item=record(value);
-      if (item.kind !== 'kalshi_sportsbook_prop' || item.status !== 'unverified'
+      if ((item.kind !== 'kalshi_sportsbook_prop' && item.kind !== 'sportsbook_sportsbook_prop')
+          || item.status !== 'unverified'
           || item.settlement_equivalent !== false || item.fee_adjusted_profit !== null
           || item.realized_profit !== null || item.execution_ready !== false
           || !Array.isArray(item.legs) || item.legs.length !== 2 || !Array.isArray(item.reasons)
@@ -69,16 +72,29 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
         throw new Error('Invalid prop screen');
       }
       const legs=item.legs.map(leg);
-      if (legs[0].venue !== 'kalshi' || legs[1].venue !== 'sportsbook'
-          || !((legs[0].side === 'yes' && legs[1].side === 'Under')
-            || (legs[0].side === 'no' && legs[1].side === 'Over'))) throw new Error('Invalid prop screen');
+      const validKalshi=item.kind === 'kalshi_sportsbook_prop' && legs[0].venue === 'kalshi'
+        && legs[1].venue === 'sportsbook' && ((legs[0].side === 'yes' && legs[1].side === 'Under')
+          || (legs[0].side === 'no' && legs[1].side === 'Over'));
+      const bookSides=new Set(legs.map(leg => leg.side));
+      const validBooks=item.kind === 'sportsbook_sportsbook_prop' && legs.every(leg => leg.venue === 'sportsbook')
+        && bookSides.size === 2 && bookSides.has('Over') && bookSides.has('Under') && new Set(legs.map(leg =>
+          leg.venue === 'sportsbook' ? leg.sportsbook : '')).size === 2;
+      if (!validKalshi && !validBooks) throw new Error('Invalid prop screen');
+      for (const value of legs) if (value.venue === 'sportsbook') {
+        const odds=value.american_odds;
+        if (odds === undefined) throw new Error('Invalid prop screen');
+        const expected=odds < 0 ? -odds/(100-odds) : 100/(100+odds);
+        if (Math.abs(Number(value.cost)-expected)>1e-12) throw new Error('Invalid prop screen');
+      }
+      if (Math.abs(Date.parse(legs[0].observed_at)-Date.parse(legs[1].observed_at))>30_000)
+        throw new Error('Invalid prop screen');
       const line=decimal(item.line), cost=decimal(item.gross_cost_to_one_dollar,0,1,true);
       const gap=decimal(item.gross_gap_to_one_dollar,0,1,true);
       const allowed=data.sport === 'nfl' ? ['pass_yds','rush_yds','rec_yds','receptions'] : ['points','rebounds','assists'];
       if (!allowed.includes(text(item.prop_type)) || Number(line)%1 !== .5
           || Math.abs(Number(legs[0].cost)+Number(legs[1].cost)-Number(cost)) > 1e-12
           || Math.abs(Number(cost)+Number(gap)-1) > 1e-12) throw new Error('Invalid prop screen');
-      return {event_id:text(item.event_id), player:text(item.player), prop_type:item.prop_type as string,
+      return {kind:item.kind,event_id:text(item.event_id), player:text(item.player), prop_type:item.prop_type as string,
         line, gross_cost_to_one_dollar:cost, gross_gap_to_one_dollar:gap, legs,
         limitations:item.reasons.map(text), status:'unverified', execution_ready:false};
     });
@@ -86,11 +102,15 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
   const age=(now-Date.parse(generated))/1000;
   const fresh=0 <= age && age <= 300 ? comparisons.filter(item => item.legs.every(
     leg => 0 <= (now-Date.parse(leg.observed_at))/1000 && (now-Date.parse(leg.observed_at))/1000 <= 300)) : [];
+  const freshSportsbook=fresh.filter(item => item.kind === 'sportsbook_sportsbook_prop').length;
+  const freshKalshi=fresh.length-freshSportsbook;
   return {
     sport:data.sport, generated_at:generated, status:fresh.length || (positive === 0 && age >= 0 && age <= 300)
       ? data.status : 'stale',
     coverage:{events, observed_events:observed, unavailable_events:unavailable,
-      captured_positive_gross_gaps:positive, positive_gross_gaps:fresh.length},
+      captured_positive_gross_gaps:positive, positive_gross_gaps:fresh.length,
+      captured_sportsbook_gaps:sportsbook, captured_kalshi_sportsbook_gaps:kalshi,
+      sportsbook_gaps:freshSportsbook, kalshi_sportsbook_gaps:freshKalshi},
     comparisons:fresh,
     execution_ready:false,
   };
