@@ -250,7 +250,7 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         if sport == 'nba':
             assert result['signals'][0]['sample_size'] == count
             assert result['signals'][0]['direction'] == 'over'
-            assert predictions[0]['home_team']=='Boston Celtics'
+            assert result['signals'][0]['home_team']=='Boston Celtics'
         event['bookmakers'][0]['markets'][0]['outcomes'][0]['point'] = 20
         await evaluate_event(pool,event,sport,ledger,identity+'integer')
         integer = next(p for p in ledger.predictions() if p['line'] == 20)
