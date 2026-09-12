@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import type { Sport } from '@/lib/types';
 
 interface SidebarProps {

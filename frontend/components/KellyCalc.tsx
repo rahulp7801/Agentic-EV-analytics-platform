@@ -24,10 +24,6 @@ function KellyArcGauge({ fraction }: { fraction: number }) {
   const pct = clamp(fraction / 0.25, 0, 1);
   const R = 52;
   const cx = 70, cy = 65;
-  const startAngle = Math.PI;
-  const endAngle = 0;
-  const angle = startAngle + pct * (endAngle - startAngle + Math.PI); // 180 degrees sweep
-
   const arcX = (a: number) => cx + R * Math.cos(a);
   const arcY = (a: number) => cy + R * Math.sin(a);
 
@@ -284,7 +280,7 @@ export default function KellyCalc() {
           <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--bg-surface)', borderRadius: 3, border: '1px solid var(--border-dim)' }}>
             <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: 4 }}>REF: Kelly (1956)</div>
             <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              "A New Interpretation of Information Rate" — Bell System Technical Journal
+              &quot;A New Interpretation of Information Rate&quot; — Bell System Technical Journal
             </div>
           </div>
         </div>
