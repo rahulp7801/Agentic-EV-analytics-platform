@@ -253,13 +253,18 @@ async def test_public_modes_use_real_graph_and_collector_without_paid_or_prop_ca
     monkeypatch.setattr(market_watch,'kalshi_games',kalshi)
     result=await daily.run(['nfl','nba'],mode,25)
     assert result['status']=='observed' and result['execution_ready'] is False
-    assert 'Public-only' in result['scope']
+    assert result['scope']==daily.PUBLIC_SCOPES[mode]
     assert refreshed==(['nfl','nba'] if mode=='public_daily' else [])
     assert kalshi.await_count==2
     books.assert_not_called();prizepicks.assert_not_called();props.assert_not_called()
     assert all(value['status']=='not_requested' for value in result['props'].values())
     expected='complete' if mode=='public_daily' else 'not_requested'
     assert all(value['status']==expected for value in result['settlements'].values())
+    if mode=='public_monitor':
+        assert all(value['reason']=='monitor_mode' for value in result['settlements'].values())
+        assert 'History refresh' in result['scope'] and 'not requested' in result['scope']
+    else:
+        assert 'history refresh' in result['scope'] and 'settlement evaluation' in result['scope']
     assert not any(key.startswith('scan:') for key in stored)
     assert {'schedule:nfl','schedule:nba','markets:nfl','markets:nba','pipeline:'+mode}<=set(stored)
     for sport in ('nfl','nba'):
