@@ -76,6 +76,7 @@ def build_signals(rows: list[dict], outcomes: dict[str, Outcome] | None = None) 
             game_start_time=entry["game_start_time"], snapshot_time=close["snapped_at"],
             entry_time=entry["snapped_at"],
             push_probability=Decimal(str(entry.get("push_probability", 0))),
+            game_cluster_id=entry["game_id"],
         ))
     return result
 

@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 import pandas as pd
+from scipy.stats import t as student_t
 from statsmodels.stats.proportion import proportion_confint
 from sportsbet.graph.models import QuantResult
 
@@ -13,6 +14,11 @@ Outcome = bool | Literal["push", "void"] | None
 BINOMIAL_INTERVAL_METHOD = (
     "Nominal 95% Wilson interval; treats decided selections as independent and "
     "does not adjust for shared games or players."
+)
+GAME_CLUSTER_INTERVAL_METHOD = (
+    "95% game-cluster robust t interval; requires at least two distinct games. "
+    "It allows arbitrary dependence within a game but does not adjust for the "
+    "same player appearing across games."
 )
 
 @dataclass
@@ -27,6 +33,7 @@ class BacktestSignal:
     entry_time: datetime | None = None
     entry_implied_prob: Decimal | None = None
     push_probability: Decimal = Decimal("0")
+    game_cluster_id: str | None = None
 
 @dataclass
 class BacktestReport:
@@ -49,8 +56,18 @@ class BacktestReport:
     baseline_zero_brier: float | None = None
     baseline_50_brier: float | None = None
     baseline_one_brier: float | None = None
+    roi_game_cluster_interval: tuple[float, float] | None = None
+    roi_game_cluster_count: int = 0
+    hit_rate_game_cluster_interval: tuple[float, float] | None = None
+    hit_rate_game_cluster_count: int = 0
+    brier_score_game_cluster_interval: tuple[float, float] | None = None
+    log_loss_game_cluster_interval: tuple[float, float] | None = None
+    calibration_game_cluster_count: int = 0
+    clv_mean_game_cluster_interval: tuple[float, float] | None = None
+    clv_game_cluster_count: int = 0
     calibration: list[dict] = field(default_factory=list)
     binomial_interval_method: str = BINOMIAL_INTERVAL_METHOD
+    game_cluster_interval_method: str = GAME_CLUSTER_INTERVAL_METHOD
     closing_line_note: str = "CLV is same-line raw implied-probability movement; requires entry < close < start."
 
 def _probability(value: Decimal | None) -> float | None:
@@ -59,6 +76,54 @@ def _probability(value: Decimal | None) -> float | None:
     if not value.is_finite() or not 0 <= value <= 1:
         raise ValueError("Probability must be finite and within [0, 1]")
     return float(value)
+
+
+def _game_cluster_mean_interval(observations: list[tuple[str | None, float]],
+        lower: float | None = None, upper: float | None = None) -> tuple[int, tuple[float, float] | None]:
+    """Return an intercept-only cluster-robust t interval for a sample mean."""
+    if not observations:
+        return 0, None
+    if any(not isinstance(cluster,str) or not cluster.strip() or not math.isfinite(value)
+            for cluster,value in observations):
+        return 0, None
+    clusters = sorted({cluster for cluster,_ in observations})
+    count = len(clusters)
+    if count < 2:
+        return count, None
+    mean = sum(value for _,value in observations) / len(observations)
+    scores = {cluster:0.0 for cluster in clusters}
+    for cluster,value in observations:
+        scores[cluster] += value-mean
+    variance = count/(count-1) * sum(score*score for score in scores.values()) / len(observations)**2
+    radius = float(student_t.ppf(.975,count-1)) * math.sqrt(max(0.0,variance))
+    left, right = mean-radius, mean+radius
+    return count, (max(lower,left) if lower is not None else left,
+        min(upper,right) if upper is not None else right)
+
+
+def _game_cluster_ratio_interval(observations: list[tuple[str | None, float, float]],
+        lower: float | None = None, upper: float | None = None) -> tuple[int, tuple[float, float] | None]:
+    """Return a cluster-robust t interval for sum(numerator)/sum(denominator)."""
+    if not observations:
+        return 0, None
+    if any(not isinstance(cluster,str) or not cluster.strip()
+            or not math.isfinite(numerator) or not math.isfinite(denominator) or denominator < 0
+            for cluster,numerator,denominator in observations):
+        return 0, None
+    clusters = sorted({cluster for cluster,_,_ in observations})
+    count = len(clusters)
+    denominator = sum(value for _,_,value in observations)
+    if count < 2 or denominator <= 0:
+        return count, None
+    ratio = sum(value for _,value,_ in observations)/denominator
+    scores = {cluster:0.0 for cluster in clusters}
+    for cluster,numerator,weight in observations:
+        scores[cluster] += numerator-ratio*weight
+    variance = count/(count-1) * sum(score*score for score in scores.values()) / denominator**2
+    radius = float(student_t.ppf(.975,count-1)) * math.sqrt(max(0.0,variance))
+    left, right = ratio-radius, ratio+radius
+    return count, (max(lower,left) if lower is not None else left,
+        min(upper,right) if upper is not None else right)
 
 
 def calibration_metrics(predictions: list[tuple[float, int]]) -> dict:
@@ -100,6 +165,10 @@ class BacktestEngine:
         rows = []
         predictions: list[tuple[float, int]] = []
         profits, stakes, clvs, wins = [], [], [], []
+        roi_clusters: list[tuple[str | None,float,float]] = []
+        hit_clusters: list[tuple[str | None,float]] = []
+        score_clusters: list[tuple[str | None,float,float]] = []
+        clv_clusters: list[tuple[str | None,float]] = []
         for s in signals:
             outcome = s.actual_outcome
             if outcome is not None and type(outcome) is not bool and outcome not in ("push", "void"):
@@ -121,6 +190,7 @@ class BacktestEngine:
             if close is not None and s.entry_time is not None and s.entry_time < s.snapshot_time < s.game_start_time:
                 clv = close - entry
                 clvs.append(clv)
+                clv_clusters.append((s.game_cluster_id,clv))
             profit = None
             if outcome is None:
                 report.pending_count += 1
@@ -131,14 +201,22 @@ class BacktestEngine:
                 profit = float(s.stake * (s.payout_multiplier - 1)) if outcome is True else (-float(s.stake) if outcome is False else 0.0)
                 profits.append(profit)
                 stakes.append(float(s.stake))
+                roi_clusters.append((s.game_cluster_id,profit,float(s.stake)))
                 if type(outcome) is bool:
                     wins.append(int(outcome))
+                    hit_clusters.append((s.game_cluster_id,float(outcome)))
                     if p is not None and push < 1:
-                        predictions.append((p / (1 - push), int(outcome)))
+                        decided_probability = p/(1-push)
+                        predictions.append((decided_probability,int(outcome)))
+                        score_clusters.append((s.game_cluster_id,
+                            (decided_probability-int(outcome))**2,
+                            -(int(outcome)*math.log(max(1e-15,decided_probability))
+                              +(1-int(outcome))*math.log(max(1e-15,1-decided_probability)))))
             rows.append(dict(model_probability=p, signal_implied_prob=entry, closing_implied_prob=close,
                 actual_outcome=outcome, profit=profit, stake=float(s.stake), raw_clv=clv,
                 payout_multiplier=float(s.payout_multiplier), game_start_time=s.game_start_time,
-                snapshot_time=s.snapshot_time, entry_time=s.entry_time))
+                snapshot_time=s.snapshot_time, entry_time=s.entry_time,
+                game_cluster_id=s.game_cluster_id))
         report.signals_df = pd.DataFrame(rows) if rows else None
         report.decided_count = len(wins)
         report.clv_count = len(clvs)
@@ -150,6 +228,17 @@ class BacktestEngine:
         report.clv_mean = sum(clvs) / len(clvs) if clvs else None
         for name, value in calibration_metrics(predictions).items():
             setattr(report, name, value)
+        report.roi_game_cluster_count, report.roi_game_cluster_interval = \
+            _game_cluster_ratio_interval(roi_clusters,lower=-1)
+        report.hit_rate_game_cluster_count, report.hit_rate_game_cluster_interval = \
+            _game_cluster_mean_interval(hit_clusters,lower=0,upper=1)
+        report.calibration_game_cluster_count, report.brier_score_game_cluster_interval = \
+            _game_cluster_mean_interval([(cluster,brier) for cluster,brier,_ in score_clusters],
+                lower=0,upper=1)
+        _, report.log_loss_game_cluster_interval = _game_cluster_mean_interval(
+            [(cluster,loss) for cluster,_,loss in score_clusters],lower=0)
+        report.clv_game_cluster_count, report.clv_mean_game_cluster_interval = \
+            _game_cluster_mean_interval(clv_clusters,lower=-1,upper=1)
         return report
 
 def main() -> None:

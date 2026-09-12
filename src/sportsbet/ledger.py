@@ -337,6 +337,7 @@ class Ledger:
                 quote_terms(p['american_odds'],Decimal(0))[1]+1, start,
                 closing_time, entered,
                 push_probability=Decimal(str(p.get('push_probability',0))),
+                game_cluster_id=p['game_id'],
             ))
         report = BacktestEngine().run(signals)
         return {**{f.name:getattr(report,f.name) for f in fields(report) if f.name!='signals_df'},
