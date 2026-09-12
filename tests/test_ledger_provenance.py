@@ -133,3 +133,33 @@ def test_malformed_retained_json_fails_closed_without_suppressing_metrics(tmp_pa
     assert report['sample_size']==1 and report['pending_count']==1
     assert report['unverified_settlements']==1
     assert report['excluded_missing_metadata']==1
+
+
+def test_malformed_metric_identity_and_version_are_excluded(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    with ledger.connect() as db:
+        for key,change in (('bad-version',{'model_version':['v1']}),
+                ('bad-identity',{'player':['Player']})):
+            db.execute('INSERT INTO predictions(id,scan_id,payload) VALUES (?,?,?)',
+                (key,key,json.dumps(payload(**change))))
+    report=ledger.report()
+    assert report['sample_size']==0 and report['excluded_missing_metadata']==2
+    assert report['available_model_versions']==['v1']
+
+
+def test_recommendation_metrics_require_boolean_acceptance_and_bounded_stake(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    accepted=payload(accepted=True,stake_fraction=.02)
+    key=ledger.record('accepted',accepted)
+    for invalid in (payload(accepted='true',stake_fraction=.02),
+            payload(accepted=True,stake_fraction=.5),
+            payload(accepted=False,stake_fraction=.01)):
+        with pytest.raises(ValueError,match='acceptance|stake'):
+            ledger.record('invalid-'+str(invalid['stake_fraction']),invalid)
+    with ledger.connect() as db:
+        db.execute('UPDATE predictions SET payload=? WHERE id=?',
+            (json.dumps(accepted | {'stake_fraction':.5}),key))
+    recommendations=ledger.report(recommendations_only=True)
+    assert recommendations['sample_size']==0
+    assert recommendations['excluded_missing_metadata']==1
+    assert ledger.report()['sample_size']==1
