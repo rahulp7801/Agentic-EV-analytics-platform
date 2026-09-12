@@ -25,3 +25,16 @@ def test_nfl_ingestion_attaches_reproducible_source_and_record_evidence():
     assert row['source_record_sha256']==stat_row_sha256('nfl',row)
     observed=row['source_observed_at']
     assert isinstance(observed,datetime) and observed.tzinfo is not None and observed.utcoffset() is not None
+
+
+def test_nfl_ingestion_preserves_unavailable_tracked_stat_as_null():
+    data=pl.DataFrame([dict(player_id='gsis-1',player_display_name='Player',team='BUF',
+        season=2026,week=1,season_type='REG',passing_yards=251)])
+    captured=[]
+    engine=MagicMock()
+    with patch('sportsbet.ingestion.player_stats.nfl.load_player_stats',return_value=data), \
+         patch.object(pd.DataFrame,'to_sql',lambda frame,*args,**kwargs: captured.append(frame.copy())):
+        ingest_player_stats_seasons([2026],engine)
+    row=captured[0].iloc[0].to_dict()
+    assert pd.isna(row['rushing_yards']) and pd.isna(row['receiving_yards'])
+    assert row['source_record_sha256']==stat_row_sha256('nfl',row)

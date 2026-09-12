@@ -106,6 +106,15 @@ def ingest_player_stats_seasons(
 
         frame=df.to_pandas()
         records=frame.to_dict('records')
+        # nflverse columns can vary by season. Preserve an unavailable tracked
+        # statistic as NULL so the stored evidence remains complete and the
+        # settlement layer can keep that market pending instead of inventing 0.
+        nullable_evidence_fields=('passing_yards','rushing_yards','receiving_yards')
+        for row in records:
+            for field in nullable_evidence_fields:
+                row.setdefault(field,None)
+        frame=frame.reindex(columns=[*frame.columns,
+            *(field for field in nullable_evidence_fields if field not in frame.columns)])
         record_hashes=[stat_row_sha256('nfl',row) for row in records]
         batch_hash=stat_batch_sha256('nflverse','nfl',season,record_hashes)
         frame['source_provider']='nflverse'
