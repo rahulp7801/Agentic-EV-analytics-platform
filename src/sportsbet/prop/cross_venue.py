@@ -296,6 +296,7 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
 
     comparisons = []
     exact_markets = price_pairs = 0
+    side_funnel = Counter()
     try:
         for quote in evidence['quotes']:
             if quote.get('milestone_id') != game['milestone_id']:
@@ -336,12 +337,21 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
                 exact_markets += 1
             for kalshi_side, book_side in (('yes', 'Under'), ('no', 'Over')):
                 ask = _ask(quote.get(kalshi_side+'_ask'))
-                paired = [book for book in relevant if book.side == book_side
-                    and abs((book.snapped_at-received).total_seconds()) <= MAX_SKEW_SECONDS]
-                if not ask or not paired:
-                    if relevant and ask:
-                        rejected['observation_skew_or_missing_side'] += 1
+                if not relevant:
                     continue
+                if not ask:
+                    side_funnel['missing_kalshi_ask'] += 1
+                    continue
+                same_side = [book for book in relevant if book.side == book_side]
+                if not same_side:
+                    side_funnel['missing_sportsbook_side'] += 1
+                    continue
+                paired = [book for book in same_side
+                    if abs((book.snapped_at-received).total_seconds()) <= MAX_SKEW_SECONDS]
+                if not paired:
+                    side_funnel['observation_skew'] += 1
+                    continue
+                side_funnel['paired'] += 1
                 book = min(paired, key=lambda item: item.implied_probability)
                 price_pairs += 1
                 gross_cost = ask[0] + book.implied_probability
@@ -388,6 +398,8 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
         coverage=dict(sportsbook_quotes=len(sportsbook_quotes), eligible_sportsbook_quotes=len(books),
             kalshi_quotes=sum(q.get('milestone_id') == game['milestone_id'] for q in evidence['quotes']),
             exact_markets=exact_markets, price_pairs=price_pairs,
+            side_funnel={key:side_funnel[key] for key in ('paired','missing_kalshi_ask',
+                'missing_sportsbook_side','observation_skew')},
             positive_gross_gaps=len(comparisons),fee_modeled_gaps=len(fee_modeled),
             rule_terms_classified_gaps=len(terms_classified),
             direct_fee_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['direct'])<1

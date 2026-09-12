@@ -204,6 +204,7 @@ async def run(sports: list[str], daily_credit_limit: int):
                         model_status='pending',cross_venue=screened['coverage'])
                     publish_snapshot('scan:'+sport,report)
                     screens[sport].append(dict(status=screened['status'],
+                        coverage=screened['coverage'],
                         comparisons=sportsbook_screen['comparisons']+screened['comparisons']))
                     result=await asyncio.wait_for(evaluate_event(pool,quoted,sport,ledger,scan_id),timeout=120)
                     result['cross_venue']=screened
@@ -223,6 +224,12 @@ async def run(sports: list[str], daily_credit_limit: int):
                 report['finished_at']=datetime.now(timezone.utc).isoformat()
                 publish_snapshot('scan:'+sport,report)
                 comparisons=[row for screen in screens[sport] for row in screen['comparisons']]
+                cross_venue=[screen['coverage'] for screen in screens[sport]
+                    if isinstance(screen.get('coverage'),dict)]
+                side_funnel=Counter()
+                for coverage in cross_venue:
+                    if isinstance(coverage.get('side_funnel'),dict):
+                        side_funnel.update(coverage['side_funnel'])
                 observed=sum(screen['status']=='observed' for screen in screens[sport])
                 screen_status='observed' if (report['status']=='complete' and (
                     report['eligible_events']==0 or observed==report['eligible_events'])) else 'degraded'
@@ -233,6 +240,12 @@ async def run(sports: list[str], daily_credit_limit: int):
                         positive_gross_gaps=len(comparisons),
                         sportsbook_gaps=sum(row['kind']=='sportsbook_sportsbook_prop' for row in comparisons),
                         kalshi_sportsbook_gaps=sum(row['kind']=='kalshi_sportsbook_prop' for row in comparisons),
+                        kalshi_quotes=sum(coverage.get('kalshi_quotes',0) for coverage in cross_venue),
+                        kalshi_exact_markets=sum(coverage.get('exact_markets',0) for coverage in cross_venue),
+                        kalshi_paired_sides=side_funnel['paired'],
+                        kalshi_missing_ask_sides=side_funnel['missing_kalshi_ask'],
+                        kalshi_missing_sportsbook_sides=side_funnel['missing_sportsbook_side'],
+                        kalshi_observation_skew_sides=side_funnel['observation_skew'],
                         kalshi_rule_terms_classified=sum(row.get('settlement_review',{}).get(
                             'kalshi',{}).get('classified') is True for row in comparisons),
                         kalshi_fee_modeled=sum('exchange_fee_scenarios' in row for row in comparisons),

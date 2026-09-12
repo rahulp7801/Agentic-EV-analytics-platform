@@ -58,6 +58,9 @@ async def test_budget_rotation_covers_both_leagues_and_unseen_events(monkeypatch
     assert stored['prop-screens:nfl']['coverage']=={
         'events':0,'observed_events':0,'unavailable_events':0,'positive_gross_gaps':0,
             'sportsbook_gaps':0,'kalshi_sportsbook_gaps':0,'kalshi_fee_modeled':0,
+            'kalshi_quotes':0,'kalshi_exact_markets':0,'kalshi_paired_sides':0,
+            'kalshi_missing_ask_sides':0,'kalshi_missing_sportsbook_sides':0,
+            'kalshi_observation_skew_sides':0,
             'kalshi_rule_terms_classified':0,
             'kalshi_direct_cost_below_one':0,'kalshi_non_direct_cost_below_one':0}
     assert stored['prop-screens:nfl']['execution_ready'] is False
@@ -125,6 +128,9 @@ async def test_observed_quote_coverage_survives_model_failure(monkeypatch,worker
             {'name':'Under','description':'Player','point':20.5,'price':-110}]}]}]}
     events['nba']=[events['nba'][0]]
     monkeypatch.setattr(scan,'evaluate_event',AsyncMock(side_effect=TimeoutError))
+    monkeypatch.setattr(scan,'screen_cross_venue',lambda *args:{'status':'observed','comparisons':[],
+        'coverage':{'kalshi_quotes':3,'exact_markets':2,'side_funnel':{'paired':2,
+            'missing_kalshi_ask':1,'missing_sportsbook_side':1,'observation_skew':0}}})
     def handle(request):
         return httpx.Response(200,json=events['nba'] if request.url.path.endswith('/events') else quoted)
     transport(monkeypatch,handle)
@@ -134,6 +140,11 @@ async def test_observed_quote_coverage_survives_model_failure(monkeypatch,worker
     assert report['coverage']['nba0']['quotes']==2
     assert report['coverage']['nba0']['source_committed_quotes']==2
     assert report['coverage']['nba0']['model_status']=='pending'
+    expected={'kalshi_quotes':3,'kalshi_exact_markets':2,'kalshi_paired_sides':2,
+        'kalshi_missing_ask_sides':1,'kalshi_missing_sportsbook_sides':1,
+        'kalshi_observation_skew_sides':0}
+    coverage=stored['prop-screens:nba']['coverage']
+    assert {key:coverage[key] for key in expected}==expected
 
 
 @pytest.mark.parametrize('mode',['budget_exhausted','empty','provider_failure'])
