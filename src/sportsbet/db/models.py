@@ -277,6 +277,9 @@ class PlayerPropSnapshot(Base):
     implied_probability: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
     side: Mapped[Optional[str]] = mapped_column(String(10))
     game_start_time: Mapped[Optional[datetime]] = mapped_column(TIMESTAMPTZ(timezone=True))
+    source_provider: Mapped[Optional[str]] = mapped_column(String)
+    source_sha256: Mapped[Optional[str]] = mapped_column(String(64))
+    source_record_sha256: Mapped[Optional[str]] = mapped_column(String(64))
     snapped_at: Mapped[datetime] = mapped_column(
         TIMESTAMPTZ(timezone=True), nullable=False, server_default=func.now()
     )

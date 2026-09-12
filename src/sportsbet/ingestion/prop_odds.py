@@ -14,7 +14,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 from datetime import datetime, timezone
-from typing import Optional
+import hashlib
+import json
+from typing import Literal, Optional
 
 import sqlalchemy as sa
 import structlog
@@ -22,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sportsbet.db.connection import get_sync_engine
 from sportsbet.db.models import PlayerPropSnapshot
+from sportsbet.ingestion.provenance import row_sha256
 
 log = structlog.get_logger()
 
@@ -51,8 +54,29 @@ class PlayerPropSnapshotCreate(BaseModel):
     price: Optional[int] = None  # American odds e.g. -115
     implied_probability: Decimal
     game_start_time: Optional[datetime] = None
+    source_provider: Literal['the_odds_api'] | None = None
+    source_sha256: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
+    source_record_sha256: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
     snapped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     side: Optional[str] = None  # "Over" | "Under" — in-memory only, not persisted to DB
+
+
+def _payload_sha256(value: dict) -> str:
+    """Commit to the exact JSON value returned for one provider event."""
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'),
+        ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+
+
+def prop_quote_record_sha256(snapshot: PlayerPropSnapshotCreate) -> str:
+    """Hash every normalized field needed to reproduce one stored quote."""
+    if snapshot.source_provider != 'the_odds_api' or snapshot.source_sha256 is None:
+        raise ValueError('Quote source evidence is incomplete')
+    return row_sha256(dict(provider=snapshot.source_provider,
+        batch_sha256=snapshot.source_sha256, sport=snapshot.sport, game_id=snapshot.game_id,
+        player_name=snapshot.player_name, sportsbook=snapshot.sportsbook,
+        prop_type=snapshot.prop_type, line=snapshot.line, price=snapshot.price,
+        implied_probability=snapshot.implied_probability, side=snapshot.side,
+        snapped_at=snapshot.snapped_at, game_start_time=snapshot.game_start_time))
 
 
 def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None = None) -> list[PlayerPropSnapshotCreate]:
@@ -69,6 +93,7 @@ def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None
         return []
     try:
         start = timestamp(event['commence_time'])
+        source_sha256 = _payload_sha256(event)
     except (KeyError, AttributeError, TypeError, ValueError):
         return []
     quotes = []
@@ -93,10 +118,13 @@ def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None
                         continue
                 except (KeyError, ArithmeticError, ValueError):
                     continue
-                quotes.append(PlayerPropSnapshotCreate(sport=sport, game_id=event['id'],
+                quote = PlayerPropSnapshotCreate(sport=sport, game_id=event['id'],
                     player_name=player, sportsbook=book['key'], prop_type=key, side=side,
                     line=line, price=price, implied_probability=american_to_raw_prob(price),
-                    snapped_at=observed, game_start_time=start))
+                    snapped_at=observed, game_start_time=start,
+                    source_provider='the_odds_api', source_sha256=source_sha256)
+                quotes.append(quote.model_copy(update={
+                    'source_record_sha256': prop_quote_record_sha256(quote)}))
     return quotes
 
 
@@ -113,12 +141,17 @@ def _persistence_row(snapshot: PlayerPropSnapshotCreate) -> tuple:
         and snapshot.side in ('Over','Under')
         and isinstance(snapshot.snapped_at,datetime) and snapshot.snapped_at.utcoffset() is not None
         and isinstance(snapshot.game_start_time,datetime) and snapshot.game_start_time.utcoffset() is not None
-        and snapshot.snapped_at<snapshot.game_start_time)
+        and snapshot.snapped_at<snapshot.game_start_time
+        and snapshot.source_provider=='the_odds_api'
+        and isinstance(snapshot.source_sha256,str) and len(snapshot.source_sha256)==64
+        and isinstance(snapshot.source_record_sha256,str) and len(snapshot.source_record_sha256)==64
+        and snapshot.source_record_sha256==prop_quote_record_sha256(snapshot))
     if not complete:
         raise ValueError('Persistence requires a complete pregame quote')
     return (snapshot.sport,snapshot.game_id,snapshot.player_name,snapshot.sportsbook,
         snapshot.prop_type,snapshot.line,snapshot.price,snapshot.implied_probability,
-        snapshot.snapped_at,snapshot.side,snapshot.game_start_time)
+        snapshot.snapped_at,snapshot.side,snapshot.game_start_time,snapshot.source_provider,
+        snapshot.source_sha256,snapshot.source_record_sha256)
 
 
 async def write_player_prop_snapshots(pool, snapshots: list[PlayerPropSnapshotCreate]) -> int:
@@ -130,8 +163,9 @@ async def write_player_prop_snapshots(pool, snapshots: list[PlayerPropSnapshotCr
         await conn.executemany(
             """INSERT INTO player_prop_snapshots
             (sport,game_id,player_name,sportsbook,prop_type,line,price,
-             implied_probability,snapped_at,side,game_start_time)
-            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
+             implied_probability,snapped_at,side,game_start_time,source_provider,
+             source_sha256,source_record_sha256)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)""",
             rows,
         )
     log.info("player_prop_snapshots_written", count=len(rows))
@@ -172,6 +206,9 @@ def write_player_prop_snapshot(
                 side=snapshot.side,
                 game_start_time=snapshot.game_start_time,
                 snapped_at=snapshot.snapped_at,
+                source_provider=snapshot.source_provider,
+                source_sha256=snapshot.source_sha256,
+                source_record_sha256=snapshot.source_record_sha256,
             )
             .returning(PlayerPropSnapshot.id)
         )
