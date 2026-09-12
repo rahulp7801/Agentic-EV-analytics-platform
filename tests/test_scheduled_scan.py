@@ -37,7 +37,8 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
         if started == 2:
             both_started.set()
         await asyncio.wait_for(both_started.wait(), timeout=1)
-        return PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24'))
+        return PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24'),
+            confidence_interval=(Decimal('.55'),Decimal('.65')))
     quant=AsyncMock(side_effect=concurrent_quant)
     target='sportsbet.prop.nba_agents.run_nba_prop_query' if sport=='nba' else 'sportsbet.prop.agents.run_prop_query'
     ledger=Ledger(tmp_path/'audit.sqlite')

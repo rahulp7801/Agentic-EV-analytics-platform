@@ -87,12 +87,14 @@ async def test_under_push_probability_and_return_are_not_overstated():
     q=PlayerPropSnapshotCreate(sport='nba',player_name='P',sportsbook='book',prop_type='player_points',
         side='Under',line=Decimal('20'),price=200,implied_probability=american_to_raw_prob(200))
     state=dict(player_name='P',prop_type='points',prop_line=Decimal('20'),prop_side='under',
-        nba_prop_result=PropResult(true_probability=Decimal('.5'),push_probability=Decimal('.1'),sample_size=50),
+        nba_prop_result=PropResult(true_probability=Decimal('.5'),push_probability=Decimal('.1'),sample_size=50,
+            confidence_interval=(Decimal('.45'),Decimal('.55'))),
         player_prop_snapshots=[q])
     s=(await make_prop_arbitrage_agent(sport='nba')(state))['ev_signal']
     assert s.true_probability==Decimal('.4')
     assert s.expected_return==Decimal('.3')
-    assert float(s.kelly_fraction)==pytest.approx(1/24)
+    assert s.confidence_interval==(Decimal('.35'),Decimal('.45'))
+    assert float(s.kelly_fraction)==pytest.approx(1/48)
 
 async def test_scanner_routes_both_sides_through_shared_agent():
     import runpy
@@ -100,7 +102,8 @@ async def test_scanner_routes_both_sides_through_shared_agent():
     from sportsbet.graph.graph import create_graph
     ns=runpy.run_path(str(Path(__file__).resolve().parents[1]/'scan_game_ev.py'))
     async def quant(state):
-        return {'nba_prop_result':PropResult(true_probability=Decimal('.6'),sample_size=50)}
+        return {'nba_prop_result':PropResult(true_probability=Decimal('.6'),sample_size=50,
+            confidence_interval=(Decimal('.55'),Decimal('.65')))}
     graph=create_graph(nba_quant_node=quant,prop_arbitrage_node=make_prop_arbitrage_agent(sport='nba'))
     quotes=[PlayerPropSnapshotCreate(sport='nba',player_name='Test Player',sportsbook='book',
         prop_type='player_points',side=side,line=Decimal('20.5'),price=price,implied_probability=american_to_raw_prob(price))

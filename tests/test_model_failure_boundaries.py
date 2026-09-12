@@ -35,7 +35,8 @@ class BrokenDatabase:
 
 def request(sport='nfl'):
     prop = 'points' if sport == 'nba' else 'pass_yds'
-    result = PropResult(true_probability=Decimal('.60'), sample_size=40, data_source='postgresql')
+    result = PropResult(true_probability=Decimal('.60'), sample_size=40,
+        confidence_interval=(Decimal('.55'),Decimal('.70')), data_source='postgresql')
     return dict(session_id='failure-regression', request_type='nba_prop_analysis' if sport == 'nba' else 'prop_analysis',
         season=2025, week=1, game_id='fixture-game', home_team='KC', away_team='LV',
         receiver_gsis_id='1620001' if sport=='nba' else 'fixture-player', player_name='Fixture Player', sport=sport,

@@ -68,6 +68,26 @@ _REST_PENALTY_PP: float = 3.0     # percentage points removed for back-to-back
 _HOME_BOOST_PP: float = 1.5       # percentage points added for home court
 
 
+def _direction_interval(
+    prop_result: PropResult,
+    direction: str,
+) -> tuple[Decimal, Decimal] | None:
+    """Return a validated unconditional interval for the requested side."""
+    interval = prop_result.confidence_interval
+    push_probability = prop_result.push_probability
+    non_push_probability = Decimal("1") - push_probability
+    if interval is None or not 0 <= push_probability < 1:
+        return None
+    lower, upper = interval
+    if not all(value.is_finite() for value in (lower, upper)):
+        return None
+    if not 0 <= lower <= upper <= non_push_probability:
+        return None
+    if direction == "over":
+        return lower, upper
+    return non_push_probability - upper, non_push_probability - lower
+
+
 def _build_prop_trade_plan(
     ev_pct: Decimal,
     kelly_frac: Decimal,
@@ -312,6 +332,12 @@ def make_prop_arbitrage_agent(
             )
             return _NO_SIGNAL
 
+        confidence_interval = _direction_interval(prop_result, direction)
+        if confidence_interval is None:
+            return {**_NO_SIGNAL, "gate_reason": "uncertainty_unavailable"}
+        if confidence_interval[0] <= implied_prob:
+            return {**_NO_SIGNAL, "gate_reason": "edge_not_confident"}
+
         # EV ceiling guard: suppress signals the model can't reliably produce.
         # Real prop edges are 1–8%; anything above _EV_CAP (15%) is almost
         # certainly NormalDist overconfidence vs. an easy/goblin line, not a
@@ -330,7 +356,7 @@ def make_prop_arbitrage_agent(
 
         # Kelly sizing — Decimal(str(...)) pattern locked in Phase 2
         kelly_frac = fractional_kelly(
-            p=true_prob / (1 - push_prob),
+            p=confidence_interval[0] / (1 - push_prob),
             b=net_payout,
             fraction=Decimal(str(cfg.max_kelly_fraction)),
         )
@@ -362,9 +388,7 @@ def make_prop_arbitrage_agent(
             ev_percentage=ev_pct,
             expected_return=compute_expected_return(true_prob, net_payout, push_prob),
             push_probability=push_prob,
-            confidence_interval=(prop_result.confidence_interval if direction == "over" else
-                (tuple(Decimal("1") - x for x in reversed(prop_result.confidence_interval))
-                 if prop_result.confidence_interval is not None and push_prob == 0 else None)),
+            confidence_interval=confidence_interval,
             sample_size=prop_result.sample_size,
             data_source=prop_result.data_source,
             game_id=state.get("game_id"),

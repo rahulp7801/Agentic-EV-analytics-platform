@@ -262,6 +262,60 @@ class TestProp06EVSignalProduced:
             "Expected None ev_signal when prop_result is None"
         )
 
+    def test_positive_point_edge_requires_interval_separation(self) -> None:
+        """A point estimate alone cannot promote an uncertain recommendation."""
+        result = PropResult(
+            true_probability=Decimal("0.62"),
+            sample_size=45,
+            confidence_interval=(Decimal("0.50"), Decimal("0.70")),
+            data_source="postgresql",
+        )
+        state = _make_nfl_state(prop_result=result)
+        update = asyncio.run(make_prop_arbitrage_agent(sport="nfl")(state))
+        assert update["ev_signal"] is None
+        assert update["gate_reason"] == "edge_not_confident"
+
+    def test_missing_or_invalid_interval_fails_closed(self) -> None:
+        """A recommendation needs finite uncertainty bounds on valid mass."""
+        agent = make_prop_arbitrage_agent(sport="nfl")
+        for interval in (None, (Decimal("0.54"), Decimal("1.01"))):
+            result = PropResult(
+                true_probability=Decimal("0.62"),
+                sample_size=45,
+                confidence_interval=interval,
+                data_source="postgresql",
+            )
+            update = asyncio.run(agent(_make_nfl_state(prop_result=result)))
+            assert update["ev_signal"] is None
+            assert update["gate_reason"] == "uncertainty_unavailable"
+
+    def test_under_interval_preserves_push_mass(self) -> None:
+        """Under bounds complement Over within the non-push outcome mass."""
+        result = PropResult(
+            true_probability=Decimal("0.30"),
+            push_probability=Decimal("0.10"),
+            sample_size=45,
+            confidence_interval=(Decimal("0.20"), Decimal("0.35")),
+            data_source="postgresql",
+        )
+        state = _make_nfl_state(prop_result=result)
+        state["prop_side"] = "under"
+        state["player_prop_snapshots"][0].side = "Under"
+        update = asyncio.run(make_prop_arbitrage_agent(sport="nfl")(state))
+        assert update["ev_signal"].confidence_interval == (
+            Decimal("0.55"), Decimal("0.70")
+        )
+
+    def test_kelly_uses_conservative_interval_bound(self) -> None:
+        """Sizing uses the lower bound rather than the optimistic point estimate."""
+        signal = asyncio.run(
+            make_prop_arbitrage_agent(sport="nfl")(
+                _make_nfl_state(true_prob=Decimal("0.62"), implied_prob=Decimal("0.50"))
+            )
+        )["ev_signal"]
+        assert signal is not None
+        assert float(signal.kelly_fraction) == pytest.approx(0.00275)
+
 
 # ---------------------------------------------------------------------------
 # PROP-07 tests — CorrelationGuard extension
