@@ -25,6 +25,14 @@ STAT_COLUMNS = {
 }
 
 
+def json_object(value):
+    try:
+        decoded = json.loads(value) if isinstance(value, str) else value
+        return decoded if isinstance(decoded, dict) else None
+    except (TypeError, ValueError):
+        return None
+
+
 def current_model_evidence_valid(payload: dict) -> bool:
     """Require the source commitments verified by the current scanner."""
     batch=payload.get('quote_source_sha256')
@@ -41,7 +49,7 @@ def verified_settlement_evidence(payload: dict, outcome, source, source_ref,
     """Reproduce an automatic result from its retained schedule/stat evidence."""
     try:
         match = SETTLEMENT_REF.fullmatch(source_ref or '')
-        proof = json.loads(evidence) if isinstance(evidence, str) else evidence
+        proof = json_object(evidence)
         if source != VERIFIED_SETTLEMENT_SOURCE or not match or not isinstance(proof, dict):
             return False
         canonical = json.dumps(proof, sort_keys=True, separators=(',', ':'), allow_nan=False)
@@ -243,7 +251,7 @@ class Ledger:
             'outcome_source':source,'outcome_ref':ref,
             'outcome_observed_at':observed.isoformat() if isinstance(observed,datetime) else observed,
             'actual_value':float(actual) if actual is not None else None,
-            'outcome_evidence':json.loads(proof) if proof else None}
+            'outcome_evidence':json_object(proof)}
             for key,payload,outcome,source,ref,observed,actual,proof in rows]
 
     def report(self, recommendations_only: bool = False, model_version: str | None = None) -> dict:

@@ -74,6 +74,10 @@ def test_metrics_reject_tampered_retained_settlement_evidence(tmp_path):
     metrics=ledger.report()
     assert metrics['settled_count']==0 and metrics['pending_count']==1
     assert metrics['unverified_settlements']==1 and metrics['roi'] is None
+    with ledger.connect() as db:
+        db.execute('UPDATE predictions SET outcome_evidence=? WHERE id=?',('invalid-json',key))
+    assert ledger.predictions()[0]['outcome_evidence'] is None
+    assert ledger.report()['unverified_settlements']==1
 
 
 @pytest.mark.parametrize(('schedule_change','stats','reason'),[

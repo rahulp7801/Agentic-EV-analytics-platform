@@ -279,6 +279,10 @@ def test_verified_settlement_evidence_constraint_preserves_legacy_rows() -> None
         with engine.begin() as conn:
             conn.execute(sa.text("""UPDATE analytics.predictions SET outcome='false'
                 WHERE id='legacy-proof'"""))
+    with pytest.raises(sa.exc.DataError):
+        with engine.begin() as conn:
+            conn.execute(sa.text("""UPDATE analytics.predictions SET outcome='false',
+                outcome_evidence='invalid-json' WHERE id='legacy-proof'"""))
     with engine.begin() as conn:
         conn.execute(sa.text("""UPDATE analytics.predictions SET outcome='false',outcome_evidence='{}'
             WHERE id='legacy-proof'"""))

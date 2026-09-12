@@ -13,7 +13,8 @@ def upgrade():
         ADD COLUMN outcome_evidence TEXT,
         ADD CONSTRAINT ck_verified_settlement_evidence CHECK (
             outcome_source IS DISTINCT FROM 'observed_final_stats'
-            OR outcome_evidence IS NOT NULL
+            OR (outcome_evidence IS NOT NULL
+                AND jsonb_typeof(outcome_evidence::jsonb) = 'object')
         ) NOT VALID
     ''')
     op.execute("""DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='sportsbet_worker') THEN
