@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from decimal import Decimal
 from sportsbet.graph.models import EVSignal, QuantResult
-from sportsbet.model_contract import MODEL_VERSION
+from sportsbet.model_contract import MODEL_VERSION, PROP_MARKETS, QUOTE_PROVENANCE_MODEL_VERSIONS
 from sportsbet.quant.backtest import BacktestSignal, BacktestEngine
 
 DEFAULT_PATH = Path('.checkpoints/analytics.sqlite')
@@ -33,15 +33,42 @@ def json_object(value):
         return None
 
 
-def current_model_evidence_valid(payload: dict) -> bool:
-    """Require the source commitments verified by the current scanner."""
+def quote_evidence_valid(payload: dict) -> bool:
+    """Validate source commitments for every scanner cohort that requires them."""
     batch=payload.get('quote_source_sha256')
     record=payload.get('quote_source_record_sha256')
-    return (payload.get('model_version') == MODEL_VERSION
+    shaped = (payload.get('model_version') in QUOTE_PROVENANCE_MODEL_VERSIONS
         and payload.get('quote_source_provider') == 'the_odds_api'
         and isinstance(payload.get('model_generated_at'),str)
         and isinstance(batch,str) and bool(re.fullmatch('[0-9a-f]{64}',batch))
         and isinstance(record,str) and bool(re.fullmatch('[0-9a-f]{64}',record)))
+    if not shaped:
+        return False
+    try:
+        from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, prop_quote_evidence_valid
+        from sportsbet.quant.vig import american_to_raw_prob
+        sport=payload['sport']
+        markets=PROP_MARKETS[sport]
+        provider_markets=[market for market,prop in markets.items() if prop==payload['prop_type']]
+        if len(provider_markets)!=1:
+            return False
+        price=payload['american_odds']
+        if type(price) is not int:
+            return False
+        snapshot=PlayerPropSnapshotCreate(
+            sport=sport,game_id=payload['game_id'],player_name=payload['player'],
+            sportsbook=payload['sportsbook'],prop_type=provider_markets[0],
+            line=Decimal(str(payload['line'])),price=price,
+            implied_probability=american_to_raw_prob(price),
+            game_start_time=utc_timestamp(payload['game_start_time']),
+            source_provider='the_odds_api',source_sha256=batch,
+            source_record_sha256=record,
+            snapped_at=utc_timestamp(payload['quote_time']),
+            side=str(payload['direction']).title(),
+        )
+        return prop_quote_evidence_valid(snapshot)
+    except (ArithmeticError, KeyError, TypeError, ValueError):
+        return False
 
 
 def verified_settlement_evidence(payload: dict, outcome, source, source_ref,
@@ -187,8 +214,9 @@ class Ledger:
 
     def record(self, scan_id: str, payload: dict) -> str:
         payload = dict(payload)
-        if payload.get('model_version') == MODEL_VERSION and not current_model_evidence_valid(payload):
-            raise ValueError('Current model prediction requires verified quote evidence')
+        if (payload.get('model_version') in QUOTE_PROVENANCE_MODEL_VERSIONS
+                and not quote_evidence_valid(payload)):
+            raise ValueError('Model prediction requires verified quote evidence')
         for field in ('captured_at','quote_time','game_start_time','model_generated_at'):
             if payload.get(field) is not None:
                 payload[field] = utc_timestamp(payload[field]).isoformat()
@@ -284,8 +312,9 @@ class Ledger:
                 excluded += 1
                 continue
             try:
-                if version == MODEL_VERSION and not current_model_evidence_valid(p):
-                    raise ValueError('Current model quote evidence required')
+                if (version in QUOTE_PROVENANCE_MODEL_VERSIONS
+                        and not quote_evidence_valid(p)):
+                    raise ValueError('Model quote evidence required')
                 start = utc_timestamp(p['game_start_time'])
                 entered = utc_timestamp(p['captured_at'])
                 quote_time = utc_timestamp(p.get('quote_time') or p['captured_at'])
