@@ -104,19 +104,29 @@ async def test_prop_inventory_preserves_counts_but_fails_closed_on_incomplete_or
 async def test_prop_inventory_rejects_cross_game_event_conflicts():
     event = 'KXNFLPASSYDS-26SEP13ATLPIT'
     reader = AsyncMock()
-    with pytest.raises(ValueError, match='Conflicting prop event identity'):
-        await market_watch.kalshi_prop_inventory(
-            reader,
-            'nfl',
-            [game(1, event), game(2, event)],
-        )
-    reader.markets.assert_not_called()
+    async def pages(series, **kwargs):
+        return {'markets': [market(series, event, 'PLAYER-250')] if series == 'KXNFLPASSYDS' else [], 'cursor': ''}
+    reader.markets.side_effect = pages
+    result = await market_watch.kalshi_prop_inventory(
+        reader,
+        'nfl',
+        [game(1, event), game(2, event)],
+    )
+    assert result['status'] == 'degraded'
+    assert result['coverage']['open_markets'] == 1
+    assert result['coverage']['linked_markets'] == 0
+    assert result['coverage']['discovery_complete'] is False
+    assert result['failures'] == [{'stage': 'prop_link', 'error_type': 'ConflictingEvent'}]
 
 
 @pytest.mark.asyncio
 async def test_prop_inventory_validates_sport_and_milestone_shape():
     reader = AsyncMock()
-    for sport, games in [('mlb', []), ('nfl', [{'id': 'game'}])]:
-        with pytest.raises(ValueError):
-            await market_watch.kalshi_prop_inventory(reader, sport, games)
-    reader.markets.assert_not_called()
+    with pytest.raises(ValueError):
+        await market_watch.kalshi_prop_inventory(reader, 'mlb', [])
+    reader.markets.return_value = {'markets': [], 'cursor': ''}
+    result = await market_watch.kalshi_prop_inventory(reader, 'nfl', [{'id': 'game'}])
+    assert result['status'] == 'degraded'
+    assert result['coverage']['discovery_complete'] is False
+    assert result['failures'] == [{'stage': 'prop_link', 'error_type': 'InvalidMilestone'}]
+    assert reader.markets.await_count == 4

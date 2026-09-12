@@ -99,7 +99,7 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
     if sport not in KALSHI_PROP_SERIES or not isinstance(games,list):
         raise ValueError('Invalid Kalshi prop inventory request')
     supported=KALSHI_PROP_SERIES[sport]
-    linked_games={}
+    linked_games={};conflicts=set();failures=[]
     for game in games:
         try:
             game_id=game['id']
@@ -107,19 +107,26 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
             if (not isinstance(game_id,str) or not game_id or not isinstance(related,list)
                     or game['details']['league']!=sport.upper()):
                 raise ValueError
-        except (KeyError,TypeError):
-            raise ValueError('Invalid Kalshi prop milestone') from None
+        except (KeyError,ValueError,TypeError):
+            failures.append(dict(stage='prop_link',error_type='InvalidMilestone'))
+            continue
         for event in related:
             if not isinstance(event,str):
-                raise ValueError('Invalid Kalshi prop event')
+                failures.append(dict(stage='prop_link',error_type='InvalidEvent'))
+                continue
             series=event.split('-',1)[0]
             if series not in supported:
                 continue
+            if event in conflicts:
+                continue
             if event in linked_games and linked_games[event]!=game_id:
-                raise ValueError('Conflicting prop event identity')
-            linked_games[event]=game_id
+                del linked_games[event]
+                conflicts.add(event)
+                failures.append(dict(stage='prop_link',error_type='ConflictingEvent'))
+            else:
+                linked_games[event]=game_id
 
-    results={};failures=[]
+    results={}
     all_markets=set();all_events=set();linked_markets=set();linked_events=set()
     for series in supported:
         cursor=None;seen_cursors=set();pages=[];tickers=set();events=set();linked=set();linked_event_set=set()
@@ -166,7 +173,7 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
             response_sha256=digest(pages) if pages else None)
     coverage=dict(series_expected=len(supported),series_observed=sum(r['status']=='observed' for r in results.values()),
         open_markets=len(all_markets),open_events=len(all_events),linked_markets=len(linked_markets),
-        linked_events=len(linked_events),discovery_complete=all(r['complete'] for r in results.values()))
+        linked_events=len(linked_events),discovery_complete=not failures and all(r['complete'] for r in results.values()))
     return dict(status='degraded' if failures else 'observed',series=results,coverage=coverage,
         failures=failures,partial_coverage=not coverage['discovery_complete'],
         scope='Aggregate open-market inventory linked only by Kalshi structured milestone event IDs. Full pages are hashed but omitted; no quote, depth, fill, settlement equivalence or profit is inferred.')
