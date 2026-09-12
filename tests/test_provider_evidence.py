@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import pytest
 
 from sportsbet.ingestion.prop_odds import parse_event_quotes, prop_quote_record_sha256
-from sportsbet.ingestion.prizepicks import parse_projections
+from sportsbet.ingestion.prizepicks import PrizePicksUnavailable, parse_projections
 
 
 def event():
@@ -54,12 +54,21 @@ def test_prizepicks_tiers_do_not_create_prices_or_synthetic_games():
 
 
 @pytest.mark.asyncio
-async def test_blocked_projection_source_does_not_create_evidence(monkeypatch, tmp_path):
+@pytest.mark.parametrize(('status','reason'),[(401,'access_denied'),(403,'access_denied'),
+    (429,'rate_limited'),(503,'upstream_unavailable'),(400,'request_rejected')])
+async def test_blocked_projection_source_is_classified_without_evidence(
+        monkeypatch,tmp_path,status,reason):
     import httpx
     from sportsbet.ingestion import prizepicks
-    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(403)))
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda request:httpx.Response(status)))
     monkeypatch.setattr(prizepicks.httpx, 'AsyncClient', lambda **kwargs: client)
     output = tmp_path / 'capture.json'
-    with pytest.raises(RuntimeError, match='HTTP 403'):
+    with pytest.raises(PrizePicksUnavailable) as error:
         await prizepicks.capture('nfl', output)
+    assert error.value.reason == reason
     assert not output.exists()
+
+
+def test_prizepicks_failure_reason_cannot_expose_arbitrary_text():
+    with pytest.raises(ValueError):
+        PrizePicksUnavailable('response included a secret URL')

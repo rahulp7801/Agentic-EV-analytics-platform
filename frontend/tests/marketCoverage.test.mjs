@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {marketCoverageText,propQuoteCoverageText} from '../lib/marketCoverage.ts';
+import {marketCoverageText,propQuoteCoverageText,sourceFailureText} from '../lib/marketCoverage.ts';
+
+test('provider failures expose only approved operational reasons',()=>{
+  assert.equal(sourceFailureText('access_denied'),'provider access denied');
+  assert.equal(sourceFailureText('rate_limited'),'provider rate limited');
+  assert.equal(sourceFailureText('upstream_unavailable'),'provider temporarily unavailable');
+  assert.equal(sourceFailureText('request_rejected'),'provider rejected the request');
+  assert.equal(sourceFailureText('RuntimeError: secret URL'),null);
+});
 
 test('stage-specific Kalshi coverage forms two explicit partitions',()=>{
   assert.equal(marketCoverageText({discovered_games:15,attempted_games:15,observed_games:13,
