@@ -27,7 +27,7 @@ log = structlog.get_logger()
 def master_router(state: GraphState) -> dict:  # type: ignore[type-arg]
     """Passthrough node that serves as the graph entry point.
 
-    Master Router does not mutate state — it relies on route_from_master (the
+    Master Router clears signal outputs for a pre-existing error, then relies on route_from_master (the
     conditional edge function) to determine the next node. This separation of
     concerns means the node itself is a pure pass-through while the routing
     logic lives in the conditional edge function where LangGraph expects it.
@@ -38,6 +38,8 @@ def master_router(state: GraphState) -> dict:  # type: ignore[type-arg]
         request_type=state["request_type"],
         has_error=state.get("error") is not None,
     )
+    if state.get("error") is not None:
+        return {"ev_signal": None, "pending_signals": [], "cleared_signals": [], "gate_reason": "model_error"}
     return {}
 
 
@@ -56,7 +58,6 @@ def route_from_master(state: GraphState) -> str:
         log.warning(
             "master_router_short_circuit",
             reason="error_pre_set",
-            error=state["error"],
             session_id=state["session_id"],
         )
         return "end"

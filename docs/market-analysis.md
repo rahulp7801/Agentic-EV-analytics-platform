@@ -46,6 +46,14 @@ partial report and exits2 for technical failures; stdout contains the JSON statu
 and graph diagnostics go to stderr. Missing fees/capacity or settlement review
 are explicit blocked analyses, not technical failures or zero-profit estimates.
 
+The model routes likewise return stable failure codes and log exception types,
+without raw validation/driver messages or tracebacks. Invalid prop input clears
+the earlier estimate in graph state; downstream prop analysis suppresses signals
+while an error is present. A request that enters with an existing error clears
+previous signal outputs before the router terminates. The caller must explicitly
+clear a prior error when beginning a fresh request; these fixes do not silently
+treat a failed request as successful or change valid model probabilities.
+
 `arbitrage/portfolio.py` solves a bounded long-only integer-lot payoff problem with
 SciPy/HiGHS. It maximizes the minimum supplied-state profit under the candidate
 budget, per-tranche capacity, unit steps, and explicit fee upper bounds. The

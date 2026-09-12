@@ -227,6 +227,9 @@ def make_prop_arbitrage_agent(
 
         log.info("prop_arbitrage_agent.enter", sport=resolved_sport)
 
+        if state.get("error"):
+            return {**_NO_SIGNAL, "cleared_signals": [], "gate_reason": "model_error"}
+
         # Guard 1: prop_result must exist with a real probability
         if prop_result is None or prop_result.true_probability is None:
             log.info(
