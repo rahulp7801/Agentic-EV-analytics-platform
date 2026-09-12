@@ -315,6 +315,14 @@ below one dollar for direct and non-direct account precision. These are cost
 coverage metrics. They remain independent of settlement equivalence, sportsbook
 limits and fills, so none is labeled arbitrage or profit.
 
+Exact archived Kalshi rule text is classified into a compact worker profile only
+when its explicit language says an active player with no snap receives a pregame
+fair-market-price settlement and a player with one snap settles on the recorded
+stat. Changed templates remain unclassified. The public screen reports classified
+rule coverage and the corresponding participation risk, while sportsbook rules,
+overtime, stat corrections, and stat source remain unavailable or unspecified.
+This explains the blocker; it does not clear settlement equivalence.
+
 The same scan also screens sportsbook Over and Under prices for the identical
 event, canonical player, stat, and half-point line. Legs must come from distinct
 books and their provider observation times must be within30seconds. American odds

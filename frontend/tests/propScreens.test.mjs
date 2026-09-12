@@ -5,13 +5,16 @@ import { publicPropScreen } from '../lib/propScreens.ts';
 function snapshot() {
   return {schema_version:1,scan_id:'internal',sport:'nfl',generated_at:'2026-09-11T12:00:00Z',
     status:'observed',coverage:{events:1,observed_events:1,unavailable_events:0,positive_gross_gaps:1,
-      sportsbook_gaps:0,kalshi_sportsbook_gaps:1},
+      sportsbook_gaps:0,kalshi_sportsbook_gaps:1,kalshi_rule_terms_classified:1},
     comparisons:[{kind:'kalshi_sportsbook_prop',status:'unverified',event_id:'game',milestone_id:'internal',
       player:'Player',prop_type:'pass_yds',line:'249.5',gross_cost_to_one_dollar:'0.85',
       gross_gap_to_one_dollar:'0.15',evidence_sha256:'internal',market_sha256:'internal',
       legs:[{venue:'kalshi',ticker:'KX-PROP',side:'yes',cost:'0.45',displayed_size:'12',
         observed_at:'2026-09-11T12:00:00Z'},{venue:'sportsbook',sportsbook:'book',side:'Under',
         american_odds:150,cost:'0.4',observed_at:'2026-09-11T12:00:00Z'}],
+      settlement_review:{kalshi:{classified:true,participation:'active_no_snap_fair_market_price',
+        statistic:'after_one_snap_recorded_stat',overtime:'unspecified',stat_corrections:'unspecified',
+        stat_source:'unspecified'},sportsbook_rules:'unavailable',equivalence:'unverified'},
       reasons:['Rules are unreviewed.'],settlement_equivalent:false,fee_adjusted_profit:null,
       realized_profit:null,execution_ready:false}],execution_ready:false};
 }
@@ -26,6 +29,9 @@ test('public prop screen omits internal evidence and retains all non-executable 
   assert.equal('evidence_sha256' in result.comparisons[0],false);
   assert.equal(result.coverage.kalshi_fee_modeled,0);
   assert.equal(result.coverage.kalshi_direct_cost_below_one,0);
+  assert.equal(result.coverage.kalshi_rule_terms_classified,1);
+  assert.equal(result.comparisons[0].settlement_review.kalshi.participation,
+    'active_no_snap_fair_market_price');
 });
 
 test('public prop screen validates and exposes only compact hypothetical fee costs', () => {
@@ -48,14 +54,25 @@ test('public prop screen validates and exposes only compact hypothetical fee cos
   assert.throws(()=>publicPropScreen(invalid,Date.parse('2026-09-11T12:01:00Z')));
 });
 
+test('unclassified settlement profiles remain visible and blocked', () => {
+  const changed=snapshot();
+  changed.comparisons[0].settlement_review.kalshi={classified:false,participation:'unclassified',
+    statistic:'unclassified',overtime:'unavailable',stat_corrections:'unavailable',stat_source:'unavailable'};
+  changed.coverage.kalshi_rule_terms_classified=0;
+  const result=publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z'));
+  assert.equal(result.comparisons[0].settlement_review.kalshi.classified,false);
+  assert.equal(result.coverage.kalshi_rule_terms_classified,0);
+});
+
 test('public prop screen accepts distinct-book complements without adding profit fields', () => {
   const changed=snapshot(), row=changed.comparisons[0];
-  row.kind='sportsbook_sportsbook_prop';delete row.milestone_id;
+  row.kind='sportsbook_sportsbook_prop';delete row.milestone_id;delete row.settlement_review;
   row.legs=[{venue:'sportsbook',sportsbook:'over-book',side:'Over',american_odds:150,cost:'0.4',
     observed_at:'2026-09-11T12:00:00Z'},{venue:'sportsbook',sportsbook:'under-book',side:'Under',
     american_odds:122,cost:'0.45045045045045046',observed_at:'2026-09-11T12:00:00Z'}];
   row.gross_cost_to_one_dollar='0.8504504504504505';row.gross_gap_to_one_dollar='0.1495495495495495';
   changed.coverage.sportsbook_gaps=1;changed.coverage.kalshi_sportsbook_gaps=0;
+  changed.coverage.kalshi_rule_terms_classified=0;
   const result=publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z'));
   assert.equal(result.comparisons[0].kind,'sportsbook_sportsbook_prop');
   assert.equal(result.comparisons[0].execution_ready,false);

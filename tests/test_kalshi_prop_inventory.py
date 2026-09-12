@@ -109,6 +109,10 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
         'source_page_sha256':quote['source_page_sha256'],
         'settlement_rules':{'primary':'Primary settlement rule.','secondary':'Secondary settlement rule.'},
         'rules_sha256':market_watch.digest({'primary':'Primary settlement rule.','secondary':'Secondary settlement rule.'}),
+        'settlement_terms':{'schema_version':1,
+            'rules_sha256':market_watch.digest({'primary':'Primary settlement rule.','secondary':'Secondary settlement rule.'}),
+            'participation':'unclassified','statistic':'unclassified','overtime':'unspecified',
+            'stat_corrections':'unspecified','stat_source':'unspecified','classified':False},
         'settlement_equivalent':False,'execution_ready':False}
     assert datetime.fromisoformat(quote['request_started_at']) <= datetime.fromisoformat(quote['received_at'])
     target=result['targets']['30000000-0000-0000-0000-000000000003']
@@ -120,6 +124,18 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
     assert set(result['fee_contexts'])=={passing,rushing}
     assert result['fee_failures']==[]
     assert all(context['event_ticker'] in (passing,rushing) for context in result['fee_contexts'].values())
+
+
+def test_nfl_prop_rule_classifier_preserves_explicit_no_snap_risk():
+    rules={'primary':'Exact primary condition.','secondary':(
+        'If Player is active but never takes a snap, the market settles to the fair market price before game start. '
+        'Once Player takes at least one snap, even if nullified by penalty, the market settles based on passing yards recorded.')}
+    terms=market_watch.classify_prop_settlement_rules(rules,'pass_yds')
+    assert terms['participation']=='active_no_snap_fair_market_price'
+    assert terms['statistic']=='after_one_snap_recorded_stat'
+    assert terms['classified'] is True and terms['overtime']=='unspecified'
+    assert terms['stat_corrections']=='unspecified' and terms['stat_source']=='unspecified'
+    assert terms['rules_sha256']==market_watch.digest(rules)
 
 
 @pytest.mark.asyncio

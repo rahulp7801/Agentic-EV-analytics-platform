@@ -71,6 +71,28 @@ function feeScenarios(value: unknown, kalshiCost: string, sportsbookCost: string
   return {direct:result.direct,non_direct:result.non_direct,scope:text(scenario.scope)};
 }
 
+function settlementReview(value: unknown) {
+  if (value === undefined) return {kalshi:{classified:false,participation:'unavailable',statistic:'unavailable',
+    overtime:'unavailable',stat_corrections:'unavailable',stat_source:'unavailable'},
+    sportsbook_rules:'unavailable',equivalence:'unverified'};
+  const review=record(value), kalshi=record(review.kalshi);
+  const participation=text(kalshi.participation), statistic=text(kalshi.statistic);
+  const overtime=text(kalshi.overtime), corrections=text(kalshi.stat_corrections);
+  const source=text(kalshi.stat_source);
+  if (typeof kalshi.classified !== 'boolean'
+      || !['active_no_snap_fair_market_price','unclassified'].includes(participation)
+      || !['after_one_snap_recorded_stat','unclassified'].includes(statistic)
+      || !['mentioned','unspecified','unavailable'].includes(overtime)
+      || !['mentioned','unspecified','unavailable'].includes(corrections)
+      || !['unspecified','unavailable'].includes(source)
+      || kalshi.classified !== (participation !== 'unclassified' && statistic !== 'unclassified')
+      || review.sportsbook_rules !== 'unavailable' || review.equivalence !== 'unverified') {
+    throw new Error('Invalid prop screen');
+  }
+  return {kalshi:{classified:kalshi.classified,participation,statistic,overtime,
+    stat_corrections:corrections,stat_source:source},sportsbook_rules:'unavailable',equivalence:'unverified'};
+}
+
 export function publicPropScreen(value: unknown, now=Date.now()) {
   const data=record(value);
   if (data.schema_version !== 1 || (data.sport !== 'nfl' && data.sport !== 'nba')
@@ -80,6 +102,8 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
   const events=count(coverage.events), observed=count(coverage.observed_events);
   const unavailable=count(coverage.unavailable_events), positive=count(coverage.positive_gross_gaps);
   const sportsbook=count(coverage.sportsbook_gaps), kalshi=count(coverage.kalshi_sportsbook_gaps);
+  const suppliedRuleCount=coverage.kalshi_rule_terms_classified === undefined ? undefined
+    : count(coverage.kalshi_rule_terms_classified);
   const suppliedFeeCounts=coverage.kalshi_fee_modeled === undefined ? undefined : {
     modeled:count(coverage.kalshi_fee_modeled),direct:count(coverage.kalshi_direct_cost_below_one),
     nonDirect:count(coverage.kalshi_non_direct_cost_below_one),
@@ -122,12 +146,17 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
           || Math.abs(Number(cost)+Number(gap)-1) > 1e-12) throw new Error('Invalid prop screen');
       const modeled_fee_costs=validKalshi ? feeScenarios(item.exchange_fee_scenarios,
         legs[0].cost,legs[1].cost) : undefined;
-      if (!validKalshi && item.exchange_fee_scenarios !== undefined) throw new Error('Invalid prop screen');
+      if (!validKalshi && (item.exchange_fee_scenarios !== undefined
+          || item.settlement_review !== undefined)) throw new Error('Invalid prop screen');
+      const settlement_review=validKalshi ? settlementReview(item.settlement_review)
+        : settlementReview(undefined);
       return {kind:item.kind,event_id:text(item.event_id), player:text(item.player), prop_type:item.prop_type as string,
         line, gross_cost_to_one_dollar:cost, gross_gap_to_one_dollar:gap, legs,
-        ...(modeled_fee_costs ? {modeled_fee_costs} : {}),limitations:item.reasons.map(text),
+        ...(modeled_fee_costs ? {modeled_fee_costs} : {}),settlement_review,
+        limitations:item.reasons.map(text),
         status:'unverified', execution_ready:false};
     });
+  const capturedClassified=comparisons.filter(item => item.settlement_review.kalshi.classified).length;
   const capturedModeled=comparisons.filter(item => 'modeled_fee_costs' in item);
   const capturedDirect=capturedModeled.filter(item => Number(item.modeled_fee_costs?.direct.combined_cost)<1).length;
   const capturedNonDirect=capturedModeled.filter(item => Number(item.modeled_fee_costs?.non_direct.combined_cost)<1).length;
@@ -135,6 +164,8 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
       || suppliedFeeCounts.direct !== capturedDirect || suppliedFeeCounts.nonDirect !== capturedNonDirect)) {
     throw new Error('Invalid prop screen');
   }
+  if (suppliedRuleCount !== undefined && suppliedRuleCount !== capturedClassified)
+    throw new Error('Invalid prop screen');
   if (!Number.isFinite(now)) throw new Error('Invalid prop screen');
   const age=(now-Date.parse(generated))/1000;
   const fresh=0 <= age && age <= 300 ? comparisons.filter(item => item.legs.every(
@@ -148,7 +179,9 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
     coverage:{events, observed_events:observed, unavailable_events:unavailable,
       captured_positive_gross_gaps:positive, positive_gross_gaps:fresh.length,
       captured_sportsbook_gaps:sportsbook, captured_kalshi_sportsbook_gaps:kalshi,
+      captured_kalshi_rule_terms_classified:capturedClassified,
       sportsbook_gaps:freshSportsbook, kalshi_sportsbook_gaps:freshKalshi,
+      kalshi_rule_terms_classified:fresh.filter(item => item.settlement_review.kalshi.classified).length,
       captured_kalshi_fee_modeled:capturedModeled.length,
       captured_kalshi_direct_cost_below_one:capturedDirect,
       captured_kalshi_non_direct_cost_below_one:capturedNonDirect,

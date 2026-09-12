@@ -33,6 +33,7 @@ def handoff() -> dict:
             yes_ask={'cost':'0.45','displayed_size':'12'}, no_ask={'cost':'0.65','displayed_size':'9'},
             request_started_at=(NOW-timedelta(seconds=2)).isoformat(), received_at=NOW.isoformat(),
             market_sha256=sha, source_page_sha256=sha, rules_sha256=sha,
+            settlement_profile='active_no_snap_recorded_stat_v1',
             settlement_equivalent=False, execution_ready=False)],
         player_targets={'player':{'player_name':'Player Name','team_target_id':'home',
             'target_sha256':sha,'target_page_sha256':sha,
@@ -80,6 +81,9 @@ def test_exact_complementary_quotes_emit_only_an_unverified_gross_screen():
     assert row['gross_cost_to_one_dollar'] == '0.85'
     assert row['gross_gap_to_one_dollar'] == '0.15'
     assert row['settlement_equivalent'] is False and row['execution_ready'] is False
+    assert row['settlement_review']['kalshi']['classified'] is True
+    assert row['settlement_review']['kalshi']['participation']=='active_no_snap_fair_market_price'
+    assert row['settlement_review']['sportsbook_rules']=='unavailable'
     assert row['fee_adjusted_profit'] is None and row['realized_profit'] is None
 
 
@@ -168,6 +172,10 @@ def test_malformed_target_or_quote_blocks_the_entire_screen():
     changed = handoff(); changed['evidence']['player_targets']['player']['team_target_id'] = 'away'
     result = screen(event(), 'nfl', [book()], rehash(changed), NOW)
     assert result['status'] == 'unavailable' and result['reason'] == 'invalid_quote_evidence'
+
+    changed=handoff();changed['evidence']['quotes'][0]['settlement_profile']='invented_profile'
+    result=screen(event(),'nfl',[book()],rehash(changed),NOW)
+    assert result['status']=='unavailable' and result['reason']=='invalid_quote_evidence'
 
 
 def test_distinct_sportsbooks_can_produce_only_an_unverified_exact_prop_gap():
