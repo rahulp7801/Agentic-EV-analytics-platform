@@ -34,11 +34,25 @@ from datetime import date as date_cls
 from typing import Any, Callable, Coroutine, Optional
 
 import asyncpg
+from nba_api.stats.static.teams import get_teams
 
 from sportsbet.graph.models import NBAContextSignals
 from sportsbet.prop.nba_executor import LEAGUE_AVG_DEF_RATING, LEAGUE_AVG_PACE
 
 log = structlog.get_logger()
+
+_NBA_TEAM_NAMES={team['full_name']:team['abbreviation'] for team in get_teams()}
+_NBA_TEAM_ABBREVIATIONS=frozenset(_NBA_TEAM_NAMES.values())
+
+
+def nba_team_abbreviation(value: object) -> str:
+    """Resolve an exact NBA full name or canonical abbreviation."""
+    if not isinstance(value,str):
+        raise ValueError('Unknown NBA team identity')
+    abbreviation=_NBA_TEAM_NAMES.get(value,value if value in _NBA_TEAM_ABBREVIATIONS else None)
+    if abbreviation is None:
+        raise ValueError('Unknown NBA team identity')
+    return abbreviation
 
 # ---------------------------------------------------------------------------
 # Module constants
@@ -111,12 +125,23 @@ def make_nba_context_signals_producer(
 
     async def producer(state: dict[str, Any]) -> dict[str, Any]:
         today: date_cls = state.get("as_of_date") or target_date or date_cls.today()
+        raw_home=state.get("home_team")
+        raw_away=state.get("away_team")
+        if bool(raw_home) != bool(raw_away):
+            raise ValueError('Incomplete NBA team identity')
+        if raw_home and raw_away:
+            home_team=nba_team_abbreviation(raw_home)
+            away_team=nba_team_abbreviation(raw_away)
+            normalized_teams={"home_team":home_team,"away_team":away_team}
+        else:
+            home_team=away_team=""
+            normalized_teams={}
 
         # --- 1. Validate player_id ---
         player_id_raw: str = state.get("receiver_gsis_id", "")
         if not player_id_raw:
             log.debug("nba_context_producer_empty_player_id")
-            return _league_avg_signals(is_home=False)
+            return _league_avg_signals(is_home=False) | normalized_teams
 
         try:
             player_id: int = int(player_id_raw)
@@ -125,12 +150,9 @@ def make_nba_context_signals_producer(
                 "nba_context_producer_invalid_player_id",
                 player_id_raw=player_id_raw,
             )
-            return {"nba_context_signals": None}
+            return {"nba_context_signals": None} | normalized_teams
 
         season: int = state.get("season", 2024)
-        home_team: str = state.get("home_team", "")
-        away_team: str = state.get("away_team", "")
-
         # --- 2. Query DB ---
         async with pool.acquire() as conn:
             # 2a. Most recent gamelog before target game date (not filtered by season —
@@ -143,7 +165,7 @@ def make_nba_context_signals_producer(
                     player_id=player_id,
                     season=season,
                 )
-                return _league_avg_signals(is_home=False)
+                return _league_avg_signals(is_home=False) | normalized_teams
 
             team_abbr: str = gamelog_row["team_abbreviation"]
             last_game_date: date_cls = gamelog_row["game_date"]
@@ -178,6 +200,6 @@ def make_nba_context_signals_producer(
             opponent_def_rating=str(signals.opponent_def_rating),
         )
 
-        return {"nba_context_signals": signals}
+        return {"nba_context_signals": signals} | normalized_teams
 
     return producer

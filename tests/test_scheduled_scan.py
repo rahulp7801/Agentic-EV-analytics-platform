@@ -9,7 +9,8 @@ from sportsbet.scan import evaluate_event, quotes_from_event
 def event(sport='nba'):
     now=datetime.now(timezone.utc)
     market='player_points' if sport=='nba' else 'player_pass_yds'
-    return dict(id='test-event-'+sport,home_team='Home',away_team='Away',commence_time=(now+timedelta(hours=2)).isoformat(),
+    home,away=('Boston Celtics','Los Angeles Lakers') if sport=='nba' else ('Home','Away')
+    return dict(id='test-event-'+sport,home_team=home,away_team=away,commence_time=(now+timedelta(hours=2)).isoformat(),
         bookmakers=[dict(key='book',last_update=now.isoformat(),markets=[dict(key=market,outcomes=[
             dict(name='Over',description='Player',point=20.5,price=100),dict(name='Under',description='Player',point=21.5,price=200)])])])
 
@@ -23,6 +24,7 @@ def test_quotes_require_real_timestamps_and_sides():
 async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_path):
     conn=AsyncMock()
     conn.fetch.return_value=[{'player_id':1}]
+    conn.fetchrow.return_value={'team_abbreviation':'BOS','game_date':datetime.now(timezone.utc).date()-timedelta(days=2)}
     pool=MagicMock()
     pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
@@ -37,6 +39,10 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     assert result['coverage']['counts']['evaluated_selections']==2
     assert all(call.args[1].last_n_games==40 for call in quant.call_args_list)
     assert all(call.args[1].as_of_date is not None for call in quant.call_args_list)
+    if sport=='nba':
+        assert all(call.args[1].opponent_team=='LAL' and call.args[1].home_away=='home'
+            for call in quant.call_args_list)
+        assert {signal['home_team'] for signal in result['signals']}=={'Boston Celtics'}
     conn.executemany.assert_awaited_once()
     statement, rows = conn.executemany.await_args.args
     assert 'INSERT INTO player_prop_snapshots' in statement
@@ -56,6 +62,7 @@ async def test_quote_archive_failure_blocks_unrecorded_model_output(tmp_path):
 
 async def test_graph_query_failure_cannot_be_reported_as_successful_empty_scan(tmp_path):
     conn=AsyncMock();conn.fetch.return_value=[{'player_id':1}]
+    conn.fetchrow.return_value={'team_abbreviation':'BOS','game_date':datetime.now(timezone.utc).date()-timedelta(days=2)}
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
     with patch('sportsbet.prop.nba_agents.run_nba_prop_query',side_effect=RuntimeError('unavailable')):
