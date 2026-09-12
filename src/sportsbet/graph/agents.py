@@ -18,7 +18,6 @@ from sportsbet.db.connection import get_sync_engine
 from sportsbet.graph.models import EVSignal, QuantParams, QuantResult
 from sportsbet.graph.state import GraphState
 from sportsbet.ingestion.odds import OddsSnapshotCreate, write_odds_snapshot
-from sportsbet.ingestion.free_odds import ESPNOddsPoller
 from sportsbet.ingestion.odds_poller import BudgetExhaustedError, OddsAPIPoller
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot, parse_event_quotes
 from sportsbet.ingestion.scraper import TEAM_ABBR_TO_ESPN_ID, InjuryWeatherScraper
@@ -197,7 +196,7 @@ def make_context_agent(
             None reads the value from Settings.vig_method (default "multiplicative").
             Passed to _extract_odds_snapshot on each invocation (Phase 15 — QUANT-02).
 
-    On any sub-error (BudgetExhaustedError, httpx.HTTPError, ESPN schema error):
+    On any provider sub-error:
     - Log the error via structlog
     - Return ContextSignals with empty/None fields rather than propagating exception
     - Set state["error"] only for unrecoverable failures
@@ -238,21 +237,9 @@ def make_context_agent(
                     raw_odds = await poller.fetch_nfl_odds()
             odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
         except BudgetExhaustedError as exc:
-            log.warning("context_agent_budget_exhausted_trying_espn", session_id=session_id, error_type=type(exc).__name__)
-            try:
-                raw_odds = await ESPNOddsPoller().fetch_h2h_odds(sport)
-                odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
-                log.info("context_agent_espn_h2h_fallback_ok", session_id=session_id)
-            except Exception as espn_exc:
-                log.warning("context_agent_espn_fallback_failed", error_type=type(espn_exc).__name__)
+            log.warning("context_agent_odds_budget_exhausted", session_id=session_id, error_type=type(exc).__name__)
         except Exception as exc:
             log.error("context_agent_odds_error", session_id=session_id, error_type=type(exc).__name__)
-            try:
-                raw_odds = await ESPNOddsPoller().fetch_h2h_odds(sport)
-                odds_snapshot = _extract_odds_snapshot(raw_odds, game_id, vig_method=_vig_method, outcome_name=state.get("outcome_name"))
-                log.info("context_agent_espn_h2h_fallback_ok", session_id=session_id)
-            except Exception as espn_exc:
-                log.warning("context_agent_espn_fallback_failed", error_type=type(espn_exc).__name__)
 
         # --- Step 1 (continued): Staleness gate (CTXT-02) ---
         if odds_snapshot is not None:
