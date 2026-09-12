@@ -95,7 +95,8 @@ def test_write_player_prop_snapshot() -> None:
 
     Mocks SQLAlchemy engine to verify INSERT is called without a real DB.
     """
-    from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot
+    from sportsbet.ingestion.prop_odds import (
+        PlayerPropSnapshotCreate, prop_quote_record_sha256, write_player_prop_snapshot)
 
     snapshot = PlayerPropSnapshotCreate(
         sport="nfl",
@@ -109,7 +110,10 @@ def test_write_player_prop_snapshot() -> None:
         side="Over",
         snapped_at=datetime(2026, 9, 12, tzinfo=timezone.utc),
         game_start_time=datetime(2026, 9, 13, tzinfo=timezone.utc),
+        source_provider='the_odds_api', source_sha256='a'*64,
     )
+    snapshot = snapshot.model_copy(update={
+        'source_record_sha256': prop_quote_record_sha256(snapshot)})
 
     mock_conn = MagicMock()
     mock_result = MagicMock()
@@ -151,16 +155,40 @@ def test_write_player_prop_snapshot() -> None:
     ],
 )
 def test_write_rejects_incomplete_or_non_pregame_snapshots(change) -> None:
-    from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot
+    from sportsbet.ingestion.prop_odds import (
+        PlayerPropSnapshotCreate, prop_quote_record_sha256, write_player_prop_snapshot)
 
-    snapshot = PlayerPropSnapshotCreate(
+    base = PlayerPropSnapshotCreate(
         sport='nfl', game_id='event', player_name='Player', sportsbook='book',
         prop_type='player_pass_yds', line=Decimal('249.5'), price=-110,
         implied_probability=Decimal('0.523809'), side='Over',
         snapped_at=datetime(2026, 9, 12, tzinfo=timezone.utc),
         game_start_time=datetime(2026, 9, 13, tzinfo=timezone.utc),
-    ).model_copy(update=change)
+        source_provider='the_odds_api', source_sha256='a'*64,
+    )
+    base = base.model_copy(update={'source_record_sha256': prop_quote_record_sha256(base)})
+    snapshot = base.model_copy(update=change)
     engine = MagicMock()
     with pytest.raises(ValueError, match='complete pregame quote'):
         write_player_prop_snapshot(snapshot, engine=engine)
     engine.begin.assert_not_called()
+
+
+def test_write_rejects_missing_or_tampered_source_evidence() -> None:
+    from sportsbet.ingestion.prop_odds import (
+        PlayerPropSnapshotCreate, prop_quote_record_sha256, write_player_prop_snapshot)
+
+    snapshot = PlayerPropSnapshotCreate(sport='nfl', game_id='event', player_name='Player',
+        sportsbook='book', prop_type='player_pass_yds', line=Decimal('249.5'), price=-110,
+        implied_probability=Decimal('0.523809'), side='Over',
+        snapped_at=datetime(2026, 9, 12, tzinfo=timezone.utc),
+        game_start_time=datetime(2026, 9, 13, tzinfo=timezone.utc),
+        source_provider='the_odds_api', source_sha256='a'*64)
+    valid = snapshot.model_copy(update={
+        'source_record_sha256': prop_quote_record_sha256(snapshot)})
+    for changed in (snapshot, valid.model_copy(update={'price': 100}),
+            valid.model_copy(update={'source_record_sha256': 'b'*64})):
+        engine = MagicMock()
+        with pytest.raises(ValueError, match='complete pregame quote'):
+            write_player_prop_snapshot(changed, engine=engine)
+        engine.begin.assert_not_called()

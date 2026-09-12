@@ -144,11 +144,13 @@ def test_new_prop_quote_constraint_preserves_legacy_rows_and_rejects_bad_inserts
         conn.execute(sa.text("""
             INSERT INTO player_prop_snapshots
                 (sport, game_id, player_name, sportsbook, prop_type, line, price,
-                 implied_probability, side, snapped_at, game_start_time)
+                 implied_probability, side, snapped_at, game_start_time, source_provider,
+                 source_sha256, source_record_sha256)
             VALUES ('nfl', 'event', 'Player', 'book', 'player_pass_yds', 249.5,
                     -110, 0.523809, 'Over', '2026-09-12T00:00:00Z',
-                    '2026-09-13T00:00:00Z')
-        """))
+                    '2026-09-13T00:00:00Z', 'the_odds_api',
+                    :source, :record)
+        """), {'source':'a'*64, 'record':'b'*64})
     with pytest.raises(sa.exc.IntegrityError):
         with engine.begin() as conn:
             conn.execute(sa.text("""
@@ -156,6 +158,11 @@ def test_new_prop_quote_constraint_preserves_legacy_rows_and_rejects_bad_inserts
                     (sport, player_name, sportsbook, prop_type, implied_probability)
                 VALUES ('nba', 'New Invalid Player', 'book', 'player_points', 0.5)
             """))
+    with engine.connect() as conn:
+        assert conn.execute(sa.text("""
+            SELECT convalidated FROM pg_constraint
+            WHERE conname = 'ck_player_prop_snapshots_source_evidence'
+        """)).scalar_one() is False
     alembic.command.downgrade(cfg, "0013_nba_stat_provenance")
     with engine.connect() as conn:
         assert conn.execute(sa.text("""

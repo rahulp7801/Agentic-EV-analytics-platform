@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from sportsbet.ingestion.prop_odds import parse_event_quotes
+from sportsbet.ingestion.prop_odds import parse_event_quotes, prop_quote_record_sha256
 from sportsbet.ingestion.prizepicks import parse_projections
 
 
@@ -18,6 +18,15 @@ def test_quotes_keep_provider_time_and_require_identity_and_start():
     quote, = parse_event_quotes(data,'nfl')
     assert quote.snapped_at == datetime(2026,9,10,15,tzinfo=timezone.utc)
     assert quote.game_start_time == datetime(2026,9,13,17,tzinfo=timezone.utc)
+    assert quote.source_provider == 'the_odds_api'
+    assert len(quote.source_sha256) == 64
+    assert quote.source_record_sha256 == prop_quote_record_sha256(quote)
+    assert parse_event_quotes(deepcopy(data),'nfl')[0].source_sha256 == quote.source_sha256
+    changed = deepcopy(data)
+    changed['bookmakers'][0]['markets'][0]['outcomes'][0]['price'] = 120
+    changed_quote, = parse_event_quotes(changed,'nfl')
+    assert changed_quote.source_sha256 != quote.source_sha256
+    assert changed_quote.source_record_sha256 != quote.source_record_sha256
     for key in ('id','commence_time'):
         invalid = deepcopy(data)
         del invalid[key]

@@ -14,7 +14,7 @@ from unittest.mock import patch
 from sportsbet.ingestion.upsert import upsert_rows
 from sportsbet.ingestion.provenance import stat_row_sha256
 from sportsbet.ledger import Ledger
-from sportsbet.scan import evaluate_event
+from sportsbet.scan import evaluate_event, quotes_from_event
 from sportsbet.settlement import settle_final_props
 
 pytestmark = pytest.mark.skipif(
@@ -237,15 +237,21 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         result = await evaluate_event(pool,event,sport,ledger,identity)
         predictions = ledger.predictions()
         assert len(predictions) == 1
+        assert result['coverage']['source_committed_quotes'] == result['coverage']['quotes'] == 1
         assert predictions[0]['model_probability'] == pytest.approx(24/count, abs=1e-6)
         assert predictions[0]['push_probability'] == 0  # Integer stats cannot push at20.5.
         async with pool.acquire() as conn:
             archived = await conn.fetchrow(
-                'SELECT sport,game_id,player_name,side,line,price,snapped_at,game_start_time '
+                'SELECT sport,game_id,player_name,side,line,price,snapped_at,game_start_time, '
+                'source_provider,source_sha256,source_record_sha256 '
                 'FROM player_prop_snapshots WHERE game_id=$1', identity)
         assert tuple(archived)[:6] == (sport,identity,player,'Over',20.5,100)
         assert archived['snapped_at'] == now
         assert archived['game_start_time'] == start
+        expected_quote, = quotes_from_event(event,sport)
+        assert archived['source_provider'] == 'the_odds_api'
+        assert archived['source_sha256'] == expected_quote.source_sha256
+        assert archived['source_record_sha256'] == expected_quote.source_record_sha256
         # NBA's 60% vs 50% quote passes policy; NFL's larger edge remains audited even if capped.
         if sport == 'nba':
             assert result['signals'][0]['sample_size'] == count
