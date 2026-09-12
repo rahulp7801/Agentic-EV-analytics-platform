@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import gc
+from sportsbet.ingestion.provenance import stat_batch_sha256, stat_row_sha256
 from sportsbet.ingestion.upsert import upsert_rows
 import sys
 import time
@@ -135,12 +136,15 @@ def ingest_nba_gamelogs_season(
 
     # Add season year as integer column for partitioning and queries.
     df["season"] = season
-    df['source_provider'] = 'nba'
-    df['source_sha256'] = None
-    df['source_observed_at'] = datetime.now(timezone.utc)
-
     # Convert game_date string to Python date objects.
     df["game_date"] = pd.to_datetime(df["game_date"]).dt.date
+    records=df.to_dict('records')
+    record_hashes=[stat_row_sha256('nba',row) for row in records]
+    batch_hash=stat_batch_sha256('nba','nba',season,record_hashes)
+    df['source_provider'] = 'nba'
+    df['source_sha256'] = batch_hash
+    df['source_record_sha256'] = record_hashes
+    df['source_observed_at'] = datetime.now(timezone.utc)
 
     # Append rows — UniqueConstraint on (player_id, game_id) handles re-runs.
     # NEVER use if_exists='replace' — drops and recreates the table.

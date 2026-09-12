@@ -149,5 +149,14 @@ def test_ingest_nba_gamelogs_season_mock() -> None:
     # Verify MATCHUP column was dropped
     assert "MATCHUP" not in result_df.columns, "MATCHUP raw column must be dropped"
 
+    from sportsbet.ingestion.provenance import stat_row_sha256
+    assert set(result_df['source_provider'])=={'nba'}
+    assert result_df['source_sha256'].str.fullmatch('[0-9a-f]{64}').all()
+    assert result_df['source_sha256'].nunique()==1
+    assert all(row['source_record_sha256']==stat_row_sha256('nba',row)
+        for row in result_df.to_dict('records'))
+    assert all(value.tzinfo is not None and value.utcoffset() is not None
+        for value in result_df['source_observed_at'])
+
     # Verify mandatory rate limit sleep was called
     mock_time.sleep.assert_called_once_with(1)

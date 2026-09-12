@@ -174,7 +174,7 @@ class Ledger:
         from dataclasses import fields
         from sportsbet.arbitrage.ev import quote_terms
         with self.connect() as db:
-            records = db.execute('SELECT id,payload,outcome FROM predictions').fetchall()
+            records = db.execute('SELECT id,payload,outcome,outcome_source FROM predictions').fetchall()
         signals = []
         excluded = 0
         duplicate = 0
@@ -182,7 +182,11 @@ class Ledger:
         seen = set()
         parsed = []
         versions = set()
-        for prediction_id, raw, outcome in records:
+        unverified_settlements=0
+        for prediction_id, raw, outcome, outcome_source in records:
+            if outcome is not None and outcome_source=='espn_final_stats':
+                outcome=None
+                unverified_settlements+=1
             p = json.loads(raw)
             version = p.get('model_version') or 'unversioned'
             versions.add(version)
@@ -253,6 +257,7 @@ class Ledger:
                 'excluded_closing_quotes':invalid_closing,
                 'cohort':'recommendations' if recommendations_only else 'all_predictions',
                 'model_version':model_version, 'available_model_versions':sorted(versions),
+                'unverified_settlements':unverified_settlements,
                 'selection_policy':'Earliest eligible prediction per game/player/market/side/line within the selected cohort.',
                 'profit_scope':'Hypothetical recorded-stake replay, not executed bets or realized account profit.'}
 

@@ -7,6 +7,7 @@ import pytest
 from requests.exceptions import ReadTimeout
 
 from sportsbet.ingestion.nba_espn import index_rows, official_names, parse_game, refresh_recent
+from sportsbet.ingestion.provenance import stat_row_sha256
 from sportsbet.refresh import refresh
 
 
@@ -45,6 +46,7 @@ def test_final_box_score_zero_dnp_and_exact_official_name_fallback():
     assert rows[0]['game_id']=='0022500001' and rows[0]['game_date']==date(2026,1,28)
     assert rows[0]['is_home'] and rows[0]['opponent_team']=='BOS'
     assert rows[0]['source_provider']=='espn' and rows[0]['source_sha256']=='a'*64
+    assert rows[0]['source_record_sha256']==stat_row_sha256('nba',rows[0])
     # Accent folding cannot choose between two official people with the same name.
     names=official_names([(1000,'Nikola Vučević'),(999,'Nikola Vucevic')])
     with pytest.raises(ValueError,match='verified NBA identity'): parse(data,game,players,teams,names)

@@ -9,7 +9,9 @@ nflreadpy.load_player_stats() returns a Polars DataFrame.
 from __future__ import annotations
 
 import gc
+from datetime import datetime, timezone
 from sportsbet.ingestion.upsert import upsert_rows
+from sportsbet.ingestion.provenance import stat_batch_sha256, stat_row_sha256
 
 import polars as pl
 import nflreadpy as nfl  # NOT nfl_data_py — archived Sep 2025
@@ -102,8 +104,16 @@ def ingest_player_stats_seasons(
         if rename_map:
             df = df.rename(rename_map)
 
+        frame=df.to_pandas()
+        records=frame.to_dict('records')
+        record_hashes=[stat_row_sha256('nfl',row) for row in records]
+        batch_hash=stat_batch_sha256('nflverse','nfl',season,record_hashes)
+        frame['source_provider']='nflverse'
+        frame['source_sha256']=batch_hash
+        frame['source_record_sha256']=record_hashes
+        frame['source_observed_at']=datetime.now(timezone.utc)
         with engine.begin() as conn:
-            df.to_pandas().to_sql(
+            frame.to_sql(
                 "player_stats", conn, if_exists="append", index=False, chunksize=1000,
                 method=upsert_rows(['player_id', 'season', 'week']),
             )

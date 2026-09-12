@@ -197,3 +197,45 @@ def test_settlement_constraint_preserves_legacy_and_requires_new_provenance() ->
         with engine.begin() as conn:
             conn.execute(sa.text("UPDATE analytics.predictions SET actual_value=-1 WHERE id='new'"))
     engine.dispose();alembic.command.downgrade(cfg,'base')
+
+
+@pytest.mark.serial
+@pytest.mark.skipif(
+    not os.environ.get("SPORTSBET_TEST_DATABASE_URL"),
+    reason="SPORTSBET_TEST_DATABASE_URL not set",
+)
+def test_stat_source_constraints_preserve_legacy_and_require_new_evidence() -> None:
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];cfg=get_alembic_cfg(url)
+    alembic.command.upgrade(cfg,'0015_settlement_provenance')
+    engine=sa.create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(sa.text("INSERT INTO player_stats(player_id,season,week) VALUES ('legacy',2025,1)"))
+        conn.execute(sa.text("INSERT INTO nba_player_gamelogs(player_id,game_id,season) VALUES (1,'legacy',2025)"))
+    alembic.command.upgrade(cfg,'head')
+    with engine.connect() as conn:
+        for name in ('ck_player_stats_source_evidence','ck_nba_gamelog_source_evidence'):
+            assert conn.execute(sa.text('SELECT convalidated FROM pg_constraint WHERE conname=:name'),
+                {'name':name}).scalar_one() is False
+        assert conn.execute(sa.text("SELECT count(*) FROM player_stats WHERE player_id='legacy'" )).scalar_one()==1
+        assert conn.execute(sa.text("SELECT count(*) FROM nba_player_gamelogs WHERE game_id='legacy'" )).scalar_one()==1
+    with engine.begin() as conn:
+        conn.execute(sa.text("""INSERT INTO player_stats(player_id,season,week,source_provider,
+            source_sha256,source_record_sha256,source_observed_at)
+            VALUES ('valid',2025,1,'nflverse',:hash,:hash,NOW())"""),{'hash':'a'*64})
+        conn.execute(sa.text("""INSERT INTO nba_player_gamelogs(player_id,game_id,season,source_provider,
+            source_sha256,source_record_sha256,source_observed_at)
+            VALUES (2,'valid',2025,'nba',:hash,:hash,NOW())"""),{'hash':'b'*64})
+    for statement in (
+        "INSERT INTO player_stats(player_id,season,week) VALUES ('invalid',2025,1)",
+        "INSERT INTO nba_player_gamelogs(player_id,game_id,season) VALUES (3,'invalid',2025)",
+    ):
+        with pytest.raises(sa.exc.IntegrityError):
+            with engine.begin() as conn:
+                conn.execute(sa.text(statement))
+    with pytest.raises(sa.exc.IntegrityError):
+        with engine.begin() as conn:
+            conn.execute(sa.text("UPDATE player_stats SET week=2 WHERE player_id='legacy'"))
+    alembic.command.downgrade(cfg,'0015_settlement_provenance')
+    columns={column['name'] for column in sa.inspect(engine).get_columns('player_stats')}
+    assert not {'source_provider','source_sha256','source_record_sha256','source_observed_at'} & columns
+    engine.dispose();alembic.command.downgrade(cfg,'base')
