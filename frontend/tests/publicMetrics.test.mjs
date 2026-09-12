@@ -53,6 +53,8 @@ test('public metrics fails closed on malformed counts, bounds, cohorts and parti
     value => { value.hit_rate=1.1; },
     value => { value.calibration[0].count=1; },
     value => { value.baseline_zero_brier=0.9; },
+    value => { value.hit_rate_interval=[0.6,0.9]; },
+    value => { value.clv_game_cluster_count=3; },
     value => { delete value.roi_game_cluster_count; },
     value => { value.profit_scope='realized profit'; value.roi=Number.NaN; },
   ]) {

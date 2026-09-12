@@ -1,6 +1,18 @@
 import type { MetricCohort } from './metricCohort';
 
 type JsonRecord = Record<string, unknown>;
+type ClusterMetrics = {
+  roi_game_cluster_interval: [number, number] | null;
+  roi_game_cluster_count: number;
+  hit_rate_game_cluster_interval: [number, number] | null;
+  hit_rate_game_cluster_count: number;
+  brier_score_game_cluster_interval: [number, number] | null;
+  log_loss_game_cluster_interval: [number, number] | null;
+  calibration_game_cluster_count: number;
+  clv_mean_game_cluster_interval: [number, number] | null;
+  clv_game_cluster_count: number;
+  game_cluster_interval_method: string;
+};
 
 const BINOMIAL_METHOD = 'Nominal 95% Wilson interval; treats decided selections as independent and does not adjust for shared games or players.';
 const CLUSTER_METHOD = '95% game-cluster robust t interval; requires at least two distinct games. It allows arbitrary dependence within a game but does not adjust for the same player appearing across games.';
@@ -64,24 +76,34 @@ function modelVersion(value: unknown): string | null {
 
 function calibration(value: unknown) {
   if (!Array.isArray(value) || value.length > 10) throw new Error('Invalid metrics');
-  return value.map(item => {
+  const bins = value.map(item => {
     const bin = record(item);
     const lower = requiredMetric(bin.lower, 0, 1);
     const upper = requiredMetric(bin.upper, 0, 1);
-    if (lower >= upper) throw new Error('Invalid metrics');
-    return {lower, upper, count: count(bin.count), predicted: requiredMetric(bin.predicted, 0, 1),
-      observed: requiredMetric(bin.observed, 0, 1), observed_interval: interval(bin.observed_interval, 0, 1)};
+    const binCount = count(bin.count);
+    if (lower >= upper || binCount === 0) throw new Error('Invalid metrics');
+    const observed = requiredMetric(bin.observed, 0, 1);
+    const observedInterval = interval(bin.observed_interval, 0, 1);
+    if (observedInterval === null || observed < observedInterval[0] || observed > observedInterval[1]) {
+      throw new Error('Invalid metrics');
+    }
+    return {lower, upper, count: binCount, predicted: requiredMetric(bin.predicted, 0, 1),
+      observed, observed_interval: observedInterval};
   });
+  if (bins.some((bin, index) => index > 0 && bin.lower < bins[index-1].upper)) {
+    throw new Error('Invalid metrics');
+  }
+  return bins;
 }
 
-function clusterMetrics(data: JsonRecord) {
+function clusterMetrics(data: JsonRecord): ClusterMetrics | null {
   const keys = ['roi_game_cluster_interval', 'roi_game_cluster_count',
     'hit_rate_game_cluster_interval', 'hit_rate_game_cluster_count',
     'brier_score_game_cluster_interval', 'log_loss_game_cluster_interval',
     'calibration_game_cluster_count', 'clv_mean_game_cluster_interval',
     'clv_game_cluster_count'];
   const present = keys.filter(key => data[key] !== undefined);
-  if (present.length === 0) return {};
+  if (present.length === 0) return null;
   if (present.length !== keys.length) throw new Error('Invalid metrics');
   const result = {
     roi_game_cluster_interval: interval(data.roi_game_cluster_interval, -1),
@@ -122,7 +144,8 @@ export function publicMetrics(value: unknown, expected: MetricCohort) {
   const bins = calibration(data.calibration);
   if (settledCount + pendingCount + voidCount !== sampleSize || decidedCount > settledCount
       || calibrationCount > decidedCount || positiveCount > calibrationCount
-      || bins.reduce((total, bin) => total + bin.count, 0) !== calibrationCount) {
+      || bins.reduce((total, bin) => total + bin.count, 0) !== calibrationCount
+      || Math.abs(bins.reduce((total, bin) => total + bin.observed*bin.count, 0)-positiveCount) > 1e-9) {
     throw new Error('Invalid metrics');
   }
   const hitRate = metric(data.hit_rate, 0, 1);
@@ -130,9 +153,11 @@ export function publicMetrics(value: unknown, expected: MetricCohort) {
   if (decidedCount === 0 ? hitRate !== null || hitRateInterval !== null : hitRate === null) {
     throw new Error('Invalid metrics');
   }
+  if (hitRate !== null && hitRateInterval !== null
+      && (hitRate < hitRateInterval[0] || hitRate > hitRateInterval[1])) throw new Error('Invalid metrics');
   const clvCount = count(data.clv_count);
   const clvMean = metric(data.clv_mean, -1, 1);
-  if ((clvCount === 0) !== (clvMean === null)) throw new Error('Invalid metrics');
+  if (clvCount > sampleSize || (clvCount === 0) !== (clvMean === null)) throw new Error('Invalid metrics');
   const brierScore = metric(data.brier_score, 0, 1);
   const logLoss = metric(data.log_loss, 0);
   const calibrationError = optionalMetric(data.calibration_error, 0, 1);
@@ -154,6 +179,24 @@ export function publicMetrics(value: unknown, expected: MetricCohort) {
     return version;
   });
   if (new Set(versions).size !== versions.length) throw new Error('Invalid metrics');
+  const roi = metric(data.roi, -1);
+  if (settledCount === 0 && roi !== null) throw new Error('Invalid metrics');
+  const clusters = clusterMetrics(data);
+  if (clusters) {
+    if (clusters.roi_game_cluster_count > settledCount
+        || clusters.hit_rate_game_cluster_count > decidedCount
+        || clusters.calibration_game_cluster_count > calibrationCount
+        || clusters.clv_game_cluster_count > clvCount) throw new Error('Invalid metrics');
+    for (const [point, range] of [[roi, clusters.roi_game_cluster_interval],
+      [hitRate, clusters.hit_rate_game_cluster_interval],
+      [brierScore, clusters.brier_score_game_cluster_interval],
+      [logLoss, clusters.log_loss_game_cluster_interval],
+      [clvMean, clusters.clv_mean_game_cluster_interval]] as const) {
+      if (point !== null && range !== null && (point < range[0] || point > range[1])) {
+        throw new Error('Invalid metrics');
+      }
+    }
+  }
   return {
     cohort,
     model_version: modelVersion(data.model_version),
@@ -164,13 +207,13 @@ export function publicMetrics(value: unknown, expected: MetricCohort) {
     duplicate_predictions: count(data.duplicate_predictions),
     excluded_closing_quotes: count(data.excluded_closing_quotes),
     unverified_settlements: count(data.unverified_settlements),
-    roi: metric(data.roi, -1), hit_rate: hitRate, hit_rate_interval: hitRateInterval,
+    roi, hit_rate: hitRate, hit_rate_interval: hitRateInterval,
     clv_mean: clvMean, clv_count: clvCount,
     calibration_count: calibrationCount, calibration_positive_count: positiveCount,
     brier_score: brierScore, log_loss: logLoss, calibration_error: calibrationError,
     baseline_zero_brier: baselineZero, baseline_50_brier: baselineHalf,
     baseline_one_brier: baselineOne, calibration: bins,
-    ...clusterMetrics(data),
+    ...(clusters ?? {}),
     binomial_interval_method: BINOMIAL_METHOD,
     closing_line_note: CLOSING_LINE_NOTE,
     selection_policy: SELECTION_POLICY,
