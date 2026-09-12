@@ -131,18 +131,20 @@ def test_nfl_settlement_joins_exact_player_week_team_and_game_date(tmp_path):
     key,payload=prediction(ledger,line=250.5,sport='nfl',prop_type='pass_yds',player_id='gsis-7')
     with ledger.connect() as db:
         db.execute('''CREATE TABLE player_stats (player_id TEXT, season INTEGER, week INTEGER,
-            team TEXT, passing_yards INTEGER, rushing_yards INTEGER, receiving_yards INTEGER,
+            team TEXT, passing_yards INTEGER, rushing_yards INTEGER, receiving_yards INTEGER, receptions INTEGER,
             source_provider TEXT, source_sha256 TEXT, source_record_sha256 TEXT,
             source_observed_at TEXT)''')
         db.execute('CREATE TABLE games (season INTEGER, week INTEGER, home_team TEXT, away_team TEXT, game_date TEXT)')
         row=dict(player_id='gsis-7',season=2026,week=1,team='H',passing_yards=251,
-            rushing_yards=0,receiving_yards=0)
-        db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?)',(
-            *row.values(),'nflverse','b'*64,stat_row_sha256('nfl',row),datetime.now(timezone.utc).isoformat()))
+            rushing_yards=0,receiving_yards=0,receptions=0)
+        db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',(
+            *row.values(),'nflverse','b'*64,stat_row_sha256('nfl',row,legacy_nfl=True),
+            datetime.now(timezone.utc).isoformat()))
         db.execute("INSERT INTO games VALUES (2026,1,'H','A',?)",(payload['game_date'],))
     report=settle_final_props(ledger,'nfl',schedule(payload))
     row=next(item for item in ledger.predictions() if item['prediction_id']==key)
     assert report['settled']==1 and row['outcome'] is True and row['actual_value']==251
+    assert ledger.report()['unverified_settlements']==0
 
 
 def test_nfl_settlement_preserves_negative_rushing_yards(tmp_path):
@@ -151,18 +153,44 @@ def test_nfl_settlement_preserves_negative_rushing_yards(tmp_path):
         prop_type='rush_yds',player_id='gsis-7')
     with ledger.connect() as db:
         db.execute('''CREATE TABLE player_stats (player_id TEXT, season INTEGER, week INTEGER,
-            team TEXT, passing_yards INTEGER, rushing_yards INTEGER, receiving_yards INTEGER,
+            team TEXT, passing_yards INTEGER, rushing_yards INTEGER, receiving_yards INTEGER, receptions INTEGER,
             source_provider TEXT, source_sha256 TEXT, source_record_sha256 TEXT,
             source_observed_at TEXT)''')
         db.execute('CREATE TABLE games (season INTEGER, week INTEGER, home_team TEXT, away_team TEXT, game_date TEXT)')
         row=dict(player_id='gsis-7',season=2026,week=1,team='H',passing_yards=0,
-            rushing_yards=-2,receiving_yards=0)
-        db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?)',(
+            rushing_yards=-2,receiving_yards=0,receptions=0)
+        db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',(
             *row.values(),'nflverse','b'*64,stat_row_sha256('nfl',row),datetime.now(timezone.utc).isoformat()))
         db.execute("INSERT INTO games VALUES (2026,1,'H','A',?)",(payload['game_date'],))
     report=settle_final_props(ledger,'nfl',schedule(payload))
     settled=next(item for item in ledger.predictions() if item['prediction_id']==key)
     assert report['settled']==1 and settled['outcome'] is True and settled['actual_value']==-2
+
+
+@pytest.mark.parametrize(('legacy','expected'),[(False,1),(True,0)])
+def test_nfl_reception_settlement_requires_reception_committed_provenance(tmp_path,legacy,expected):
+    ledger=Ledger(tmp_path/f'audit-{legacy}.sqlite')
+    key,payload=prediction(ledger,line=4.5,sport='nfl',prop_type='receptions',player_id='gsis-7')
+    with ledger.connect() as db:
+        db.execute('''CREATE TABLE player_stats (player_id TEXT, season INTEGER, week INTEGER,
+            team TEXT, passing_yards INTEGER, rushing_yards INTEGER, receiving_yards INTEGER, receptions INTEGER,
+            source_provider TEXT, source_sha256 TEXT, source_record_sha256 TEXT,
+            source_observed_at TEXT)''')
+        db.execute('CREATE TABLE games (season INTEGER, week INTEGER, home_team TEXT, away_team TEXT, game_date TEXT)')
+        row=dict(player_id='gsis-7',season=2026,week=1,team='H',passing_yards=0,
+            rushing_yards=0,receiving_yards=62,receptions=5)
+        digest=stat_row_sha256('nfl',row,legacy_nfl=legacy)
+        db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',(
+            *row.values(),'nflverse','b'*64,digest,datetime.now(timezone.utc).isoformat()))
+        db.execute("INSERT INTO games VALUES (2026,1,'H','A',?)",(payload['game_date'],))
+    report=settle_final_props(ledger,'nfl',schedule(payload))
+    settled=next(item for item in ledger.predictions() if item['prediction_id']==key)
+    assert report['settled']==expected
+    assert settled['outcome'] is (True if expected else None)
+    assert report['reasons']==({} if expected else {'stat_provenance_invalid':1})
+    if expected:
+        metrics=ledger.report()
+        assert metrics['settled_count']==1 and metrics['unverified_settlements']==0
 
 
 @pytest.mark.parametrize(('provider','record_hash','reason'),[

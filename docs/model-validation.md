@@ -60,6 +60,13 @@ player history, but it receives no invented venue or opponent filter.
 
 ## Reproducible research checks
 
+Automatic observed-stat grading covers the same live core markets collected by
+the scanner: NBA points, rebounds and assists; NFL passing yards, rushing yards,
+receiving yards and receptions. New nflverse row commitments include receptions.
+Older NFL commitments remain reproducible for yard props, while reception outcomes
+stay pending unless the retained digest authenticates the reception count. The free
+ESPN final-stat archive can also export receptions for unpriced walk-forward checks.
+
 The implementation was rerun through the actual LangGraph nodes against two
 previously archived ESPN final-stat datasets and the restricted PostgreSQL history.
 The game date remained an exclusive cutoff, the most recent 40 prior games were

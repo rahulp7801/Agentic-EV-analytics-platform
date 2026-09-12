@@ -38,6 +38,16 @@ def test_conflicting_stats_fail_instead_of_choosing_a_value():
         parse_boxscore(data, 'nba')
 
 
+def test_nfl_boxscore_exports_receptions_for_unpriced_walkforward_data():
+    data=summary()
+    group=data['boxscore']['players'][0]['statistics'][0]
+    group['keys']=['passingYards','rushingYards','receivingYards','receptions']
+    group['athletes'][0]['stats']=['0','0','31','3']
+    rows=parse_boxscore(data,'nfl')
+    assert {(row['prop_type'],row['actual_value']) for row in rows}=={
+        ('pass_yds',0),('rush_yds',0),('rec_yds',31),('receptions',3)}
+
+
 async def test_walkforward_uses_exclusive_date_and_no_fabricated_quotes(monkeypatch):
     from sportsbet.quant import walkforward
     from sportsbet.graph.models import PropResult

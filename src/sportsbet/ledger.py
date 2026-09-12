@@ -21,7 +21,7 @@ SETTLEMENT_REF = re.compile(
 STAT_COLUMNS = {
     'nba': {'points': 'points', 'rebounds': 'rebounds', 'assists': 'assists'},
     'nfl': {'pass_yds': 'passing_yards', 'rush_yds': 'rushing_yards',
-            'rec_yds': 'receiving_yards'},
+            'rec_yds': 'receiving_yards', 'receptions': 'receptions'},
 }
 
 

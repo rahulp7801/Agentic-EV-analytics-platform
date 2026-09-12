@@ -11,7 +11,7 @@ from sportsbet.ingestion.provenance import stat_row_sha256
 def test_nfl_ingestion_attaches_reproducible_source_and_record_evidence():
     data=pl.DataFrame([dict(player_id='gsis-1',player_display_name='Player',recent_team='BUF',
         season=2026,week=1,season_type='REG',passing_yards=251,rushing_yards=3,
-        receiving_yards=0)])
+        receiving_yards=18,receptions=2)])
     captured=[]
     def capture(frame,name,*args,**kwargs):
         captured.append(frame.copy())
@@ -37,4 +37,5 @@ def test_nfl_ingestion_preserves_unavailable_tracked_stat_as_null():
         ingest_player_stats_seasons([2026],engine)
     row=captured[0].iloc[0].to_dict()
     assert pd.isna(row['rushing_yards']) and pd.isna(row['receiving_yards'])
+    assert pd.isna(row['receptions'])
     assert row['source_record_sha256']==stat_row_sha256('nfl',row)

@@ -61,6 +61,45 @@ def test_final_prop_settlement_uses_real_postgres_and_retains_provenance():
         engine.dispose()
 
 
+def test_nfl_receptions_settle_with_real_postgres_and_committed_stat():
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];ledger=Ledger(database_url=url)
+    identity=uuid.uuid4().hex[:16];player_id='p-'+uuid.uuid4().hex[:12]
+    now=datetime.now(timezone.utc);day=(now-timedelta(days=1)).date()
+    payload=dict(game_id=identity,player='Reception Fixture',player_id=player_id,sport='nfl',
+        game_date=day.isoformat(),home_team='Home',away_team='Away',prop_type='receptions',
+        direction='over',line=4.5,sportsbook='book',american_odds=100,model_probability=.6,
+        captured_at=(now-timedelta(days=1,hours=3)).isoformat(),
+        game_start_time=(now-timedelta(days=1,hours=2)).isoformat(),model_version=identity)
+    stat=dict(player_id=player_id,season=2026,week=1,team='HOM',passing_yards=0,
+        rushing_yards=0,receiving_yards=62,receptions=5)
+    engine=sa.create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(sa.text("""INSERT INTO games(game_id,season,week,home_team,away_team,game_date)
+                VALUES (:id,2026,1,'HOM','AWY',:day)"""),{'id':identity,'day':day})
+            conn.execute(sa.text("""INSERT INTO player_stats(player_id,player_name,season,week,team,
+                passing_yards,rushing_yards,receiving_yards,receptions,source_provider,source_sha256,
+                source_record_sha256,source_observed_at) VALUES (:player,'Reception Fixture',2026,1,'HOM',
+                0,0,62,5,'nflverse',:source,:record,:observed)"""),
+                {'player':player_id,'source':'b'*64,'record':stat_row_sha256('nfl',stat),'observed':now})
+        key=ledger.record(identity,payload)
+        schedule=dict(status='complete',captured_at=now.isoformat(),games=[dict(
+            provider_event_id='espn-'+identity,date=day.isoformat(),home_name='Home',away_name='Away',
+            completed=True,game_time=payload['game_start_time'])])
+        assert settle_final_props(ledger,'nfl',schedule)['settled']==1
+        row=next(item for item in ledger.predictions() if item['prediction_id']==key)
+        assert row['outcome'] is True and row['actual_value']==5
+        report=ledger.report(model_version=identity)
+        assert report['settled_count']==1 and report['unverified_settlements']==0
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text('DELETE FROM player_stats WHERE player_id=:id'),{'id':player_id})
+            conn.execute(sa.text('DELETE FROM games WHERE game_id=:id'),{'id':identity})
+            conn.execute(sa.text('DELETE FROM analytics.predictions WHERE scan_id=:id'),{'id':identity})
+            conn.execute(sa.text('DELETE FROM analytics.quotes WHERE identity=:id'),{'id':ledger.quote_identity(payload)})
+        engine.dispose()
+
+
 def test_nba_fallback_protects_official_rows_and_applies_corrections_atomically():
     from sportsbet.ingestion.nba_espn import store_rows
     engine=sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
