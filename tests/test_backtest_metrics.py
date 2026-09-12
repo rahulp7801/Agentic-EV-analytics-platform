@@ -62,6 +62,31 @@ def test_fixed_brier_baselines_use_model_scored_cohort_not_all_settlements():
     assert report.brier_score==pytest.approx(.04)
     assert (report.baseline_zero_brier,report.baseline_50_brier,report.baseline_one_brier)==(.25,.25,.75)
 
+
+def test_game_cluster_intervals_reflect_within_game_dependence():
+    signals=[]
+    for game,outcome in enumerate((True,True,False,False)):
+        signals.extend([signal(actual_outcome=outcome,game_cluster_id=f'game-{game}') for _ in range(2)])
+    report=BacktestEngine().run(signals)
+    assert report.hit_rate==.5 and report.hit_rate_interval==pytest.approx((.215216,.784784),abs=1e-6)
+    assert report.hit_rate_game_cluster_count==report.roi_game_cluster_count==4
+    assert report.calibration_game_cluster_count==report.clv_game_cluster_count==4
+    assert report.hit_rate_game_cluster_interval==(0,1)
+    assert report.roi_game_cluster_interval==pytest.approx((-1,1.837386),abs=1e-6)
+    assert report.brier_score_game_cluster_interval==pytest.approx((.076261,.443739),abs=1e-6)
+    assert report.log_loss_game_cluster_interval==pytest.approx((.341060,1.086056),abs=1e-6)
+    assert report.clv_mean_game_cluster_interval==pytest.approx((.05,.05))
+    assert report.game_cluster_interval_method.startswith('95% game-cluster robust t interval')
+
+
+def test_game_cluster_intervals_require_two_identified_games():
+    one=BacktestEngine().run([signal(game_cluster_id='one')])
+    assert one.hit_rate_game_cluster_count==one.calibration_game_cluster_count==1
+    assert one.hit_rate_game_cluster_interval is one.brier_score_game_cluster_interval is None
+    unidentified=BacktestEngine().run([signal()])
+    assert unidentified.hit_rate_game_cluster_count==unidentified.calibration_game_cluster_count==0
+    assert unidentified.hit_rate_game_cluster_interval is unidentified.brier_score_game_cluster_interval is None
+
 @pytest.mark.parametrize('close', [START, START+timedelta(minutes=1), START-timedelta(hours=2)])
 def test_inplay_or_same_quote_has_no_clv(close):
     report = BacktestEngine().run([signal(snapshot_time=close)])

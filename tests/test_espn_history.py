@@ -71,5 +71,8 @@ async def test_walkforward_uses_exclusive_date_and_no_fabricated_quotes(monkeypa
     assert state['as_of_date'] == date(2026,1,28)
     assert state['last_n_games'] == 40 and state['player_prop_snapshots'] == []
     assert result['brier_score'] == pytest.approx(0.16)
+    assert result['calibration_game_cluster_count'] == 1
+    assert result['brier_score_game_cluster_interval'] is None
+    assert result['log_loss_game_cluster_interval'] is None
     assert result['roi'] is None and result['clv'] is None
     pool.close.assert_awaited_once()
