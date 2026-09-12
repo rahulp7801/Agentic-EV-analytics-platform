@@ -414,9 +414,13 @@ def kalshi_prop_handoff(source: dict, sport: str, captured_at: str) -> dict:
             milestone['start_date']).isoformat(),main_game_event_ticker=details['main_game_event_ticker'],
             home_team_id=home_id,away_team_id=away_id,home_team_aliases=aliases[home_id],
             away_team_aliases=aliases[away_id]))
+    quote_games={quote.get('milestone_id') for quote in inventory.get('quotes',[])}
+    context_games={game['milestone_id'] for game in games}
+    incomplete=inventory.get('partial_coverage',True) or not quote_games<=context_games
     evidence=dict(quotes=inventory.get('quotes',[]),player_targets=inventory.get('targets',{}),
-        games=games,coverage=inventory.get('coverage',{}),partial_coverage=source.get('partial_coverage',True))
-    return dict(schema_version=1,sport=sport,captured_at=captured_at,status=source.get('status','unavailable'),
+        games=games,coverage=inventory.get('coverage',{}),partial_coverage=incomplete)
+    status='degraded' if incomplete else inventory.get('status','unavailable')
+    return dict(schema_version=1,sport=sport,captured_at=captured_at,status=status,
         evidence=evidence,evidence_sha256=digest(evidence),execution_ready=False)
 
 

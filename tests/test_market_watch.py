@@ -83,8 +83,9 @@ def test_cross_venue_requires_unique_exact_team_and_start_match():
 
 def test_prop_handoff_keeps_only_normalized_worker_context_and_exact_team_aliases():
     from sportsbet import market_watch
-    inventory={'quotes':[{'ticker':'PROP','player_target_id':'player'}],
-        'targets':{'player':{'player_name':'Player'}},'coverage':{'structured_quote_markets':1}}
+    inventory={'quotes':[{'ticker':'PROP','player_target_id':'player','milestone_id':'game'}],
+        'targets':{'player':{'player_name':'Player'}},'coverage':{'structured_quote_markets':1},
+        'partial_coverage':False,'status':'observed'}
     source={'status':'observed','partial_coverage':False,'prop_inventory':inventory,
         'targets':{'home':{'name':'BOS','details':{'abbreviation':'BOS'}},
             'away':{'name':'LAL','details':{'abbreviation':'LAL'}}},
@@ -105,13 +106,28 @@ def test_prop_handoff_keeps_only_normalized_worker_context_and_exact_team_aliase
     assert 'team_directory' not in handoff['evidence'] and 'targets' not in handoff['evidence']
 
 
+def test_prop_handoff_completeness_is_scoped_to_props_and_required_game_context():
+    from sportsbet import market_watch
+    inventory={'quotes':[],'targets':{},'coverage':{'discovery_complete':True},
+        'partial_coverage':False,'status':'observed'}
+    source={'status':'degraded','partial_coverage':True,'prop_inventory':inventory,
+        'games':[],'targets':{},'team_directory':None}
+    handoff=market_watch.kalshi_prop_handoff(source,'nfl',NOW.isoformat())
+    assert handoff['status']=='observed' and handoff['evidence']['partial_coverage'] is False
+
+    inventory['quotes']=[{'milestone_id':'missing'}]
+    handoff=market_watch.kalshi_prop_handoff(source,'nfl',NOW.isoformat())
+    assert handoff['status']=='degraded' and handoff['evidence']['partial_coverage'] is True
+
+
 @pytest.mark.asyncio
 async def test_publish_writes_separate_prop_handoff_only_when_kalshi_is_requested(monkeypatch,tmp_path):
     from unittest.mock import AsyncMock
     from sportsbet import market_watch
     stored={};monkeypatch.chdir(tmp_path)
     source={'status':'observed','partial_coverage':False,'games':[],'targets':{},
-        'prop_inventory':{'quotes':[],'targets':{},'coverage':{}}}
+        'prop_inventory':{'quotes':[],'targets':{},'coverage':{},
+            'partial_coverage':False,'status':'observed'}}
     monkeypatch.setattr(market_watch,'kalshi_games',AsyncMock(return_value=source))
     monkeypatch.setattr(market_watch,'publish_snapshot',lambda key,value:stored.update({key:value}))
     await market_watch.run('nfl',25,1,True,'kalshi')
