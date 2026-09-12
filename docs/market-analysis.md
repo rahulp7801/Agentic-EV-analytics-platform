@@ -336,6 +336,15 @@ below one dollar for direct and non-direct account precision. These are cost
 coverage metrics. They remain independent of settlement equivalence, sportsbook
 limits and fills, so none is labeled arbitrage or profit.
 
+For each Kalshi market with at least one sportsbook quote at the exact event,
+player, stat and half-point line, both complementary sides enter a complete
+pairing funnel. A side is counted exactly once as paired, missing its Kalshi ask,
+missing its required sportsbook side, or outside the 30-second observation window.
+The worker and public boundary enforce that these four counts sum to twice the
+number of exact markets. The dashboard reports this coverage even when no positive
+gross gap exists; it measures comparable quote availability, not execution or
+profitability.
+
 Exact archived Kalshi rule text is classified into a compact worker profile only
 when its explicit language says an active player with no snap receives a pregame
 fair-market-price settlement and a player with one snap settles on the recorded
