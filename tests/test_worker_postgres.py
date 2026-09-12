@@ -256,11 +256,17 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         assert archived['source_provider'] == 'the_odds_api'
         assert archived['source_sha256'] == expected_quote.source_sha256
         assert archived['source_record_sha256'] == expected_quote.source_record_sha256
-        # NBA's 60% vs 50% quote passes policy; NFL's larger edge remains audited even if capped.
+        # Both estimates remain auditable while their distinct gates suppress a recommendation.
+        assert result['signals'] == []
+        assert predictions[0]['model_sample_size'] == count
+        lower, upper = predictions[0]['model_confidence_interval']
+        assert lower < upper
         if sport == 'nba':
-            assert result['signals'][0]['sample_size'] == count
-            assert result['signals'][0]['direction'] == 'over'
-            assert result['signals'][0]['home_team']=='Boston Celtics'
+            assert lower <= .5 <= upper
+            assert predictions[0]['gate_reason'] == 'edge_not_confident'
+        else:
+            assert lower > .5
+            assert predictions[0]['gate_reason'] == 'edge_review_limit'
         event['bookmakers'][0]['markets'][0]['outcomes'][0]['point'] = 20
         await evaluate_event(pool,event,sport,ledger,identity+'integer')
         integer = next(p for p in ledger.predictions() if p['line'] == 20)

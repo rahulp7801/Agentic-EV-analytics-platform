@@ -27,21 +27,26 @@ async def test_actual_payout_sizes_kelly(price, expected, prop_agent):
     state = {
         "session_id": "pricing", "player_name": "Test Player",
         "prop_type": "points", "prop_line": Decimal("20.5"),
-        "nba_prop_result": PropResult(true_probability=Decimal("0.6"), sample_size=50),
+        "nba_prop_result": PropResult(true_probability=Decimal("0.6"), sample_size=50,
+            confidence_interval=(Decimal("0.55"), Decimal("0.70"))),
         "quant_result": QuantResult(prediction_target="market_outcome", true_probability=Decimal("0.6")),
         "player_prop_snapshots": [quote(price)],
     }
     agent = make_prop_arbitrage_agent(sport="nba", settings_override=cfg) if prop_agent else make_arbitrage_agent(cfg)
     signal = (await agent(state))["ev_signal"]
     assert signal is not None
-    assert float(signal.kelly_fraction) == pytest.approx(float(expected))
+    conservative = {-110: 0.01375, 120: 0.04375}
+    assert float(signal.kelly_fraction) == pytest.approx(
+        conservative[price] if prop_agent else float(expected)
+    )
     assert float(signal.expected_return) == pytest.approx(0.16 / 1.1 if price == -110 else 0.32)
 
 
 async def test_prop_never_uses_under_quote_for_over_probability():
     state = {
         "player_name": "Test Player", "prop_type": "points", "prop_line": Decimal("20.5"),
-        "nba_prop_result": PropResult(true_probability=Decimal("0.6"), sample_size=50),
+        "nba_prop_result": PropResult(true_probability=Decimal("0.6"), sample_size=50,
+            confidence_interval=(Decimal("0.55"), Decimal("0.70"))),
         "player_prop_snapshots": [quote(-150, "Under"), quote(-110)],
     }
     signal = (await make_prop_arbitrage_agent(sport="nba")(state))["ev_signal"]

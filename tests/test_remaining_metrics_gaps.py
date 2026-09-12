@@ -53,8 +53,8 @@ async def test_partial_name_unlabelled_side_and_wrong_line_cannot_price_prop(cha
 
 async def test_under_interval_is_complement_of_reported_over_interval():
     quote=PlayerPropSnapshotCreate(sport='nba',player_name='P',sportsbook='book',prop_type='player_points',side='Under',line=Decimal('20.5'),price=100,implied_probability=Decimal('.5'))
-    result=await make_prop_arbitrage_agent(sport='nba')({'player_name':'P','prop_type':'points','prop_line':Decimal('20.5'),'prop_side':'under','player_prop_snapshots':[quote],'nba_prop_result':PropResult(true_probability=Decimal('.4'),sample_size=30,confidence_interval=(Decimal('.2'),Decimal('.5')))})
-    assert result['ev_signal'].confidence_interval==(Decimal('.5'),Decimal('.8'))
+    result=await make_prop_arbitrage_agent(sport='nba')({'player_name':'P','prop_type':'points','prop_line':Decimal('20.5'),'prop_side':'under','player_prop_snapshots':[quote],'nba_prop_result':PropResult(true_probability=Decimal('.4'),sample_size=30,confidence_interval=(Decimal('.2'),Decimal('.49')))})
+    assert result['ev_signal'].confidence_interval==(Decimal('.51'),Decimal('.8'))
 
 async def test_scanner_evaluates_each_line_and_under_only_quotes():
     import runpy

@@ -30,6 +30,7 @@ from sportsbet.arbitrage.kelly import fractional_kelly
 from sportsbet.config import settings as _settings
 from sportsbet.graph.models import EVSignal, NBAContextSignals, PropResult
 from sportsbet.graph.state import GraphState
+from sportsbet.prop.probability import outcome_interval_for_side
 
 log = structlog.get_logger()
 
@@ -312,6 +313,14 @@ def make_prop_arbitrage_agent(
             )
             return _NO_SIGNAL
 
+        confidence_interval = outcome_interval_for_side(
+            prop_result.confidence_interval, push_prob, direction
+        )
+        if confidence_interval is None:
+            return {**_NO_SIGNAL, "gate_reason": "uncertainty_unavailable"}
+        if confidence_interval[0] <= implied_prob:
+            return {**_NO_SIGNAL, "gate_reason": "edge_not_confident"}
+
         # EV ceiling guard: suppress signals the model can't reliably produce.
         # Real prop edges are 1–8%; anything above _EV_CAP (15%) is almost
         # certainly NormalDist overconfidence vs. an easy/goblin line, not a
@@ -330,7 +339,7 @@ def make_prop_arbitrage_agent(
 
         # Kelly sizing — Decimal(str(...)) pattern locked in Phase 2
         kelly_frac = fractional_kelly(
-            p=true_prob / (1 - push_prob),
+            p=confidence_interval[0] / (1 - push_prob),
             b=net_payout,
             fraction=Decimal(str(cfg.max_kelly_fraction)),
         )
@@ -362,9 +371,7 @@ def make_prop_arbitrage_agent(
             ev_percentage=ev_pct,
             expected_return=compute_expected_return(true_prob, net_payout, push_prob),
             push_probability=push_prob,
-            confidence_interval=(prop_result.confidence_interval if direction == "over" else
-                (tuple(Decimal("1") - x for x in reversed(prop_result.confidence_interval))
-                 if prop_result.confidence_interval is not None and push_prob == 0 else None)),
+            confidence_interval=confidence_interval,
             sample_size=prop_result.sample_size,
             data_source=prop_result.data_source,
             game_id=state.get("game_id"),

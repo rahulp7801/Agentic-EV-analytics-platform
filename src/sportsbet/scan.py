@@ -21,6 +21,7 @@ from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.prop.cross_venue import PROP_MARKETS, screen as screen_cross_venue, screen_sportsbooks
+from sportsbet.prop.probability import outcome_interval_for_side
 from sportsbet.quant.vig import american_to_raw_prob
 
 MARKETS = PROP_MARKETS
@@ -97,6 +98,8 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             continue
         counts['evaluated_selections'] += 1
         probability=prop.true_probability if side=='Over' else 1-prop.true_probability-prop.push_probability
+        model_interval=outcome_interval_for_side(
+            prop.confidence_interval,prop.push_probability,side.lower())
         signal=state.get('ev_signal')
         accepted=False
         reason=state.get('gate_reason') or 'no_positive_edge'
@@ -108,7 +111,9 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         payload=dict(game_id=event['id'],player=player,player_id=player_id,sport=sport,
             game_date=game_date.isoformat(),prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
             sportsbook=quote.sportsbook,american_odds=quote.price,model_probability=float(probability),
-            push_probability=float(prop.push_probability),captured_at=now.isoformat(),game_start_time=start.isoformat(),
+            push_probability=float(prop.push_probability),model_sample_size=prop.sample_size,
+            model_confidence_interval=[float(x) for x in model_interval] if model_interval else None,
+            captured_at=now.isoformat(),game_start_time=start.isoformat(),
             quote_time=quote.snapped_at.isoformat(),model_generated_at=now.isoformat(),
             quote_source_provider=quote.source_provider,quote_source_sha256=quote.source_sha256,
             quote_source_record_sha256=quote.source_record_sha256,accepted=accepted,gate_reason=reason,
