@@ -8,14 +8,14 @@ import hashlib
 import json
 import re
 
-from sportsbet.ledger import Ledger, utc_timestamp
+from sportsbet.ledger import Ledger, VERIFIED_SETTLEMENT_SOURCE, utc_timestamp
 from sportsbet.ingestion.provenance import STAT_FIELDS, stat_row_sha256
 
 STAT_COLUMNS={
     'nba':{'points':'points','rebounds':'rebounds','assists':'assists'},
     'nfl':{'pass_yds':'passing_yards','rush_yds':'rushing_yards','rec_yds':'receiving_yards'},
 }
-AUTO_SOURCE='observed_final_stats'
+AUTO_SOURCE=VERIFIED_SETTLEMENT_SOURCE
 AUTO_SOURCES={AUTO_SOURCE,'espn_final_stats'}
 
 
@@ -140,7 +140,8 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
         reference=f"espn_schedule+{provenance['provider']}:{game['provider_event_id']}:sha256:{digest}"
         ledger.settle({prediction['prediction_id']:outcome},source=AUTO_SOURCE,source_ref=reference,
             observed_at=max(schedule_observed,provenance['observed_at']),
-            actual_values={prediction['prediction_id']:actual})
+            actual_values={prediction['prediction_id']:actual},
+            evidence={prediction['prediction_id']:evidence})
     return dict(sport=sport,status='complete' if schedule.get('status')=='complete' else 'degraded',
         candidates=len(candidates),settled=len(resolved),pending=len(candidates)-len(resolved),
         reasons=dict(sorted(reasons.items())),execution_ready=False)

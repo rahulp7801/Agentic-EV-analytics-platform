@@ -15,6 +15,22 @@ from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.quant.backtest import BacktestSignal, BacktestEngine
 
 DEFAULT_PATH = Path('.checkpoints/analytics.sqlite')
+VERIFIED_SETTLEMENT_SOURCE = 'observed_final_stats'
+SETTLEMENT_REF = re.compile(
+    r'^espn_schedule\+(nba|espn|nflverse):([^:]{1,80}):sha256:([0-9a-f]{64})$')
+STAT_COLUMNS = {
+    'nba': {'points': 'points', 'rebounds': 'rebounds', 'assists': 'assists'},
+    'nfl': {'pass_yds': 'passing_yards', 'rush_yds': 'rushing_yards',
+            'rec_yds': 'receiving_yards'},
+}
+
+
+def json_object(value):
+    try:
+        decoded = json.loads(value) if isinstance(value, str) else value
+        return decoded if isinstance(decoded, dict) else None
+    except (TypeError, ValueError):
+        return None
 
 
 def current_model_evidence_valid(payload: dict) -> bool:
@@ -26,6 +42,49 @@ def current_model_evidence_valid(payload: dict) -> bool:
         and isinstance(payload.get('model_generated_at'),str)
         and isinstance(batch,str) and bool(re.fullmatch('[0-9a-f]{64}',batch))
         and isinstance(record,str) and bool(re.fullmatch('[0-9a-f]{64}',record)))
+
+
+def verified_settlement_evidence(payload: dict, outcome, source, source_ref,
+                                 observed_at, actual_value, evidence) -> bool:
+    """Reproduce an automatic result from its retained schedule/stat evidence."""
+    try:
+        match = SETTLEMENT_REF.fullmatch(source_ref or '')
+        proof = json_object(evidence)
+        if source != VERIFIED_SETTLEMENT_SOURCE or not match or not isinstance(proof, dict):
+            return False
+        canonical = json.dumps(proof, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        if hashlib.sha256(canonical.encode()).hexdigest() != match.group(3):
+            return False
+        sport = payload['sport']
+        column = STAT_COLUMNS[sport][payload['prop_type']]
+        row = proof['stat_row']
+        if (match.group(1) != proof['stat_provider'] or match.group(2) != proof['provider_event_id']
+                or proof.get('completed') is not True or proof.get('date') != payload['game_date']
+                or proof.get('home_name') != payload['home_team']
+                or proof.get('away_name') != payload['away_team']
+                or str(proof.get('player_id')) != str(payload['player_id'])
+                or proof.get('prop_type') != payload['prop_type']
+                or not isinstance(row, dict)
+                or not re.fullmatch('[0-9a-f]{64}', proof.get('stat_source_sha256', ''))
+                or not re.fullmatch('[0-9a-f]{64}', proof.get('stat_record_sha256', ''))):
+            return False
+        from sportsbet.ingestion.provenance import stat_row_sha256
+        if stat_row_sha256(sport, row) != proof['stat_record_sha256']:
+            return False
+        actual = Decimal(str(actual_value))
+        if (not actual.is_finite() or actual != Decimal(str(proof['actual_value']))
+                or actual != Decimal(str(row[column]))):
+            return False
+        line = Decimal(str(payload['line']))
+        expected = 'push' if actual == line else ((actual > line) == (payload['direction'] == 'over'))
+        if outcome != expected:
+            return False
+        game_time = utc_timestamp(proof['game_time'])
+        stat_time = utc_timestamp(proof['stat_observed_at'])
+        settlement_time = observed_at if isinstance(observed_at, datetime) else utc_timestamp(observed_at)
+        return game_time <= stat_time <= settlement_time.astimezone(timezone.utc)
+    except (ArithmeticError, KeyError, TypeError, ValueError):
+        return False
 
 
 def utc_timestamp(value: str) -> datetime:
@@ -43,9 +102,10 @@ class Ledger:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
-            db.execute('CREATE TABLE IF NOT EXISTS predictions (id TEXT PRIMARY KEY, scan_id TEXT NOT NULL, payload TEXT NOT NULL, outcome TEXT, outcome_source TEXT, outcome_ref TEXT, outcome_observed_at TEXT, actual_value REAL)')
+            db.execute('CREATE TABLE IF NOT EXISTS predictions (id TEXT PRIMARY KEY, scan_id TEXT NOT NULL, payload TEXT NOT NULL, outcome TEXT, outcome_source TEXT, outcome_ref TEXT, outcome_observed_at TEXT, actual_value REAL, outcome_evidence TEXT)')
             columns={row[1] for row in db.execute('PRAGMA table_info(predictions)').fetchall()}
-            for name,kind in (('outcome_source','TEXT'),('outcome_ref','TEXT'),('outcome_observed_at','TEXT'),('actual_value','REAL')):
+            for name,kind in (('outcome_source','TEXT'),('outcome_ref','TEXT'),('outcome_observed_at','TEXT'),
+                              ('actual_value','REAL'),('outcome_evidence','TEXT')):
                 if name not in columns:
                     db.execute(f'ALTER TABLE predictions ADD COLUMN {name} {kind}')
             db.execute('CREATE TABLE IF NOT EXISTS exposure (identity TEXT PRIMARY KEY, group_key TEXT NOT NULL, risk_day TEXT NOT NULL, fraction REAL NOT NULL)')
@@ -154,7 +214,8 @@ class Ledger:
         return key
 
     def settle(self, outcomes: dict, *, source: str = 'manual', source_ref: str = 'caller_supplied',
-               observed_at: datetime | None = None, actual_values: dict | None = None) -> None:
+               observed_at: datetime | None = None, actual_values: dict | None = None,
+               evidence: dict | None = None) -> None:
         if (not isinstance(source,str) or not source.strip() or len(source)>40
                 or not isinstance(source_ref,str) or not source_ref.strip() or len(source_ref)>200):
             raise ValueError('Settlement provenance is invalid')
@@ -172,24 +233,32 @@ class Ledger:
                     if not actual.is_finite():
                         raise ValueError('Settlement actual value is invalid')
                     actual=int(actual) if actual==actual.to_integral_value() else str(actual)
-                if db.execute('UPDATE predictions SET outcome=?,outcome_source=?,outcome_ref=?,outcome_observed_at=?,actual_value=? WHERE id=?',
-                    (json.dumps(outcome),source,source_ref,stamp.isoformat(),actual,key)).rowcount != 1:
+                row=db.execute('SELECT payload FROM predictions WHERE id=?',(key,)).fetchone()
+                if row is None:
                     raise ValueError(f'Unknown prediction ID: {key}')
+                proof=(evidence or {}).get(key)
+                encoded=json.dumps(proof,sort_keys=True,separators=(',',':'),allow_nan=False) if proof is not None else None
+                if source == VERIFIED_SETTLEMENT_SOURCE and not verified_settlement_evidence(
+                        json.loads(row[0]),outcome,source,source_ref,stamp,actual,encoded):
+                    raise ValueError('Verified settlement evidence is invalid')
+                db.execute('UPDATE predictions SET outcome=?,outcome_source=?,outcome_ref=?,outcome_observed_at=?,actual_value=?,outcome_evidence=? WHERE id=?',
+                    (json.dumps(outcome),source,source_ref,stamp.isoformat(),actual,encoded,key))
 
     def predictions(self) -> list[dict]:
         with self.connect() as db:
-            rows = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value FROM predictions ORDER BY id').fetchall()
+            rows = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value,outcome_evidence FROM predictions ORDER BY id').fetchall()
         return [{'prediction_id':key, **json.loads(payload), 'outcome':json.loads(outcome) if outcome else None,
             'outcome_source':source,'outcome_ref':ref,
             'outcome_observed_at':observed.isoformat() if isinstance(observed,datetime) else observed,
-            'actual_value':float(actual) if actual is not None else None}
-            for key,payload,outcome,source,ref,observed,actual in rows]
+            'actual_value':float(actual) if actual is not None else None,
+            'outcome_evidence':json_object(proof)}
+            for key,payload,outcome,source,ref,observed,actual,proof in rows]
 
     def report(self, recommendations_only: bool = False, model_version: str | None = None) -> dict:
         from dataclasses import fields
         from sportsbet.arbitrage.ev import quote_terms
         with self.connect() as db:
-            records = db.execute('SELECT id,payload,outcome,outcome_source FROM predictions').fetchall()
+            records = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value,outcome_evidence FROM predictions').fetchall()
         signals = []
         excluded = 0
         duplicate = 0
@@ -198,10 +267,7 @@ class Ledger:
         parsed = []
         versions = set()
         unverified_settlements=0
-        for prediction_id, raw, outcome, outcome_source in records:
-            if outcome is not None and outcome_source=='espn_final_stats':
-                outcome=None
-                unverified_settlements+=1
+        for prediction_id, raw, outcome, outcome_source, outcome_ref, outcome_observed, actual, proof in records:
             p = json.loads(raw)
             version = p.get('model_version') or 'unversioned'
             versions.add(version)
@@ -209,6 +275,10 @@ class Ledger:
                 continue
             if recommendations_only and not p.get('accepted'):
                 continue
+            if outcome is not None and not verified_settlement_evidence(
+                    p,json.loads(outcome),outcome_source,outcome_ref,outcome_observed,actual,proof):
+                outcome=None
+                unverified_settlements+=1
             # Without recorded actual tipoff/entry, no trustworthy historical evaluation.
             if not p.get('game_start_time') or not p.get('captured_at') or p.get('model_probability') is None:
                 excluded += 1

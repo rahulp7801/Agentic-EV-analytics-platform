@@ -36,10 +36,12 @@ def test_legacy_utc_chronology_and_model_cohorts(tmp_path):
         db.execute('INSERT INTO predictions(id,scan_id,payload,outcome) VALUES (?,?,?,?)',
             ('invalid','s',json.dumps(payload(captured_at='2026-01-01T10:00:00')),'true'))
     report=ledger.report()
-    assert report['brier_score']==pytest.approx(.04)
+    assert report['brier_score'] is None and report['pending_count']==1
     assert report['excluded_missing_metadata']==1 and report['duplicate_predictions']==1
+    assert report['unverified_settlements']==3
     assert report['available_model_versions']==['v1','v2']
-    assert ledger.report(model_version='v2')['brier_score']==pytest.approx(.64)
+    selected=ledger.report(model_version='v2')
+    assert selected['brier_score'] is None and selected['unverified_settlements']==1
     assert ledger.report(model_version='missing')['sample_size']==0
 
 

@@ -18,10 +18,11 @@ def test_postgres_audit_and_concurrent_budget():
     now=datetime.now(timezone.utc)
     key=ledger.record(group,dict(game_id=group,player='P',prop_type='points',direction='over',line=20.5,
         sportsbook='book',american_odds=100,model_probability=.6,captured_at=now.isoformat(),
-        game_start_time=(now+timedelta(hours=1)).isoformat()))
+        game_start_time=(now+timedelta(hours=1)).isoformat(),model_version=group))
     ledger.settle({key:True})
     assert any(r['prediction_id']==key and r['outcome'] is True for r in ledger.predictions())
-    assert ledger.report()['settled_count']>=1
+    report=ledger.report(model_version=group)
+    assert report['settled_count']==0 and report['unverified_settlements']==1
     def reserve(i):
         signal=EVSignal(game_id=group,player_name=str(i),direction='over',market_type='player_points',
             ev_percentage=Decimal('.1'),true_probability=Decimal('.6'),implied_probability=Decimal('.5'),
