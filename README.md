@@ -161,7 +161,9 @@ Kalshi structured targets, an ESPN team directory, and exact home/away/start
 agreement. Matching names does not establish settlement equivalence. Gross gaps
 exclude fees and tie/void scenarios; all comparisons remain unverified and no
 orders are supported. PrizePicks HTTP403 remains an access limitation, never a
-reason to substitute synthetic odds.
+reason to substitute synthetic odds. Successful PrizePicks archives commit the
+canonical raw JSON and each normalized projection with reproducible SHA-256
+hashes and one provider observation time; tier labels remain unpriced metadata.
 
 Daily prop scans publish per-league coverage at `/api/scans`: attempted/completed
 games, missing estimates, budget exclusions, failures, and completion time. A

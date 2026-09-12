@@ -84,6 +84,12 @@ async def test_prizepicks_archive_reproduces_payload_and_projection_hashes(monke
     assert all(row['source_sha256'] == archived['source_sha256']
         and row['source_record_sha256'] == projection_record_sha256(row)
         for row in archived['projections'])
+    tampered_raw = deepcopy(archived['raw'])
+    tampered_raw['data'][0]['attributes']['line_score'] = 201.5
+    assert provider_payload_sha256(tampered_raw) != archived['source_sha256']
+    tampered_row = deepcopy(archived['projections'][0])
+    tampered_row['line'] = '201.5'
+    assert projection_record_sha256(tampered_row) != tampered_row['source_record_sha256']
 
 
 @pytest.mark.asyncio
