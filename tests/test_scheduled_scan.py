@@ -49,6 +49,8 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     assert result['coverage']['counts']['evaluated_selections']==2
     assert result['coverage']['unique_players']==result['coverage']['resolved_players']==1
     assert result['coverage']['model_requests']==2
+    assert result['coverage']['model_estimates']==2
+    assert result['coverage']['model_status']=='complete'
     assert result['coverage']['model_concurrency_limit']==8
     assert conn.fetch.await_count==1  # One identity lookup per player, not per line/side.
     assert all(call.args[1].last_n_games==40 for call in quant.call_args_list)
@@ -84,6 +86,21 @@ async def test_graph_query_failure_cannot_be_reported_as_successful_empty_scan(t
         with pytest.raises(RuntimeError,match='Model evaluation failed'):
             await evaluate_event(pool,event(), 'nba', ledger,'scan')
     assert ledger.predictions()==[]
+
+
+async def test_unresolved_quoted_player_reports_unavailable_model_coverage(tmp_path):
+    conn=AsyncMock();conn.fetch.return_value=[]
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    quant=AsyncMock(return_value=PropResult(true_probability=Decimal('.6'),sample_size=40))
+    with patch('sportsbet.prop.nba_agents.run_nba_prop_query',quant):
+        result=await evaluate_event(pool,event(),'nba',Ledger(tmp_path/'audit.sqlite'),'scan')
+    assert result['signals']==[]
+    assert result['coverage']['quotes']==2
+    assert result['coverage']['selections']==2
+    assert result['coverage']['model_requests']==result['coverage']['model_estimates']==0
+    assert result['coverage']['model_status']=='unavailable'
+    quant.assert_not_awaited()
 
 def test_api_budget_survives_restart(tmp_path):
     path=tmp_path/'budget.sqlite'

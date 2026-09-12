@@ -95,6 +95,46 @@ async def test_mismatched_quote_response_is_rejected_and_next_event_continues(mo
     assert 'nba0' in report['attempts']
 
 
+@pytest.mark.asyncio
+async def test_unavailable_model_coverage_degrades_otherwise_completed_events(monkeypatch,worker):
+    stored,events,_,_=worker
+    async def unavailable(*args):
+        return {'signals':[],'games':[],'coverage':{'quotes':2,'selections':2,
+            'model_requests':0,'model_estimates':0,'model_status':'unavailable','counts':{}}}
+    monkeypatch.setattr(scan,'evaluate_event',unavailable)
+    def handle(request):
+        if request.url.path.endswith('/events'): return httpx.Response(200,json=events['nba'])
+        return httpx.Response(200,json=next(e for e in events['nba'] if e['id'] in request.url.path))
+    transport(monkeypatch,handle)
+    report=(await scan.run(['nba'],25))['nba']
+    assert report['completed_events']==2
+    assert report['model_complete_events']==report['model_partial_events']==0
+    assert report['model_unavailable_events']==2
+    assert report['status']=='degraded'
+    assert stored['prop-screens:nba']['status']=='degraded'
+
+
+@pytest.mark.asyncio
+async def test_observed_quote_coverage_survives_model_failure(monkeypatch,worker):
+    stored,events,_,_=worker
+    now=datetime.now(timezone.utc)
+    quoted=events['nba'][0] | {'bookmakers':[{'key':'book','last_update':now.isoformat(),
+        'markets':[{'key':'player_points','outcomes':[
+            {'name':'Over','description':'Player','point':20.5,'price':-110},
+            {'name':'Under','description':'Player','point':20.5,'price':-110}]}]}]}
+    events['nba']=[events['nba'][0]]
+    monkeypatch.setattr(scan,'evaluate_event',AsyncMock(side_effect=TimeoutError))
+    def handle(request):
+        return httpx.Response(200,json=events['nba'] if request.url.path.endswith('/events') else quoted)
+    transport(monkeypatch,handle)
+    report=(await scan.run(['nba'],25))['nba']
+    assert report['status']=='degraded' and report['completed_events']==0
+    assert report['failures']==[{'stage':'event_evaluation','event_id':'nba0','error_type':'TimeoutError'}]
+    assert report['coverage']['nba0']['quotes']==2
+    assert report['coverage']['nba0']['source_committed_quotes']==2
+    assert report['coverage']['nba0']['model_status']=='pending'
+
+
 @pytest.mark.parametrize('mode',['budget_exhausted','empty','provider_failure'])
 def test_cli_status_matches_actual_scan_coverage(monkeypatch,worker,capsys,mode):
     import json

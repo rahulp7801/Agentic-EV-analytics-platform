@@ -35,6 +35,13 @@ def timestamp(value: str) -> datetime:
 def quotes_from_event(event: dict, sport: str) -> list[PlayerPropSnapshotCreate]:
     return parse_event_quotes(event, sport, set(MARKETS[sport]))
 
+def quote_coverage(quotes: list[PlayerPropSnapshotCreate]) -> dict:
+    selections={(q.player_name,q.prop_type,q.line,q.side) for q in quotes}
+    return dict(quotes=len(quotes),source_committed_quotes=sum(
+        quote.source_provider=='the_odds_api' and bool(quote.source_sha256)
+        and bool(quote.source_record_sha256) for quote in quotes),
+        selections=len(selections),unique_players=len({selection[0] for selection in selections}))
+
 async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id: str) -> dict:
     start=timestamp(event['commence_time'])
     game_date=start.astimezone(ZoneInfo('America/New_York')).date()
@@ -116,12 +123,12 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 game_start_time=start.isoformat(),sample_size=prop.sample_size,mean_stat=float(prop.mean_stat) if prop.mean_stat is not None else None,
                 confidence_interval=[float(x) for x in signal.confidence_interval] if signal.confidence_interval else None,
                 model_version='empirical-v2',strength='unrated',trade_plan=[],injury_flags={},market_type=market))
+    estimates=counts['evaluated_selections']
+    model_status=('no_quotes' if not selections else 'unavailable' if not prepared or not estimates
+        else 'complete' if len(prepared)==len(selections) and estimates==len(prepared) else 'partial')
     return dict(generated_at=datetime.now(timezone.utc).isoformat(),signals=export,
-        coverage=dict(quotes=len(quotes),source_committed_quotes=sum(
-            quote.source_provider=='the_odds_api' and bool(quote.source_sha256)
-            and bool(quote.source_record_sha256) for quote in quotes),
-            selections=len(selections),unique_players=len({selection[0] for selection in selections}),
-            resolved_players=len(player_ids),model_requests=len(prepared),
+        coverage=quote_coverage(quotes)|dict(resolved_players=len(player_ids),model_requests=len(prepared),
+            model_estimates=estimates,model_status=model_status,
             model_concurrency_limit=MAX_MODEL_CONCURRENCY,counts=dict(counts)),games=[dict(game_id=event['id'],
         home_team=event['home_team'],away_team=event['away_team'],date=game_date.strftime('%Y%m%d'),sport=sport)])
 
@@ -143,7 +150,9 @@ async def run(sports: list[str], daily_credit_limit: int):
                 previous=load_snapshot('scan:'+sport) or {}
                 report=dict(scan_id=scan_id,sport=sport,started_at=now.isoformat(),finished_at=None,status='running',
                     eligible_events=None,attempted_events=0,completed_events=0,budget_skipped_events=0,
-                    failures=[],coverage={},attempts=previous.get('attempts',{}),execution_ready=False)
+                    failures=[],coverage={},attempts=previous.get('attempts',{}),
+                    model_complete_events=0,model_partial_events=0,model_unavailable_events=0,
+                    execution_ready=False)
                 reports[sport]=report
                 publish_snapshot('scan:'+sport,report)
                 try:
@@ -183,6 +192,9 @@ async def run(sports: list[str], daily_credit_limit: int):
                     sportsbook_screen=screen_sportsbooks(quoted,sport,quotes,datetime.now(timezone.utc))
                     screened=screen_cross_venue(quoted,sport,quotes,
                         load_snapshot('kalshi-props:'+sport),datetime.now(timezone.utc))
+                    report['coverage'][event['id']]=quote_coverage(quotes)|dict(
+                        model_status='pending',cross_venue=screened['coverage'])
+                    publish_snapshot('scan:'+sport,report)
                     screens[sport].append(dict(status=screened['status'],
                         comparisons=sportsbook_screen['comparisons']+screened['comparisons']))
                     result=await asyncio.wait_for(evaluate_event(pool,quoted,sport,ledger,scan_id),timeout=120)
@@ -194,7 +206,12 @@ async def run(sports: list[str], daily_credit_limit: int):
                 except Exception as exc:
                     report['failures'].append(dict(stage='event_evaluation',event_id=event['id'],error_type=type(exc).__name__))
             for sport,report in reports.items():
-                report['status']='degraded' if report['failures'] or report['budget_skipped_events'] else 'complete'
+                model_statuses=Counter(item.get('model_status') for item in report['coverage'].values())
+                report['model_complete_events']=model_statuses['complete']
+                report['model_partial_events']=model_statuses['partial']
+                report['model_unavailable_events']=model_statuses['unavailable']
+                model_incomplete=report['model_partial_events'] or report['model_unavailable_events']
+                report['status']='degraded' if report['failures'] or report['budget_skipped_events'] or model_incomplete else 'complete'
                 report['finished_at']=datetime.now(timezone.utc).isoformat()
                 publish_snapshot('scan:'+sport,report)
                 comparisons=[row for screen in screens[sport] for row in screen['comparisons']]
