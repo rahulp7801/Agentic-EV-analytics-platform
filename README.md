@@ -198,11 +198,11 @@ public run means the requested collection succeeded, not full market coverage or
 season readiness. Provider failures still exit unsuccessfully.
 
 After both manual public operations pass, set the repository variable
-`PUBLIC_DATA_PIPELINE_ENABLED=true` to run `public_daily` at 13:17 UTC and
+`PUBLIC_DATA_PIPELINE_ENABLED=true` to attempt `public_daily` at 13:17 and 13:47 UTC and
 attempt `public_monitor` at :07/:22/:37/:52 each hour. The redundant off-hour
 attempts reduce the chance that GitHub scheduler delays leave the 90-minute
 snapshot window uncovered; they do not make GitHub Actions a guaranteed or
-low-latency scheduler. The two added slots are public-only and do not increase
+low-latency scheduler. The recovery slots are public-only and do not increase
 future paid-provider polling. These jobs receive restricted database
 credentials but no Odds API or Kalshi trading key. Full collection takes
 precedence if `DATA_PIPELINE_ENABLED=true`; the public flag does not enable
