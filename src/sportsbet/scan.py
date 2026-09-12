@@ -19,10 +19,10 @@ from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
+from sportsbet.prop.cross_venue import PROP_MARKETS, screen as screen_cross_venue
 from sportsbet.quant.vig import american_to_raw_prob
 
-MARKETS = {'nba':{'player_points':'points','player_rebounds':'rebounds','player_assists':'assists'},
-           'nfl':{'player_pass_yds':'pass_yds','player_rush_yds':'rush_yds','player_reception_yds':'rec_yds'}}
+MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl'}
 
 def timestamp(value: str) -> datetime:
@@ -112,6 +112,7 @@ async def run(sports: list[str], daily_credit_limit: int):
     now=datetime.now(timezone.utc)
     reports={}
     queues={}
+    screens={sport:[] for sport in sports}
     try:
         async with httpx.AsyncClient(base_url='https://api.the-odds-api.com/v4',timeout=20,follow_redirects=False) as client:
             for sport in sports:
@@ -154,16 +155,29 @@ async def run(sports: list[str], daily_credit_limit: int):
                     quoted=response.json()
                     if quoted.get('id')!=event['id'] or any(quoted.get(k)!=event.get(k) for k in ('home_team','away_team')) or timestamp(quoted['commence_time'])!=timestamp(event['commence_time']):
                         raise ValueError('Quote response does not match the discovered event')
+                    screened=screen_cross_venue(quoted,sport,quotes_from_event(quoted,sport),
+                        load_snapshot('kalshi-props:'+sport),datetime.now(timezone.utc))
+                    screens[sport].append(screened)
                     result=await asyncio.wait_for(evaluate_event(pool,quoted,sport,ledger,scan_id),timeout=120)
+                    result['cross_venue']=screened
                     publish_snapshot(f'signals:{sport}:{event["id"]}',result)
                     report['completed_events']+=1
-                    report['coverage'][event['id']]=result['coverage']
+                    report['coverage'][event['id']]=result['coverage']|{'cross_venue':screened['coverage']}
                 except Exception as exc:
                     report['failures'].append(dict(stage='event_evaluation',event_id=event['id'],error_type=type(exc).__name__))
             for sport,report in reports.items():
                 report['status']='degraded' if report['failures'] or report['budget_skipped_events'] else 'complete'
                 report['finished_at']=datetime.now(timezone.utc).isoformat()
                 publish_snapshot('scan:'+sport,report)
+                comparisons=[row for screen in screens[sport] for row in screen['comparisons']]
+                observed=sum(screen['status']=='observed' for screen in screens[sport])
+                screen_status='observed' if (report['status']=='complete' and (
+                    report['eligible_events']==0 or observed==report['eligible_events'])) else 'degraded'
+                publish_snapshot('prop-screens:'+sport,dict(schema_version=1,scan_id=scan_id,sport=sport,
+                    generated_at=report['finished_at'],status=screen_status,
+                    coverage=dict(events=len(screens[sport]),observed_events=observed,
+                        unavailable_events=sum(screen['status']=='unavailable' for screen in screens[sport]),
+                        positive_gross_gaps=len(comparisons)),comparisons=comparisons,execution_ready=False))
         publish_snapshot('metrics:all',ledger.report())
         publish_snapshot('metrics:recommendations',ledger.report(True))
         return reports

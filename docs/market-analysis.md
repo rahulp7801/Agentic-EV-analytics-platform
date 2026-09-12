@@ -265,6 +265,26 @@ remain prerequisites for executable recommendations. Quoted size is not a fill.
 Multiple independently optimized candidates must not share the same bankroll or
 liquidity without a portfolio-level reservation.
 
+The paid sportsbook scan now performs a bounded prop price screen against that
+internal handoff before running the slower model graph. A handoff is rejected if
+it is stale, future-dated, incomplete, hash-mismatched, or not fully observed.
+Events require one exact home/away/start match. Players use case-folded and
+whitespace-normalized canonical names only; duplicate names are ambiguous rather
+than guessed. Stat type, line, and complementary outcome must be exact, and quote
+observations may differ by at most30seconds. Only half-point lines are screened,
+because an integer-stat push prevents the two legs from being simple complements.
+Current-scan results replace `prop-screens:{sport}` so an empty or degraded run
+does not leave an old candidate looking current. Positive rows are explicitly
+gross price gaps: Kalshi fees, sportsbook limits, fills, DNP/void/stat rules, and
+settlement equivalence remain unset, and `execution_ready` is always false.
+The NFL paid scan requests all four corresponding core markets: passing yards,
+rushing yards, receiving yards, and receptions. API credits are reserved for all
+four before the provider request; partial affordability skips the event.
+The read-only `/api/prop-screens?sport=nfl|nba` response omits internal scan,
+milestone, and evidence identifiers. It revalidates the complementary legs and
+price arithmetic at the public boundary and removes candidates more than five
+minutes after observation. Captured counts remain visible when candidates expire.
+
 Free ESPN data provides outcomes, not historical player-prop prices. Current real
 walk-forward pilots exercise the actual model graph at explicitly chosen research
 thresholds. They have no priced ROI or CLV. Build forward timestamped quote history
