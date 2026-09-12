@@ -409,7 +409,10 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
             prop_linked_markets=prop_coverage['linked_markets'],prop_linked_events=prop_coverage['linked_events'],
             prop_structured_quote_markets=prop_coverage['structured_quote_markets'],
             prop_two_sided_quote_markets=prop_coverage['two_sided_quote_markets'],
-            prop_player_resolved_quote_markets=prop_coverage['player_resolved_quote_markets']))
+            prop_player_resolved_quote_markets=prop_coverage['player_resolved_quote_markets'],
+            prop_fee_contexts_expected=prop_coverage['fee_contexts_expected'],
+            prop_fee_contexts_observed=prop_coverage['fee_contexts_observed'],
+            prop_fee_failures=len(prop_inventory['fee_failures'])))
 
 
 def book_quotes(event: dict, now: datetime) -> list[dict]:

@@ -84,7 +84,8 @@ def test_cross_venue_requires_unique_exact_team_and_start_match():
 def test_prop_handoff_keeps_only_normalized_worker_context_and_exact_team_aliases():
     from sportsbet import market_watch
     inventory={'quotes':[{'ticker':'PROP','player_target_id':'player','milestone_id':'game'}],
-        'targets':{'player':{'player_name':'Player'}},'coverage':{'structured_quote_markets':1},
+        'targets':{'player':{'player_name':'Player'}},'coverage':{'structured_quote_markets':1,
+            'fee_contexts_expected':1,'fee_contexts_observed':1},
         'fee_contexts':{'PROP-EVENT':{'status':'observed'}},
         'partial_coverage':False,'status':'observed'}
     source={'status':'observed','partial_coverage':False,'prop_inventory':inventory,
@@ -110,7 +111,8 @@ def test_prop_handoff_keeps_only_normalized_worker_context_and_exact_team_aliase
 
 def test_prop_handoff_completeness_is_scoped_to_props_and_required_game_context():
     from sportsbet import market_watch
-    inventory={'quotes':[],'targets':{},'coverage':{'discovery_complete':True},
+    inventory={'quotes':[],'targets':{},'fee_contexts':{},'coverage':{'discovery_complete':True,
+        'fee_contexts_expected':0,'fee_contexts_observed':0},
         'partial_coverage':False,'status':'observed'}
     source={'status':'degraded','partial_coverage':True,'prop_inventory':inventory,
         'games':[],'targets':{},'team_directory':None}

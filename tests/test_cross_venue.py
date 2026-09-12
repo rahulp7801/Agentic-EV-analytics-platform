@@ -42,7 +42,8 @@ def handoff() -> dict:
             main_game_event_ticker='KXNFLGAME', home_team_id='home', away_team_id='away',
             home_team_aliases=['KC', 'Kansas City Chiefs'], away_team_aliases=['BUF', 'Buffalo Bills'])],
         coverage=dict(discovery_complete=True, series_observed=4, series_expected=4,
-            structured_quote_markets=1, player_resolved_quote_markets=1), partial_coverage=False)
+            structured_quote_markets=1, player_resolved_quote_markets=1,
+            fee_contexts_expected=0,fee_contexts_observed=0), partial_coverage=False)
     return dict(schema_version=1, sport='nfl', captured_at=NOW.isoformat(), status='observed',
         evidence=evidence, evidence_sha256=digest(evidence), execution_ready=False)
 
@@ -65,6 +66,8 @@ def fee_handoff() -> dict:
         series_changes={'series_fee_change_arr':[]},
         event_changes={'event_fee_changes':[],'cursor':''},series_sha256=sha,
         series_changes_sha256=sha,event_changes_sha256=sha)}
+    value['evidence']['coverage']['fee_contexts_expected']=1
+    value['evidence']['coverage']['fee_contexts_observed']=1
     return rehash(value)
 
 
@@ -93,7 +96,8 @@ def test_captured_prop_fees_add_a_cost_scenario_without_claiming_profit():
 
 def test_missing_ambiguous_or_waived_prop_fees_preserve_only_the_gross_screen():
     cases=[]
-    missing=fee_handoff();missing['evidence']['fee_contexts']={};cases.append(rehash(missing))
+    missing=fee_handoff();missing['evidence']['fee_contexts']={}
+    missing['evidence']['coverage']['fee_contexts_observed']=0;cases.append(rehash(missing))
     incomplete=fee_handoff();context=next(iter(incomplete['evidence']['fee_contexts'].values()))
     context['event_changes']['cursor']='next';cases.append(rehash(incomplete))
     waived=fee_handoff();waived['evidence']['quotes'][0]['fee_waiver_expiration_time']=(

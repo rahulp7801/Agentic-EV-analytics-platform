@@ -148,8 +148,11 @@ Coverage reports discovered, inspected, quoted and failed games; discovery or
 sampling limits remain explicit. A failed event or market preserves other valid
 observations. It also reports bounded open player-prop inventory for four core NFL
 and three core NBA series, linked only through structured milestone event IDs.
-Those aggregate counts are coverage evidence, not captured prop quotes or arb
-candidates. Quote freshness uses each comparison's oldest leg, not collection
+The private worker handoff retains those exact prop quotes and public Kalshi fee
+terms for sportsbook comparison. The public prop-screen API exposes only fresh,
+exact, non-executable gross gaps and validated one-contract fee-cost scenarios;
+it never reports fee-adjusted or realized profit. Aggregate counts remain coverage
+evidence. Quote freshness uses each comparison's oldest leg, not collection
 completion time. Team matching uses captured
 Kalshi structured targets, an ESPN team directory, and exact home/away/start
 agreement. Matching names does not establish settlement equivalence. Gross gaps

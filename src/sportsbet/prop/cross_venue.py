@@ -90,8 +90,15 @@ def _evidence(handoff: dict | None, sport: str, now: datetime) -> tuple[dict, da
     if not isinstance(evidence.get('quotes'), list) or not isinstance(evidence.get('games'), list) \
             or not isinstance(evidence.get('player_targets'), dict):
         raise InvalidHandoff('handoff_incomplete_or_corrupt')
-    if version==2 and not isinstance(evidence.get('fee_contexts'),dict):
-        raise InvalidHandoff('handoff_incomplete_or_corrupt')
+    if version==2:
+        contexts=evidence.get('fee_contexts')
+        fee_counts=[coverage.get(key) for key in ('fee_contexts_expected','fee_contexts_observed')]
+        if (not isinstance(contexts,dict)
+                or any(type(value) is not int or value<0 for value in fee_counts)
+                or coverage['fee_contexts_observed']!=len(contexts)
+                or coverage['fee_contexts_expected']<coverage['fee_contexts_observed']
+                or any(not isinstance(event,str) or not event for event in contexts)):
+            raise InvalidHandoff('handoff_incomplete_or_corrupt')
     return evidence, captured, version
 
 
