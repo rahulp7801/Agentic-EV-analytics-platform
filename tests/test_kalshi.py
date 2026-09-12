@@ -1,6 +1,7 @@
 """Authentication isolation and fixed-point order-book regression checks."""
 import base64
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -69,6 +70,60 @@ async def test_signed_get_is_verifiable_and_cannot_redirect_credentials(monkeypa
         with pytest.raises(ValueError, match='not configured'):
             await reader.check_credentials()
     assert len(calls) == 3  # Never fall back from demo to production credentials.
+
+
+@pytest.mark.asyncio
+async def test_reads_retry_transient_statuses_with_bounded_exponential_backoff(monkeypatch):
+    from sportsbet.ingestion import kalshi
+    statuses=iter((503,429,200));calls=[]
+    def handle(request):
+        calls.append(request)
+        status=next(statuses)
+        return httpx.Response(status,json={'markets':[]} if status==200 else {'error':'temporary'})
+    sleep=AsyncMock();monkeypatch.setattr(kalshi.asyncio,'sleep',sleep)
+    async with KalshiReader(transport=httpx.MockTransport(handle)) as reader:
+        assert await reader._get('/markets') == {'markets':[]}
+    assert len(calls)==3
+    assert [call.args[0] for call in sleep.await_args_list]==[0.25,0.5]
+
+
+@pytest.mark.asyncio
+async def test_authenticated_retry_regenerates_request_headers(monkeypatch):
+    from sportsbet.ingestion import kalshi
+    observed=[];statuses=iter((503,200))
+    def handle(request):
+        observed.append(request.headers['X-Test-Signature'])
+        return httpx.Response(next(statuses),json={'ok':True})
+    sleep=AsyncMock();monkeypatch.setattr(kalshi.asyncio,'sleep',sleep)
+    async with KalshiReader(transport=httpx.MockTransport(handle)) as reader:
+        reader._headers=MagicMock(side_effect=[{'X-Test-Signature':'first'},
+            {'X-Test-Signature':'second'}])
+        assert await reader._get('/api_keys',authenticated=True) == {'ok':True}
+        assert reader._headers.call_count==2
+    assert observed==['first','second'] and sleep.await_count==1
+
+
+@pytest.mark.asyncio
+async def test_reads_do_not_retry_permanent_errors_and_bound_transport_retries(monkeypatch):
+    from sportsbet.ingestion import kalshi
+    sleep=AsyncMock();monkeypatch.setattr(kalshi.asyncio,'sleep',sleep)
+    permanent=[]
+    def reject(request):
+        permanent.append(request)
+        return httpx.Response(400,json={'error':'bad request'})
+    async with KalshiReader(transport=httpx.MockTransport(reject)) as reader:
+        with pytest.raises(RuntimeError,match='HTTP 400'):
+            await reader._get('/markets')
+    assert len(permanent)==1 and sleep.await_count==0
+
+    attempts=[]
+    def disconnect(request):
+        attempts.append(request)
+        raise httpx.ConnectError('provider unavailable',request=request)
+    async with KalshiReader(transport=httpx.MockTransport(disconnect)) as reader:
+        with pytest.raises(RuntimeError,match='transport'):
+            await reader._get('/markets')
+    assert len(attempts)==3 and sleep.await_count==2
 
 
 @pytest.mark.asyncio
