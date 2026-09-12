@@ -177,3 +177,15 @@ async def test_none_signals_returns_baseline():
     result = result_dict["nba_prop_result"]
     assert result.true_probability == Decimal("0.42")
     assert result.data_source == "postgresql"
+
+
+async def test_missing_context_never_invents_player_side_or_opponent():
+    base_result=PropResult(true_probability=Decimal("0.42"),data_source="postgresql",
+        sample_size=45,confidence_interval=None)
+    query=AsyncMock(return_value=base_result)
+    agent=make_nba_quant_agent(MagicMock(),target_date=date(2024,11,20))
+    with patch("sportsbet.prop.nba_agents.run_nba_prop_query",new=query):
+        await agent(_base_state(nba_context_signals=None))
+    params=query.await_args.args[1]
+    assert params.opponent_team is None
+    assert params.home_away is None

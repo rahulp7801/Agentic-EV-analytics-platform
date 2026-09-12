@@ -4,9 +4,9 @@ These tests define the exact contract that nba_context_producer.py must satisfy.
 
 Key invariants tested:
 - Happy path: player has gamelog rows, rest_days and is_home computed correctly
-- Cold DB (no gamelog rows): returns league-average NBAContextSignals
+- Cold DB or a team mismatch: returns no matchup context
 - Back-to-back not triggered: last game 3 days ago -> rest_days=2
-- Invalid player_id (empty string): returns league-average defaults without DB query
+- Invalid player_id (empty string): returns no matchup context without a DB query
 - Decimal wrapping: opponent_def_rating is Decimal instance, not float
 - No opponent stats (avg_pts_per_game is None): falls back to LEAGUE_AVG_DEF_RATING
 
@@ -114,24 +114,22 @@ async def test_unknown_provider_team_identity_fails_closed():
 
 
 async def test_cold_db_no_gamelog_rows():
-    """Test 2: cold DB — fetchrow returns None (no gamelog rows for player/season).
-
-    Should return NBAContextSignals with league-average defaults.
-    rest_days=1 (default), opponent_def_rating=LEAGUE_AVG_DEF_RATING,
-    pace_factor=LEAGUE_AVG_PACE, is_home=False (default when no DB data).
-    """
+    """A cold DB cannot establish the player's side or opponent."""
     pool = make_mock_pool([None])  # Only one fetchrow call; returns None
     state = _make_state(receiver_gsis_id="2544")
     producer = make_nba_context_signals_producer(pool, target_date=date(2025, 1, 15))
 
     result = await producer(state)
 
-    signals: NBAContextSignals = result["nba_context_signals"]
-    assert isinstance(signals, NBAContextSignals)
-    assert signals.rest_days == 1, f"Cold DB default rest_days should be 1, got {signals.rest_days}"
-    assert signals.opponent_def_rating == LEAGUE_AVG_DEF_RATING
-    assert signals.pace_factor == LEAGUE_AVG_PACE
-    assert signals.is_home is False
+    assert result["nba_context_signals"] is None
+    assert result["home_team"] == "LAL" and result["away_team"] == "BOS"
+
+
+async def test_latest_player_team_must_belong_to_the_scheduled_event():
+    pool=make_mock_pool([{"team_abbreviation":"MIA","game_date":date(2025,1,14)}])
+    producer=make_nba_context_signals_producer(pool,target_date=date(2025,1,15))
+    result=await producer(_make_state(home_team="LAL",away_team="BOS"))
+    assert result["nba_context_signals"] is None
 
 
 async def test_not_back_to_back_three_days_ago():
@@ -157,11 +155,7 @@ async def test_not_back_to_back_three_days_ago():
 
 
 async def test_invalid_player_id_empty_string():
-    """Test 4: invalid player_id (empty string) -> returns league-average defaults, no DB query.
-
-    When receiver_gsis_id is empty string, producer should short-circuit and return
-    NBAContextSignals with league-average defaults without touching the DB.
-    """
+    """An empty player ID cannot establish matchup context or touch the DB."""
     # Pool should NOT be called — pass a pool that would fail if called
     pool = make_mock_pool([])  # No side effects; any call would raise StopAsyncIteration
     state = _make_state(receiver_gsis_id="")  # Empty string -> invalid
@@ -169,12 +163,7 @@ async def test_invalid_player_id_empty_string():
 
     result = await producer(state)
 
-    signals: NBAContextSignals = result["nba_context_signals"]
-    assert isinstance(signals, NBAContextSignals)
-    assert signals.opponent_def_rating == LEAGUE_AVG_DEF_RATING
-    assert signals.pace_factor == LEAGUE_AVG_PACE
-    assert signals.rest_days == 1
-    assert signals.is_home is False
+    assert result["nba_context_signals"] is None
 
 
 async def test_decimal_wrapping_opponent_def_rating():
