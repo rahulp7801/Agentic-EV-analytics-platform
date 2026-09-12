@@ -25,6 +25,7 @@ from sportsbet.quant.vig import american_to_raw_prob
 MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl'}
 MAX_MODEL_CONCURRENCY = 8
+MODEL_VERSION = 'empirical-v2'
 
 def timestamp(value: str) -> datetime:
     result=datetime.fromisoformat(value.replace('Z','+00:00'))
@@ -109,7 +110,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             sportsbook=quote.sportsbook,american_odds=quote.price,model_probability=float(probability),
             push_probability=float(prop.push_probability),captured_at=now.isoformat(),game_start_time=start.isoformat(),
             quote_time=quote.snapped_at.isoformat(),accepted=accepted,gate_reason=reason,
-            stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version='empirical-v2')
+            stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version=MODEL_VERSION)
         prediction_id=ledger.record(scan_id,payload)
         counts[reason] += 1
         if signal:
@@ -122,7 +123,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 sportsbook=quote.sportsbook,american_odds=quote.price,snapped_at=quote.snapped_at.isoformat(),
                 game_start_time=start.isoformat(),sample_size=prop.sample_size,mean_stat=float(prop.mean_stat) if prop.mean_stat is not None else None,
                 confidence_interval=[float(x) for x in signal.confidence_interval] if signal.confidence_interval else None,
-                model_version='empirical-v2',strength='unrated',trade_plan=[],injury_flags={},market_type=market))
+                model_version=MODEL_VERSION,strength='unrated',trade_plan=[],injury_flags={},market_type=market))
     estimates=counts['evaluated_selections']
     model_status=('no_quotes' if not selections else 'unavailable' if not prepared or not estimates
         else 'complete' if len(prepared)==len(selections) and estimates==len(prepared) else 'partial')
@@ -233,8 +234,8 @@ async def run(sports: list[str], daily_credit_limit: int):
                         kalshi_non_direct_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['non_direct'])<1
                             for row in comparisons if 'exchange_fee_scenarios' in row)),
                     comparisons=comparisons,execution_ready=False))
-        publish_snapshot('metrics:all',ledger.report())
-        publish_snapshot('metrics:recommendations',ledger.report(True))
+        publish_snapshot('metrics:all',ledger.report(model_version=MODEL_VERSION))
+        publish_snapshot('metrics:recommendations',ledger.report(True,model_version=MODEL_VERSION))
         return reports
     finally:
         await pool.close()
