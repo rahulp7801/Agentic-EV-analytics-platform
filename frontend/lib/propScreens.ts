@@ -74,7 +74,7 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
             || (legs[0].side === 'no' && legs[1].side === 'Over'))) throw new Error('Invalid prop screen');
       const line=decimal(item.line), cost=decimal(item.gross_cost_to_one_dollar,0,1,true);
       const gap=decimal(item.gross_gap_to_one_dollar,0,1,true);
-      const allowed=data.sport === 'nfl' ? ['pass_yds','rush_yds','rec_yds'] : ['points','rebounds','assists'];
+      const allowed=data.sport === 'nfl' ? ['pass_yds','rush_yds','rec_yds','receptions'] : ['points','rebounds','assists'];
       if (!allowed.includes(text(item.prop_type)) || Number(line)%1 !== .5
           || Math.abs(Number(legs[0].cost)+Number(legs[1].cost)-Number(cost)) > 1e-12
           || Math.abs(Number(cost)+Number(gap)-1) > 1e-12) throw new Error('Invalid prop screen');

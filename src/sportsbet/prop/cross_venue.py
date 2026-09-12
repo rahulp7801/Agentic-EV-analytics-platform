@@ -13,7 +13,7 @@ from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
 PROP_MARKETS = {
     'nba': {'player_points': 'points', 'player_rebounds': 'rebounds', 'player_assists': 'assists'},
     'nfl': {'player_pass_yds': 'pass_yds', 'player_rush_yds': 'rush_yds',
-            'player_reception_yds': 'rec_yds'},
+            'player_reception_yds': 'rec_yds', 'player_receptions': 'receptions'},
 }
 MAX_AGE_SECONDS = 300
 MAX_SKEW_SECONDS = 30

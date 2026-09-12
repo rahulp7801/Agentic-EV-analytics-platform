@@ -277,6 +277,9 @@ Current-scan results replace `prop-screens:{sport}` so an empty or degraded run
 does not leave an old candidate looking current. Positive rows are explicitly
 gross price gaps: Kalshi fees, sportsbook limits, fills, DNP/void/stat rules, and
 settlement equivalence remain unset, and `execution_ready` is always false.
+The NFL paid scan requests all four corresponding core markets: passing yards,
+rushing yards, receiving yards, and receptions. API credits are reserved for all
+four before the provider request; partial affordability skips the event.
 The read-only `/api/prop-screens?sport=nfl|nba` response omits internal scan,
 milestone, and evidence identifiers. It revalidates the complementary legs and
 price arithmetic at the public boundary and removes candidates more than five

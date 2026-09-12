@@ -63,6 +63,11 @@ def test_exact_complementary_quotes_emit_only_an_unverified_gross_screen():
     assert row['fee_adjusted_profit'] is None and row['realized_profit'] is None
 
 
+def test_all_collected_core_nfl_prop_series_have_a_sportsbook_market():
+    from sportsbet.prop.cross_venue import PROP_MARKETS
+    assert set(PROP_MARKETS['nfl'].values()) == {'pass_yds','rush_yds','rec_yds','receptions'}
+
+
 def test_handoff_hash_completeness_status_and_age_fail_closed():
     cases = []
     changed = handoff(); changed['evidence_sha256'] = '0'*64; cases.append(changed)

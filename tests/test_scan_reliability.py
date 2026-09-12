@@ -47,7 +47,7 @@ async def test_budget_rotation_covers_both_leagues_and_unseen_events(monkeypatch
         return httpx.Response(200,json=next(e for e in events[sport] if e['id']==identity))
     transport(monkeypatch,handle)
     # Raise the daily ceiling by exactly one event each run; prior credits remain spent.
-    for limit in (3,6,9,12):
+    for limit in (4,7,11,14):
         await scan.run(['nfl','nba'],limit)
     assert evaluated==['nfl0','nba0','nfl1','nba1']
     assert stored['scan:nba']['completed_events']==1
