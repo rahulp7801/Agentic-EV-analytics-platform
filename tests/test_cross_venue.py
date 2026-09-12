@@ -2,7 +2,11 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
+from sportsbet.ingestion.prop_odds import (
+    PlayerPropSnapshotCreate,
+    prop_quote_record_sha256,
+    provider_event_sha256,
+)
 from sportsbet.market_watch import digest
 from sportsbet.arbitrage.kalshi_fees import taker_buy_cost
 from sportsbet.prop.cross_venue import screen, screen_sportsbooks
@@ -18,11 +22,13 @@ def event() -> dict:
         commence_time=START.isoformat())
 
 
-def book(side='Under', line=Decimal('249.5'), observed=NOW, player='Player Name'):
-    price = 150
-    return PlayerPropSnapshotCreate(sport='nfl', game_id='book-game', player_name=player,
-        sportsbook='book', prop_type='player_pass_yds', side=side, line=line, price=price,
-        implied_probability=american_to_raw_prob(price), snapped_at=observed, game_start_time=START)
+def book(side='Under', line=Decimal('249.5'), observed=NOW, player='Player Name',
+        sportsbook='book', price=150):
+    quote=PlayerPropSnapshotCreate(sport='nfl', game_id='book-game', player_name=player,
+        sportsbook=sportsbook, prop_type='player_pass_yds', side=side, line=line, price=price,
+        implied_probability=american_to_raw_prob(price), snapped_at=observed, game_start_time=START,
+        source_provider='the_odds_api',source_sha256=provider_event_sha256(event()))
+    return quote.model_copy(update={'source_record_sha256':prop_quote_record_sha256(quote)})
 
 
 def handoff() -> dict:
@@ -86,6 +92,10 @@ def test_exact_complementary_quotes_emit_only_an_unverified_gross_screen():
     assert row['settlement_review']['kalshi']['classified'] is True
     assert row['settlement_review']['kalshi']['participation']=='active_no_snap_fair_market_price'
     assert row['settlement_review']['sportsbook_rules']=='unavailable'
+    sportsbook_leg=row['legs'][1]
+    assert sportsbook_leg['source_provider']=='the_odds_api'
+    assert sportsbook_leg['source_sha256']==provider_event_sha256(event())
+    assert sportsbook_leg['source_record_sha256']==book().source_record_sha256
     assert row['fee_adjusted_profit'] is None and row['realized_profit'] is None
 
 
@@ -198,10 +208,8 @@ def test_malformed_target_or_quote_blocks_the_entire_screen():
 
 
 def test_distinct_sportsbooks_can_produce_only_an_unverified_exact_prop_gap():
-    over=book(side='Over');over.sportsbook='over-book';over.price=200
-    over.implied_probability=american_to_raw_prob(200)
-    under=book(side='Under');under.sportsbook='under-book';under.price=200
-    under.implied_probability=american_to_raw_prob(200)
+    over=book(side='Over',sportsbook='over-book',price=200)
+    under=book(side='Under',sportsbook='under-book',price=200)
     result=screen_sportsbooks(event(),'nfl',[over,under],NOW)
     row,=result['comparisons']
     assert row['kind']=='sportsbook_sportsbook_prop'
@@ -209,6 +217,8 @@ def test_distinct_sportsbooks_can_produce_only_an_unverified_exact_prop_gap():
     assert row['gross_cost_to_one_dollar']==str(2*american_to_raw_prob(200))
     assert row['settlement_equivalent'] is False and row['execution_ready'] is False
     assert row['fee_adjusted_profit'] is None and row['realized_profit'] is None
+    assert all(leg['source_provider']=='the_odds_api' for leg in row['legs'])
+    assert all(leg['source_sha256']==provider_event_sha256(event()) for leg in row['legs'])
 
 
 def test_sportsbook_screen_requires_distinct_books_half_line_freshness_and_real_price():
@@ -230,3 +240,14 @@ def test_cross_venue_rejects_a_price_probability_mismatch():
     result=screen(event(),'nfl',[corrupted],handoff(),NOW)
     assert result['comparisons']==[]
     assert result['coverage']['rejected']['sportsbook_price']==1
+
+
+def test_arb_screens_reject_sportsbook_evidence_not_bound_to_the_event():
+    changed=book()
+    changed.source_sha256='b'*64
+    changed.source_record_sha256=prop_quote_record_sha256(changed)
+    cross=screen(event(),'nfl',[changed],handoff(),NOW)
+    books=screen_sportsbooks(event(),'nfl',[changed],NOW)
+    assert cross['comparisons']==books['comparisons']==[]
+    assert cross['coverage']['rejected']['sportsbook_evidence']==1
+    assert books['coverage']['rejected']['sportsbook_evidence']==1
