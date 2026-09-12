@@ -348,6 +348,29 @@ async def test_fetch_player_props_called_with_nfl_when_sport_absent() -> None:
     mock_props.assert_called_once_with("nfl")
 
 
+@pytest.mark.asyncio
+async def test_unavailable_priced_props_fail_closed_without_public_projection_fallbacks() -> None:
+    """A sportsbook outage must not turn unpriced projections into quote evidence."""
+    mock_pool=MagicMock();state=_make_full_state(sport="nba")
+    with (
+        patch.object(OddsAPIPoller,"fetch_nba_odds",new_callable=AsyncMock,return_value=[]),
+        patch.object(OddsAPIPoller,"fetch_player_props",new_callable=AsyncMock,
+            side_effect=RuntimeError("private provider detail")) as mock_props,
+        patch("sportsbet.graph.agents.write_player_prop_snapshot") as write_prop,
+        patch("sportsbet.graph.agents.write_odds_snapshot"),
+        patch("sqlalchemy.create_engine",return_value=MagicMock()) as create_engine,
+        patch("sportsbet.ingestion.scraper.InjuryWeatherScraper.fetch_team_injuries",
+            new_callable=AsyncMock,return_value=[]),
+        patch("sportsbet.ingestion.scraper.InjuryWeatherScraper.write_injury_reports",
+            new_callable=AsyncMock,return_value=0),
+    ):
+        result=await make_context_agent(mock_pool,api_key="test-key",daily_credit_cap=500)(state)
+    mock_props.assert_called_once_with("nba")
+    write_prop.assert_not_called()
+    create_engine.assert_not_called()
+    assert result["player_prop_snapshots"] is None
+
+
 @pytest.fixture(autouse=True)
 def isolated_injury_sources(monkeypatch):
     # These tests exercise orchestration with fixture data, never live injury feeds.

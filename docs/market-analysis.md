@@ -309,7 +309,13 @@ is retained only when its gross cost is below one dollar. DNP/void/stat rules,
 limits, acceptance, and price movement remain unreviewed, so these rows are also
 unverified and non-executable with null profit fields.
 
-Free ESPN data provides outcomes, not historical player-prop prices. Current real
+Free ESPN data provides outcomes and current projection targets, not player-prop
+prices. A live NFL schema check found roughly 180 pages per game with no price
+field. The optional LangGraph context agent therefore stops after a priced
+sportsbook-provider failure instead of crawling those pages or assigning sides
+from response order. The former DraftKings fallback is also removed: its endpoint
+currently returns HTTP403 and its records could not be joined to the requested
+event by exact provider identity. Missing priced props remain missing. Current real
 walk-forward pilots exercise the actual model graph at explicitly chosen research
 thresholds. They have no priced ROI or CLV. Build forward timestamped quote history
 and evaluate genuinely held-out dates before any profitability claim.
