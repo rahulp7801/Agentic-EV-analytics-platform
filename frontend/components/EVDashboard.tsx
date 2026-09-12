@@ -92,7 +92,7 @@ function EVSignalRow({ signal, onSelect }: { signal: RichSignal; onSelect: (s: E
         </div>
       </td>
       <td>
-        <span className="badge badge-blue">NBA</span>
+        <span className={`badge ${signal.sport === 'nba' ? 'badge-blue' : 'badge-purple'}`}>{signal.sport.toUpperCase()}</span>
         {signal.gated && (
           <span className="badge badge-amber" style={{ marginLeft: 4 }}>GATED</span>
         )}
@@ -167,7 +167,7 @@ function SignalDetailPanel({ signal, onClose, onAddToParlay, inParlay }: {
               background: signal.direction === 'under' ? 'rgba(0,180,255,0.15)' : 'rgba(0,229,160,0.12)',
               color: signal.direction === 'under' ? 'var(--accent-cyan)' : 'var(--accent-mint)',
             }}>
-              {(signal.direction || 'over').toUpperCase()} {signal.line}
+              {signal.direction.toUpperCase()} {signal.line}
             </span>
             <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{signal.team} vs {signal.opponent}</span>
           </div>
@@ -237,7 +237,7 @@ function SignalDetailPanel({ signal, onClose, onAddToParlay, inParlay }: {
                 const isWeakD = delta > 1;
                 const overFavorable = isWeakD;
                 const underFavorable = isStrongD;
-                const isOver = (signal.direction || 'over') === 'over';
+                const isOver = signal.direction === 'over';
                 const favorable = isOver ? overFavorable : underFavorable;
                 const risk = isOver ? isStrongD : isWeakD;
                 return (
