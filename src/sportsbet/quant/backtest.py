@@ -159,6 +159,22 @@ def calibration_metrics(predictions: list[tuple[float, int]]) -> dict:
     result['calibration_error'] = weighted_error
     return result
 
+
+def game_cluster_score_metrics(predictions: list[tuple[str | None,float,int]]) -> dict:
+    """Cluster-robust intervals for proper scores on identified games."""
+    if any(not math.isfinite(p) or not 0 <= p <= 1 or y not in (0,1)
+            for _,p,y in predictions):
+        raise ValueError('Clustered calibration needs finite probabilities and binary outcomes')
+    brier=[(cluster,(p-y)**2) for cluster,p,y in predictions]
+    log_loss=[(cluster,-(y*math.log(max(1e-15,p))
+        +(1-y)*math.log(max(1e-15,1-p)))) for cluster,p,y in predictions]
+    count,brier_interval=_game_cluster_mean_interval(brier,lower=0,upper=1)
+    _,log_loss_interval=_game_cluster_mean_interval(log_loss,lower=0)
+    return dict(calibration_game_cluster_count=count,
+        brier_score_game_cluster_interval=brier_interval,
+        log_loss_game_cluster_interval=log_loss_interval,
+        game_cluster_interval_method=GAME_CLUSTER_INTERVAL_METHOD)
+
 class BacktestEngine:
     def run(self, signals: list[BacktestSignal]) -> BacktestReport:
         report = BacktestReport(sample_size=len(signals))
@@ -167,7 +183,7 @@ class BacktestEngine:
         profits, stakes, clvs, wins = [], [], [], []
         roi_clusters: list[tuple[str | None,float,float]] = []
         hit_clusters: list[tuple[str | None,float]] = []
-        score_clusters: list[tuple[str | None,float,float]] = []
+        score_clusters: list[tuple[str | None,float,int]] = []
         clv_clusters: list[tuple[str | None,float]] = []
         for s in signals:
             outcome = s.actual_outcome
@@ -208,10 +224,7 @@ class BacktestEngine:
                     if p is not None and push < 1:
                         decided_probability = p/(1-push)
                         predictions.append((decided_probability,int(outcome)))
-                        score_clusters.append((s.game_cluster_id,
-                            (decided_probability-int(outcome))**2,
-                            -(int(outcome)*math.log(max(1e-15,decided_probability))
-                              +(1-int(outcome))*math.log(max(1e-15,1-decided_probability)))))
+                        score_clusters.append((s.game_cluster_id,decided_probability,int(outcome)))
             rows.append(dict(model_probability=p, signal_implied_prob=entry, closing_implied_prob=close,
                 actual_outcome=outcome, profit=profit, stake=float(s.stake), raw_clv=clv,
                 payout_multiplier=float(s.payout_multiplier), game_start_time=s.game_start_time,
@@ -232,11 +245,8 @@ class BacktestEngine:
             _game_cluster_ratio_interval(roi_clusters,lower=-1)
         report.hit_rate_game_cluster_count, report.hit_rate_game_cluster_interval = \
             _game_cluster_mean_interval(hit_clusters,lower=0,upper=1)
-        report.calibration_game_cluster_count, report.brier_score_game_cluster_interval = \
-            _game_cluster_mean_interval([(cluster,brier) for cluster,brier,_ in score_clusters],
-                lower=0,upper=1)
-        _, report.log_loss_game_cluster_interval = _game_cluster_mean_interval(
-            [(cluster,loss) for cluster,_,loss in score_clusters],lower=0)
+        for name,value in game_cluster_score_metrics(score_clusters).items():
+            setattr(report,name,value)
         report.clv_game_cluster_count, report.clv_mean_game_cluster_interval = \
             _game_cluster_mean_interval(clv_clusters,lower=-1,upper=1)
         return report

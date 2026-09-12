@@ -20,7 +20,7 @@ from sportsbet.ingestion.espn_history import STATS
 from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.prop.nba_agents import make_nba_quant_agent
-from sportsbet.quant.backtest import calibration_metrics
+from sportsbet.quant.backtest import calibration_metrics, game_cluster_score_metrics
 from sportsbet.model_contract import MODEL_VERSION
 
 
@@ -35,7 +35,7 @@ async def evaluate(dataset: dict, prop: str, threshold: Decimal) -> dict:
     pool = await create_async_pool()
     graph = create_graph(nba_quant_node=make_nba_quant_agent(pool),
         prop_quant_node=make_prop_quant_agent(pool), prop_arbitrage_node=make_prop_arbitrage_agent(sport=sport))
-    scored, skipped, predictions, identities = [], Counter(), [], {}
+    scored, skipped, predictions, cluster_predictions, identities = [], Counter(), [], [], {}
     rows = [r for r in dataset['records'] if r['prop_type'] == prop]
     seen = set()
     try:
@@ -71,7 +71,9 @@ async def evaluate(dataset: dict, prop: str, threshold: Decimal) -> dict:
             outcome = 'push' if actual == threshold else bool(actual > threshold)
             p, push = float(estimate.true_probability), float(estimate.push_probability)
             if type(outcome) is bool and push < 1:
-                predictions.append((p/(1-push), int(outcome)))
+                decided_probability=p/(1-push)
+                predictions.append((decided_probability,int(outcome)))
+                cluster_predictions.append((row['event_id'],decided_probability,int(outcome)))
             scored.append(row | dict(model_player_id=str(players[0]['player_id']),
                 research_threshold=str(threshold), model_probability=p, push_probability=push,
                 sample_size=estimate.sample_size, outcome=outcome))
@@ -80,6 +82,7 @@ async def evaluate(dataset: dict, prop: str, threshold: Decimal) -> dict:
     return dict(sport=sport, prop_type=prop, research_threshold=str(threshold), model_version=MODEL_VERSION,
         candidate_count=len(rows), evaluated_count=len(scored), skipped=dict(skipped),
         **calibration_metrics(predictions),
+        **game_cluster_score_metrics(cluster_predictions),
         roi=None, clv=None,
         records=scored, limitations=[
             'Fixed user-specified research threshold, not a historical sportsbook line; no priced betting result.',
@@ -87,7 +90,8 @@ async def evaluate(dataset: dict, prop: str, threshold: Decimal) -> dict:
             'Participating-player outcome cohort; missing identities and small samples are reported, not filled.',
             'Brier baselines use fixed 0%, 50%, and 100% Over probabilities on the same scored non-push outcomes; none is fitted to this holdout.',
             'Historical stats include later provider corrections. No historical injury/roster adjustment.',
-            'Multiple players share games; samples are not independent. Small pilot results do not establish an edge.'])
+            'Game-cluster score intervals allow within-game dependence when at least two games are scored; repeat-player dependence across games remains unadjusted.',
+            'Small pilot results do not establish an edge.'])
 
 
 def main():
