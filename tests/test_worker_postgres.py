@@ -30,7 +30,7 @@ def test_final_prop_settlement_uses_real_postgres_and_retains_provenance():
         game_date=day.isoformat(),home_team='Home',away_team='Away',prop_type='points',direction='over',
         line=20.5,sportsbook='book',american_odds=100,model_probability=.6,
         captured_at=(now-timedelta(days=1,hours=3)).isoformat(),
-        game_start_time=(now-timedelta(days=1,hours=2)).isoformat())
+        game_start_time=(now-timedelta(days=1,hours=2)).isoformat(),model_version=identity)
     engine=sa.create_engine(url)
     try:
         stat=dict(player_id=player_id,game_id=identity,game_date=day,team_abbreviation='H',
@@ -51,7 +51,8 @@ def test_final_prop_settlement_uses_real_postgres_and_retains_provenance():
         assert row['outcome'] is True and row['actual_value']==21
         assert row['outcome_source']=='observed_final_stats' and identity in row['outcome_ref']
         assert row['outcome_evidence']['stat_record_sha256']==stat_row_sha256('nba',stat)
-        assert ledger.report()['unverified_settlements']==0
+        report=ledger.report(model_version=identity)
+        assert report['settled_count']==1 and report['unverified_settlements']==0
     finally:
         with engine.begin() as conn:
             conn.execute(sa.text('DELETE FROM nba_player_gamelogs WHERE game_id=:id'),{'id':identity})
