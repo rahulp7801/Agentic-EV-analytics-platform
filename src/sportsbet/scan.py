@@ -98,7 +98,10 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 confidence_interval=[float(x) for x in signal.confidence_interval] if signal.confidence_interval else None,
                 model_version='empirical-v2',strength='unrated',trade_plan=[],injury_flags={},market_type=market))
     return dict(generated_at=datetime.now(timezone.utc).isoformat(),signals=export,
-        coverage=dict(quotes=len(quotes),selections=len(selections),counts=dict(counts)),games=[dict(game_id=event['id'],
+        coverage=dict(quotes=len(quotes),source_committed_quotes=sum(
+            quote.source_provider=='the_odds_api' and bool(quote.source_sha256)
+            and bool(quote.source_record_sha256) for quote in quotes),
+            selections=len(selections),counts=dict(counts)),games=[dict(game_id=event['id'],
         home_team=event['home_team'],away_team=event['away_team'],date=game_date.strftime('%Y%m%d'),sport=sport)])
 
 async def run(sports: list[str], daily_credit_limit: int):

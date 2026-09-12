@@ -331,6 +331,15 @@ is retained only when its gross cost is below one dollar. DNP/void/stat rules,
 limits, acceptance, and price movement remain unreviewed, so these rows are also
 unverified and non-executable with null profit fields.
 
+Every new persisted sportsbook prop quote carries two commitments: one to the
+canonical provider event response and one to the exact normalized quote row. The
+writer recomputes the row commitment before opening a transaction, and PostgreSQL
+rejects future rows without correctly shaped source evidence. Existing rows are
+retained as legacy observations rather than being assigned invented provenance.
+Scan coverage reports how many quotes carry these commitments. A commitment proves
+internal integrity and common batch origin; it does not prove bookmaker settlement
+rules, account eligibility, limits, or fills.
+
 Free ESPN data provides outcomes and current projection targets, not player-prop
 prices. A live NFL schema check found roughly 180 pages per game with no price
 field. The optional LangGraph context agent therefore stops after a priced
