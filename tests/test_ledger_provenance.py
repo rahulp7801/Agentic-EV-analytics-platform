@@ -40,7 +40,8 @@ def test_legacy_utc_chronology_and_model_cohorts(tmp_path):
     assert report['excluded_missing_metadata']==1 and report['duplicate_predictions']==1
     assert report['unverified_settlements']==3
     assert report['available_model_versions']==['v1','v2']
-    assert ledger.report(model_version='v2')['brier_score'] is None
+    selected=ledger.report(model_version='v2')
+    assert selected['brier_score'] is None and selected['unverified_settlements']==1
     assert ledger.report(model_version='missing')['sample_size']==0
 
 

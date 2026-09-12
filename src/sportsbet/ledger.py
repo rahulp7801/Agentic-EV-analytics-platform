@@ -261,16 +261,16 @@ class Ledger:
         unverified_settlements=0
         for prediction_id, raw, outcome, outcome_source, outcome_ref, outcome_observed, actual, proof in records:
             p = json.loads(raw)
-            if outcome is not None and not verified_settlement_evidence(
-                    p,json.loads(outcome),outcome_source,outcome_ref,outcome_observed,actual,proof):
-                outcome=None
-                unverified_settlements+=1
             version = p.get('model_version') or 'unversioned'
             versions.add(version)
             if model_version is not None and version != model_version:
                 continue
             if recommendations_only and not p.get('accepted'):
                 continue
+            if outcome is not None and not verified_settlement_evidence(
+                    p,json.loads(outcome),outcome_source,outcome_ref,outcome_observed,actual,proof):
+                outcome=None
+                unverified_settlements+=1
             # Without recorded actual tipoff/entry, no trustworthy historical evaluation.
             if not p.get('game_start_time') or not p.get('captured_at') or p.get('model_probability') is None:
                 excluded += 1
