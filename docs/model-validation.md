@@ -39,6 +39,17 @@ expected return continues to use the point estimate and is not a guaranteed
 return. Interval admission is a conservative uncertainty screen; it does not
 establish calibration, independence, market-rule equivalence, fills, or profit.
 
+## Public signal boundary
+
+The dashboard API accepts a signal only when its event, player, sport, prop,
+direction, line, sportsbook, integer American price, model cohort, sample fields,
+and quote/game timestamps are present and valid. It recomputes implied probability,
+edge, expected return, uncertainty, gating, and stake eligibility at the boundary.
+Unexpected worker fields are omitted. Invalid records are excluded and counted as
+`invalid_signals`; the UI does not fill missing values with a plausible sport,
+market, direction, venue, price, probability, line, or stake. PrizePicks projections
+cannot enter this priced-signal response until a complete entry payout is captured.
+
 ## Reproducible research checks
 
 The implementation was rerun through the actual LangGraph nodes against two

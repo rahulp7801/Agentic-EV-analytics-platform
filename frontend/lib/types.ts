@@ -38,7 +38,7 @@ export interface EVSignal {
   // Extended fields from cache (not in EVSignal base type)
   gated?: boolean;
   sample_size?: number;
-  mean_stat?: number;
+  mean_stat?: number | null;
   // Context signals from nba_context_producer
   opponent_def_rating?: number; // league avg = 115.0; higher = weaker defense
   rest_days?: number;           // 0 = back-to-back; 1+ = rest

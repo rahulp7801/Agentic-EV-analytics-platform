@@ -1,16 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import type { Sport, PropType } from '@/lib/types';
+import type { Sport, PropType, EVSignal } from '@/lib/types';
 
 // PropAnalysis is derived from real EV signals — no mock data
-interface PropAnalysis {
-  id: string; player: string; player_id: string; team: string; opponent: string;
-  sport: Sport; prop_type: PropType; line: number; direction: 'over' | 'under';
-  model_prob: number; implied_prob: number; ev_pct: number; kelly_fraction: number;
-  mean_stat: number | null; sample_size: number; confidence_interval: [number, number] | null;
-  sportsbook: string; american_odds: number; gated?: boolean;
-}
-
 interface PropsAnalysisProps { sport: Sport; }
 
 const PROP_TYPES: PropType[] = ['points', 'rebounds', 'assists', 'threes', 'pra', 'pass_yds', 'pass_tds', 'rush_yds', 'rec_yds'];
@@ -66,36 +58,14 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   const [playerFilter, setPlayerFilter] = useState('');
   const [propFilter, setPropFilter] = useState<string>('all');
   const [minEV, setMinEV] = useState(0);
-  const [allProps, setAllProps] = useState<PropAnalysis[]>([]);
+  const [allProps, setAllProps] = useState<EVSignal[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/signals', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
-        // Convert EV signals → PropAnalysis shape
-        const props: PropAnalysis[] = (data.signals || []).map((s: Record<string, unknown>, i: number) => ({
-          id: String(s.id ?? i),
-          player: String(s.player ?? ''),
-          player_id: String(s.id ?? i),
-          team: String(s.team ?? ''),
-          opponent: String(s.opponent ?? ''),
-          sport: (s.sport === 'nfl' ? 'nfl' : 'nba') as Sport,
-          prop_type: String(s.prop_type ?? 'points') as PropType,
-          line: Number(s.line ?? 0),
-          direction: s.direction === 'under' ? 'under' as const : 'over' as const,
-          model_prob: Number(s.true_prob ?? 0),
-          implied_prob: Number(s.implied_prob ?? 0),
-          ev_pct: Number(s.ev_pct ?? 0),
-          kelly_fraction: Number(s.kelly_fraction ?? 0),
-          mean_stat: s.mean_stat == null ? null : Number(s.mean_stat),
-          sample_size: Number(s.sample_size ?? 0),
-          confidence_interval: Array.isArray(s.confidence_interval) ? s.confidence_interval as [number, number] : null,
-          sportsbook: String(s.sportsbook ?? 'PrizePicks'),
-          american_odds: Number(s.american_odds ?? -105),
-          gated: Boolean(s.gated),
-        }));
-        setAllProps(props);
+        setAllProps(Array.isArray(data.signals) ? data.signals : []);
       })
       .catch(() => setAllProps([]))
       .finally(() => setLoading(false));
@@ -183,7 +153,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   );
 }
 
-function PropRow({ prop }: { prop: PropAnalysis }) {
+function PropRow({ prop }: { prop: EVSignal }) {
   const evPct = prop.ev_pct * 100;
   return (
     <tr>
@@ -206,7 +176,7 @@ function PropRow({ prop }: { prop: PropAnalysis }) {
         </span>
       </td>
       <td>
-        <ProbabilityComparison model={prop.model_prob} implied={prop.implied_prob} />
+        <ProbabilityComparison model={prop.true_prob} implied={prop.implied_prob} />
       </td>
       <td>
         <span style={{
@@ -221,7 +191,7 @@ function PropRow({ prop }: { prop: PropAnalysis }) {
         <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>of bankroll</div>
       </td>
       <td>
-        <ConfidenceBar ci={prop.confidence_interval} mean={prop.mean_stat} line={prop.line} />
+        <ConfidenceBar ci={prop.confidence_interval ?? null} mean={prop.mean_stat ?? null} line={prop.line} />
         <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>n={prop.sample_size}</div>
       </td>
       <td>
