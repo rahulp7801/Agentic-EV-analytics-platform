@@ -27,10 +27,62 @@ DEFAULT_GAME_LIMIT=20
 MAX_GAME_LIMIT=40
 PROP_PAGE_LIMIT=1000
 MAX_PROP_PAGES=3
+PROP_FEE_CONCURRENCY=8
 
 
 def digest(value) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, allow_nan=False).encode()).hexdigest()
+
+
+def prop_fee_context(series: dict, series_changes: dict, event: str,
+        event_changes: dict, received_at: datetime) -> dict:
+    """Retain only fields needed to reproduce a prop fee decision plus source hashes."""
+    if (not isinstance(series,dict) or not isinstance(series_changes,dict)
+            or not isinstance(series_changes.get('series_fee_change_arr'),list)
+            or not isinstance(event_changes,dict)
+            or not isinstance(event_changes.get('event_fee_changes'),list)):
+        raise ValueError('Invalid prop fee evidence')
+    series_fields={key:series[key] for key in ('ticker','fee_type','fee_multiplier','last_updated_ts')}
+    scheduled=[{key:item.get(key) for key in ('series_ticker','fee_type','fee_multiplier','scheduled_ts')}
+        for item in series_changes['series_fee_change_arr']]
+    overrides=[{key:item.get(key) for key in ('event_ticker','series_ticker','fee_type_override',
+        'fee_multiplier_override','scheduled_ts')} for item in event_changes['event_fee_changes']]
+    return dict(status='observed',received_at=received_at.isoformat(),series=series_fields,
+        series_changes={'series_fee_change_arr':scheduled},
+        event_changes={'event_fee_changes':overrides,'cursor':event_changes.get('cursor')},
+        series_sha256=digest(series),series_changes_sha256=digest(series_changes),
+        event_changes_sha256=digest(event_changes),event_ticker=event)
+
+
+async def kalshi_prop_fee_contexts(reader: KalshiReader, supported: dict,
+        linked_games: dict) -> tuple[dict, list[dict]]:
+    """Capture public fee terms before quotes without making fee availability a price gate."""
+    contexts={};failures=[];semaphore=asyncio.Semaphore(PROP_FEE_CONCURRENCY)
+    for series in supported:
+        events=sorted(event for event in linked_games if event.startswith(series+'-'))
+        if not events:
+            continue
+        try:
+            series_data,series_changes=await asyncio.gather(
+                reader.series(series),reader.series_fee_changes(series))
+        except Exception as exc:
+            failures.append(dict(stage='prop_fees',series=series,error_type=type(exc).__name__))
+            continue
+
+        async def capture(event: str):
+            async with semaphore:
+                changes=await reader.event_fee_changes(event)
+                return prop_fee_context(series_data,series_changes,event,changes,
+                    datetime.now(timezone.utc))
+
+        results=await asyncio.gather(*(capture(event) for event in events),return_exceptions=True)
+        for event,result in zip(events,results):
+            if isinstance(result,Exception):
+                failures.append(dict(stage='prop_fees',series=series,event_ticker=event,
+                    error_type=type(result).__name__))
+            else:
+                contexts[event]=result
+    return contexts,failures
 
 
 async def sportsbooks(sport: str, daily_credit_limit: int) -> dict:
@@ -128,6 +180,7 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
             else:
                 linked_games[event]=game
 
+    fee_contexts,fee_failures=await kalshi_prop_fee_contexts(reader,supported,linked_games)
     results={}
     all_markets=set();all_events=set();linked_markets=set();linked_events=set();quotes=[]
     for series in supported:
@@ -215,10 +268,12 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
         linked_events=len(linked_events),structured_quote_markets=len(quotes),
         two_sided_quote_markets=sum(bool(q['yes_ask'] and q['no_ask']) for q in quotes),
         player_resolved_quote_markets=sum(quote['player_target_id'] in target_records for quote in quotes),
+        fee_contexts_expected=len(linked_games),fee_contexts_observed=len(fee_contexts),
         discovery_complete=not failures and all(r['complete'] for r in results.values()))
-    return dict(status='degraded' if failures else 'observed',series=results,quotes=quotes,targets=target_records,coverage=coverage,
-        failures=failures,partial_coverage=not coverage['discovery_complete'],
-        scope='Open-market top-of-book observations linked by Kalshi structured milestone, player and team IDs. Kalshi player names are resolved in one bulk structured-target read. Full pages are hashed but omitted. One displayed level is not a fill; cross-provider identity, fees and settlement equivalence remain unverified, and no profit is inferred.')
+    return dict(status='degraded' if failures else 'observed',series=results,quotes=quotes,targets=target_records,
+        fee_contexts=fee_contexts,coverage=coverage,failures=failures,fee_failures=fee_failures,
+        partial_coverage=not coverage['discovery_complete'],
+        scope='Open-market top-of-book observations linked by Kalshi structured milestone, player and team IDs. Kalshi player names are resolved in one bulk structured-target read. Public series and event fee terms are captured independently; missing fee evidence does not discard prices. Full pages are hashed but omitted. One displayed level is not a fill; cross-provider settlement equivalence remains unverified, and no profit is inferred.')
 
 
 def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
@@ -261,7 +316,7 @@ def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
     rules=dict(primary=market.get('rules_primary'),secondary=market.get('rules_secondary'))
     if not all(isinstance(value,str) and value.strip() for value in rules.values()):
         raise ValueError('Missing prop settlement rules')
-    return dict(ticker=market['ticker'],event_ticker=market['event_ticker'],series_ticker=series,
+    result=dict(ticker=market['ticker'],event_ticker=market['event_ticker'],series_ticker=series,
         milestone_id=game['id'],scheduled_game_start_time=timestamp(game['start_date']).isoformat(),
         market_occurrence_time=occurrence.isoformat(),
         prop_type=prop_type,player_target_id=player_id,team_target_id=team_id,
@@ -269,6 +324,10 @@ def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
         request_started_at=request_started.isoformat(),received_at=received_at.isoformat(),
         market_sha256=digest(market),source_page_sha256=page_sha256,rules_sha256=digest(rules),
         settlement_equivalent=False,execution_ready=False)
+    waiver=market.get('fee_waiver_expiration_time')
+    if waiver is not None:
+        result['fee_waiver_expiration_time']=timestamp(waiver).isoformat()
+    return result
 
 
 async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
@@ -418,9 +477,10 @@ def kalshi_prop_handoff(source: dict, sport: str, captured_at: str) -> dict:
     context_games={game['milestone_id'] for game in games}
     incomplete=inventory.get('partial_coverage',True) or not quote_games<=context_games
     evidence=dict(quotes=inventory.get('quotes',[]),player_targets=inventory.get('targets',{}),
-        games=games,coverage=inventory.get('coverage',{}),partial_coverage=incomplete)
+        fee_contexts=inventory.get('fee_contexts',{}),games=games,coverage=inventory.get('coverage',{}),
+        partial_coverage=incomplete)
     status='degraded' if incomplete else inventory.get('status','unavailable')
-    return dict(schema_version=1,sport=sport,captured_at=captured_at,status=status,
+    return dict(schema_version=2,sport=sport,captured_at=captured_at,status=status,
         evidence=evidence,evidence_sha256=digest(evidence),execution_ready=False)
 
 
