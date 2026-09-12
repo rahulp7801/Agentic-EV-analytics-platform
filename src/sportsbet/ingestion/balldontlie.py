@@ -47,7 +47,7 @@ async def fetch_player_season_averages(
             resp.raise_for_status()
             data: dict[str, Any] = resp.json()
     except Exception as exc:
-        log.warning("balldontlie_averages_failed", player_id=player_id, error=str(exc))
+        log.warning("balldontlie_averages_failed", player_id=player_id, error_type=type(exc).__name__)
         return None
 
     results: list[dict[str, Any]] = data.get("data", [])
@@ -88,7 +88,7 @@ async def fetch_team_recent_games(
             resp.raise_for_status()
             data: dict[str, Any] = resp.json()
     except Exception as exc:
-        log.warning("balldontlie_games_failed", team_id=team_id, error=str(exc))
+        log.warning("balldontlie_games_failed", team_id=team_id, error_type=type(exc).__name__)
         return []
 
     results: list[dict[str, Any]] = data.get("data", [])
@@ -127,7 +127,7 @@ async def fetch_player_game_logs(
             resp.raise_for_status()
             data: dict[str, Any] = resp.json()
     except Exception as exc:
-        log.warning("balldontlie_stats_failed", player_id=player_id, error=str(exc))
+        log.warning("balldontlie_stats_failed", player_id=player_id, error_type=type(exc).__name__)
         return []
 
     results: list[dict[str, Any]] = data.get("data", [])

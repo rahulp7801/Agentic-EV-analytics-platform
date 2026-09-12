@@ -74,7 +74,7 @@ async def fetch_sleeper_team_injuries(
             "sleeper_fetch_failed",
             sport=sport,
             team=team_abbr,
-            error=str(exc),
+            error_type=type(exc).__name__,
         )
         return []
 
