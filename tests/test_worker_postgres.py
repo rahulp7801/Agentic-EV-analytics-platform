@@ -241,8 +241,9 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         predictions = ledger.predictions()
         assert len(predictions) == 1
         assert result['coverage']['source_committed_quotes'] == result['coverage']['quotes'] == 1
-        assert predictions[0]['model_probability'] == pytest.approx(24/count, abs=1e-6)
-        assert predictions[0]['push_probability'] == 0  # Integer stats cannot push at20.5.
+        # Jeffreys posterior predictive mean for 24 Overs and no pushes.
+        assert predictions[0]['model_probability'] == pytest.approx(24.5 / (count + 1), abs=1e-6)
+        assert predictions[0]['push_probability'] == 0  # Integer stats cannot push at 20.5.
         async with pool.acquire() as conn:
             archived = await conn.fetchrow(
                 'SELECT sport,game_id,player_name,side,line,price,snapped_at,game_start_time, '
