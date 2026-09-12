@@ -24,6 +24,7 @@ def test_metrics_separate_price_model_and_outcome():
     assert report.calibration_error == pytest.approx(0.1)
     assert report.roi == 0
     assert report.hit_rate_interval == pytest.approx((0.094531, 0.905469), abs=1e-6)
+    assert report.binomial_interval_method.startswith('Nominal 95% Wilson interval')
     assert [{key:value for key,value in bucket.items() if key!='observed_interval'}
         for bucket in report.calibration] == [dict(
             lower=0.6, upper=0.7, count=2, predicted=0.6, observed=0.5)]

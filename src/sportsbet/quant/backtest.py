@@ -10,6 +10,10 @@ from statsmodels.stats.proportion import proportion_confint
 from sportsbet.graph.models import QuantResult
 
 Outcome = bool | Literal["push", "void"] | None
+BINOMIAL_INTERVAL_METHOD = (
+    "Nominal 95% Wilson interval; treats decided selections as independent and "
+    "does not adjust for shared games or players."
+)
 
 @dataclass
 class BacktestSignal:
@@ -46,6 +50,7 @@ class BacktestReport:
     baseline_50_brier: float | None = None
     baseline_one_brier: float | None = None
     calibration: list[dict] = field(default_factory=list)
+    binomial_interval_method: str = BINOMIAL_INTERVAL_METHOD
     closing_line_note: str = "CLV is same-line raw implied-probability movement; requires entry < close < start."
 
 def _probability(value: Decimal | None) -> float | None:
@@ -62,7 +67,8 @@ def calibration_metrics(predictions: list[tuple[float, int]]) -> dict:
         raise ValueError('Calibration needs finite probabilities and binary outcomes')
     result = dict(calibration_count=len(predictions), calibration_positive_count=0,
         brier_score=None, log_loss=None, calibration_error=None, calibration=[],
-        baseline_zero_brier=None, baseline_50_brier=None, baseline_one_brier=None)
+        baseline_zero_brier=None, baseline_50_brier=None, baseline_one_brier=None,
+        binomial_interval_method=BINOMIAL_INTERVAL_METHOD)
     if not predictions:
         return result
     result['brier_score'] = sum((p-y)**2 for p, y in predictions) / len(predictions)

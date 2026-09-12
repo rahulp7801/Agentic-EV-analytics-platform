@@ -23,10 +23,10 @@ function MetricBlock({ title, metrics }: { title: string; metrics: MetricReport 
     <h3>{title}</h3>
     <p>Settled: {count(metrics, 'settled_count')} · Pending: {count(metrics, 'pending_count')} · Calibration sample: {count(metrics, 'calibration_count')}</p>
     <p>ROI: {value(metrics, 'roi', true)} · Hit rate: {value(metrics, 'hit_rate', true)} (95% Wilson {rateInterval(metrics, 'hit_rate_interval')}) · Brier: {value(metrics, 'brier_score')} · Log loss: {value(metrics, 'log_loss')}</p>
-    <p>10-bin calibration error: {value(metrics, 'calibration_error')}. Lower is better; each populated calibration bin also retains a 95% Wilson interval for its observed outcome rate.</p>
+    <p>10-bin calibration error: {value(metrics, 'calibration_error')}. Lower is better; each populated calibration bin also retains a nominal 95% Wilson interval for its observed outcome rate.</p>
     <p>Brier benchmarks: always predict loss {value(metrics, 'baseline_zero_brier')} · 50/50 {value(metrics, 'baseline_50_brier')} · always predict win {value(metrics, 'baseline_one_brier')}.</p>
     <p>Scored outcomes: {count(metrics, 'calibration_positive_count')} wins among {count(metrics, 'calibration_count')} forecasts. Lower Brier is better. Benchmarks use the same sample, excluding pushes, voids, pending outcomes and missing forecasts.</p>
-    <p>CLV: {value(metrics, 'clv_mean', true, 'pp')} ({count(metrics, 'clv_count')} matched quotes). Missing outcomes remain unsettled. ROI, Brier, log loss and CLV remain point estimates.</p>
+    <p>CLV: {value(metrics, 'clv_mean', true, 'pp')} ({count(metrics, 'clv_count')} matched quotes). Missing outcomes remain unsettled. Wilson intervals treat selections as independent and do not adjust for shared games or players. ROI, Brier, log loss and CLV remain point estimates.</p>
   </article>;
 }
 
