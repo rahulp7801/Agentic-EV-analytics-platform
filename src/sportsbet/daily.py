@@ -12,8 +12,9 @@ from langgraph.graph import END, START, StateGraph
 from sportsbet.dashboard import load_snapshot, publish_snapshot
 from sportsbet.market_watch import run as watch, DEFAULT_GAME_LIMIT
 from sportsbet.ledger import Ledger
+from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.refresh import refresh_history
-from sportsbet.scan import MODEL_VERSION, run as scan, timestamp
+from sportsbet.scan import run as scan, timestamp
 from sportsbet.schedules import collect as collect_schedule
 from sportsbet.settlement import settle_final_props
 

@@ -21,6 +21,7 @@ from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.quant.backtest import calibration_metrics
+from sportsbet.model_contract import MODEL_VERSION
 
 
 async def evaluate(dataset: dict, prop: str, threshold: Decimal) -> dict:
@@ -76,7 +77,7 @@ async def evaluate(dataset: dict, prop: str, threshold: Decimal) -> dict:
                 sample_size=estimate.sample_size, outcome=outcome))
     finally:
         await pool.close()
-    return dict(sport=sport, prop_type=prop, research_threshold=str(threshold), model_version='empirical-v2',
+    return dict(sport=sport, prop_type=prop, research_threshold=str(threshold), model_version=MODEL_VERSION,
         candidate_count=len(rows), evaluated_count=len(scored), skipped=dict(skipped),
         **calibration_metrics(predictions),
         roi=None, clv=None,

@@ -15,6 +15,7 @@ from sportsbet.db.connection import create_async_pool
 from sportsbet.graph.graph import create_graph
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_quotes, write_player_prop_snapshots
 from sportsbet.ledger import Ledger
+from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
@@ -25,7 +26,6 @@ from sportsbet.quant.vig import american_to_raw_prob
 MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl'}
 MAX_MODEL_CONCURRENCY = 8
-MODEL_VERSION = 'empirical-v2'
 
 def timestamp(value: str) -> datetime:
     result=datetime.fromisoformat(value.replace('Z','+00:00'))
@@ -109,7 +109,9 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             game_date=game_date.isoformat(),prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
             sportsbook=quote.sportsbook,american_odds=quote.price,model_probability=float(probability),
             push_probability=float(prop.push_probability),captured_at=now.isoformat(),game_start_time=start.isoformat(),
-            quote_time=quote.snapped_at.isoformat(),accepted=accepted,gate_reason=reason,
+            quote_time=quote.snapped_at.isoformat(),model_generated_at=now.isoformat(),
+            quote_source_provider=quote.source_provider,quote_source_sha256=quote.source_sha256,
+            quote_source_record_sha256=quote.source_record_sha256,accepted=accepted,gate_reason=reason,
             stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version=MODEL_VERSION)
         prediction_id=ledger.record(scan_id,payload)
         counts[reason] += 1
