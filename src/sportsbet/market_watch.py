@@ -316,6 +316,7 @@ def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
     rules=dict(primary=market.get('rules_primary'),secondary=market.get('rules_secondary'))
     if not all(isinstance(value,str) and value.strip() for value in rules.values()):
         raise ValueError('Missing prop settlement rules')
+    terms=classify_prop_settlement_rules(rules,prop_type)
     result=dict(ticker=market['ticker'],event_ticker=market['event_ticker'],series_ticker=series,
         milestone_id=game['id'],scheduled_game_start_time=timestamp(game['start_date']).isoformat(),
         market_occurrence_time=occurrence.isoformat(),
@@ -323,12 +324,34 @@ def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
         strike_type='greater',line=str(line),yes_ask=yes_ask,no_ask=no_ask,
         request_started_at=request_started.isoformat(),received_at=received_at.isoformat(),
         market_sha256=digest(market),source_page_sha256=page_sha256,
-        settlement_rules=rules,rules_sha256=digest(rules),
+        settlement_rules=rules,rules_sha256=digest(rules),settlement_terms=terms,
         settlement_equivalent=False,execution_ready=False)
     waiver=market.get('fee_waiver_expiration_time')
     if waiver is not None:
         result['fee_waiver_expiration_time']=timestamp(waiver).isoformat()
     return result
+
+
+def classify_prop_settlement_rules(rules: dict, prop_type: str) -> dict:
+    """Classify only explicit contract text; unknown templates stay unclassified."""
+    labels={'pass_yds':'passing yards','rush_yds':'rushing yards',
+        'rec_yds':'receiving yards','receptions':'receptions','points':'points',
+        'rebounds':'rebounds','assists':'assists'}
+    if prop_type not in labels or not isinstance(rules,dict) or set(rules)!= {'primary','secondary'} \
+            or not all(isinstance(value,str) and value.strip() for value in rules.values()):
+        raise ValueError('Invalid prop settlement rules')
+    text=rules['secondary'].casefold()
+    participation=('active_no_snap_fair_market_price' if
+        'is active but never takes a snap, the market settles to the fair market price before game start.' in text
+        else 'unclassified')
+    statistic=('after_one_snap_recorded_stat' if
+        f'even if nullified by penalty, the market settles based on {labels[prop_type]} recorded.' in text
+        else 'unclassified')
+    return dict(schema_version=1,rules_sha256=digest(rules),
+        participation=participation,statistic=statistic,
+        overtime='mentioned' if 'overtime' in text else 'unspecified',
+        stat_corrections='mentioned' if 'stat correction' in text else 'unspecified',
+        stat_source='unspecified',classified=participation!='unclassified' and statistic!='unclassified')
 
 
 async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
@@ -482,14 +505,39 @@ def kalshi_prop_handoff(source: dict, sport: str, captured_at: str) -> dict:
     incomplete=inventory.get('partial_coverage',True) or not quote_games<=context_games
     # Exact rule text belongs in immutable research archives. The worker handoff
     # carries its commitment and normalized quote fields, keeping hosted snapshots compact.
-    quotes=[{key:value for key,value in quote.items() if key!='settlement_rules'}
-        for quote in inventory.get('quotes',[])]
+    quotes=[compact_prop_quote(quote) for quote in inventory.get('quotes',[])]
     evidence=dict(quotes=quotes,player_targets=inventory.get('targets',{}),
         fee_contexts=inventory.get('fee_contexts',{}),games=games,coverage=inventory.get('coverage',{}),
         partial_coverage=incomplete)
     status='degraded' if incomplete else inventory.get('status','unavailable')
     return dict(schema_version=2,sport=sport,captured_at=captured_at,status=status,
         evidence=evidence,evidence_sha256=digest(evidence),execution_ready=False)
+
+
+def compact_prop_quote(quote: dict) -> dict:
+    """Strip archived rule text and collapse classified terms to a stable profile."""
+    if not isinstance(quote,dict):
+        raise ValueError('Invalid prop quote')
+    result={key:value for key,value in quote.items()
+        if key not in ('settlement_rules','settlement_terms')}
+    terms=quote.get('settlement_terms')
+    if terms is None:
+        return result
+    valid=(isinstance(terms,dict) and terms.get('schema_version')==1
+        and terms.get('rules_sha256')==quote.get('rules_sha256')
+        and terms.get('participation') in ('active_no_snap_fair_market_price','unclassified')
+        and terms.get('statistic') in ('after_one_snap_recorded_stat','unclassified')
+        and terms.get('overtime') in ('mentioned','unspecified')
+        and terms.get('stat_corrections') in ('mentioned','unspecified')
+        and terms.get('stat_source')=='unspecified' and type(terms.get('classified')) is bool
+        and terms['classified']==(terms['participation']!='unclassified'
+            and terms['statistic']!='unclassified'))
+    if not valid:
+        raise ValueError('Invalid settlement terms')
+    classified=(terms['classified'] and terms['overtime']=='unspecified'
+        and terms['stat_corrections']=='unspecified')
+    result['settlement_profile']='active_no_snap_recorded_stat_v1' if classified else 'unclassified_v1'
+    return result
 
 
 def comparisons(evidence: dict) -> list[dict]:

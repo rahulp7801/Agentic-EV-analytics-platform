@@ -184,6 +184,8 @@ async def run(sports: list[str], daily_credit_limit: int):
                         positive_gross_gaps=len(comparisons),
                         sportsbook_gaps=sum(row['kind']=='sportsbook_sportsbook_prop' for row in comparisons),
                         kalshi_sportsbook_gaps=sum(row['kind']=='kalshi_sportsbook_prop' for row in comparisons),
+                        kalshi_rule_terms_classified=sum(row.get('settlement_review',{}).get(
+                            'kalshi',{}).get('classified') is True for row in comparisons),
                         kalshi_fee_modeled=sum('exchange_fee_scenarios' in row for row in comparisons),
                         kalshi_direct_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['direct'])<1
                             for row in comparisons if 'exchange_fee_scenarios' in row),

@@ -143,6 +143,24 @@ def _ask(value) -> tuple[Decimal, Decimal] | None:
     return cost, size
 
 
+def _settlement_review(quote: dict) -> dict:
+    """Expose classified Kalshi risks without treating them as equivalence proof."""
+    profile=quote.get('settlement_profile')
+    kalshi=dict(classified=False,participation='unavailable',statistic='unavailable',
+        overtime='unavailable',stat_corrections='unavailable',stat_source='unavailable')
+    if profile is not None:
+        if profile not in ('active_no_snap_recorded_stat_v1','unclassified_v1'):
+            raise InvalidHandoff('invalid_settlement_terms')
+        if profile=='active_no_snap_recorded_stat_v1':
+            kalshi=dict(classified=True,participation='active_no_snap_fair_market_price',
+                statistic='after_one_snap_recorded_stat',overtime='unspecified',
+                stat_corrections='unspecified',stat_source='unspecified')
+        else:
+            kalshi=dict(classified=False,participation='unclassified',statistic='unclassified',
+                overtime='unavailable',stat_corrections='unavailable',stat_source='unavailable')
+    return dict(kalshi=kalshi,sportsbook_rules='unavailable',equivalence='unverified')
+
+
 def _fee_scenario(evidence: dict, quote: dict, ask: tuple[Decimal, Decimal],
         sportsbook_cost: Decimal, observed_at: datetime) -> dict | None:
     """Price one hypothetical Kalshi taker contract from captured public fee terms."""
@@ -329,6 +347,7 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
                 gross_cost = ask[0] + book.implied_probability
                 if gross_cost >= 1:
                     continue
+                settlement_review=_settlement_review(quote)
                 fee_scenario=None
                 if version==2:
                     try:
@@ -347,8 +366,12 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
                     evidence_sha256=handoff['evidence_sha256'], settlement_equivalent=False,
                     market_sha256=quote['market_sha256'], rules_sha256=quote['rules_sha256'],
                     source_page_sha256=quote['source_page_sha256'],
+                    settlement_review=settlement_review,
                     fee_adjusted_profit=None, realized_profit=None, execution_ready=False,
-                    reasons=['Settlement rules, DNP/void treatment, and stat provider are unreviewed.',
+                    reasons=[('Kalshi active-player/no-snap treatment settles at a pregame fair-market price.'
+                            if settlement_review['kalshi']['participation']=='active_no_snap_fair_market_price'
+                            else 'Kalshi participation and exceptional settlement states are unclassified.'),
+                        'Sportsbook DNP/void, overtime, stat-correction, and stat-source rules are unavailable.',
                         ('Captured Kalshi fee terms model one hypothetical contract; sportsbook limits are not included.'
                             if fee_scenario else 'Kalshi fees and sportsbook limits are not included.'),
                         'One displayed Kalshi level is not a fill.'])
@@ -359,12 +382,14 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
         return _unavailable(sport, now, 'invalid_quote_evidence')
 
     fee_modeled=[row for row in comparisons if 'exchange_fee_scenarios' in row]
+    terms_classified=[row for row in comparisons if row['settlement_review']['kalshi']['classified']]
     return dict(schema_version=1, sport=sport, screened_at=now.isoformat(), status='observed',
         handoff_captured_at=captured.isoformat(), event_id=event['id'],
         coverage=dict(sportsbook_quotes=len(sportsbook_quotes), eligible_sportsbook_quotes=len(books),
             kalshi_quotes=sum(q.get('milestone_id') == game['milestone_id'] for q in evidence['quotes']),
             exact_markets=exact_markets, price_pairs=price_pairs,
             positive_gross_gaps=len(comparisons),fee_modeled_gaps=len(fee_modeled),
+            rule_terms_classified_gaps=len(terms_classified),
             direct_fee_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['direct'])<1
                 for row in fee_modeled),
             non_direct_fee_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['non_direct'])<1
