@@ -210,7 +210,9 @@ delays leave the 90-minute snapshot window uncovered; they do not make GitHub
 Actions a guaranteed or low-latency scheduler. The separate **Market data**
 schedule depends only on `DATA_PIPELINE_ENABLED=true` and retains the paid
 provider path. The public flag cannot enable sportsbook, PrizePicks, prop scans,
-or paid polling. Clear the public flag to stop the public schedule.
+or paid polling. Each successful public job also requires production to expose
+the exact market and schedule capture timestamps from that run. Clear the public
+flag to stop the public schedule.
 Clean evidence passes the credential/secret scan before public artifact upload.
 GitHub's periodic schedule remains unsuitable for continuous or low-latency arbitrage monitoring;
 the dashboard continues to identify stale quotes between captures.

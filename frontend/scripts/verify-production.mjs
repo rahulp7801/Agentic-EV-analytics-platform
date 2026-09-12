@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 export const paidPipelinePaths = [
@@ -24,11 +25,21 @@ export function readinessStatuses(path, { paidEnabled, publicEnabled }) {
   throw new Error(`Unclassified readiness endpoint: ${path}`);
 }
 
+function expectedPublicCapture(path, report) {
+  if (!report) return undefined;
+  const url = new URL(path, 'https://readiness.invalid');
+  const sport = url.searchParams.get('sport');
+  if (url.pathname === '/api/markets') return report.markets?.[sport]?.captured_at;
+  if (url.pathname === '/api/games') return report.schedules?.[sport]?.captured_at;
+  return undefined;
+}
+
 export async function verifyProduction({
   base = 'https://agentic-ev-analytics-platform.vercel.app',
   fetchImpl = fetch,
   paidEnabled = process.env.DATA_PIPELINE_ENABLED === 'true',
   publicEnabled = process.env.PUBLIC_DATA_PIPELINE_ENABLED === 'true',
+  expectedPublicReport,
 } = {}) {
   async function check(path, expected, options = {}) {
     const response = await fetchImpl(base + path, {
@@ -55,9 +66,19 @@ export async function verifyProduction({
     if (response.status === 503) {
       console.log(`::warning::${path} unavailable; its data pipeline is disabled`);
     }
+    const capturedAt = expectedPublicCapture(path, expectedPublicReport);
+    if (capturedAt !== undefined) {
+      const body = await response.json();
+      if (body?.captured_at !== capturedAt) {
+        throw new Error(`${path}: deployed capture does not match this collection run`);
+      }
+    }
   }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await verifyProduction();
+  const expectedPublicReport = process.env.PUBLIC_DATA_REPORT_PATH
+    ? JSON.parse(await readFile(process.env.PUBLIC_DATA_REPORT_PATH, 'utf8'))
+    : undefined;
+  await verifyProduction({ expectedPublicReport });
 }
