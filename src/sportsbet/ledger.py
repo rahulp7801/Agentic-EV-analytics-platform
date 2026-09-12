@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from decimal import Decimal
 from sportsbet.graph.models import EVSignal, QuantResult
-from sportsbet.model_contract import MODEL_VERSION
+from sportsbet.model_contract import MODEL_VERSION, QUOTE_PROVENANCE_MODEL_VERSIONS
 from sportsbet.quant.backtest import BacktestSignal, BacktestEngine
 
 DEFAULT_PATH = Path('.checkpoints/analytics.sqlite')
@@ -33,11 +33,11 @@ def json_object(value):
         return None
 
 
-def current_model_evidence_valid(payload: dict) -> bool:
-    """Require the source commitments verified by the current scanner."""
+def quote_evidence_valid(payload: dict) -> bool:
+    """Validate source commitments for every scanner cohort that requires them."""
     batch=payload.get('quote_source_sha256')
     record=payload.get('quote_source_record_sha256')
-    return (payload.get('model_version') == MODEL_VERSION
+    return (payload.get('model_version') in QUOTE_PROVENANCE_MODEL_VERSIONS
         and payload.get('quote_source_provider') == 'the_odds_api'
         and isinstance(payload.get('model_generated_at'),str)
         and isinstance(batch,str) and bool(re.fullmatch('[0-9a-f]{64}',batch))
@@ -187,8 +187,9 @@ class Ledger:
 
     def record(self, scan_id: str, payload: dict) -> str:
         payload = dict(payload)
-        if payload.get('model_version') == MODEL_VERSION and not current_model_evidence_valid(payload):
-            raise ValueError('Current model prediction requires verified quote evidence')
+        if (payload.get('model_version') in QUOTE_PROVENANCE_MODEL_VERSIONS
+                and not quote_evidence_valid(payload)):
+            raise ValueError('Model prediction requires verified quote evidence')
         for field in ('captured_at','quote_time','game_start_time','model_generated_at'):
             if payload.get(field) is not None:
                 payload[field] = utc_timestamp(payload[field]).isoformat()
@@ -284,8 +285,9 @@ class Ledger:
                 excluded += 1
                 continue
             try:
-                if version == MODEL_VERSION and not current_model_evidence_valid(p):
-                    raise ValueError('Current model quote evidence required')
+                if (version in QUOTE_PROVENANCE_MODEL_VERSIONS
+                        and not quote_evidence_valid(p)):
+                    raise ValueError('Model quote evidence required')
                 start = utc_timestamp(p['game_start_time'])
                 entered = utc_timestamp(p['captured_at'])
                 quote_time = utc_timestamp(p.get('quote_time') or p['captured_at'])
