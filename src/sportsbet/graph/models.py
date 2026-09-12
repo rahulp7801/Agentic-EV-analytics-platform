@@ -6,7 +6,7 @@ precision through the Kelly Criterion calculation pipeline.
 
 Design contract:
 - Phase 3+ agent nodes receive typed inputs and return typed outputs via these models.
-- Stub nodes in Plan 02 return static fixture instances — Phase 3 implements real logic.
+- Unconfigured graph routes fail closed; fixtures belong only in tests.
 - Zero LLM hallucination: every Decimal field is populated from DB or external API,
   never inferred by an LLM.
 """

@@ -15,30 +15,30 @@ create_graph_with_sqlite() is the runtime factory — writes checkpoints to disk
 at .checkpoints/sportsbet.sqlite using AsyncSqliteSaver.
 
 Phase 3 Plan 01 update: create_graph() accepts an optional quant_node parameter.
-- If quant_node is None (default): uses the sync stub quant_agent (Phase 2 backward-compat).
+- If quant_node is None (default): the route fails closed without a result.
 - If quant_node is provided: uses the real async closure from make_quant_agent(pool).
 
 Phase 4 Plan 04 update: create_graph() accepts an optional context_node parameter.
-- If context_node is None (default): uses the sync stub context_agent (Phase 2 backward-compat).
+- If context_node is None (default): the route fails closed without provider output.
 - If context_node is provided: uses the real async closure from make_context_agent(pool, api_key, cap).
 
 Phase 5 Plan 03 update: create_graph() accepts optional arbitrage_node, correlation_guard_node,
 and aggregator_node parameters.
-- arbitrage_node: real async closure from make_arbitrage_agent(); None uses sync stub.
+- arbitrage_node: real async closure from make_arbitrage_agent(); None fails closed.
 - correlation_guard_node: from make_correlation_guard_node(); None skips guard.
 - aggregator_node: from make_aggregator_node(bankroll, limit); None skips gate.
 When correlation_guard_node and aggregator_node are both provided, the arbitrage pipeline
 is extended: arbitrage_agent -> correlation_guard -> aggregator -> END.
 
 Phase 6 Plan 02 update: create_graph() accepts an optional kinematic_node parameter.
-- If kinematic_node is None (default): uses _kinematic_stub (returns kinematic_result=None).
+- If kinematic_node is None (default): the route fails closed.
 - If kinematic_node is provided: uses the real async closure from make_kinematic_agent(pool).
 
 Phase 13 Plan 02 update: create_graph() accepts optional prop_quant_node, nba_quant_node,
 and prop_arbitrage_node parameters.
-- prop_quant_node: real async closure from make_prop_quant_agent(pool); None uses _prop_quant_stub.
-- nba_quant_node: real async closure from make_nba_quant_agent(pool); None uses _nba_quant_stub.
-- prop_arbitrage_node: real async closure from make_prop_arbitrage_agent(sport); None uses _prop_arb_stub.
+- prop_quant_node: real async closure from make_prop_quant_agent(pool); None fails closed.
+- nba_quant_node: real async closure from make_nba_quant_agent(pool); None fails closed.
+- prop_arbitrage_node: real async closure from make_prop_arbitrage_agent(sport); None fails closed.
 Both prop_quant_agent and nba_quant_agent chain to the same prop_arbitrage_agent node.
 prop_arbitrage_agent chains to correlation_guard (if present) or directly to END.
 create_graph_with_sqlite() wires all three when pool is provided.
@@ -68,7 +68,6 @@ from typing import Any, Callable
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from sportsbet.graph.agents import arbitrage_agent, context_agent, quant_agent
 from sportsbet.graph.router import master_router, route_from_master
 from sportsbet.graph.state import GraphState
 
@@ -169,15 +168,15 @@ def create_graph(
         AsyncSqliteSaver for runtime). If None, compiles without checkpointing
         (backward-compatible with Plan 02-02 tests).
     quant_node:
-        Optional async quant agent node. If None, uses the sync stub quant_agent
-        (Phase 2 backward-compat). Pass make_quant_agent(pool) for real SQL execution.
+        Optional async quant agent node. If None, the route fails closed. Pass
+        make_quant_agent(pool) for real SQL execution.
     context_node:
-        Optional async context agent node. If None, uses the sync stub context_agent
-        (Phase 2 backward-compat). Pass make_context_agent(pool, api_key, cap) for
+        Optional async context agent node. If None, the route fails closed. Pass
+        make_context_agent(pool, api_key, cap) for
         real odds + injury pipeline execution.
     arbitrage_node:
-        Optional async arbitrage agent node. If None, uses the sync stub arbitrage_agent
-        (Phase 2 backward-compat). Pass make_arbitrage_agent() for real EV computation.
+        Optional async arbitrage agent node. If None, the route fails closed. Pass
+        make_arbitrage_agent() for real EV computation.
     correlation_guard_node:
         Optional sync node from make_correlation_guard_node(). When provided alongside
         aggregator_node, extends the arbitrage pipeline with CorrelationGuard filtering.
@@ -187,16 +186,16 @@ def create_graph(
         alongside correlation_guard_node, gates signals through the daily drawdown limit.
         If None, arbitrage_agent routes directly to END (backward-compat).
     kinematic_node:
-        Optional async kinematic agent node. If None, uses _kinematic_stub which returns
-        {"kinematic_result": None} (backward-compat). Pass make_kinematic_agent(pool) for
+        Optional async kinematic agent node. If None, the route fails closed. Pass
+        make_kinematic_agent(pool) for
         real NGS separation query execution.
     prop_quant_node:
-        Optional async NFL prop quant agent node. If None, uses _prop_quant_stub which
-        returns {"prop_result": None}. Pass make_prop_quant_agent(pool) for real SQL.
+        Optional async NFL prop quant agent node. If None, the route fails closed.
+        Pass make_prop_quant_agent(pool) for real SQL.
         Chains to prop_arbitrage_agent after execution.
     nba_quant_node:
-        Optional async NBA prop quant agent node. If None, uses _nba_quant_stub which
-        returns {"nba_prop_result": None}. Pass make_nba_quant_agent(pool) for real SQL.
+        Optional async NBA prop quant agent node. If None, the route fails closed.
+        Pass make_nba_quant_agent(pool) for real SQL.
         Chains to prop_arbitrage_agent after execution (via nba_context_producer).
     nba_context_producer_node:
         Optional async NBA context signals producer node. If None, uses _nba_context_stub
@@ -204,8 +203,8 @@ def create_graph(
         Pass make_nba_context_signals_producer(pool) to populate NBAContextSignals before
         nba_quant_agent executes. Inserted between router and nba_quant_agent.
     prop_arbitrage_node:
-        Optional async prop arbitrage agent node. If None, uses _prop_arb_stub which
-        returns {"ev_signal": None}. Pass make_prop_arbitrage_agent(sport) for real EV.
+        Optional async prop arbitrage agent node. If None, the route fails closed.
+        Pass make_prop_arbitrage_agent(sport) for real EV.
         Receives output from prop_quant_agent, nba_quant_agent, or directly from router.
         Chains to correlation_guard (if present) or END.
 
@@ -219,36 +218,17 @@ def create_graph(
 
     builder: StateGraph = StateGraph(GraphState)
 
-    # quant_node: real async closure (Phase 3+) or sync stub (Phase 2 backward-compat)
-    active_quant_node = quant_node if quant_node is not None else quant_agent
+    def unconfigured(code: str, **outputs: Any) -> Callable[[GraphState], dict]:  # type: ignore[type-arg]
+        """Fail closed when a selected route has no runtime implementation."""
+        def node(state: GraphState) -> dict:  # type: ignore[type-arg]
+            return dict(error=state.get("error") or code, ev_signal=None, pending_signals=[],
+                        cleared_signals=[], gate_reason="model_unavailable", **outputs)
+        return node
 
-    # context_node: real async closure (Phase 4+) or sync stub (Phase 2 backward-compat)
-    active_context_node = context_node if context_node is not None else context_agent
-
-    # arbitrage_node: real async closure (Phase 5+) or sync stub (Phase 2 backward-compat)
-    active_arbitrage_node = arbitrage_node if arbitrage_node is not None else arbitrage_agent
-
-    # kinematic_node: real async closure (Phase 6+) or inline stub (backward-compat)
-    def _kinematic_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
-        """Inline stub: returns kinematic_result=None when no real kinematic node provided."""
-        return {"kinematic_result": None}
-
-    active_kinematic_node = kinematic_node if kinematic_node is not None else _kinematic_stub
-
-    # prop_quant_node: real async closure (Phase 13+) or inline stub (backward-compat)
-    def _prop_quant_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
-        """Inline stub: returns prop_result=None when no real prop quant node provided."""
-        return {"prop_result": None}
-
-    # nba_quant_node: real async closure (Phase 13+) or inline stub (backward-compat)
-    def _nba_quant_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
-        """Inline stub: returns nba_prop_result=None when no real NBA quant node provided."""
-        return {"nba_prop_result": None}
-
-    # prop_arbitrage_node: real async closure (Phase 13+) or inline stub (backward-compat)
-    def _prop_arb_stub(state: GraphState) -> dict:  # type: ignore[type-arg]
-        """Inline stub: returns ev_signal=None when no real prop arbitrage node provided."""
-        return {"ev_signal": None}
+    active_quant_node = quant_node or unconfigured("quant_agent_not_configured", quant_result=None)
+    active_context_node = context_node or unconfigured("context_agent_not_configured", context_signals=None)
+    active_arbitrage_node = arbitrage_node or unconfigured("arbitrage_agent_not_configured")
+    active_kinematic_node = kinematic_node or unconfigured("kinematic_agent_not_configured", kinematic_result=None)
 
     # nba_context_producer_node: populates NBAContextSignals before nba_quant_agent runs.
     # Stub returns nba_context_signals=None (neutral — no adjustments applied).
@@ -261,9 +241,9 @@ def create_graph(
         else _nba_context_stub
     )
 
-    active_prop_quant_node = prop_quant_node if prop_quant_node is not None else _prop_quant_stub
-    active_nba_quant_node = nba_quant_node if nba_quant_node is not None else _nba_quant_stub
-    active_prop_arbitrage_node = prop_arbitrage_node if prop_arbitrage_node is not None else _prop_arb_stub
+    active_prop_quant_node = prop_quant_node or unconfigured("prop_quant_agent_not_configured", prop_result=None)
+    active_nba_quant_node = nba_quant_node or unconfigured("nba_quant_agent_not_configured", nba_prop_result=None)
+    active_prop_arbitrage_node = prop_arbitrage_node or unconfigured("prop_arbitrage_agent_not_configured")
 
     # Register all base nodes
     builder.add_node("master_router", master_router)
@@ -401,10 +381,10 @@ async def create_graph_with_sqlite(
         Defaults to .checkpoints/sportsbet.sqlite (relative to cwd).
     pool:
         Optional asyncpg.Pool. If provided, wires real quant agent into graph.
-        If None, uses sync stub (backward-compat).
+        If None, the corresponding route fails closed.
     api_key:
         Optional Odds API key. If provided alongside pool, wires real context
-        agent into graph. If None, uses sync stub (backward-compat).
+        agent into graph. If None, the corresponding route fails closed.
     daily_credit_cap:
         Maximum Odds API credits allowed per day. Passed to make_context_agent.
         Defaults to 500.

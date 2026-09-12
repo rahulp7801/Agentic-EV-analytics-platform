@@ -1,28 +1,9 @@
-"""Agent nodes for the LangGraph state machine.
+"""Runtime agent factories and fail-closed legacy entry points for LangGraph.
 
-Phase 3 Plan 01 adds make_quant_agent(pool) — an async closure factory that
-replaces the sync stub quant_agent with a real QuantParams -> SQL -> QuantResult
-pipeline. The sync stub is preserved for backward-compat with tests that don't
-pass a pool to create_graph().
-
-Phase 4 Plan 04 adds make_context_agent(pool, api_key, daily_credit_cap) — an
-async closure factory that replaces the sync stub context_agent. The real agent
-fetches live NFL odds via OddsAPIPoller and injury reports via InjuryWeatherScraper,
-assembles a ContextSignals object, and returns a partial GraphState dict. Downstream
-agents read context_signals from state — never re-fetch the API.
-
-Phase 5 Plan 01 adds make_arbitrage_agent(settings_override) — an async closure
-factory that reads QuantResult and AgentOddsSnapshot from GraphState, computes
-+EV percentage via fractional_kelly and compute_ev_percentage, and returns an
-EVSignal with a 3-bullet trade plan. Negative-EV signals are suppressed entirely.
-
-Phase replacement schedule:
-- quant_agent (stub)  -> make_quant_agent(pool) closure (Phase 3)
-- context_agent (stub) -> make_context_agent(pool, api_key, cap) closure (Phase 4)
-- arbitrage_agent (stub) -> make_arbitrage_agent() closure (Phase 5, this plan)
-
-Design: agents return dicts (partial state updates), not full GraphState.
-LangGraph merges the returned dict into the current state using registered reducers.
+Real quant, context, pricing and kinematic nodes are created with explicit
+database/provider dependencies. Agents return partial state updates; LangGraph
+merges them using the state reducers. Calling a legacy entry point directly
+returns an unavailable error and never fixture analysis.
 """
 from __future__ import annotations
 
@@ -569,8 +550,7 @@ def make_arbitrage_agent(
     8. Build trade_plan = build_trade_plan(ev_pct, kelly_frac, injury_flags, market_type)
     9. Construct EVSignal — Pydantic validates all constraints at construction time
 
-    The sync arbitrage_agent stub is preserved below for backward-compat with
-    Phase 2 tests using create_graph() without an arbitrage_node parameter.
+    The fail-closed legacy entry point below is retained for import compatibility.
     """
     from sportsbet.arbitrage.ev import build_trade_plan, compute_ev_percentage, compute_expected_return, quote_terms
     from sportsbet.arbitrage.kelly import fractional_kelly
@@ -695,68 +675,29 @@ def make_arbitrage_agent(
 
 
 # ---------------------------------------------------------------------------
-# Backward-compat sync stub (Phase 2 — preserved for test isolation)
+# Fail-closed legacy direct entry points
 # ---------------------------------------------------------------------------
 
 def quant_agent(state: GraphState) -> dict:  # type: ignore[type-arg]
-    """Quant Agent stub — returns a hardcoded QuantResult fixture instance.
-
-    Preserved for backward-compat: create_graph() without a quant_node parameter
-    uses this stub so all existing Phase 2 tests continue to pass without a DB.
-
-    Phase 3 replacement: pass make_quant_agent(pool) as quant_node to create_graph().
-    data_source="fixture" signals this is stub output (never from real SQL).
-    """
-    log.info("stub_agent_called", agent="quant_agent", session_id=state["session_id"])
-    return {
-        "quant_result": QuantResult(
-            true_probability=Decimal("0.62"),
-            sample_size=142,
-            data_source="fixture",
-        )
-    }
+    """Legacy direct entry point that fails closed without a configured database."""
+    return {"error": "quant_agent_not_configured", "quant_result": None,
+            "ev_signal": None, "pending_signals": [], "cleared_signals": []}
 
 
 # ---------------------------------------------------------------------------
-# Stub agents — Phase 4/5 replacements pending
+# Direct calls also fail closed; runtime callers use the real factories above.
 # ---------------------------------------------------------------------------
 
 def arbitrage_agent(state: GraphState) -> dict:  # type: ignore[type-arg]
-    """Arbitrage Agent stub — returns a hardcoded EVSignal fixture instance.
-
-    Stub: Phase 5 replaces this with real odds comparison logic.
-    Fixture instance establishes interface contract for Phase 5 development.
-
-    EVSignal fixture values:
-    - ev_percentage=0.07  (7% edge over implied probability)
-    - kelly_fraction=0.05 (5% fractional Kelly stake, well within 25% cap)
-    - 2-item trade_plan (within CLAUDE.md 3-bullet limit)
-    """
-    log.info(
-        "stub_agent_called", agent="arbitrage_agent", session_id=state["session_id"]
-    )
-    return {
-        "ev_signal": EVSignal(
-            ev_percentage=Decimal("0.07"),
-            true_probability=Decimal("0.62"),
-            implied_probability=Decimal("0.55"),
-            kelly_fraction=Decimal("0.05"),
-            trade_plan=["Fixture edge 1", "Fixture edge 2"],
-            market_type="moneyline",
-        )
-    }
+    """Legacy direct entry point that fails closed without a real analysis input."""
+    return {"error": "arbitrage_agent_not_configured", "ev_signal": None,
+            "pending_signals": [], "cleared_signals": []}
 
 
 def context_agent(state: GraphState) -> dict:  # type: ignore[type-arg]
-    """Context Agent stub — passthrough, no output model yet.
-
-    Stub: Phase 4 replaces this with real context stream processing.
-    Returns empty dict — no output model defined until Phase 4.
-    """
-    log.info(
-        "stub_agent_called", agent="context_agent", session_id=state["session_id"]
-    )
-    return {}
+    """Legacy direct entry point that fails closed without configured providers."""
+    return {"error": "context_agent_not_configured", "context_signals": None,
+            "ev_signal": None, "pending_signals": [], "cleared_signals": []}
 
 
 # ---------------------------------------------------------------------------
