@@ -1,4 +1,6 @@
 import { database } from '@/lib/database';
+import { publicGameLogs } from '@/lib/publicGameLogs';
+import type { Sport } from '@/lib/types';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +18,8 @@ export async function GET(request: Request) {
     const {rows} = await database().query(
       'SELECT payload FROM dashboard_gamelogs WHERE sport=$1 AND ($2=\'\' OR strpos(lower(player_name),lower($2))>0) '
       + 'ORDER BY game_date DESC,player_name,game_key LIMIT $3', [sport,player,limit]);
-    return NextResponse.json({logs:rows.map(row=>row.payload)}, {headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json({logs:publicGameLogs(rows.map(row=>row.payload),sport as Sport)},
+      {headers:{'Cache-Control':'no-store'}});
   } catch {
     return NextResponse.json({error:'Game logs are temporarily unavailable.',logs:[]}, {status:503});
   }
