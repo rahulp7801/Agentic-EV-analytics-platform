@@ -57,6 +57,20 @@ def test_manual_settlement_cli_hashes_the_exact_input_file(tmp_path,monkeypatch,
     assert row['outcome_source']=='manual'
     assert row['outcome_ref']=='sha256:'+hashlib.sha256(raw).hexdigest()
 
+
+def test_legacy_automatic_outcomes_remain_unscored_until_verified(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite');now=datetime.now(timezone.utc)
+    key=ledger.record('scan',dict(game_id='g',player='P',prop_type='points',direction='over',
+        line=20.5,sportsbook='book',american_odds=100,model_probability=.6,
+        captured_at=now.isoformat(),game_start_time=(now+timedelta(hours=1)).isoformat()))
+    ledger.settle({key:True},source='espn_final_stats',source_ref='legacy')
+    legacy=ledger.report()
+    assert legacy['settled_count']==0 and legacy['pending_count']==1
+    assert legacy['unverified_settlements']==1
+    ledger.settle({key:True},source='observed_final_stats',source_ref='verified')
+    verified=ledger.report()
+    assert verified['settled_count']==1 and verified['unverified_settlements']==0
+
 @pytest.mark.parametrize('side', ['over','under'])
 async def test_sample_gate_and_synthetic_prices_apply_to_both_sides(side):
     q=PlayerPropSnapshotCreate(sport='nba',player_name='P',sportsbook='book',prop_type='player_points',

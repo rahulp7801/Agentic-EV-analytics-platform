@@ -129,6 +129,10 @@ class PlayerStat(Base):
     # nullable — existing rows do not have this data; populated on new ingest.
     opponent_team: Mapped[Optional[str]] = mapped_column(String(3))
     home_away: Mapped[Optional[str]] = mapped_column(String(4))  # "home" | "away"
+    source_provider: Mapped[Optional[str]] = mapped_column(String)
+    source_sha256: Mapped[Optional[str]] = mapped_column(String(64))
+    source_record_sha256: Mapped[Optional[str]] = mapped_column(String(64))
+    source_observed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMPTZ(timezone=True))
 
     __table_args__ = (
         UniqueConstraint(
@@ -356,8 +360,9 @@ class NBAPlayerGameLog(Base):
     threes_made: Mapped[Optional[int]] = mapped_column(SmallInteger)
     steals: Mapped[Optional[int]] = mapped_column(SmallInteger)
     blocks: Mapped[Optional[int]] = mapped_column(SmallInteger)
-    source_provider: Mapped[str] = mapped_column(String, nullable=False, server_default='nba')
+    source_provider: Mapped[str] = mapped_column(String, nullable=False)
     source_sha256: Mapped[Optional[str]] = mapped_column(String(64))
+    source_record_sha256: Mapped[Optional[str]] = mapped_column(String(64))
     source_observed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMPTZ(timezone=True))
 
     __table_args__ = (

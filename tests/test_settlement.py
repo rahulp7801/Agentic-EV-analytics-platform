@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from sportsbet.ledger import Ledger
+from sportsbet.ingestion.provenance import stat_row_sha256
 from sportsbet.settlement import settle_final_props
 
 
@@ -23,6 +24,21 @@ def schedule(payload, *, completed=True, home='Home'):
         game_time=payload['game_start_time'])])
 
 
+def create_nba_stats(db):
+    db.execute('''CREATE TABLE nba_player_gamelogs (player_id INTEGER, game_id TEXT,
+        game_date TEXT, team_abbreviation TEXT, points INTEGER, rebounds INTEGER,
+        assists INTEGER, source_provider TEXT, source_sha256 TEXT,
+        source_record_sha256 TEXT, source_observed_at TEXT)''')
+
+
+def add_nba_stat(db,payload,points,*,game_id='stat-game',provider='nba',record_hash=None,observed_at=None):
+    row=dict(player_id=int(payload['player_id']),game_id=game_id,game_date=payload['game_date'],
+        team_abbreviation='H',points=points,rebounds=5,assists=4)
+    digest=record_hash if record_hash is not None else stat_row_sha256('nba',row)
+    db.execute('INSERT INTO nba_player_gamelogs VALUES (?,?,?,?,?,?,?,?,?,?,?)',(
+        *row.values(),provider,'a'*64,digest,observed_at or datetime.now(timezone.utc).isoformat()))
+
+
 @pytest.mark.parametrize(('direction','line','actual','expected'),[
     ('over',20.5,21,True),('over',20.5,20,False),('over',20,20,'push'),
     ('under',20.5,20,True),('under',20.5,21,False),('under',20,20,'push'),
@@ -31,14 +47,13 @@ def test_settlement_uses_final_exact_game_and_observed_stat(tmp_path,direction,l
     ledger=Ledger(tmp_path/'audit.sqlite')
     key,payload=prediction(ledger,direction=direction,line=line)
     with ledger.connect() as db:
-        db.execute('CREATE TABLE nba_player_gamelogs (player_id INTEGER, game_date TEXT, points INTEGER, rebounds INTEGER, assists INTEGER)')
-        db.execute('INSERT INTO nba_player_gamelogs(player_id,game_date,points) VALUES (?,?,?)',(7,payload['game_date'],actual))
+        create_nba_stats(db);add_nba_stat(db,payload,actual)
     report=settle_final_props(ledger,'nba',schedule(payload))
     assert report['settled']==1 and report['pending']==0
     row=next(row for row in ledger.predictions() if row['prediction_id']==key)
     assert row['outcome']==expected and row['actual_value']==actual
-    assert row['outcome_source']=='espn_final_stats'
-    assert row['outcome_ref'].startswith('espn:espn-event:sha256:') and len(row['outcome_ref'])==87
+    assert row['outcome_source']=='observed_final_stats'
+    assert row['outcome_ref'].startswith('espn_schedule+nba:espn-event:sha256:')
     assert datetime.fromisoformat(row['outcome_observed_at']).utcoffset() is not None
 
 
@@ -51,9 +66,9 @@ def test_settlement_uses_final_exact_game_and_observed_stat(tmp_path,direction,l
 def test_settlement_never_guesses_game_dnp_or_ambiguous_stat(tmp_path,schedule_change,stats,reason):
     ledger=Ledger(tmp_path/'audit.sqlite');key,payload=prediction(ledger)
     with ledger.connect() as db:
-        db.execute('CREATE TABLE nba_player_gamelogs (player_id INTEGER, game_date TEXT, points INTEGER, rebounds INTEGER, assists INTEGER)')
-        for (value,) in stats:
-            db.execute('INSERT INTO nba_player_gamelogs(player_id,game_date,points) VALUES (?,?,?)',(7,payload['game_date'],value))
+        create_nba_stats(db)
+        for index,(value,) in enumerate(stats):
+            add_nba_stat(db,payload,value,game_id=f'stat-game-{index}')
     report=settle_final_props(ledger,'nba',schedule(payload,**schedule_change))
     assert report['settled']==0 and report['pending']==1 and report['reasons']=={reason:1}
     assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is None
@@ -63,8 +78,7 @@ def test_settlement_does_not_rewrite_existing_outcome(tmp_path):
     ledger=Ledger(tmp_path/'audit.sqlite');key,payload=prediction(ledger)
     ledger.settle({key:False})
     with ledger.connect() as db:
-        db.execute('CREATE TABLE nba_player_gamelogs (player_id INTEGER, game_date TEXT, points INTEGER, rebounds INTEGER, assists INTEGER)')
-        db.execute('INSERT INTO nba_player_gamelogs(player_id,game_date,points) VALUES (?,?,?)',(7,payload['game_date'],99))
+        create_nba_stats(db);add_nba_stat(db,payload,99)
     report=settle_final_props(ledger,'nba',schedule(payload))
     assert report['candidates']==0 and report['settled']==0
     assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is False
@@ -73,11 +87,14 @@ def test_settlement_does_not_rewrite_existing_outcome(tmp_path):
 def test_automatic_correction_only_rechecks_dates_in_supplied_evidence(tmp_path):
     ledger=Ledger(tmp_path/'audit.sqlite');key,payload=prediction(ledger)
     with ledger.connect() as db:
-        db.execute('CREATE TABLE nba_player_gamelogs (player_id INTEGER, game_date TEXT, points INTEGER, rebounds INTEGER, assists INTEGER)')
-        db.execute('INSERT INTO nba_player_gamelogs(player_id,game_date,points) VALUES (?,?,?)',(7,payload['game_date'],21))
+        create_nba_stats(db);add_nba_stat(db,payload,21)
     assert settle_final_props(ledger,'nba',schedule(payload))['settled']==1
+    ledger.settle({key:True},source='espn_final_stats',source_ref='legacy')
     with ledger.connect() as db:
-        db.execute('UPDATE nba_player_gamelogs SET points=20 WHERE player_id=7')
+        corrected=dict(player_id=7,game_id='stat-game',game_date=payload['game_date'],
+            team_abbreviation='H',points=20,rebounds=5,assists=4)
+        db.execute('UPDATE nba_player_gamelogs SET points=20,source_record_sha256=? WHERE player_id=7',
+            (stat_row_sha256('nba',corrected),))
     outside={**schedule(payload),'games':[]}
     assert settle_final_props(ledger,'nba',outside)['candidates']==0
     assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is True
@@ -90,10 +107,37 @@ def test_nfl_settlement_joins_exact_player_week_team_and_game_date(tmp_path):
     ledger=Ledger(tmp_path/'audit.sqlite')
     key,payload=prediction(ledger,line=250.5,sport='nfl',prop_type='pass_yds',player_id='gsis-7')
     with ledger.connect() as db:
-        db.execute('CREATE TABLE player_stats (player_id TEXT, season INTEGER, week INTEGER, team TEXT, passing_yards INTEGER, rushing_yards INTEGER, receiving_yards INTEGER)')
+        db.execute('''CREATE TABLE player_stats (player_id TEXT, season INTEGER, week INTEGER,
+            team TEXT, passing_yards INTEGER, rushing_yards INTEGER, receiving_yards INTEGER,
+            source_provider TEXT, source_sha256 TEXT, source_record_sha256 TEXT,
+            source_observed_at TEXT)''')
         db.execute('CREATE TABLE games (season INTEGER, week INTEGER, home_team TEXT, away_team TEXT, game_date TEXT)')
-        db.execute("INSERT INTO player_stats(player_id,season,week,team,passing_yards) VALUES ('gsis-7',2026,1,'H',251)")
+        row=dict(player_id='gsis-7',season=2026,week=1,team='H',passing_yards=251,
+            rushing_yards=0,receiving_yards=0)
+        db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?)',(
+            *row.values(),'nflverse','b'*64,stat_row_sha256('nfl',row),datetime.now(timezone.utc).isoformat()))
         db.execute("INSERT INTO games VALUES (2026,1,'H','A',?)",(payload['game_date'],))
     report=settle_final_props(ledger,'nfl',schedule(payload))
     row=next(item for item in ledger.predictions() if item['prediction_id']==key)
     assert report['settled']==1 and row['outcome'] is True and row['actual_value']==251
+
+
+@pytest.mark.parametrize(('provider','record_hash','reason'),[
+    ('unknown',None,'stat_provenance_invalid'),('nba','bad','stat_provenance_invalid')])
+def test_settlement_rejects_missing_or_tampered_stat_provenance(tmp_path,provider,record_hash,reason):
+    ledger=Ledger(tmp_path/'audit.sqlite');_,payload=prediction(ledger)
+    with ledger.connect() as db:
+        create_nba_stats(db);add_nba_stat(db,payload,21,provider=provider,record_hash=record_hash)
+        if record_hash=='bad':
+            db.execute("UPDATE nba_player_gamelogs SET source_record_sha256=?",('c'*64,))
+    report=settle_final_props(ledger,'nba',schedule(payload))
+    assert report['settled']==0 and report['pending']==1 and report['reasons']=={reason:1}
+
+
+def test_settlement_rejects_stat_observation_before_game_or_in_future(tmp_path):
+    for observed in (datetime.now(timezone.utc)-timedelta(days=2),datetime.now(timezone.utc)+timedelta(days=1)):
+        ledger=Ledger(tmp_path/(observed.date().isoformat()+'.sqlite'));_,payload=prediction(ledger)
+        with ledger.connect() as db:
+            create_nba_stats(db);add_nba_stat(db,payload,21,observed_at=observed.isoformat())
+        report=settle_final_props(ledger,'nba',schedule(payload))
+        assert report['settled']==0 and report['reasons']=={'stat_provenance_invalid':1}

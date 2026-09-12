@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from sportsbet.db.models import NBAPlayerGameLog
 from sportsbet.ingestion.archive import write_archive
+from sportsbet.ingestion.provenance import stat_row_sha256
 
 CROSSWALKS = 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/nba_crosswalk'
 ESPN = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
@@ -121,11 +122,13 @@ def parse_game(data: dict, season: int, game: dict, players: dict, teams: dict,
             stats['minutes']=int(pieces[0])+(int(pieces[1])/60 if len(pieces)==2 else 0)
             if stats['minutes']>999.9:
                 raise ValueError('Playing time exceeds storage bounds')
-            rows.append(dict(player_id=player_id,player_name=mapping['nba_player_name'],
+            row=dict(player_id=player_id,player_name=mapping['nba_player_name'],
                 game_id=game['nba_game_id'],game_date=day,season=season,
                 team_abbreviation=teams[team_id]['nba_team_abbreviation'],is_home=team_id==home,
                 opponent_team=teams[away if team_id==home else home]['nba_team_abbreviation'],
-                **stats,source_provider='espn',source_sha256=source_hash,source_observed_at=received))
+                **stats,source_provider='espn',source_sha256=source_hash,source_observed_at=received)
+            row['source_record_sha256']=stat_row_sha256('nba',row)
+            rows.append(row)
             count+=1
         if count<5:
             raise ValueError('Incomplete participating-player box score')

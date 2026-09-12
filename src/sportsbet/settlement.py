@@ -2,18 +2,25 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 import hashlib
 import json
+import re
 
 from sportsbet.ledger import Ledger, utc_timestamp
+from sportsbet.ingestion.provenance import STAT_FIELDS, stat_row_sha256
 
 STAT_COLUMNS={
     'nba':{'points':'points','rebounds':'rebounds','assists':'assists'},
     'nfl':{'pass_yds':'passing_yards','rush_yds':'rushing_yards','rec_yds':'receiving_yards'},
 }
-AUTO_SOURCE='espn_final_stats'
+AUTO_SOURCE='observed_final_stats'
+AUTO_SOURCES={AUTO_SOURCE,'espn_final_stats'}
+
+
+class StatProvenanceError(ValueError):
+    pass
 
 
 def _candidate(prediction: dict, sport: str, games: list[dict]):
@@ -45,20 +52,48 @@ def _actual(db, prediction: dict, sport: str, day: str):
     if sport=='nba':
         if not player_id.isdigit() or int(player_id)<=0 or str(int(player_id))!=player_id:
             raise ValueError('Invalid player identity')
-        rows=db.execute(f'SELECT {column} FROM nba_player_gamelogs WHERE player_id=? AND game_date=?',
+        fields=STAT_FIELDS['nba']
+        rows=db.execute(f'''SELECT {','.join(fields)},source_provider,source_sha256,
+            source_record_sha256,source_observed_at
+            FROM nba_player_gamelogs WHERE player_id=? AND game_date=?''',
             (int(player_id),day)).fetchall()
     else:
         if not player_id.strip() or len(player_id)>20:
             raise ValueError('Invalid player identity')
-        rows=db.execute(f'''SELECT ps.{column} FROM player_stats ps JOIN games g
+        fields=STAT_FIELDS['nfl']
+        rows=db.execute(f'''SELECT {','.join('ps.'+field for field in fields)},ps.source_provider,
+            ps.source_sha256,ps.source_record_sha256,ps.source_observed_at
+            FROM player_stats ps JOIN games g
             ON g.season=ps.season AND g.week=ps.week AND ps.team IN (g.home_team,g.away_team)
             WHERE ps.player_id=? AND g.game_date=?''',(player_id,day)).fetchall()
-    if len(rows)!=1 or rows[0][0] is None or type(rows[0][0]) is bool:
+    if len(rows)!=1:
         return None
-    value=Decimal(str(rows[0][0]))
+    record=dict(zip(fields,rows[0][:len(fields)],strict=True))
+    if record[column] is None or type(record[column]) is bool:
+        return None
+    value=Decimal(str(record[column]))
     if not value.is_finite() or value < 0:
         raise ValueError('Invalid observed stat')
-    return value
+    provider,digest,record_digest,observed=rows[0][len(fields):]
+    expected={'nba':{'nba','espn'},'nfl':{'nflverse'}}[sport]
+    if (provider not in expected or not isinstance(digest,str) or not re.fullmatch('[0-9a-f]{64}',digest)
+            or not isinstance(record_digest,str) or not re.fullmatch('[0-9a-f]{64}',record_digest)):
+        raise StatProvenanceError('Invalid stat source')
+    try:
+        if stat_row_sha256(sport,record)!=record_digest:
+            raise StatProvenanceError('Stat record hash does not match')
+    except ValueError:
+        raise StatProvenanceError('Stat record hash does not match') from None
+    try:
+        observed=observed if isinstance(observed,datetime) else datetime.fromisoformat(observed)
+        if observed.tzinfo is None or observed.utcoffset() is None:
+            raise ValueError
+    except (TypeError,ValueError):
+        raise StatProvenanceError('Invalid stat observation time') from None
+    evidence_record={key:(item.isoformat() if isinstance(item,(date,datetime)) else item)
+        for key,item in record.items()}
+    return value,dict(provider=provider,sha256=digest,record_sha256=record_digest,
+        observed_at=observed,record=evidence_record)
 
 
 def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
@@ -67,7 +102,7 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
         raise ValueError('Invalid settlement scope')
     game_dates={game.get('date') for game in schedule['games']}
     candidates=[row for row in ledger.predictions() if row.get('sport')==sport
-        and (row.get('outcome') is None or (row.get('outcome_source')==AUTO_SOURCE
+        and (row.get('outcome') is None or (row.get('outcome_source') in AUTO_SOURCES
             and row.get('game_date') in game_dates))]
     reasons=Counter();resolved=[]
     with ledger.connect() as db:
@@ -78,24 +113,34 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
                     reasons['final_game_not_matched']+=1
                     continue
                 game,day,line=matched
-                actual=_actual(db,prediction,sport,day)
-                if actual is None:
+                observed=_actual(db,prediction,sport,day)
+                if observed is None:
                     reasons['stat_not_found_or_ambiguous']+=1
                     continue
+                actual,provenance=observed
+                game_time=utc_timestamp(game['game_time'])
+                if not game_time <= provenance['observed_at'].astimezone(timezone.utc) <= datetime.now(timezone.utc):
+                    raise StatProvenanceError('Stat observation time is outside the evidence window')
                 outcome='push' if actual==line else ((actual>line)==(prediction['direction']=='over'))
-                resolved.append((prediction,game,outcome,actual))
+                resolved.append((prediction,game,outcome,actual,provenance))
+            except StatProvenanceError:
+                reasons['stat_provenance_invalid']+=1
             except (KeyError,TypeError,ValueError,ArithmeticError):
                 reasons['invalid_prediction_or_evidence']+=1
-    observed=utc_timestamp(schedule['captured_at'])
-    for prediction,game,outcome,actual in resolved:
+    schedule_observed=utc_timestamp(schedule['captured_at'])
+    for prediction,game,outcome,actual,provenance in resolved:
         evidence=dict(provider_event_id=game['provider_event_id'],date=game['date'],
             home_name=game['home_name'],away_name=game['away_name'],completed=True,
             game_time=game['game_time'],player_id=prediction['player_id'],
-            prop_type=prediction['prop_type'],actual_value=str(actual))
+            prop_type=prediction['prop_type'],actual_value=str(actual),
+            stat_provider=provenance['provider'],stat_source_sha256=provenance['sha256'],
+            stat_record_sha256=provenance['record_sha256'],
+            stat_observed_at=provenance['observed_at'].isoformat(),stat_row=provenance['record'])
         digest=hashlib.sha256(json.dumps(evidence,sort_keys=True,separators=(',',':')).encode()).hexdigest()
-        reference=f"espn:{game['provider_event_id']}:sha256:{digest}"
+        reference=f"espn_schedule+{provenance['provider']}:{game['provider_event_id']}:sha256:{digest}"
         ledger.settle({prediction['prediction_id']:outcome},source=AUTO_SOURCE,source_ref=reference,
-            observed_at=observed,actual_values={prediction['prediction_id']:actual})
+            observed_at=max(schedule_observed,provenance['observed_at']),
+            actual_values={prediction['prediction_id']:actual})
     return dict(sport=sport,status='complete' if schedule.get('status')=='complete' else 'degraded',
         candidates=len(candidates),settled=len(resolved),pending=len(candidates)-len(resolved),
         reasons=dict(sorted(reasons.items())),execution_ready=False)
