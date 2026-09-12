@@ -162,7 +162,7 @@ def test_player_identity_strike_freshness_and_skew_are_never_fuzzy_matched():
 
     changed = handoff(); changed['evidence']['quotes'][0]['line'] = '250'
     whole = screen(event(), 'nfl', [book(line=Decimal('250'))], rehash(changed), NOW)
-    assert whole['coverage']['rejected']['non_complementary_strike'] == 1
+    assert whole['coverage']['rejected']['non_complementary_strike'] == 2
 
     skewed = screen(event(), 'nfl', [book(observed=NOW+timedelta(seconds=31))], handoff(),
         NOW+timedelta(seconds=31))
@@ -222,3 +222,11 @@ def test_sportsbook_screen_requires_distinct_books_half_line_freshness_and_real_
     under.snapped_at=NOW;under.implied_probability=Decimal('.01')
     result=screen_sportsbooks(event(),'nfl',[over,under],NOW)
     assert result['comparisons']==[] and result['coverage']['rejected']['sportsbook_price']==1
+
+
+def test_cross_venue_rejects_a_price_probability_mismatch():
+    corrupted=book()
+    corrupted.implied_probability=Decimal('.01')
+    result=screen(event(),'nfl',[corrupted],handoff(),NOW)
+    assert result['comparisons']==[]
+    assert result['coverage']['rejected']['sportsbook_price']==1

@@ -190,6 +190,28 @@ def _fee_scenario(evidence: dict, quote: dict, ask: tuple[Decimal, Decimal],
             'exceptional charges and settlement differences are excluded.')
 
 
+def _sportsbook_rejection(quote: PlayerPropSnapshotCreate, event: dict, sport: str,
+        now: datetime, start: datetime) -> str | None:
+    """Return the first reason an observed sportsbook quote cannot be screened."""
+    try:
+        age=(now-quote.snapped_at).total_seconds()
+    except (TypeError,AttributeError):
+        return 'sportsbook_timestamp'
+    if (quote.sport != sport or quote.game_id != event.get('id')
+            or quote.prop_type not in PROP_MARKETS[sport]):
+        return 'sportsbook_identity'
+    if (type(quote.price) is not int or abs(quote.price)<100
+            or quote.implied_probability != american_to_raw_prob(quote.price)
+            or quote.side not in ('Over','Under')):
+        return 'sportsbook_price'
+    if not -1 <= age <= MAX_AGE_SECONDS or quote.snapped_at >= start:
+        return 'sportsbook_future_or_stale'
+    if (not isinstance(quote.line,Decimal) or not quote.line.is_finite()
+            or quote.line<0 or quote.line % 1 != Decimal('.5')):
+        return 'non_complementary_strike'
+    return None
+
+
 def screen_sportsbooks(event: dict, sport: str, quotes: list[PlayerPropSnapshotCreate],
         now: datetime) -> dict:
     """Screen exact opposite props at distinct books using observed payout prices."""
@@ -201,25 +223,11 @@ def screen_sportsbooks(event: dict, sport: str, quotes: list[PlayerPropSnapshotC
         return _unavailable(sport, now, 'invalid_event')
     eligible=[];rejected=Counter()
     for quote in quotes:
-        try:
-            age=(now-quote.snapped_at).total_seconds()
-        except (TypeError,AttributeError):
-            rejected['sportsbook_timestamp'] += 1
+        reason=_sportsbook_rejection(quote,event,sport,now,start)
+        if reason:
+            rejected[reason] += 1
             continue
-        if (quote.sport != sport or quote.game_id != event.get('id')
-                or quote.prop_type not in PROP_MARKETS[sport]):
-            rejected['sportsbook_identity'] += 1
-        elif (type(quote.price) is not int or abs(quote.price)<100
-                or quote.implied_probability != american_to_raw_prob(quote.price)
-                or quote.side not in ('Over','Under')):
-            rejected['sportsbook_price'] += 1
-        elif not -1 <= age <= MAX_AGE_SECONDS or quote.snapped_at >= start:
-            rejected['sportsbook_future_or_stale'] += 1
-        elif not isinstance(quote.line,Decimal) or not quote.line.is_finite() \
-                or quote.line<0 or quote.line % 1 != Decimal('.5'):
-            rejected['non_complementary_strike'] += 1
-        else:
-            eligible.append(quote)
+        eligible.append(quote)
     try:
         groups={(_name(quote.player_name),quote.prop_type,quote.line) for quote in eligible}
     except InvalidHandoff:
@@ -286,13 +294,11 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
     books = []
     rejected = Counter()
     for quote in sportsbook_quotes:
-        age = (now-quote.snapped_at).total_seconds()
-        if quote.sport != sport or quote.game_id != event.get('id') or quote.prop_type not in PROP_MARKETS[sport]:
-            rejected['sportsbook_identity'] += 1
-        elif not -1 <= age <= MAX_AGE_SECONDS or quote.snapped_at >= start:
-            rejected['sportsbook_future_or_stale'] += 1
-        else:
-            books.append(quote)
+        reason=_sportsbook_rejection(quote,event,sport,now,start)
+        if reason:
+            rejected[reason] += 1
+            continue
+        books.append(quote)
 
     comparisons = []
     exact_markets = price_pairs = 0
