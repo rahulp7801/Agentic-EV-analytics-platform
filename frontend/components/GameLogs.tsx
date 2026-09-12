@@ -8,7 +8,7 @@ interface GameLogsProps { sport: Sport; }
 const NBA_COLS = ['points', 'rebounds', 'assists', 'threes', 'steals', 'blocks', 'minutes'] as const;
 const NFL_COLS = ['pass_yds', 'pass_tds', 'rush_yds', 'rec_yds', 'receptions'] as const;
 
-function StatCell({ value, prop, line }: { value?: number; prop: string; line?: number }) {
+function StatCell({ value, line }: { value?: number; line?: number }) {
   if (value === undefined) return <td style={{ color: 'var(--text-dim)' }}>—</td>;
   const beat = line !== undefined && value !== line ? value > line : undefined;
   return (
@@ -163,7 +163,6 @@ export default function GameLogs({ sport }: GameLogsProps) {
                   <StatCell
                     key={c}
                     value={log[c as keyof GameLog] as number | undefined}
-                    prop={c}
                     line={c === activeProp ? lineVal : undefined}
                   />
                 ))}

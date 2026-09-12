@@ -262,9 +262,9 @@ export default function Arbitrage({ sport }: { sport: Sport }) {
   }, [sport]);
 
   useEffect(() => {
-    fetchEVSignals();
+    const initial = setTimeout(() => void fetchEVSignals(), 0);
     const timer = setInterval(fetchEVSignals, 30000);
-    return () => clearInterval(timer);
+    return () => { clearTimeout(initial); clearInterval(timer); };
   }, [fetchEVSignals]);
 
   const handleRefresh = async () => {

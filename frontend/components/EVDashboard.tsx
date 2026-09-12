@@ -47,14 +47,6 @@ function time_ago(iso: string) {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-function buildMispricingReason(signal: RichSignal): [string, string, string] {
-  return [
-    `${signal.direction.toUpperCase()} ${signal.line}: ${(signal.true_prob * 100).toFixed(1)}% estimated win probability.`,
-    signal.expected_return == null ? 'Expected return unavailable.' : `${(signal.expected_return * 100).toFixed(1)}% expected return per unit stake at the quoted payout.`,
-    `Sample: ${signal.sample_size ?? 'unknown'} games. ${signal.gated ? `Gated: ${signal.gate_reason ?? 'risk policy'}.` : 'Estimate has not been validated by settled results.'}`,
-  ];
-}
-
 function KellyBar({ fraction }: { fraction: number }) {
   const pct = fraction * 100;
   const color = pct >= 10 ? 'var(--accent-mint)' : pct >= 5 ? 'var(--accent-amber)' : 'var(--text-secondary)';
@@ -144,8 +136,6 @@ function SignalDetailPanel({ signal, onClose, onAddToParlay, inParlay }: {
 }) {
   const evPct = signal.ev_pct * 100;
   const kellyPct = signal.kelly_fraction * 100;
-  const mispricingReasons = buildMispricingReason(signal);
-
   return (
     <div style={{
       position: 'absolute', right: 0, top: 0, bottom: 0, width: 340,
