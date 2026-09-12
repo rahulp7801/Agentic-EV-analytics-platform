@@ -174,25 +174,5 @@ jobs:
       - name: Verify deployed access controls and data readiness
         env:
           DATA_PIPELINE_ENABLED: ${{ vars.DATA_PIPELINE_ENABLED }}
-        run: |
-          node --input-type=module <<'JS'
-          const base = 'https://agentic-ev-analytics-platform.vercel.app';
-          async function check(path, expected, options = {}) {
-            const response = await fetch(base + path, { ...options, signal: AbortSignal.timeout(20000), redirect: 'manual' });
-            if (!expected.includes(response.status)) throw new Error(`${path}: unexpected HTTP ${response.status}`);
-            return response;
-          }
-          const home = await check('/', [200]);
-          if (home.headers.get('x-content-type-options') !== 'nosniff' || !home.headers.get('content-security-policy')) {
-            throw new Error('Production security headers are missing');
-          }
-          await check('/api/scan', [403], { method: 'POST' });
-          await check('/.env', [404]);
-          await check('/signals_cache.json', [404]);
-          const required = process.env.DATA_PIPELINE_ENABLED === 'true';
-          for (const path of ['/api/signals', '/api/metrics', '/api/scans', '/api/markets?sport=nfl', '/api/markets?sport=nba',
-            '/api/games?sport=nfl', '/api/games?sport=nba', '/api/gamelogs?sport=nfl', '/api/gamelogs?sport=nba']) {
-            const response = await check(path, required ? [200] : [200, 503]);
-            if (response.status === 503) console.log(`::warning::${path} unavailable; deployment is not live-data ready`);
-          }
-          JS
+          PUBLIC_DATA_PIPELINE_ENABLED: ${{ vars.PUBLIC_DATA_PIPELINE_ENABLED }}
+        run: node frontend/scripts/verify-production.mjs
