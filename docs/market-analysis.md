@@ -205,16 +205,33 @@ of 1,000 open markets per series, validates active binary one-dollar market and
 event identities, and links events only through each selected structured game
 milestone's `related_event_tickers`. The dashboard reports series, market, and
 linked-event counts plus whether every cursor was exhausted. Full provider pages
-are hashed and discarded so a half-hourly status snapshot does not publish
-thousands of contracts. This aggregate inventory contains no quote timestamp,
-depth, settlement-equivalence decision, or executable candidate. Exact contracts
-will be captured later at the cross-venue matching boundary.
+are hashed and discarded. A compact archive record for every linked contract now
+retains the structured player/team target IDs, numeric strike, milestone kickoff,
+market occurrence time, request interval, raw-market/rule/page hashes, and listed
+top-of-book ask price and size. The asks are checked against complementary bids as
+specified by Kalshi's [order-book documentation](https://docs.kalshi.com/getting_started/orderbook_responses).
+This uses the already-fetched [Get Markets](https://docs.kalshi.com/api-reference/market/get-markets)
+pages, avoiding thousands of extra order-book calls. Missing one-sided liquidity
+is preserved as missing; inconsistent prices, identities, UUIDs, rules, or pages
+degrade the source instead of producing a quote.
+
+`occurrence_datetime` is retained as market metadata and is not used as kickoff.
+In a real NFL sample it was three hours after the linked milestone start. The
+milestone remains the documented structured game relationship. Player names and
+settlement equivalence are intentionally unresolved: a later exact sportsbook
+match must resolve the player target, re-fetch and review the contract rules, and
+check DNP/void and stat-provider treatment. One listed level is displayed depth,
+not a fill, and every normalized record has `settlement_equivalent=false` and
+`execution_ready=false`.
 
 On September 12, 2026, a real public NFL run exhausted all four series and found
 3,073 open contracts across 56 prop events, all linked to 15 upcoming structured
-games. The same run retained 30 game-market comparisons and replayed them exactly.
-The three core NBA series were empty during the offseason. These counts establish
-collector coverage at that observation time, not liquidity, edge, or profitability.
+games. A later run through the normalized quote path retained all 3,073 records;
+2,878 had top-of-book liquidity on both sides and 195 were one-sided. The compact
+uncompressed evidence was about 3.15 MB and required only the four paginated series
+reads. One sampled list quote matched the full public order book. The three core
+NBA series were empty during the offseason. These observations establish source
+coverage and schema consistency at that time, not an edge or profitability.
 
 Research agents may eventually propose mappings and summarize rules with source
 references. They must not invent prices, probability calibration, fills, or

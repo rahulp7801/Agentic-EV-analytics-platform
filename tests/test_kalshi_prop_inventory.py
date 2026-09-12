@@ -14,7 +14,8 @@ def game(number: int, *events: str) -> dict:
         'id': f'00000000-0000-0000-0000-00000000000{number}',
         'start_date': (NOW + timedelta(days=1)).isoformat(),
         'related_event_tickers': list(events),
-        'details': {'league': 'NFL'},
+        'details': {'league': 'NFL','home_team_id':'10000000-0000-0000-0000-000000000001',
+            'away_team_id':'20000000-0000-0000-0000-000000000002'},
     }
 
 
@@ -25,6 +26,15 @@ def market(series: str, event: str, suffix: str) -> dict:
         'status': 'active',
         'market_type': 'binary',
         'notional_value_dollars': '1.0000',
+        'primary_participant_key':'football_player',
+        'custom_strike':{'football_player':'30000000-0000-0000-0000-000000000003',
+            'football_team':'10000000-0000-0000-0000-000000000001'},
+        'strike_type':'greater','floor_strike':249.5,
+        'occurrence_datetime':(NOW+timedelta(days=1)).isoformat(),
+        'yes_bid_dollars':'0.4000','yes_bid_size_fp':'12.00',
+        'yes_ask_dollars':'0.4500','yes_ask_size_fp':'10.00',
+        'no_bid_dollars':'0.5500','no_ask_dollars':'0.6000',
+        'rules_primary':'Primary settlement rule.','rules_secondary':'Secondary settlement rule.',
     }
 
 
@@ -61,12 +71,29 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
         'open_events': 2,
         'linked_markets': 3,
         'linked_events': 2,
+        'structured_quote_markets': 3,
+        'two_sided_quote_markets': 3,
         'discovery_complete': True,
     }
     assert result['series']['KXNFLPASSYDS']['pages'] == 2
     assert result['series']['KXNFLPASSYDS']['linked_markets'] == 2
     assert result['series']['KXNFLPASSYDS']['response_sha256']
     assert 'markets' not in result['series']['KXNFLPASSYDS']
+    assert len(result['quotes'])==3
+    quote=result['quotes'][0]
+    assert {k:v for k,v in quote.items() if k not in ('request_started_at','received_at')} == {
+        'ticker':f'{passing}-PLAYER-250','event_ticker':passing,'series_ticker':'KXNFLPASSYDS',
+        'milestone_id':game(1)['id'],'scheduled_game_start_time':(NOW+timedelta(days=1)).isoformat(),
+        'market_occurrence_time':(NOW+timedelta(days=1)).isoformat(),
+        'prop_type':'pass_yds','player_target_id':'30000000-0000-0000-0000-000000000003',
+        'team_target_id':'10000000-0000-0000-0000-000000000001','strike_type':'greater','line':'249.5',
+        'yes_ask':{'cost':'0.4500','displayed_size':'10.00'},
+        'no_ask':{'cost':'0.6000','displayed_size':'12.00'},
+        'market_sha256':market_watch.digest(market('KXNFLPASSYDS',passing,'PLAYER-250')),
+        'source_page_sha256':quote['source_page_sha256'],
+        'rules_sha256':market_watch.digest({'primary':'Primary settlement rule.','secondary':'Secondary settlement rule.'}),
+        'settlement_equivalent':False,'execution_ready':False}
+    assert datetime.fromisoformat(quote['request_started_at']) <= datetime.fromisoformat(quote['received_at'])
     assert reader.markets.await_count == 5
 
 
@@ -92,6 +119,7 @@ async def test_prop_inventory_preserves_counts_but_fails_closed_on_incomplete_or
     assert result['status'] == 'degraded'
     assert result['partial_coverage'] is True
     assert result['coverage']['linked_markets'] == 1
+    assert result['coverage']['structured_quote_markets'] == 1
     assert result['coverage']['discovery_complete'] is False
     assert result['series']['KXNFLPASSYDS']['complete'] is False
     assert result['series']['KXNFLRSHYDS']['status'] == 'invalid'
@@ -130,3 +158,21 @@ async def test_prop_inventory_validates_sport_and_milestone_shape():
     assert result['coverage']['discovery_complete'] is False
     assert result['failures'] == [{'stage': 'prop_link', 'error_type': 'InvalidMilestone'}]
     assert reader.markets.await_count == 4
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('change',[{'yes_ask_dollars':'0.4600'},
+    {'custom_strike':{'football_player':'30000000-0000-0000-0000-000000000003',
+        'football_team':'90000000-0000-0000-0000-000000000009'}},
+    {'primary_participant_key':'football_team'}])
+async def test_prop_inventory_rejects_inconsistent_quote_or_structured_identity(change):
+    event='KXNFLPASSYDS-26SEP13ATLPIT';reader=AsyncMock()
+    item=market('KXNFLPASSYDS',event,'PLAYER-250')|change
+    async def pages(series,**kwargs):
+        return {'markets':[item] if series=='KXNFLPASSYDS' else [],'cursor':''}
+    reader.markets.side_effect=pages
+    result=await market_watch.kalshi_prop_inventory(reader,'nfl',[game(1,event)])
+    assert result['status']=='degraded' and result['partial_coverage'] is True
+    assert result['coverage']['structured_quote_markets']==0
+    assert result['series']['KXNFLPASSYDS']['status']=='invalid'
+    assert result['failures']==[{'stage':'prop_discovery','series':'KXNFLPASSYDS','error_type':'ValueError'}]
