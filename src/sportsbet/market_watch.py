@@ -273,7 +273,7 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
     return dict(status='degraded' if failures else 'observed',series=results,quotes=quotes,targets=target_records,
         fee_contexts=fee_contexts,coverage=coverage,failures=failures,fee_failures=fee_failures,
         partial_coverage=not coverage['discovery_complete'],
-        scope='Open-market top-of-book observations linked by Kalshi structured milestone, player and team IDs. Kalshi player names are resolved in one bulk structured-target read. Public series and event fee terms are captured independently; missing fee evidence does not discard prices. Full pages are hashed but omitted. One displayed level is not a fill; cross-provider settlement equivalence remains unverified, and no profit is inferred.')
+        scope='Open-market top-of-book observations linked by Kalshi structured milestone, player and team IDs. Kalshi player names are resolved in one bulk structured-target read. Exact settlement rules are retained in the immutable archive; full pages are hashed but omitted. Public series and event fee terms are captured independently; missing fee evidence does not discard prices. One displayed level is not a fill; cross-provider settlement equivalence remains unverified, and no profit is inferred.')
 
 
 def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
@@ -322,7 +322,8 @@ def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
         prop_type=prop_type,player_target_id=player_id,team_target_id=team_id,
         strike_type='greater',line=str(line),yes_ask=yes_ask,no_ask=no_ask,
         request_started_at=request_started.isoformat(),received_at=received_at.isoformat(),
-        market_sha256=digest(market),source_page_sha256=page_sha256,rules_sha256=digest(rules),
+        market_sha256=digest(market),source_page_sha256=page_sha256,
+        settlement_rules=rules,rules_sha256=digest(rules),
         settlement_equivalent=False,execution_ready=False)
     waiver=market.get('fee_waiver_expiration_time')
     if waiver is not None:
@@ -479,7 +480,11 @@ def kalshi_prop_handoff(source: dict, sport: str, captured_at: str) -> dict:
     quote_games={quote.get('milestone_id') for quote in inventory.get('quotes',[])}
     context_games={game['milestone_id'] for game in games}
     incomplete=inventory.get('partial_coverage',True) or not quote_games<=context_games
-    evidence=dict(quotes=inventory.get('quotes',[]),player_targets=inventory.get('targets',{}),
+    # Exact rule text belongs in immutable research archives. The worker handoff
+    # carries its commitment and normalized quote fields, keeping hosted snapshots compact.
+    quotes=[{key:value for key,value in quote.items() if key!='settlement_rules'}
+        for quote in inventory.get('quotes',[])]
+    evidence=dict(quotes=quotes,player_targets=inventory.get('targets',{}),
         fee_contexts=inventory.get('fee_contexts',{}),games=games,coverage=inventory.get('coverage',{}),
         partial_coverage=incomplete)
     status='degraded' if incomplete else inventory.get('status','unavailable')

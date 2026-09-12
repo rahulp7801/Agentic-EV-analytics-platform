@@ -107,6 +107,7 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
         'no_ask':{'cost':'0.6000','displayed_size':'12.00'},
         'market_sha256':market_watch.digest(market('KXNFLPASSYDS',passing,'PLAYER-250')),
         'source_page_sha256':quote['source_page_sha256'],
+        'settlement_rules':{'primary':'Primary settlement rule.','secondary':'Secondary settlement rule.'},
         'rules_sha256':market_watch.digest({'primary':'Primary settlement rule.','secondary':'Secondary settlement rule.'}),
         'settlement_equivalent':False,'execution_ready':False}
     assert datetime.fromisoformat(quote['request_started_at']) <= datetime.fromisoformat(quote['received_at'])

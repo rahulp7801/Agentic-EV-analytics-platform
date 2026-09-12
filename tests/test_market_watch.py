@@ -83,7 +83,9 @@ def test_cross_venue_requires_unique_exact_team_and_start_match():
 
 def test_prop_handoff_keeps_only_normalized_worker_context_and_exact_team_aliases():
     from sportsbet import market_watch
-    inventory={'quotes':[{'ticker':'PROP','player_target_id':'player','milestone_id':'game'}],
+    inventory={'quotes':[{'ticker':'PROP','player_target_id':'player','milestone_id':'game',
+        'settlement_rules':{'primary':'Exact primary rule.','secondary':'Exact secondary rule.'},
+        'rules_sha256':market_watch.digest({'primary':'Exact primary rule.','secondary':'Exact secondary rule.'})}],
         'targets':{'player':{'player_name':'Player'}},'coverage':{'structured_quote_markets':1,
             'fee_contexts_expected':1,'fee_contexts_observed':1},
         'fee_contexts':{'PROP-EVENT':{'status':'observed'}},
@@ -98,7 +100,9 @@ def test_prop_handoff_keeps_only_normalized_worker_context_and_exact_team_aliase
             'main_game_event_ticker':'MAIN','home_team_id':'home','away_team_id':'away'}}}]}
     handoff=market_watch.kalshi_prop_handoff(source,'nfl',NOW.isoformat())
     assert handoff['schema_version']==2 and handoff['status']=='observed' and handoff['execution_ready'] is False
-    assert handoff['evidence']['quotes']==inventory['quotes']
+    assert handoff['evidence']['quotes']==[{key:value for key,value in inventory['quotes'][0].items()
+        if key!='settlement_rules'}]
+    assert 'settlement_rules' not in handoff['evidence']['quotes'][0]
     assert handoff['evidence']['player_targets']==inventory['targets']
     assert handoff['evidence']['fee_contexts']==inventory['fee_contexts']
     assert handoff['evidence']['games']==[{'milestone_id':'game',

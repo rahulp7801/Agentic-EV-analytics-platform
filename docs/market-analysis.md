@@ -208,7 +208,10 @@ of 1,000 open markets per series, validates active binary one-dollar market and
 event identities, and links events only through each selected structured game
 milestone's `related_event_tickers`. The dashboard reports series, market, and
 linked-event counts plus whether every cursor was exhausted. Full provider pages
-are hashed and discarded. A compact archive record for every linked contract now
+are hashed and discarded. The immutable research archive retains the exact primary
+and secondary settlement rules for each linked contract so its rule hash remains
+reproducible. The compact hosted worker handoff strips that text and keeps the hash.
+A compact quote record for every linked contract also
 retains the structured player/team target IDs, numeric strike, milestone kickoff,
 market occurrence time, request interval, raw-market/rule/page hashes, and listed
 top-of-book ask price and size. The asks are checked against complementary bids as
@@ -217,6 +220,12 @@ This uses the already-fetched [Get Markets](https://docs.kalshi.com/api-referenc
 pages, avoiding thousands of extra order-book calls. Missing one-sided liquidity
 is preserved as missing; inconsistent prices, identities, UUIDs, rules, or pages
 degrade the source instead of producing a quote.
+
+A September 12 NFL capture retained and hash-verified exact rules for all 3,081
+linked prop quotes while the stripped worker handoff remained about 3.1 MB. The
+rules describe a fair-market-price resolution when an active player never takes a
+snap. Overtime, stat corrections, and sportsbook-specific void treatment still
+need explicit matching, so this evidence does not establish settlement equivalence.
 
 Each linked prop event also gets a bounded public fee-evidence read before its
 market quotes. The internal version-2 handoff retains only current series terms,
