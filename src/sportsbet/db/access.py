@@ -49,7 +49,7 @@ def apply_access(conn):
         conn.execute(sql.SQL('ALTER TABLE {} ENABLE ROW LEVEL SECURITY').format(target))
         conn.execute(sql.SQL('DROP POLICY IF EXISTS sportsbet_worker_access ON {}').format(target))
         conn.execute(sql.SQL('CREATE POLICY sportsbet_worker_access ON {} TO {} USING (true) WITH CHECK (true)').format(target, sql.Identifier(WORKER)))
-    conn.execute(sql.SQL('GRANT UPDATE (outcome) ON analytics.predictions TO {}').format(sql.Identifier(WORKER)))
+    conn.execute(sql.SQL('GRANT UPDATE (outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value) ON analytics.predictions TO {}').format(sql.Identifier(WORKER)))
     for table in ('exposure', 'api_usage'):
         conn.execute(sql.SQL('GRANT UPDATE ON {} TO {}').format(sql.Identifier('analytics', table), sql.Identifier(WORKER)))
     # Only sequences attached to writable public tables, not every current/future sequence.

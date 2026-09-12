@@ -164,3 +164,36 @@ def test_new_prop_quote_constraint_preserves_legacy_rows_and_rejects_bad_inserts
         """)).scalar_one() == 0
     engine.dispose()
     alembic.command.downgrade(cfg, "base")
+
+
+@pytest.mark.serial
+@pytest.mark.skipif(
+    not os.environ.get("SPORTSBET_TEST_DATABASE_URL"),
+    reason="SPORTSBET_TEST_DATABASE_URL not set",
+)
+def test_settlement_constraint_preserves_legacy_and_requires_new_provenance() -> None:
+    """Old outcomes remain evidence; every future settlement identifies its source."""
+    from sportsbet.ledger import Ledger
+
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];cfg=get_alembic_cfg(url)
+    alembic.command.upgrade(cfg,'0014_prop_snapshot_integrity')
+    engine=sa.create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(sa.text("INSERT INTO analytics.predictions(id,scan_id,payload,outcome) VALUES ('legacy','s','{}','true')"))
+    alembic.command.upgrade(cfg,'head')
+    with engine.connect() as conn:
+        assert conn.execute(sa.text("SELECT outcome FROM analytics.predictions WHERE id='legacy'")).scalar_one()=='true'
+        assert conn.execute(sa.text("SELECT convalidated FROM pg_constraint WHERE conname='ck_prediction_settlement_evidence'")).scalar_one() is False
+    with engine.begin() as conn:
+        conn.execute(sa.text("INSERT INTO analytics.predictions(id,scan_id,payload) VALUES ('new','s','{}')"))
+    with pytest.raises(sa.exc.IntegrityError):
+        with engine.begin() as conn:
+            conn.execute(sa.text("UPDATE analytics.predictions SET outcome='true' WHERE id='new'"))
+    Ledger(database_url=url).settle({'new':True})
+    with engine.connect() as conn:
+        row=conn.execute(sa.text("SELECT outcome,outcome_source,outcome_ref,outcome_observed_at FROM analytics.predictions WHERE id='new'")).one()
+        assert tuple(row[:3])==('true','manual','caller_supplied') and row[3] is not None
+    with pytest.raises(sa.exc.IntegrityError):
+        with engine.begin() as conn:
+            conn.execute(sa.text("UPDATE analytics.predictions SET actual_value=-1 WHERE id='new'"))
+    engine.dispose();alembic.command.downgrade(cfg,'base')

@@ -30,9 +30,9 @@ def test_legacy_utc_chronology_and_model_cohorts(tmp_path):
     with ledger.connect() as db:
         for key,time,prob,version in [('earlier','2026-01-01T15:00:00+00:00',.8,'v1'),
                                       ('later','2026-01-01T10:00:00-07:00',.2,'v2')]:
-            db.execute('INSERT INTO predictions VALUES (?,?,?,?)',
+            db.execute('INSERT INTO predictions(id,scan_id,payload,outcome) VALUES (?,?,?,?)',
                 (key,key,json.dumps(payload(captured_at=time,model_probability=prob,model_version=version)),'true'))
-        db.execute('INSERT INTO predictions VALUES (?,?,?,?)',
+        db.execute('INSERT INTO predictions(id,scan_id,payload,outcome) VALUES (?,?,?,?)',
             ('invalid','s',json.dumps(payload(captured_at='2026-01-01T10:00:00')),'true'))
     report=ledger.report()
     assert report['brier_score']==pytest.approx(.04)
