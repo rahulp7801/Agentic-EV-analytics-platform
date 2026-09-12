@@ -482,11 +482,10 @@ def test_kinematic_agent_independence() -> None:
 
 
 def test_route_kinematic_analysis() -> None:
-    """create_graph(checkpointer=MemorySaver()) stub routes kinematic_analysis cleanly.
+    """An unconfigured kinematic route fails closed after valid routing.
 
     Invokes graph with request_type='kinematic_analysis' and no kinematic_node
-    (uses _kinematic_stub). Confirms no 'unknown_request_type' error is set
-    and the graph terminates cleanly.
+    and confirms the graph reports the missing runtime node.
 
     Also tests route_from_master directly for the kinematic_analysis request_type.
     """
@@ -508,8 +507,8 @@ def test_route_kinematic_analysis() -> None:
         f"route_from_master must return 'kinematic_agent' for kinematic_analysis, got {route!r}"
     )
 
-    # End-to-end graph stub test
-    graph = create_graph(checkpointer=MemorySaver())  # no kinematic_node → stub
+    # End-to-end fail-closed graph test
+    graph = create_graph(checkpointer=MemorySaver())
     initial_state = _make_initial_state("kinematic_analysis")
     result = asyncio.run(
         graph.ainvoke(
@@ -517,9 +516,7 @@ def test_route_kinematic_analysis() -> None:
             config={"configurable": {"thread_id": str(uuid.uuid4())}},
         )
     )
-    assert result.get("error") is None, (
-        f"Stub route must not set error, got: {result.get('error')}"
-    )
+    assert result.get("error") == "kinematic_agent_not_configured"
 
 
 # ---------------------------------------------------------------------------

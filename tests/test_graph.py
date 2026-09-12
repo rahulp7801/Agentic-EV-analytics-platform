@@ -112,44 +112,37 @@ class TestGraphState:
 
 class TestRouter:
     async def test_router_dispatch_quant(self) -> None:
-        """Request type 'quant_analysis' routes to quant_agent — quant_result set."""
+        """An unconfigured quant route fails closed without a result."""
         from sportsbet.graph.graph import create_graph
-        from sportsbet.graph.models import QuantResult
 
         graph = create_graph()
         state = make_minimal_state()
         state["request_type"] = "quant_analysis"
         result = await graph.ainvoke(state)
-        assert result["quant_result"] is not None, "quant_result should be set"
-        assert isinstance(result["quant_result"], QuantResult), (
-            f"Expected QuantResult, got {type(result['quant_result'])}"
-        )
+        assert result["quant_result"] is None
+        assert result["error"] == "quant_agent_not_configured"
 
     async def test_router_dispatch_odds(self) -> None:
-        """Request type 'odds_check' routes to arbitrage_agent — ev_signal set."""
+        """An unconfigured odds route fails closed without an EV signal."""
         from sportsbet.graph.graph import create_graph
-        from sportsbet.graph.models import EVSignal
 
         graph = create_graph()
         state = make_minimal_state()
         state["request_type"] = "odds_check"
         result = await graph.ainvoke(state)
-        assert result["ev_signal"] is not None, "ev_signal should be set"
-        assert isinstance(result["ev_signal"], EVSignal), (
-            f"Expected EVSignal, got {type(result['ev_signal'])}"
-        )
+        assert result["ev_signal"] is None
+        assert result["error"] == "arbitrage_agent_not_configured"
 
     async def test_router_dispatch_context(self) -> None:
-        """Request type 'context_update' routes to context_agent — terminates cleanly."""
+        """An unconfigured context route fails closed without provider data."""
         from sportsbet.graph.graph import create_graph
 
         graph = create_graph()
         state = make_minimal_state()
         state["request_type"] = "context_update"
         result = await graph.ainvoke(state)
-        assert result.get("error") is None, (
-            f"context_update should not set error, got: {result.get('error')}"
-        )
+        assert result.get("error") == "context_agent_not_configured"
+        assert result.get("context_signals") is None
 
     async def test_router_routes_to_end_on_error(self) -> None:
         """When error is pre-set, graph terminates without dispatching to any agent."""
