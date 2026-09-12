@@ -13,7 +13,7 @@ from sportsbet.config import settings
 from sportsbet.dashboard import publish_snapshot, load_snapshot
 from sportsbet.db.connection import create_async_pool
 from sportsbet.graph.graph import create_graph
-from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_quotes
+from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_quotes, write_player_prop_snapshots
 from sportsbet.ledger import Ledger
 from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.nba_agents import make_nba_quant_agent
@@ -40,6 +40,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     graph=create_graph(nba_quant_node=make_nba_quant_agent(pool),prop_quant_node=make_prop_quant_agent(pool),
         prop_arbitrage_node=make_prop_arbitrage_agent(sport=sport))
     quotes=quotes_from_event(event,sport)
+    await write_player_prop_snapshots(pool,quotes)
     export=[]
     counts=Counter()
     # A separate model evaluation per line; prices are compared only for identical outcomes.

@@ -103,6 +103,12 @@ time strictly before game start. The database enforces this for new writes with
 an unvalidated check constraint, so historical incomplete rows remain preserved
 but cannot be mistaken for replayable quotes.
 
+The scheduled scanner appends each complete provider quote batch before it runs
+the LangGraph model. If that archive write fails, the event cannot publish model
+output. This builds a point-in-time dataset from future scans; it does not repair
+or infer fields for old rows, and collection must remain disabled until its
+credential and quota are ready.
+
 Reports include input hashes, sample coverage, and an explicit evaluation scope. Empty usable datasets exit unsuccessfully with null performance metrics. Replay evaluates the supplied selections; it does not rerun the current model historically or establish profitability. Unit-test fixtures verify arithmetic only.
 
 CI runs the Python suite, dependency audits, frontend metric/access tests, TypeScript/build checks, and an isolated PostgreSQL service for migrations, concurrency, stat upserts, and actual NFL/NBA graph SQL. Production deployment depends on these jobs. Vercel's root directory is `frontend`; automatic Git deployments are disabled so they cannot bypass CI. The CLI uses direct deployment because `vercel pull` currently rejects project-scoped tokens during team lookup.
@@ -237,6 +243,11 @@ uv run python -m sportsbet.quant.walkforward --dataset .local/history/nba/datase
 
 The collector caches ESPN final box scores with source URLs, retrieval times and hashes; requests cover at most31 days at a time. `walkforward` requires the corresponding PostgreSQL history and runs the same LangGraph quant nodes used by scans. Its threshold is an explicit research benchmark, not an invented sportsbook line. It reports excluded identities/small samples, calibration, dataset/code hashes, and null ROI/CLV. A small pilot is not proof of an edge.
 
-The site and CI/CD deploy successfully. Supabase is now reachable and migrated, with NBA history preserved and2023-2025 NFL stats backfilled. Live-data readiness still requires the Vercel read-only URL, worker secrets, current refreshes and verified coverage. Public data APIs report unavailability until configured; a successful web deployment does not establish data readiness.
+The site and protected CI/CD deployment are live. Supabase is migrated with
+separate restricted worker and read-only dashboard roles, NBA history is
+preserved, and2023-2025NFL stats are backfilled. Public-only hosted monitoring
+has replayed exactly against production. Full sportsbook collection still needs
+verified Odds-key rotation, a suitable quota, and measured slate coverage; the
+GitHub scheduler has not demonstrated reliable30-minute cadence.
 
 Automatic settlement, robust historical injury/roster context, NFL game-log presentation, full-slate refresh coverage, and out-of-sample calibration/profitability remain unfinished. A green deployment or unit test is not evidence of model accuracy. Maintain current findings and constraints in `CLAUDE.md`.
