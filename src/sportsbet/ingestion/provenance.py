@@ -65,7 +65,8 @@ def stat_row_sha256(sport: str, row: Mapping[str, object]) -> str:
     if (any(normalized[key] is not None and type(normalized[key]) is not int for key in integers)
             or any(not isinstance(normalized[key],str) or not normalized[key].strip() for key in strings)):
         raise ValueError('Settlement stat evidence has invalid field types')
-    if any(normalized[key] is not None and normalized[key] < 0 for key in integers):
+    nonnegative_fields=integers if sport=='nba' else ('season','week')
+    if any(normalized[key] is not None and normalized[key] < 0 for key in nonnegative_fields):
         raise ValueError('Settlement stat evidence has negative values')
     return row_sha256(selected)
 

@@ -72,7 +72,7 @@ def _actual(db, prediction: dict, sport: str, day: str):
     if record[column] is None or type(record[column]) is bool:
         return None
     value=Decimal(str(record[column]))
-    if not value.is_finite() or value < 0:
+    if not value.is_finite() or (sport=='nba' and value < 0):
         raise ValueError('Invalid observed stat')
     provider,digest,record_digest,observed=rows[0][len(fields):]
     expected={'nba':{'nba','espn'},'nfl':{'nflverse'}}[sport]

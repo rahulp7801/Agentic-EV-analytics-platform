@@ -154,7 +154,7 @@ class Ledger:
                 actual=(actual_values or {}).get(key)
                 if actual is not None:
                     actual=Decimal(str(actual))
-                    if not actual.is_finite() or actual < 0:
+                    if not actual.is_finite():
                         raise ValueError('Settlement actual value is invalid')
                     actual=int(actual) if actual==actual.to_integral_value() else str(actual)
                 if db.execute('UPDATE predictions SET outcome=?,outcome_source=?,outcome_ref=?,outcome_observed_at=?,actual_value=? WHERE id=?',

@@ -32,3 +32,9 @@ def test_batch_hash_is_order_independent_and_binds_scope():
     assert stat_batch_sha256('nba','nba',2026,records)!=expected
     with pytest.raises(ValueError):
         stat_batch_sha256('nflverse','nba',2025,records)
+
+
+def test_nfl_record_hash_preserves_legitimate_negative_yards():
+    row=dict(player_id='gsis-1',season=2026,week=1,team='BUF',passing_yards=0,
+        rushing_yards=-2,receiving_yards=0)
+    assert len(stat_row_sha256('nfl',row))==64

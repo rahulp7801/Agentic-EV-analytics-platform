@@ -122,6 +122,26 @@ def test_nfl_settlement_joins_exact_player_week_team_and_game_date(tmp_path):
     assert report['settled']==1 and row['outcome'] is True and row['actual_value']==251
 
 
+def test_nfl_settlement_preserves_negative_rushing_yards(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    key,payload=prediction(ledger,direction='under',line=.5,sport='nfl',
+        prop_type='rush_yds',player_id='gsis-7')
+    with ledger.connect() as db:
+        db.execute('''CREATE TABLE player_stats (player_id TEXT, season INTEGER, week INTEGER,
+            team TEXT, passing_yards INTEGER, rushing_yards INTEGER, receiving_yards INTEGER,
+            source_provider TEXT, source_sha256 TEXT, source_record_sha256 TEXT,
+            source_observed_at TEXT)''')
+        db.execute('CREATE TABLE games (season INTEGER, week INTEGER, home_team TEXT, away_team TEXT, game_date TEXT)')
+        row=dict(player_id='gsis-7',season=2026,week=1,team='H',passing_yards=0,
+            rushing_yards=-2,receiving_yards=0)
+        db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?)',(
+            *row.values(),'nflverse','b'*64,stat_row_sha256('nfl',row),datetime.now(timezone.utc).isoformat()))
+        db.execute("INSERT INTO games VALUES (2026,1,'H','A',?)",(payload['game_date'],))
+    report=settle_final_props(ledger,'nfl',schedule(payload))
+    settled=next(item for item in ledger.predictions() if item['prediction_id']==key)
+    assert report['settled']==1 and settled['outcome'] is True and settled['actual_value']==-2
+
+
 @pytest.mark.parametrize(('provider','record_hash','reason'),[
     ('unknown',None,'stat_provenance_invalid'),('nba','bad','stat_provenance_invalid')])
 def test_settlement_rejects_missing_or_tampered_stat_provenance(tmp_path,provider,record_hash,reason):
