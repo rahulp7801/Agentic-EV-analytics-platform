@@ -6,9 +6,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 import pandas as pd
+from statsmodels.stats.proportion import proportion_confint
 from sportsbet.graph.models import QuantResult
 
 Outcome = bool | Literal["push", "void"] | None
+BINOMIAL_INTERVAL_METHOD = (
+    "Nominal 95% Wilson interval; treats decided selections as independent and "
+    "does not adjust for shared games or players."
+)
 
 @dataclass
 class BacktestSignal:
@@ -27,6 +32,7 @@ class BacktestSignal:
 class BacktestReport:
     roi: float | None = None
     hit_rate: float | None = None
+    hit_rate_interval: tuple[float, float] | None = None
     clv_mean: float | None = None
     sample_size: int = 0
     signals_df: pd.DataFrame | None = None
@@ -39,10 +45,12 @@ class BacktestReport:
     calibration_positive_count: int = 0
     brier_score: float | None = None
     log_loss: float | None = None
+    calibration_error: float | None = None
     baseline_zero_brier: float | None = None
     baseline_50_brier: float | None = None
     baseline_one_brier: float | None = None
     calibration: list[dict] = field(default_factory=list)
+    binomial_interval_method: str = BINOMIAL_INTERVAL_METHOD
     closing_line_note: str = "CLV is same-line raw implied-probability movement; requires entry < close < start."
 
 def _probability(value: Decimal | None) -> float | None:
@@ -58,8 +66,9 @@ def calibration_metrics(predictions: list[tuple[float, int]]) -> dict:
     if any(not math.isfinite(p) or not 0 <= p <= 1 or y not in (0, 1) for p, y in predictions):
         raise ValueError('Calibration needs finite probabilities and binary outcomes')
     result = dict(calibration_count=len(predictions), calibration_positive_count=0,
-        brier_score=None, log_loss=None, calibration=[],
-        baseline_zero_brier=None, baseline_50_brier=None, baseline_one_brier=None)
+        brier_score=None, log_loss=None, calibration_error=None, calibration=[],
+        baseline_zero_brier=None, baseline_50_brier=None, baseline_one_brier=None,
+        binomial_interval_method=BINOMIAL_INTERVAL_METHOD)
     if not predictions:
         return result
     result['brier_score'] = sum((p-y)**2 for p, y in predictions) / len(predictions)
@@ -70,12 +79,19 @@ def calibration_metrics(predictions: list[tuple[float, int]]) -> dict:
         baseline_zero_brier=positives/len(predictions),baseline_50_brier=0.25,
         baseline_one_brier=(len(predictions)-positives)/len(predictions))
     result['log_loss'] = -sum(y*math.log(max(1e-15,p)) + (1-y)*math.log(max(1e-15,1-p)) for p,y in predictions) / len(predictions)
+    weighted_error = 0.0
     for bucket in range(10):
         group = [(p,y) for p,y in predictions if min(int(p*10),9) == bucket]
         if group:
+            predicted = sum(p for p,_ in group)/len(group)
+            observed = sum(y for _,y in group)/len(group)
+            observed_interval = tuple(float(value) for value in proportion_confint(
+                count=sum(y for _,y in group), nobs=len(group), alpha=0.05, method='wilson'))
+            weighted_error += len(group)/len(predictions) * abs(predicted-observed)
             result['calibration'].append(dict(lower=bucket/10, upper=(bucket+1)/10,
-                count=len(group), predicted=sum(p for p,_ in group)/len(group),
-                observed=sum(y for _,y in group)/len(group)))
+                count=len(group), predicted=predicted, observed=observed,
+                observed_interval=observed_interval))
+    result['calibration_error'] = weighted_error
     return result
 
 class BacktestEngine:
@@ -129,6 +145,8 @@ class BacktestEngine:
         report.calibration_count = len(predictions)
         report.roi = sum(profits) / sum(stakes) if sum(stakes) > 0 else None
         report.hit_rate = sum(wins) / len(wins) if wins else None
+        report.hit_rate_interval = tuple(float(value) for value in proportion_confint(
+            count=sum(wins), nobs=len(wins), alpha=0.05, method='wilson')) if wins else None
         report.clv_mean = sum(clvs) / len(clvs) if clvs else None
         for name, value in calibration_metrics(predictions).items():
             setattr(report, name, value)
