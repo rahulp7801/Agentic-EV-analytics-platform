@@ -198,12 +198,16 @@ season readiness. Provider failures still exit unsuccessfully.
 
 After both manual public operations pass, set the repository variable
 `PUBLIC_DATA_PIPELINE_ENABLED=true` to run `public_daily` at 13:17 UTC and
-`public_monitor` at :07/:37 each hour. These jobs receive restricted database
+attempt `public_monitor` at :07/:22/:37/:52 each hour. The redundant off-hour
+attempts reduce the chance that GitHub scheduler delays leave the 90-minute
+snapshot window uncovered; they do not make GitHub Actions a guaranteed or
+low-latency scheduler. The two added slots are public-only and do not increase
+future paid-provider polling. These jobs receive restricted database
 credentials but no Odds API or Kalshi trading key. Full collection takes
 precedence if `DATA_PIPELINE_ENABLED=true`; the public flag does not enable
 sportsbook, PrizePicks or prop scans. Clear the public flag to stop its schedule.
 Clean evidence passes the credential/secret scan before public artifact upload.
-GitHub's periodic schedule is not continuous or low-latency arbitrage monitoring;
+GitHub's periodic schedule remains unsuitable for continuous or low-latency arbitrage monitoring;
 the dashboard continues to identify stale quotes between captures.
 
 Paid requests share both a daily ceiling and `ODDS_ROLLING_CREDIT_LIMIT` (default450
