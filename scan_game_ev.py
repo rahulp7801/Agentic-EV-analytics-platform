@@ -38,6 +38,7 @@ from sportsbet.config import settings
 from sportsbet.ledger import Ledger
 from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
 from sportsbet.arbitrage.kelly import fractional_kelly
+from sportsbet.model_contract import MODEL_VERSION
 
 def _under_kelly(true_prob: float, american_odds: int, fraction: float = 0.25) -> float:
     """Fractional Kelly for a bet at the given American odds."""
@@ -721,7 +722,7 @@ async def main():
             'accepted': accepted, 'gate_reason': reason,
             'stake_fraction': float(sig.kelly_fraction) if accepted else 0,
             'sample_size': prop.sample_size if prop else 0,
-            'model_version': 'empirical-v2',
+            'model_version': MODEL_VERSION,
         })
 
     # ── Persist signals to PostgreSQL ev_signals table (async, before pool close) ──
@@ -868,7 +869,7 @@ async def main():
             "market_type":    r["prop_type"],
             "snapped_at": r["quote"].snapped_at.isoformat(),
             "game_start_time": r["quote"].game_start_time.isoformat() if r["quote"].game_start_time else None,
-            "model_version": "empirical-v2",
+            "model_version": MODEL_VERSION,
             "strength": "unrated",
             "gated":          r.get("gated", False),
             "sample_size":    prop.sample_size if prop else None,

@@ -13,7 +13,7 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
   const sample = Number(s.sample_size), kelly = Number(s.kelly_fraction);
   const valid = typeof s.true_prob === 'number' && typeof s.american_odds === 'number' && Number.isFinite(p) && p >= 0 && p <= 1 && Number.isFinite(push) && push >= 0 && p + push <= 1.000001
     && Number.isFinite(odds) && odds !== 0 && (s.direction === 'over' || s.direction === 'under');
-  const legacy = s.model_version !== 'empirical-v2';
+  const legacy = s.model_version !== 'empirical-jeffreys-v3';
   const stale = !Number.isFinite(quoteTime) || now - quoteTime > 300000 || quoteTime > now + 60000;
   const started = !Number.isFinite(start) || start <= now;
   const reason = !valid ? 'invalid_metrics' : legacy ? 'legacy_model' : synthetic ? 'synthetic_price'

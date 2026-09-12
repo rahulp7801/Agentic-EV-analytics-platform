@@ -112,7 +112,7 @@ def test_adequate_sample() -> None:
     assert isinstance(lo, Decimal), "CI lower bound must be Decimal (not float)"
     assert isinstance(hi, Decimal), "CI upper bound must be Decimal (not float)"
     assert lo < hi, "CI lower must be less than upper"
-    assert result.true_probability == Decimal("0.6"), "30/50 = 0.6"
+    assert result.true_probability == Decimal("0.598039"), "Jeffreys mean for 30/50"
     assert isinstance(result.mean_stat, Decimal), "mean_stat must be Decimal (not float)"
 
 
@@ -129,6 +129,23 @@ def test_insufficient_sample() -> None:
     assert result.data_source == "insufficient_sample"
     assert result.true_probability is None
     assert result.sample_size == 5
+
+
+def test_pushes_are_separate_from_decided_outcome_smoothing() -> None:
+    mock_pool = _make_mock_pool({"total": 50, "successes": 20, "pushes": 10, "mean_val": 250})
+    result = asyncio.run(run_prop_query(mock_pool, _valid_prop_params()))  # type: ignore[arg-type]
+
+    assert result.true_probability == Decimal("0.400000")
+    assert result.push_probability == Decimal("0.200000")
+    assert Decimal(1) - result.true_probability - result.push_probability == Decimal("0.400000")
+
+
+def test_all_push_sample_has_no_directional_estimate() -> None:
+    mock_pool = _make_mock_pool({"total": 50, "successes": 0, "pushes": 50, "mean_val": 250})
+    result = asyncio.run(run_prop_query(mock_pool, _valid_prop_params()))  # type: ignore[arg-type]
+
+    assert result.true_probability is None
+    assert result.data_source == "insufficient_sample"
 
 
 @pytest.mark.skipif(

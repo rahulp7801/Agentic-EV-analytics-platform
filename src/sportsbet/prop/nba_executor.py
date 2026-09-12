@@ -41,16 +41,14 @@ Placeholder constants for Plan 02 NBAQuantAgent:
 """
 from __future__ import annotations
 
-import math
 from decimal import Decimal
 from statistics import NormalDist
 
 import asyncpg
 import structlog
-from statsmodels.stats.proportion import proportion_confint
-
 from sportsbet.graph.models import PropParams, PropResult
 from sportsbet.prop.nba_query_builder import NBA_PROP_CV_MAP, NBAQueryBuilder
+from sportsbet.prop.probability import empirical_outcome_probabilities
 
 log = structlog.get_logger()
 
@@ -167,16 +165,15 @@ async def run_nba_gamelog_query(pool: asyncpg.Pool, params: PropParams) -> PropR
             sample_size=0,
         )
 
-    lo: float
-    hi: float
-    lo, hi = proportion_confint(count=successes, nobs=total, alpha=0.05, method="wilson")
-
-    # Belt-and-suspenders NaN guard
-    if math.isnan(lo) or math.isnan(hi):
+    pushes = int(row.get("pushes") or 0)
+    try:
+        probability, push_probability, interval = empirical_outcome_probabilities(successes, pushes, total)
+    except (TypeError, ValueError):
         log.warning(
-            "nba_gamelog_wilson_ci_nan",
+            "nba_gamelog_outcomes_invalid",
             total=total,
             successes=successes,
+            pushes=pushes,
             prop_type=params.prop_type,
         )
         return PropResult(
@@ -184,10 +181,10 @@ async def run_nba_gamelog_query(pool: asyncpg.Pool, params: PropParams) -> PropR
             sample_size=total,
         )
 
-    true_prob = Decimal(str(round(successes / total, 6)))
+    true_prob = Decimal(str(round(probability, 6)))
     ci: tuple[Decimal, Decimal] = (
-        Decimal(str(round(lo, 6))),
-        Decimal(str(round(hi, 6))),
+        Decimal(str(round(interval[0], 6))),
+        Decimal(str(round(interval[1], 6))),
     )
 
     mean_stat: Decimal | None = None
@@ -210,7 +207,7 @@ async def run_nba_gamelog_query(pool: asyncpg.Pool, params: PropParams) -> PropR
         true_probability=true_prob,
         sample_size=total,
         confidence_interval=ci,
-        push_probability=Decimal(str(round(int(row.get("pushes") or 0) / total, 6))),
+        push_probability=Decimal(str(round(push_probability, 6))),
         data_source=data_src,
         mean_stat=mean_stat,
     )
