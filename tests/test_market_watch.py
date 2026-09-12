@@ -81,6 +81,49 @@ def test_cross_venue_requires_unique_exact_team_and_start_match():
     assert not [r for r in comparisons(changed) if r['kind']=='kalshi_sportsbook']
 
 
+def test_prop_handoff_keeps_only_normalized_worker_context_and_exact_team_aliases():
+    from sportsbet import market_watch
+    inventory={'quotes':[{'ticker':'PROP','player_target_id':'player'}],
+        'targets':{'player':{'player_name':'Player'}},'coverage':{'structured_quote_markets':1}}
+    source={'status':'observed','partial_coverage':False,'prop_inventory':inventory,
+        'targets':{'home':{'name':'BOS','details':{'abbreviation':'BOS'}},
+            'away':{'name':'LAL','details':{'abbreviation':'LAL'}}},
+        'team_directory':{'sports':[{'leagues':[{'abbreviation':'NFL','teams':[
+            {'team':{'abbreviation':'BOS','displayName':'Boston Team'}},
+            {'team':{'abbreviation':'LAL','displayName':'Los Angeles Team'}}]}]}]},
+        'games':[{'milestone':{'id':'game','start_date':'2026-09-13T17:00:00Z','details':{
+            'main_game_event_ticker':'MAIN','home_team_id':'home','away_team_id':'away'}}}]}
+    handoff=market_watch.kalshi_prop_handoff(source,'nfl',NOW.isoformat())
+    assert handoff['status']=='observed' and handoff['execution_ready'] is False
+    assert handoff['evidence']['quotes']==inventory['quotes']
+    assert handoff['evidence']['player_targets']==inventory['targets']
+    assert handoff['evidence']['games']==[{'milestone_id':'game',
+        'scheduled_game_start_time':'2026-09-13T17:00:00+00:00','main_game_event_ticker':'MAIN',
+        'home_team_id':'home','away_team_id':'away','home_team_aliases':['BOS','Boston Team'],
+        'away_team_aliases':['LAL','Los Angeles Team']}]
+    assert handoff['evidence_sha256']==market_watch.digest(handoff['evidence'])
+    assert 'team_directory' not in handoff['evidence'] and 'targets' not in handoff['evidence']
+
+
+@pytest.mark.asyncio
+async def test_publish_writes_separate_prop_handoff_only_when_kalshi_is_requested(monkeypatch,tmp_path):
+    from unittest.mock import AsyncMock
+    from sportsbet import market_watch
+    stored={};monkeypatch.chdir(tmp_path)
+    source={'status':'observed','partial_coverage':False,'games':[],'targets':{},
+        'prop_inventory':{'quotes':[],'targets':{},'coverage':{}}}
+    monkeypatch.setattr(market_watch,'kalshi_games',AsyncMock(return_value=source))
+    monkeypatch.setattr(market_watch,'publish_snapshot',lambda key,value:stored.update({key:value}))
+    await market_watch.run('nfl',25,1,True,'kalshi')
+    assert set(stored)=={'kalshi-props:nfl','markets:nfl'}
+    assert stored['kalshi-props:nfl']['evidence_sha256']==market_watch.digest(
+        stored['kalshi-props:nfl']['evidence'])
+    stored.clear();monkeypatch.setattr(market_watch,'sportsbooks',AsyncMock(return_value={
+        'status':'observed','events':[]}))
+    await market_watch.run('nfl',25,1,True,'sportsbook')
+    assert set(stored)=={'markets:nfl'}
+
+
 @pytest.mark.asyncio
 async def test_unavailable_source_is_retained_without_discarding_other_evidence(monkeypatch,tmp_path):
     from sportsbet import market_watch

@@ -248,6 +248,17 @@ before low-latency arbitrage monitoring. Do not run that worker in a Vercel requ
 SQLite checkpoints remain local-only; distributed workers need durable checkpoint
 storage and idempotent writes before multiple replicas are enabled.
 
+When publication is requested, the collector also writes `kalshi-props:{sport}`
+as an internal worker snapshot in PostgreSQL. It contains only normalized prop
+quotes, player targets, exact milestone context, and exact team aliases; raw game
+markets, full order books, and the ESPN directory are omitted. The public markets
+API reads a different fixed snapshot key and does not expose this payload. The
+handoff has its own schema version and evidence hash. A Kalshi failure replaces it
+with an unavailable record instead of allowing a later sportsbook scan to reuse
+stale quotes. A real NFL collection produced 3,073 quotes, 190 normalized player
+targets, and complete exact aliases for all 15 game contexts in about 3.24 MB.
+Every handoff remains `execution_ready=false`.
+
 Automatic cross-venue contract mapping, sportsbook account limits, exact fee
 reconciliation, PrizePicks entry ingestion, joint calibration, and fill simulation
 remain prerequisites for executable recommendations. Quoted size is not a fill.
