@@ -170,10 +170,12 @@ async def run(sports: list[str], daily_credit_limit: int):
                 report['finished_at']=datetime.now(timezone.utc).isoformat()
                 publish_snapshot('scan:'+sport,report)
                 comparisons=[row for screen in screens[sport] for row in screen['comparisons']]
+                observed=sum(screen['status']=='observed' for screen in screens[sport])
+                screen_status='observed' if (report['status']=='complete' and (
+                    report['eligible_events']==0 or observed==report['eligible_events'])) else 'degraded'
                 publish_snapshot('prop-screens:'+sport,dict(schema_version=1,scan_id=scan_id,sport=sport,
-                    generated_at=report['finished_at'],status=report['status'],
-                    coverage=dict(events=len(screens[sport]),observed_events=sum(
-                        screen['status']=='observed' for screen in screens[sport]),
+                    generated_at=report['finished_at'],status=screen_status,
+                    coverage=dict(events=len(screens[sport]),observed_events=observed,
                         unavailable_events=sum(screen['status']=='unavailable' for screen in screens[sport]),
                         positive_gross_gaps=len(comparisons)),comparisons=comparisons,execution_ready=False))
         publish_snapshot('metrics:all',ledger.report())
