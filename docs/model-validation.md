@@ -86,6 +86,17 @@ used, and no experimental context adjustment was enabled.
 | NFL 2025-09-14 passing yards over 200.5 | 16 | 0.237315 | 0.236471 | 0.668644 | 0.666337 |
 | NBA 2026-01-28 points over 20.5 | 192 | 0.087209 | 0.087149 | 0.434929 | 0.283616 |
 
+The current v4 code was rerun on the same NBA archive through the actual LangGraph
+and restricted hosted history. It evaluated 192 of 203 candidates with Brier
+`0.087149`, log loss `0.283616`, calibration error `0.038333`, and nine distinct
+game clusters; its Brier interval was `0.050317-0.123980` and log-loss interval was
+`0.177962-0.389269`. The report has dataset hash
+`26cbd446a4d0adc1c5a8f83bbd9e75e4ad8e375ae5141e2a32333c69c5e20b3f` and source
+hash `b867111719537b78f7003059492f5e51b3058976c59dbfa6d9e8c8eb8bc51a81`.
+That walk-forward contains no point-in-time matchup context, so it validates the
+rolling estimator used by the fallback but not the fallback trigger itself. The
+separate hosted executor replay verifies that trigger and cutoff behavior.
+
 Reception support was checked after implementation on two retained archives with
 the unchanged v3 model and a fixed 4.5 threshold:
 
