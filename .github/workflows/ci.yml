@@ -137,9 +137,27 @@ jobs:
             --tmpfs /app/.local:rw,nosuid,nodev,uid=10001,gid=10001,size=128m \
             --volume "$PWD/tests/worker_image_smoke.py:/checks/smoke.py:ro" \
             sportsbet-worker:test python /checks/smoke.py
+  production-schema:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: pip install uv==0.11.32
+      - run: uv sync --locked
+      - name: Verify hosted schema is at the application head
+        run: uv run --locked alembic current --check-heads
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: [secrets, backend, frontend, postgres, worker-image]
+    needs: [secrets, backend, frontend, postgres, worker-image, production-schema]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production

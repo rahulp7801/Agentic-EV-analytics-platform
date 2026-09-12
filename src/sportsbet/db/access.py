@@ -23,6 +23,7 @@ ANALYTICS_TABLES = ('predictions', 'exposure', 'quotes', 'api_usage')
 
 def apply_access(conn):
     """Explicit grants and role-specific RLS policies; no rights for anonymous users."""
+    conn.execute(sql.SQL('GRANT SELECT ON public.alembic_version TO {}').format(sql.Identifier(WORKER)))
     conn.execute(sql.SQL('GRANT USAGE ON SCHEMA public TO {}, {}').format(sql.Identifier(READER), sql.Identifier(WORKER)))
     conn.execute(sql.SQL('GRANT SELECT ON public.dashboard_snapshots TO {}').format(sql.Identifier(READER)))
     conn.execute(sql.SQL('GRANT SELECT ON public.dashboard_gamelogs TO {}').format(sql.Identifier(READER)))

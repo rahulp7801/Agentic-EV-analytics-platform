@@ -40,6 +40,7 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
                 with pytest.raises(psycopg.errors.InsufficientPrivilege):
                     reader.execute(statement)
         with psycopg.connect(dsn, user=WORKER, password=passwords[WORKER], autocommit=True) as worker:
+            assert worker.execute('SELECT version_num FROM public.alembic_version').fetchone()[0]
             with worker.transaction(force_rollback=True):
                 assert worker.execute("UPDATE dashboard_snapshots SET payload='{}' WHERE snapshot_key=%s", (key,)).rowcount == 1
                 worker.execute('SELECT * FROM player_stats LIMIT 1')
