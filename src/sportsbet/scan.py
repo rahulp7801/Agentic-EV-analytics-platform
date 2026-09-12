@@ -24,6 +24,7 @@ from sportsbet.quant.vig import american_to_raw_prob
 
 MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl'}
+MAX_MODEL_CONCURRENCY = 8
 
 def timestamp(value: str) -> datetime:
     result=datetime.fromisoformat(value.replace('Z','+00:00'))
@@ -48,22 +49,40 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     counts=Counter()
     # A separate model evaluation per line; prices are compared only for identical outcomes.
     selections=sorted({(q.player_name,q.prop_type,q.line,q.side) for q in quotes})
+    player_ids={}
+    table='nba_player_gamelogs' if sport=='nba' else 'player_stats'
+    for player in sorted({selection[0] for selection in selections}):
+        async with pool.acquire() as conn:
+            players=await conn.fetch(
+                f'SELECT DISTINCT player_id FROM {table} WHERE LOWER(player_name)=LOWER($1)',player)
+        if len(players)==1:
+            player_ids[player]=str(players[0]['player_id'])
+    prepared=[]
+    selection_time=datetime.now(timezone.utc)
     for player,market,line,side in selections:
         candidates=[q for q in quotes if (q.player_name,q.prop_type,q.line,q.side)==(player,market,line,side)]
-        fresh=[q for q in candidates if -60 <= (datetime.now(timezone.utc)-q.snapped_at).total_seconds() <= 300]
+        fresh=[q for q in candidates if -60 <= (selection_time-q.snapped_at).total_seconds() <= 300]
         quote=min(fresh or candidates,key=lambda q:american_to_raw_prob(q.price))
-        async with pool.acquire() as conn:
-            table='nba_player_gamelogs' if sport=='nba' else 'player_stats'
-            players=await conn.fetch(f'SELECT DISTINCT player_id FROM {table} WHERE LOWER(player_name)=LOWER($1)',player)
-        if len(players)!=1:
+        if player not in player_ids:
             counts['unknown_or_ambiguous_player'] += 1
             continue  # Unknown/ambiguous identity cannot borrow another player's history.
-        state=await graph.ainvoke(dict(session_id=scan_id,request_type='nba_prop_analysis' if sport=='nba' else 'prop_analysis',
+        prepared.append((player,market,line,side,quote,player_ids[player]))
+
+    limiter=asyncio.Semaphore(MAX_MODEL_CONCURRENCY)
+    async def model(selection):
+        player,market,line,side,quote,player_id=selection
+        async with limiter:
+            state=await graph.ainvoke(dict(session_id=scan_id,request_type='nba_prop_analysis' if sport=='nba' else 'prop_analysis',
             game_id=event['id'],home_team=event['home_team'],away_team=event['away_team'],season=season-2,week=1,
-            receiver_gsis_id=str(players[0]['player_id']),player_name=player,sport=sport,prop_type=MARKETS[sport][market],
+            receiver_gsis_id=player_id,player_name=player,sport=sport,prop_type=MARKETS[sport][market],
             prop_line=line,prop_side=side.lower(),as_of_date=game_date,last_n_games=40,player_prop_snapshots=[quote]))
-        if state.get('error'):
-            raise RuntimeError('Model evaluation failed')
+        return selection,state
+
+    modeled=await asyncio.gather(*(model(selection) for selection in prepared))
+    if any(state.get('error') for _,state in modeled):
+        raise RuntimeError('Model evaluation failed')
+    for selection,state in modeled:
+        player,market,line,side,quote,player_id=selection
         prop=state.get('nba_prop_result' if sport=='nba' else 'prop_result')
         if not prop or prop.true_probability is None:
             counts['missing_model_estimate'] += 1
@@ -78,7 +97,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             if now >= start: reason='game_started'
             elif not -60 <= (now-quote.snapped_at).total_seconds() <= 300: reason='stale_quote'
             else: accepted,reason=ledger.reserve(signal,float(line))
-        payload=dict(game_id=event['id'],player=player,player_id=str(players[0]['player_id']),sport=sport,
+        payload=dict(game_id=event['id'],player=player,player_id=player_id,sport=sport,
             game_date=game_date.isoformat(),prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
             sportsbook=quote.sportsbook,american_odds=quote.price,model_probability=float(probability),
             push_probability=float(prop.push_probability),captured_at=now.isoformat(),game_start_time=start.isoformat(),
@@ -101,7 +120,9 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         coverage=dict(quotes=len(quotes),source_committed_quotes=sum(
             quote.source_provider=='the_odds_api' and bool(quote.source_sha256)
             and bool(quote.source_record_sha256) for quote in quotes),
-            selections=len(selections),counts=dict(counts)),games=[dict(game_id=event['id'],
+            selections=len(selections),unique_players=len({selection[0] for selection in selections}),
+            resolved_players=len(player_ids),model_requests=len(prepared),
+            model_concurrency_limit=MAX_MODEL_CONCURRENCY,counts=dict(counts)),games=[dict(game_id=event['id'],
         home_team=event['home_team'],away_team=event['away_team'],date=game_date.strftime('%Y%m%d'),sport=sport)])
 
 async def run(sports: list[str], daily_credit_limit: int):

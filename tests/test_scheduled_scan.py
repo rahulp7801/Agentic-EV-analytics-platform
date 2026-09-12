@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -28,7 +29,16 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     pool=MagicMock()
     pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
-    quant=AsyncMock(return_value=PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24')))
+    both_started=asyncio.Event()
+    started=0
+    async def concurrent_quant(*args):
+        nonlocal started
+        started += 1
+        if started == 2:
+            both_started.set()
+        await asyncio.wait_for(both_started.wait(), timeout=1)
+        return PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24'))
+    quant=AsyncMock(side_effect=concurrent_quant)
     target='sportsbet.prop.nba_agents.run_nba_prop_query' if sport=='nba' else 'sportsbet.prop.agents.run_prop_query'
     ledger=Ledger(tmp_path/'audit.sqlite')
     with patch(target,quant):
@@ -37,6 +47,10 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     assert {s['direction'] for s in result['signals']}=={'over','under'}
     assert len(ledger.predictions())==2
     assert result['coverage']['counts']['evaluated_selections']==2
+    assert result['coverage']['unique_players']==result['coverage']['resolved_players']==1
+    assert result['coverage']['model_requests']==2
+    assert result['coverage']['model_concurrency_limit']==8
+    assert conn.fetch.await_count==1  # One identity lookup per player, not per line/side.
     assert all(call.args[1].last_n_games==40 for call in quant.call_args_list)
     assert all(call.args[1].as_of_date is not None for call in quant.call_args_list)
     if sport=='nba':
@@ -65,9 +79,11 @@ async def test_graph_query_failure_cannot_be_reported_as_successful_empty_scan(t
     conn.fetchrow.return_value={'team_abbreviation':'BOS','game_date':datetime.now(timezone.utc).date()-timedelta(days=2)}
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    ledger=Ledger(tmp_path/'audit.sqlite')
     with patch('sportsbet.prop.nba_agents.run_nba_prop_query',side_effect=RuntimeError('unavailable')):
         with pytest.raises(RuntimeError,match='Model evaluation failed'):
-            await evaluate_event(pool,event(), 'nba', Ledger(tmp_path/'audit.sqlite'),'scan')
+            await evaluate_event(pool,event(), 'nba', ledger,'scan')
+    assert ledger.predictions()==[]
 
 def test_api_budget_survives_restart(tmp_path):
     path=tmp_path/'budget.sqlite'
