@@ -43,6 +43,15 @@ python -m sportsbet.daily --mode public_daily --sport both
 
 Use one active scheduler and serialize the two commands. Do not independently run two scheduler services that can overlap. On an existing server, one OS scheduler with a common process lock can supervise both. Configure bounded execution time, failure notifications and private evidence retention. These obligations are not implemented by a Docker image alone.
 
+Within one paid event scan, the worker resolves each distinct player identity once
+and runs at most eight independent selection graphs concurrently against the
+ten-connection database pool. The event retains deterministic selection order and
+does not write any model decision to the ledger until every graph invocation has
+returned without an error state. Coverage reports unique and resolved players,
+model requests, and the concurrency limit. This reduces avoidable serial work while
+keeping database demand bounded; provider requests and separate events remain
+serialized by the existing credit and event timeout controls.
+
 Cut over only after a hosted public monitor and daily refresh both pass, their archives replay, production matches the captures, and an automatic host-triggered run is observed. Then unset `PUBLIC_DATA_PIPELINE_ENABLED` in GitHub to stop duplicate scheduled collection; keep manual Actions runs available for recovery. Keep `DATA_PIPELINE_ENABLED` off until full-provider readiness is verified. Roll back by disabling the new schedule before restoring the public GitHub flag.
 
 ## Hosting decision remains open
