@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { database, hosted } from '@/lib/database';
-import { signalMetrics } from '@/lib/signalMetrics';
+import { publicSignals } from '@/lib/signalMetrics';
 
 // Force dynamic — never cache this route handler (cache file changes after each scan).
 export const dynamic = 'force-dynamic';
@@ -16,8 +16,9 @@ export async function GET() {
     try {
       const {rows} = await database().query("SELECT payload FROM dashboard_snapshots WHERE snapshot_key LIKE 'signals:%' ORDER BY updated_at DESC LIMIT 100");
       const data = rows.map(r => r.payload);
+      const projected=publicSignals(data.flatMap(d => d.signals ?? []));
       return NextResponse.json({generated_at: data[0]?.generated_at ?? null,
-        games: data.flatMap(d => d.games ?? []), signals: data.flatMap(d => d.signals ?? []).map(s => signalMetrics(s))},
+        games: data.flatMap(d => d.games ?? []), ...projected},
         {headers: {'Cache-Control':'no-store'}});
     } catch {
       return NextResponse.json({error:'Results are temporarily unavailable.',signals:[]}, {status:503});
@@ -36,7 +37,7 @@ export async function GET() {
   try {
     const raw = fs.readFileSync(filePath, 'utf-8');
     const data = JSON.parse(raw);
-    data.signals = (data.signals ?? []).map((s: Record<string, unknown>) => signalMetrics(s));
+    Object.assign(data,publicSignals(data.signals ?? []));
     return NextResponse.json(data, {
       headers: { 'Cache-Control': 'no-store' },
     });
