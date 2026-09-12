@@ -115,3 +115,21 @@ def test_provenance_model_versions_keep_requiring_quote_source_commitments(tmp_p
         ledger.record('missing-historical',payload(model_version='empirical-jeffreys-v3'))
     with pytest.raises(ValueError,match='verified quote evidence'):
         ledger.record('tampered-historical',historical | {'line':21.5})
+
+
+def test_malformed_retained_json_fails_closed_without_suppressing_metrics(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    valid=payload(game_id='valid-game')
+    key=ledger.record('valid',valid)
+    with ledger.connect() as db:
+        db.execute('UPDATE predictions SET outcome=?,actual_value=? WHERE id=?',
+            ('not-json','not-number',key))
+        db.execute('INSERT INTO predictions(id,scan_id,payload,outcome) VALUES (?,?,?,?)',
+            ('corrupt','corrupt','not-json','true'))
+    retained=ledger.predictions()
+    assert len(retained)==1 and retained[0]['prediction_id']==key
+    assert retained[0]['outcome'] is None and retained[0]['actual_value'] is None
+    report=ledger.report()
+    assert report['sample_size']==1 and report['pending_count']==1
+    assert report['unverified_settlements']==1
+    assert report['excluded_missing_metadata']==1
