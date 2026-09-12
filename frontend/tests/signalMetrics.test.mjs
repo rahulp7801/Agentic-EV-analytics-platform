@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {signalMetrics, parlayScenario} from '../lib/signalMetrics.ts';
 const now = Date.parse('2026-09-10T12:00:00Z');
 const quote = {true_prob: .6, american_odds: -110, push_probability: 0,
-  direction: 'under', sportsbook: 'draftkings', model_version: 'empirical-v2',
+  direction: 'under', sportsbook: 'draftkings', model_version: 'empirical-jeffreys-v3',
   sample_size: 30, kelly_fraction: .04, snapped_at: new Date(now).toISOString(),
   game_start_time: new Date(now + 3600000).toISOString()};
 test('uses payout for expected return, separates edge and preserves Under', () => {

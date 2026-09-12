@@ -10,7 +10,7 @@ test('public requests cannot start scans, including forged loopback Host headers
 });
 
 test('dollar profit uses expected return at actual payout, not probability edge', () => {
-  const s = signalMetrics({true_prob:.6,american_odds:100,direction:'over',model_version:'empirical-v2',sportsbook:'book'});
+  const s = signalMetrics({true_prob:.6,american_odds:100,direction:'over',model_version:'empirical-jeffreys-v3',sportsbook:'book'});
   assert.ok(Math.abs(expectedProfit(s.expected_return, 100)-20)<1e-10);
   assert.equal(expectedProfit(null, 100), null);
   assert.equal(expectedProfit(.2, -100), null);

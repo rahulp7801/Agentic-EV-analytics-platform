@@ -1,7 +1,7 @@
 """NFL player prop quant agent: make_prop_quant_agent closure factory.
 
 Delivers the full production path for NFL player prop probability estimation:
-Pydantic gate -> PropQueryBuilder SQL -> Wilson CI -> kinematic boost -> PropResult.
+Pydantic gate -> PropQueryBuilder SQL -> finite-sample estimate -> kinematic boost -> PropResult.
 
 Kinematic integration (PROP-04): For receiving props (rec_yds, rec_tds, receptions),
 the agent reads kinematic_result from GraphState and applies a separation-based

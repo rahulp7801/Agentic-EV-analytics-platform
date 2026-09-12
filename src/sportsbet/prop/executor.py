@@ -1,4 +1,4 @@
-"""Prop executor: run_prop_query async function + Wilson CI computation.
+"""Prop executor: run_prop_query and finite-sample outcome probabilities.
 
 Security chain:
   PropParams (Pydantic validated) -> PropQueryBuilder.build() -> asyncpg $N params
@@ -8,8 +8,8 @@ unreliable. The gate returns PropResult(data_source="insufficient_sample")
 rather than a probability — callers must handle the None true_probability case
 before applying Kelly Criterion sizing.
 
-Wilson CI: proportion_confint(method="wilson") from statsmodels. Bounds are
-converted to Decimal(str(round(x, 6))) before being passed to PropResult —
+Decided outcomes use the Jeffreys posterior predictive mean and Wilson interval.
+Observed push mass stays separate. Values are rounded to Decimal before being passed to PropResult —
 the strict=True Pydantic model rejects raw float values.
 
 Pitfall guards (mirroring quant/executor.py patterns):
@@ -19,15 +19,14 @@ Pitfall guards (mirroring quant/executor.py patterns):
 """
 from __future__ import annotations
 
-import math
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import asyncpg
 import structlog
-from statsmodels.stats.proportion import proportion_confint
 
 from sportsbet.graph.models import PropParams, PropResult
+from sportsbet.prop.probability import empirical_outcome_probabilities
 from sportsbet.prop.query_builder import PropQueryBuilder
 
 if TYPE_CHECKING:
@@ -119,18 +118,16 @@ async def run_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResult:
             sample_size=total,
         )
 
-    # Wilson CI — statsmodels proportion_confint with method="wilson"
-    # bounds are float; convert to Decimal immediately (strict Pydantic guard)
-    lo: float
-    hi: float
-    lo, hi = proportion_confint(count=successes, nobs=total, alpha=0.05, method="wilson")
-
-    # Belt-and-suspenders NaN guard (nobs=1 edge case safety net)
-    if math.isnan(lo) or math.isnan(hi):
+    # Estimate Over conditional on a decision while preserving observed push mass.
+    pushes = int(row.get("pushes") or 0)
+    try:
+        probability, push_probability, interval = empirical_outcome_probabilities(successes, pushes, total)
+    except (TypeError, ValueError):
         log.warning(
-            "prop_wilson_ci_nan",
+            "prop_outcomes_invalid",
             total=total,
             successes=successes,
+            pushes=pushes,
             prop_type=params.prop_type,
         )
         return PropResult(
@@ -138,10 +135,10 @@ async def run_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResult:
             sample_size=total,
         )
 
-    true_prob = Decimal(str(round(successes / total, 6)))
+    true_prob = Decimal(str(round(probability, 6)))
     ci: tuple[Decimal, Decimal] = (
-        Decimal(str(round(lo, 6))),
-        Decimal(str(round(hi, 6))),
+        Decimal(str(round(interval[0], 6))),
+        Decimal(str(round(interval[1], 6))),
     )
 
     # mean_val from AVG() — may be None if player_stats has no non-NULL rows for this column
@@ -170,7 +167,7 @@ async def run_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResult:
         true_probability=true_prob,
         sample_size=total,
         confidence_interval=ci,
-        push_probability=Decimal(str(round(int(row.get("pushes") or 0) / total, 6))),
+        push_probability=Decimal(str(round(push_probability, 6))),
         data_source=data_src,
         mean_stat=mean_stat,
     )
