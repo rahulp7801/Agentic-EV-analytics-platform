@@ -98,6 +98,11 @@ uv run python -m sportsbet.quant.backtest --database --outcomes-file outcomes.js
 
 Quote rows require unique `id`, `game_id`, `sportsbook`, `market_type`, `outcome_name`, `price` (American), and timezone-aware `snapped_at`/`game_start_time`. Props additionally require `player_name` and `line`. Outcomes map the earliest snapshot ID for each exact selection to `true`, `false`, `"push"`, `"void"`, or `null`. Optional `model_probability` requires a `model_version` and timezone-aware `model_generated_at` no later than the entry quote; include `push_probability` for push markets. Missing probabilities cannot produce calibration. Optional `stake` defaults to one unit.
 
+New player-prop rows must also contain a valid `Over`/`Under` side and a quote
+time strictly before game start. The database enforces this for new writes with
+an unvalidated check constraint, so historical incomplete rows remain preserved
+but cannot be mistaken for replayable quotes.
+
 Reports include input hashes, sample coverage, and an explicit evaluation scope. Empty usable datasets exit unsuccessfully with null performance metrics. Replay evaluates the supplied selections; it does not rerun the current model historically or establish profitability. Unit-test fixtures verify arithmetic only.
 
 CI runs the Python suite, dependency audits, frontend metric/access tests, TypeScript/build checks, and an isolated PostgreSQL service for migrations, concurrency, stat upserts, and actual NFL/NBA graph SQL. Production deployment depends on these jobs. Vercel's root directory is `frontend`; automatic Git deployments are disabled so they cannot bypass CI. The CLI uses direct deployment because `vercel pull` currently rejects project-scoped tokens during team lookup.

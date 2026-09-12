@@ -115,6 +115,20 @@ def write_player_prop_snapshot(
     Returns:
         The autoincrement row id of the newly inserted row.
     """
+    strings = ((snapshot.game_id,64),(snapshot.player_name,100),(snapshot.sportsbook,50),(snapshot.prop_type,40))
+    complete = (snapshot.sport in ('nba','nfl')
+        and all(isinstance(value,str) and bool(value.strip()) and len(value)<=limit for value,limit in strings)
+        and isinstance(snapshot.line,Decimal) and snapshot.line.is_finite()
+        and Decimal(0)<=snapshot.line<=Decimal('99999.99')
+        and type(snapshot.price) is int and 100<=abs(snapshot.price)<=32767
+        and isinstance(snapshot.implied_probability,Decimal) and snapshot.implied_probability.is_finite()
+        and Decimal(0)<snapshot.implied_probability<Decimal(1)
+        and snapshot.side in ('Over','Under')
+        and isinstance(snapshot.snapped_at,datetime) and snapshot.snapped_at.utcoffset() is not None
+        and isinstance(snapshot.game_start_time,datetime) and snapshot.game_start_time.utcoffset() is not None
+        and snapshot.snapped_at<snapshot.game_start_time)
+    if not complete:
+        raise ValueError('Persistence requires a complete pregame quote')
     if engine is None:
         engine = get_sync_engine()
 

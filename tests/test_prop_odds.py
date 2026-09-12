@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from decimal import Decimal
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -105,6 +106,9 @@ def test_write_player_prop_snapshot() -> None:
         line=Decimal("287.5"),
         price=-115,
         implied_probability=Decimal(str(round(115 / (115 + 100), 6))),
+        side="Over",
+        snapped_at=datetime(2026, 9, 12, tzinfo=timezone.utc),
+        game_start_time=datetime(2026, 9, 13, tzinfo=timezone.utc),
     )
 
     mock_conn = MagicMock()
@@ -120,3 +124,43 @@ def test_write_player_prop_snapshot() -> None:
     row_id = write_player_prop_snapshot(snapshot, engine=mock_engine)
     assert row_id == 1
     mock_conn.execute.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    'change',
+    [
+        {'sport': 'mlb'},
+        {'game_id': None},
+        {'game_id': ' '},
+        {'player_name': ' '},
+        {'sportsbook': ''},
+        {'prop_type': ''},
+        {'line': None},
+        {'line': Decimal('NaN')},
+        {'line': Decimal('-0.5')},
+        {'price': None},
+        {'price': 99},
+        {'implied_probability': Decimal('0')},
+        {'implied_probability': Decimal('NaN')},
+        {'side': None},
+        {'side': 'Yes'},
+        {'game_start_time': None},
+        {'snapped_at': datetime(2026, 9, 12)},
+        {'game_start_time': datetime(2026, 9, 13)},
+        {'game_start_time': datetime(2026, 9, 12, tzinfo=timezone.utc)},
+    ],
+)
+def test_write_rejects_incomplete_or_non_pregame_snapshots(change) -> None:
+    from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, write_player_prop_snapshot
+
+    snapshot = PlayerPropSnapshotCreate(
+        sport='nfl', game_id='event', player_name='Player', sportsbook='book',
+        prop_type='player_pass_yds', line=Decimal('249.5'), price=-110,
+        implied_probability=Decimal('0.523809'), side='Over',
+        snapped_at=datetime(2026, 9, 12, tzinfo=timezone.utc),
+        game_start_time=datetime(2026, 9, 13, tzinfo=timezone.utc),
+    ).model_copy(update=change)
+    engine = MagicMock()
+    with pytest.raises(ValueError, match='complete pregame quote'):
+        write_player_prop_snapshot(snapshot, engine=engine)
+    engine.begin.assert_not_called()
