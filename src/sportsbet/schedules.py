@@ -1,10 +1,27 @@
 """Collect bounded ESPN schedules on the worker, preserving source failures."""
 from datetime import datetime, timedelta, timezone
+import re
 from zoneinfo import ZoneInfo
 
 import httpx
 
 SPORTS = {'nba':'basketball/nba', 'nfl':'football/nfl'}
+STAT_TEAM_ALIASES = {'nba':{}, 'nfl':{'LAR':'LA', 'WSH':'WAS'}}
+
+
+def scheduled_stat_teams(sport: str, game: dict) -> frozenset[str]:
+    """Translate exact ESPN abbreviations to the stat provider's identities."""
+    if sport not in STAT_TEAM_ALIASES:
+        raise ValueError('Unsupported sport')
+    values=[]
+    for field in ('home_abbr','away_abbr'):
+        value=game.get(field)
+        if not isinstance(value,str) or not re.fullmatch('[A-Z]{2,3}',value):
+            raise ValueError('Invalid schedule team identity')
+        values.append(STAT_TEAM_ALIASES[sport].get(value,value))
+    if len(set(values))!=2:
+        raise ValueError('Schedule teams must be distinct')
+    return frozenset(values)
 
 
 def parse_day(data: dict, day: str, label: str) -> list[dict]:
