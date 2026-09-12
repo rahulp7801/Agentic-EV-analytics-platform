@@ -1,6 +1,6 @@
 # Prop probability model and validation
 
-The current scanner cohort is `empirical-jeffreys-v3`. NBA and NFL prop scans use
+The current scanner cohort is `empirical-jeffreys-v4`. NBA and NFL prop scans use
 the same finite-sample probability contract when per-game outcomes are available.
 For `o` Overs, `u` Unders and `p` pushes, the model keeps the observed push mass
 `p / n`. Conditional on a decided outcome, its next-outcome Over estimate is:
@@ -57,6 +57,15 @@ when the player's latest gamelog team is one of the two canonical teams in the
 scheduled event. A missing player ID, missing prior gamelog, or third-team record
 returns no matchup context. The as-of base model can still evaluate available
 player history, but it receives no invented venue or opponent filter.
+
+The production scanner first evaluates verified same-opponent and same-venue
+history. If matchup or availability filters leave fewer than the 20 observations
+required by the signal gate, v4 removes only those narrow filters and re-evaluates
+the same player, line, exclusive target-date cutoff, and rolling-game limit. It does
+not blend the sparse matchup estimate into the fallback. A hosted history audit of
+5,179 recent player-game targets found no exact matchup/venue cohort with 20 games;
+4,850 had at least 20 prior games in the rolling-40 window. This supports the sample
+selection change but does not measure accuracy or profitability.
 
 ## Reproducible research checks
 

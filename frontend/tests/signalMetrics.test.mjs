@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {signalMetrics,publicSignals,publicSignalSnapshots,parlayScenario} from '../lib/signalMetrics.ts';
 const now = Date.parse('2026-09-10T12:00:00Z');
 const quote = {true_prob: .6, american_odds: -110, push_probability: 0,
-  direction: 'under', sportsbook: 'draftkings', model_version: 'empirical-jeffreys-v3',
+  direction: 'under', sportsbook: 'draftkings', model_version: 'empirical-jeffreys-v4',
   sample_size: 30, kelly_fraction: .04, snapped_at: new Date(now).toISOString(),
   game_start_time: new Date(now + 3600000).toISOString()};
 const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
@@ -21,7 +21,7 @@ test('push refunds count toward expected return', () => {
   assert.ok(Math.abs(signalMetrics({...quote, true_prob:.5, push_probability:.1},now).expected_return - .0545454545) < 1e-8);
 });
 test('legacy, stale, synthetic, malformed and gated estimates cannot recommend stakes', () => {
-  for (const patch of [{model_version: undefined}, {snapped_at:'2020-01-01'},
+  for (const patch of [{model_version: undefined}, {model_version:'empirical-jeffreys-v3'}, {snapped_at:'2020-01-01'},
     {sportsbook:'prizepicks'}, {sample_size:NaN}, {game_start_time:undefined},
     {gated:true}, {true_prob:null}, {kelly_fraction:NaN}, {direction:undefined}]) {
     const s=signalMetrics({...quote,...patch},now);
