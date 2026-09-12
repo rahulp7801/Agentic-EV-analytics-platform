@@ -11,7 +11,9 @@ NOW=datetime(2026,9,11,tzinfo=timezone.utc)
 
 
 def milestone(number):
+    event=f'KXNFLGAME-TEST{number}'
     return dict(id=str(number),title=f'Game {number}',start_date=(NOW+timedelta(days=1)).isoformat(),
+        related_event_tickers=[event],
         details=dict(league='NFL',main_game_event_ticker=f'KXNFLGAME-TEST{number}',
             home_team_id='00000000-0000-0000-0000-000000000001',away_team_id='00000000-0000-0000-0000-000000000002'))
 
@@ -67,6 +69,8 @@ async def test_one_failed_game_or_market_does_not_discard_other_observations(mon
                 'markets':[dict(ticker=event+'-HOME',event_ticker=event,status='active')]})
         if path.endswith('/orderbook'):
             return httpx.Response(200,json={'orderbook_fp':{'yes_dollars':[['.5','10']],'no_dollars':[['.49','10']]}})
+        if path.endswith('/markets'):
+            return httpx.Response(200,json={'markets':[],'cursor':''})
         if '/markets/' in path:
             ticker=path.rsplit('/',1)[1]
             if 'TEST3' in ticker:return httpx.Response(503)
@@ -79,7 +83,9 @@ async def test_one_failed_game_or_market_does_not_discard_other_observations(mon
     source=await market_watch.kalshi_games('nfl',NOW,20)
     assert source['status']=='degraded' and source['partial_coverage'] is True
     assert source['coverage']==dict(discovery_complete=True,discovered_games=4,attempted_games=4,
-        observed_games=3,quoted_games=1,failed_games=3,omitted_markets=0)
+        observed_games=3,quoted_games=1,failed_games=3,omitted_markets=0,
+        prop_discovery_complete=True,prop_series_observed=4,prop_series_expected=4,
+        prop_open_markets=0,prop_open_events=0,prop_linked_markets=0,prop_linked_events=0)
     rows=market_watch.comparisons(dict(sport='nfl',schema_version=2,captured_at=datetime.now(timezone.utc).isoformat(),sources={'kalshi':source}))
     assert len(rows)==1 and rows[0]['identity']=='KXNFLGAME-TEST1-HOME'
     assert rows[0]['execution_ready'] is False
@@ -95,6 +101,7 @@ async def test_default_sample_reaches_later_games_and_reports_the_bound(monkeypa
         async def series(self,*args):raise RuntimeError('Unavailable optional fee metadata')
         async def series_fee_changes(self,*args):return {}
         async def milestones(self,*args,**kwargs):return {'milestones':[milestone(i) for i in range(25)],'cursor':''}
+        async def markets(self,*args,**kwargs):return {'markets':[],'cursor':''}
         async def target(self,*args):return {'name':'Team'}
         async def event(self,event):return {'event':{'event_ticker':event,'series_ticker':'KXNFLGAME'},'markets':[]}
     client=httpx.AsyncClient
