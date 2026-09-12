@@ -11,11 +11,13 @@ from zoneinfo import ZoneInfo
 
 from sportsbet.ledger import (Ledger, VERIFIED_SETTLEMENT_SOURCE, utc_timestamp,
     verified_settlement_evidence)
-from sportsbet.ingestion.provenance import STAT_FIELDS, stat_row_sha256
+from sportsbet.ingestion.provenance import (
+    LEGACY_NFL_STAT_FIELDS, STAT_FIELDS, stat_row_sha256)
 
 STAT_COLUMNS={
     'nba':{'points':'points','rebounds':'rebounds','assists':'assists'},
-    'nfl':{'pass_yds':'passing_yards','rush_yds':'rushing_yards','rec_yds':'receiving_yards'},
+    'nfl':{'pass_yds':'passing_yards','rush_yds':'rushing_yards',
+        'rec_yds':'receiving_yards','receptions':'receptions'},
 }
 AUTO_SOURCE=VERIFIED_SETTLEMENT_SOURCE
 AUTO_SOURCES={AUTO_SOURCE,'espn_final_stats'}
@@ -108,9 +110,15 @@ def _actual(db, prediction: dict, sport: str, day: str):
     if (provider not in expected or not isinstance(digest,str) or not re.fullmatch('[0-9a-f]{64}',digest)
             or not isinstance(record_digest,str) or not re.fullmatch('[0-9a-f]{64}',record_digest)):
         raise StatProvenanceError('Invalid stat source')
+    evidence_fields=fields
     try:
         if stat_row_sha256(sport,record)!=record_digest:
-            raise StatProvenanceError('Stat record hash does not match')
+            legacy_valid=(sport=='nfl' and prediction['prop_type']!='receptions'
+                and stat_row_sha256(sport,record,legacy_nfl=True)==record_digest)
+            if not legacy_valid:
+                raise StatProvenanceError('Stat record hash does not match')
+            # Do not retain an unhashed field in the settlement proof.
+            evidence_fields=LEGACY_NFL_STAT_FIELDS
     except ValueError:
         raise StatProvenanceError('Stat record hash does not match') from None
     try:
@@ -119,8 +127,8 @@ def _actual(db, prediction: dict, sport: str, day: str):
             raise ValueError
     except (TypeError,ValueError):
         raise StatProvenanceError('Invalid stat observation time') from None
-    evidence_record={key:(item.isoformat() if isinstance(item,(date,datetime)) else item)
-        for key,item in record.items()}
+    evidence_record={key:(record[key].isoformat() if isinstance(record[key],(date,datetime)) else record[key])
+        for key in evidence_fields}
     return value,dict(provider=provider,sha256=digest,record_sha256=record_digest,
         observed_at=observed,record=evidence_record)
 

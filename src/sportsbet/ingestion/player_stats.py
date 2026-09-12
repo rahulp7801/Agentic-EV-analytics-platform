@@ -109,7 +109,7 @@ def ingest_player_stats_seasons(
         # nflverse columns can vary by season. Preserve an unavailable tracked
         # statistic as NULL so the stored evidence remains complete and the
         # settlement layer can keep that market pending instead of inventing 0.
-        nullable_evidence_fields=('passing_yards','rushing_yards','receiving_yards')
+        nullable_evidence_fields=('passing_yards','rushing_yards','receiving_yards','receptions')
         for row in records:
             for field in nullable_evidence_fields:
                 row.setdefault(field,None)

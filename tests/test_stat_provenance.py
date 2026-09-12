@@ -36,5 +36,15 @@ def test_batch_hash_is_order_independent_and_binds_scope():
 
 def test_nfl_record_hash_preserves_legitimate_negative_yards():
     row=dict(player_id='gsis-1',season=2026,week=1,team='BUF',passing_yards=0,
-        rushing_yards=-2,receiving_yards=0)
+        rushing_yards=-2,receiving_yards=0,receptions=3)
     assert len(stat_row_sha256('nfl',row))==64
+
+
+def test_nfl_record_hash_commits_receptions_and_retains_legacy_format():
+    row=dict(player_id='gsis-1',season=2026,week=1,team='BUF',passing_yards=0,
+        rushing_yards=0,receiving_yards=31,receptions=3)
+    current=stat_row_sha256('nfl',row)
+    assert stat_row_sha256('nfl',row|{'receptions':4})!=current
+    legacy=stat_row_sha256('nfl',row,legacy_nfl=True)
+    assert legacy==stat_row_sha256('nfl',{k:v for k,v in row.items() if k!='receptions'})
+    assert legacy!=current

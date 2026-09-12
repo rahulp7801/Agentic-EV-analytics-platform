@@ -9,9 +9,12 @@ import json
 import math
 import re
 
+LEGACY_NFL_STAT_FIELDS=(
+    'player_id','season','week','team','passing_yards','rushing_yards','receiving_yards')
+
 STAT_FIELDS={
     'nba':('player_id','game_id','game_date','team_abbreviation','points','rebounds','assists'),
-    'nfl':('player_id','season','week','team','passing_yards','rushing_yards','receiving_yards'),
+    'nfl':LEGACY_NFL_STAT_FIELDS+('receptions',),
 }
 
 
@@ -49,9 +52,29 @@ def row_sha256(row: Mapping[str, object]) -> str:
         ensure_ascii=False,allow_nan=False).encode()).hexdigest()
 
 
-def stat_row_sha256(sport: str, row: Mapping[str, object]) -> str:
+def stat_row_sha256(
+    sport: str,
+    row: Mapping[str, object],
+    *,
+    legacy_nfl: bool = False,
+) -> str:
+    """Hash one stored stat row, retaining the pre-receptions NFL format.
+
+    New NFL ingestion commits ``receptions`` to the row digest. A row that does
+    not contain that field is hashed with the legacy field set so retained
+    settlement evidence remains reproducible. Callers validating a stored row
+    that includes receptions may explicitly request the legacy format for
+    non-reception predictions recorded before this extension.
+    """
     try:
-        fields=STAT_FIELDS[sport]
+        if legacy_nfl:
+            if sport!='nfl':
+                raise ValueError('Legacy stat evidence is only defined for NFL rows')
+            fields=LEGACY_NFL_STAT_FIELDS
+        else:
+            fields=STAT_FIELDS[sport]
+            if sport=='nfl' and 'receptions' not in row:
+                fields=LEGACY_NFL_STAT_FIELDS
         selected={field:row[field] for field in fields}
     except (KeyError,TypeError):
         raise ValueError('Settlement stat evidence is incomplete') from None
@@ -61,6 +84,8 @@ def stat_row_sha256(sport: str, row: Mapping[str, object]) -> str:
         strings=('game_id','game_date','team_abbreviation')
     else:
         integers=('season','week','passing_yards','rushing_yards','receiving_yards')
+        if 'receptions' in selected:
+            integers+=('receptions',)
         strings=('player_id','team')
     if (any(normalized[key] is not None and type(normalized[key]) is not int for key in integers)
             or any(not isinstance(normalized[key],str) or not normalized[key].strip() for key in strings)):

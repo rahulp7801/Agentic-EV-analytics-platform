@@ -14,7 +14,8 @@ import httpx
 SPORTS = {'nba': 'basketball/nba', 'nfl': 'football/nfl'}
 STATS = {
     'nba': {'points': 'points', 'rebounds': 'rebounds', 'assists': 'assists'},
-    'nfl': {'passingYards': 'pass_yds', 'rushingYards': 'rush_yds', 'receivingYards': 'rec_yds'},
+    'nfl': {'passingYards': 'pass_yds', 'rushingYards': 'rush_yds',
+            'receivingYards': 'rec_yds', 'receptions': 'receptions'},
 }
 
 
