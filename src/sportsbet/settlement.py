@@ -65,8 +65,10 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
     """Settle supported props; uncertain finality, identity, or stats stay pending."""
     if sport not in STAT_COLUMNS or not isinstance(schedule.get('games'),list):
         raise ValueError('Invalid settlement scope')
+    game_dates={game.get('date') for game in schedule['games']}
     candidates=[row for row in ledger.predictions() if row.get('sport')==sport
-        and (row.get('outcome') is None or row.get('outcome_source')==AUTO_SOURCE)]
+        and (row.get('outcome') is None or (row.get('outcome_source')==AUTO_SOURCE
+            and row.get('game_date') in game_dates))]
     reasons=Counter();resolved=[]
     with ledger.connect() as db:
         for prediction in candidates:
