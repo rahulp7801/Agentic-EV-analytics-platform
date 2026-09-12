@@ -100,6 +100,44 @@ def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None
     return quotes
 
 
+def _persistence_row(snapshot: PlayerPropSnapshotCreate) -> tuple:
+    """Return a complete database row or reject an unauditable quote."""
+    strings = ((snapshot.game_id,64),(snapshot.player_name,100),(snapshot.sportsbook,50),(snapshot.prop_type,40))
+    complete = (snapshot.sport in ('nba','nfl')
+        and all(isinstance(value,str) and bool(value.strip()) and len(value)<=limit for value,limit in strings)
+        and isinstance(snapshot.line,Decimal) and snapshot.line.is_finite()
+        and Decimal(0)<=snapshot.line<=Decimal('99999.99')
+        and type(snapshot.price) is int and 100<=abs(snapshot.price)<=32767
+        and isinstance(snapshot.implied_probability,Decimal) and snapshot.implied_probability.is_finite()
+        and Decimal(0)<snapshot.implied_probability<Decimal(1)
+        and snapshot.side in ('Over','Under')
+        and isinstance(snapshot.snapped_at,datetime) and snapshot.snapped_at.utcoffset() is not None
+        and isinstance(snapshot.game_start_time,datetime) and snapshot.game_start_time.utcoffset() is not None
+        and snapshot.snapped_at<snapshot.game_start_time)
+    if not complete:
+        raise ValueError('Persistence requires a complete pregame quote')
+    return (snapshot.sport,snapshot.game_id,snapshot.player_name,snapshot.sportsbook,
+        snapshot.prop_type,snapshot.line,snapshot.price,snapshot.implied_probability,
+        snapshot.snapped_at,snapshot.side,snapshot.game_start_time)
+
+
+async def write_player_prop_snapshots(pool, snapshots: list[PlayerPropSnapshotCreate]) -> int:
+    """Atomically append a provider batch before its quotes reach the model."""
+    rows = [_persistence_row(snapshot) for snapshot in snapshots]
+    if not rows:
+        return 0
+    async with pool.acquire() as conn:
+        await conn.executemany(
+            """INSERT INTO player_prop_snapshots
+            (sport,game_id,player_name,sportsbook,prop_type,line,price,
+             implied_probability,snapped_at,side,game_start_time)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
+            rows,
+        )
+    log.info("player_prop_snapshots_written", count=len(rows))
+    return len(rows)
+
+
 def write_player_prop_snapshot(
     snapshot: PlayerPropSnapshotCreate,
     engine: sa.Engine | None = None,
@@ -115,20 +153,7 @@ def write_player_prop_snapshot(
     Returns:
         The autoincrement row id of the newly inserted row.
     """
-    strings = ((snapshot.game_id,64),(snapshot.player_name,100),(snapshot.sportsbook,50),(snapshot.prop_type,40))
-    complete = (snapshot.sport in ('nba','nfl')
-        and all(isinstance(value,str) and bool(value.strip()) and len(value)<=limit for value,limit in strings)
-        and isinstance(snapshot.line,Decimal) and snapshot.line.is_finite()
-        and Decimal(0)<=snapshot.line<=Decimal('99999.99')
-        and type(snapshot.price) is int and 100<=abs(snapshot.price)<=32767
-        and isinstance(snapshot.implied_probability,Decimal) and snapshot.implied_probability.is_finite()
-        and Decimal(0)<snapshot.implied_probability<Decimal(1)
-        and snapshot.side in ('Over','Under')
-        and isinstance(snapshot.snapped_at,datetime) and snapshot.snapped_at.utcoffset() is not None
-        and isinstance(snapshot.game_start_time,datetime) and snapshot.game_start_time.utcoffset() is not None
-        and snapshot.snapped_at<snapshot.game_start_time)
-    if not complete:
-        raise ValueError('Persistence requires a complete pregame quote')
+    _persistence_row(snapshot)
     if engine is None:
         engine = get_sync_engine()
 

@@ -174,6 +174,13 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         assert len(predictions) == 1
         assert predictions[0]['model_probability'] == pytest.approx(24/count, abs=1e-6)
         assert predictions[0]['push_probability'] == 0  # Integer stats cannot push at20.5.
+        async with pool.acquire() as conn:
+            archived = await conn.fetchrow(
+                'SELECT sport,game_id,player_name,side,line,price,snapped_at,game_start_time '
+                'FROM player_prop_snapshots WHERE game_id=$1', identity)
+        assert tuple(archived)[:6] == (sport,identity,player,'Over',20.5,100)
+        assert archived['snapped_at'] == now
+        assert archived['game_start_time'] == start
         # NBA's 60% vs 50% quote passes policy; NFL's larger edge remains audited even if capped.
         if sport == 'nba':
             assert result['signals'][0]['sample_size'] == count
@@ -184,6 +191,7 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         assert integer['push_probability'] == pytest.approx((count-24)/count, abs=1e-6)
     finally:
         async with pool.acquire() as conn:
+            await conn.execute('DELETE FROM player_prop_snapshots WHERE game_id=$1',identity)
             await conn.execute(f'DELETE FROM {table} WHERE player_id=$1',player_id)
             if sport == 'nfl':
                 await conn.execute('DELETE FROM games WHERE game_id LIKE $1',identity+'%')

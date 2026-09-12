@@ -37,6 +37,21 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     assert result['coverage']['counts']['evaluated_selections']==2
     assert all(call.args[1].last_n_games==40 for call in quant.call_args_list)
     assert all(call.args[1].as_of_date is not None for call in quant.call_args_list)
+    conn.executemany.assert_awaited_once()
+    statement, rows = conn.executemany.await_args.args
+    assert 'INSERT INTO player_prop_snapshots' in statement
+    assert len(rows)==2 and {row[9] for row in rows}=={'Over','Under'}
+
+
+async def test_quote_archive_failure_blocks_unrecorded_model_output(tmp_path):
+    conn=AsyncMock();conn.executemany.side_effect=RuntimeError('database URL with secret')
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    quant=AsyncMock(return_value=PropResult(true_probability=Decimal('.6'),sample_size=40))
+    with patch('sportsbet.prop.nba_agents.run_nba_prop_query',quant):
+        with pytest.raises(RuntimeError,match='database URL with secret'):
+            await evaluate_event(pool,event(),'nba',Ledger(tmp_path/'audit.sqlite'),'scan')
+    quant.assert_not_awaited()
 
 
 async def test_graph_query_failure_cannot_be_reported_as_successful_empty_scan(tmp_path):
