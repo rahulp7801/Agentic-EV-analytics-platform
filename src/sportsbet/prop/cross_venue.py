@@ -8,7 +8,11 @@ from datetime import datetime
 from decimal import Decimal
 
 from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost
-from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
+from sportsbet.ingestion.prop_odds import (
+    PlayerPropSnapshotCreate,
+    prop_quote_record_sha256,
+    provider_event_sha256,
+)
 from sportsbet.quant.vig import american_to_raw_prob
 
 
@@ -204,6 +208,15 @@ def _sportsbook_rejection(quote: PlayerPropSnapshotCreate, event: dict, sport: s
             or quote.implied_probability != american_to_raw_prob(quote.price)
             or quote.side not in ('Over','Under')):
         return 'sportsbook_price'
+    try:
+        evidence_valid=(quote.source_provider=='the_odds_api'
+            and quote.source_sha256==provider_event_sha256(event)
+            and _sha256(quote.source_record_sha256)
+            and quote.source_record_sha256==prop_quote_record_sha256(quote))
+    except (TypeError,ValueError,ArithmeticError):
+        evidence_valid=False
+    if not evidence_valid:
+        return 'sportsbook_evidence'
     if not -1 <= age <= MAX_AGE_SECONDS or quote.snapped_at >= start:
         return 'sportsbook_future_or_stale'
     if (not isinstance(quote.line,Decimal) or not quote.line.is_finite()
@@ -249,7 +262,9 @@ def screen_sportsbooks(event: dict, sport: str, quotes: list[PlayerPropSnapshotC
             continue
         legs=[dict(venue='sportsbook',sportsbook=quote.sportsbook,side=quote.side,
             american_odds=quote.price,cost=str(quote.implied_probability),
-            observed_at=quote.snapped_at.isoformat()) for quote in (over,under)]
+            observed_at=quote.snapped_at.isoformat(),source_provider=quote.source_provider,
+            source_sha256=quote.source_sha256,source_record_sha256=quote.source_record_sha256)
+            for quote in (over,under)]
         comparisons.append(dict(kind='sportsbook_sportsbook_prop',status='unverified',
             event_id=event['id'],player=over.player_name,prop_type=PROP_MARKETS[sport][market],line=str(line),
             legs=legs,gross_cost_to_one_dollar=str(gross_cost),gross_gap_to_one_dollar=str(1-gross_cost),
@@ -377,7 +392,9 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
                         cost=str(ask[0]), displayed_size=str(ask[1]), observed_at=received.isoformat()),
                         dict(venue='sportsbook', sportsbook=book.sportsbook, side=book_side,
                         american_odds=book.price, cost=str(book.implied_probability),
-                        observed_at=book.snapped_at.isoformat())],
+                        observed_at=book.snapped_at.isoformat(), source_provider=book.source_provider,
+                        source_sha256=book.source_sha256,
+                        source_record_sha256=book.source_record_sha256)],
                     gross_cost_to_one_dollar=str(gross_cost), gross_gap_to_one_dollar=str(1-gross_cost),
                     evidence_sha256=handoff['evidence_sha256'], settlement_equivalent=False,
                     market_sha256=quote['market_sha256'], rules_sha256=quote['rules_sha256'],

@@ -61,7 +61,7 @@ class PlayerPropSnapshotCreate(BaseModel):
     side: Optional[str] = None  # "Over" | "Under" — in-memory only, not persisted to DB
 
 
-def _payload_sha256(value: dict) -> str:
+def provider_event_sha256(value: dict) -> str:
     """Commit to the exact JSON value returned for one provider event."""
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'),
         ensure_ascii=False, allow_nan=False).encode()).hexdigest()
@@ -93,7 +93,7 @@ def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None
         return []
     try:
         start = timestamp(event['commence_time'])
-        source_sha256 = _payload_sha256(event)
+        source_sha256 = provider_event_sha256(event)
     except (KeyError, AttributeError, TypeError, ValueError):
         return []
     quotes = []
