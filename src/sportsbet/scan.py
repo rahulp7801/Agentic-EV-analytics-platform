@@ -19,7 +19,7 @@ from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
-from sportsbet.prop.cross_venue import PROP_MARKETS, screen as screen_cross_venue
+from sportsbet.prop.cross_venue import PROP_MARKETS, screen as screen_cross_venue, screen_sportsbooks
 from sportsbet.quant.vig import american_to_raw_prob
 
 MARKETS = PROP_MARKETS
@@ -155,11 +155,15 @@ async def run(sports: list[str], daily_credit_limit: int):
                     quoted=response.json()
                     if quoted.get('id')!=event['id'] or any(quoted.get(k)!=event.get(k) for k in ('home_team','away_team')) or timestamp(quoted['commence_time'])!=timestamp(event['commence_time']):
                         raise ValueError('Quote response does not match the discovered event')
-                    screened=screen_cross_venue(quoted,sport,quotes_from_event(quoted,sport),
+                    quotes=quotes_from_event(quoted,sport)
+                    sportsbook_screen=screen_sportsbooks(quoted,sport,quotes,datetime.now(timezone.utc))
+                    screened=screen_cross_venue(quoted,sport,quotes,
                         load_snapshot('kalshi-props:'+sport),datetime.now(timezone.utc))
-                    screens[sport].append(screened)
+                    screens[sport].append(dict(status=screened['status'],
+                        comparisons=sportsbook_screen['comparisons']+screened['comparisons']))
                     result=await asyncio.wait_for(evaluate_event(pool,quoted,sport,ledger,scan_id),timeout=120)
                     result['cross_venue']=screened
+                    result['sportsbook_arb']=sportsbook_screen
                     publish_snapshot(f'signals:{sport}:{event["id"]}',result)
                     report['completed_events']+=1
                     report['coverage'][event['id']]=result['coverage']|{'cross_venue':screened['coverage']}
@@ -177,7 +181,10 @@ async def run(sports: list[str], daily_credit_limit: int):
                     generated_at=report['finished_at'],status=screen_status,
                     coverage=dict(events=len(screens[sport]),observed_events=observed,
                         unavailable_events=sum(screen['status']=='unavailable' for screen in screens[sport]),
-                        positive_gross_gaps=len(comparisons)),comparisons=comparisons,execution_ready=False))
+                        positive_gross_gaps=len(comparisons),
+                        sportsbook_gaps=sum(row['kind']=='sportsbook_sportsbook_prop' for row in comparisons),
+                        kalshi_sportsbook_gaps=sum(row['kind']=='kalshi_sportsbook_prop' for row in comparisons)),
+                    comparisons=comparisons,execution_ready=False))
         publish_snapshot('metrics:all',ledger.report())
         publish_snapshot('metrics:recommendations',ledger.report(True))
         return reports

@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
+from sportsbet.quant.vig import american_to_raw_prob
 
 
 PROP_MARKETS = {
@@ -129,6 +130,70 @@ def _ask(value) -> tuple[Decimal, Decimal] | None:
     if not 0 < cost < 1 or size <= 0:
         raise InvalidHandoff('invalid_quote')
     return cost, size
+
+
+def screen_sportsbooks(event: dict, sport: str, quotes: list[PlayerPropSnapshotCreate],
+        now: datetime) -> dict:
+    """Screen exact opposite props at distinct books using observed payout prices."""
+    if sport not in PROP_MARKETS or now.utcoffset() is None:
+        raise ValueError('Invalid screening request')
+    try:
+        start = _timestamp(event.get('commence_time'))
+    except (InvalidHandoff, AttributeError, TypeError, ValueError):
+        return _unavailable(sport, now, 'invalid_event')
+    eligible=[];rejected=Counter()
+    for quote in quotes:
+        try:
+            age=(now-quote.snapped_at).total_seconds()
+        except (TypeError,AttributeError):
+            rejected['sportsbook_timestamp'] += 1
+            continue
+        if (quote.sport != sport or quote.game_id != event.get('id')
+                or quote.prop_type not in PROP_MARKETS[sport]):
+            rejected['sportsbook_identity'] += 1
+        elif (type(quote.price) is not int or abs(quote.price)<100
+                or quote.implied_probability != american_to_raw_prob(quote.price)
+                or quote.side not in ('Over','Under')):
+            rejected['sportsbook_price'] += 1
+        elif not -1 <= age <= MAX_AGE_SECONDS or quote.snapped_at >= start:
+            rejected['sportsbook_future_or_stale'] += 1
+        elif not isinstance(quote.line,Decimal) or not quote.line.is_finite() \
+                or quote.line<0 or quote.line % 1 != Decimal('.5'):
+            rejected['non_complementary_strike'] += 1
+        else:
+            eligible.append(quote)
+    try:
+        groups={(_name(quote.player_name),quote.prop_type,quote.line) for quote in eligible}
+    except InvalidHandoff:
+        return _unavailable(sport,now,'invalid_sportsbook_quote')
+    comparisons=[];price_pairs=0
+    for player,market,line in sorted(groups):
+        matching=[quote for quote in eligible if (_name(quote.player_name),quote.prop_type,quote.line)==(
+            player,market,line)]
+        pairs=[(over,under) for over in matching if over.side=='Over' for under in matching
+            if under.side=='Under' and over.sportsbook!=under.sportsbook
+            and abs((over.snapped_at-under.snapped_at).total_seconds())<=MAX_SKEW_SECONDS]
+        if not pairs:
+            rejected['distinct_book_pair_or_skew'] += 1
+            continue
+        over,under=min(pairs,key=lambda pair:pair[0].implied_probability+pair[1].implied_probability)
+        price_pairs += 1
+        gross_cost=over.implied_probability+under.implied_probability
+        if gross_cost >= 1:
+            continue
+        legs=[dict(venue='sportsbook',sportsbook=quote.sportsbook,side=quote.side,
+            american_odds=quote.price,cost=str(quote.implied_probability),
+            observed_at=quote.snapped_at.isoformat()) for quote in (over,under)]
+        comparisons.append(dict(kind='sportsbook_sportsbook_prop',status='unverified',
+            event_id=event['id'],player=over.player_name,prop_type=PROP_MARKETS[sport][market],line=str(line),
+            legs=legs,gross_cost_to_one_dollar=str(gross_cost),gross_gap_to_one_dollar=str(1-gross_cost),
+            settlement_equivalent=False,fee_adjusted_profit=None,realized_profit=None,execution_ready=False,
+            reasons=['Sportsbook limits, DNP/void treatment, and stat rules are unreviewed.',
+                'Observed prices can move and are not fills.']))
+    return dict(schema_version=1,sport=sport,screened_at=now.isoformat(),status='observed',event_id=event['id'],
+        coverage=dict(sportsbook_quotes=len(quotes),eligible_sportsbook_quotes=len(eligible),
+            exact_markets=len(groups),price_pairs=price_pairs,positive_gross_gaps=len(comparisons),
+            rejected=dict(rejected)),comparisons=comparisons,execution_ready=False)
 
 
 def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCreate],

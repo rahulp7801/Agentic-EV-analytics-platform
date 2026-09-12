@@ -285,6 +285,14 @@ milestone, and evidence identifiers. It revalidates the complementary legs and
 price arithmetic at the public boundary and removes candidates more than five
 minutes after observation. Captured counts remain visible when candidates expire.
 
+The same scan also screens sportsbook Over and Under prices for the identical
+event, canonical player, stat, and half-point line. Legs must come from distinct
+books and their provider observation times must be within30seconds. American odds
+are converted to the cost of one dollar of total payout; the cheapest valid pair
+is retained only when its gross cost is below one dollar. DNP/void/stat rules,
+limits, acceptance, and price movement remain unreviewed, so these rows are also
+unverified and non-executable with null profit fields.
+
 Free ESPN data provides outcomes, not historical player-prop prices. Current real
 walk-forward pilots exercise the actual model graph at explicitly chosen research
 thresholds. They have no priced ROI or CLV. Build forward timestamped quote history

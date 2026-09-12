@@ -56,7 +56,8 @@ async def test_budget_rotation_covers_both_leagues_and_unseen_events(monkeypatch
     assert stored['signals:nfl:nfl0']['cross_venue']['reason']=='missing_handoff'
     # The fourth scan attempted no NFL quote, so it replaces the prior screen with an honest empty snapshot.
     assert stored['prop-screens:nfl']['coverage']=={
-        'events':0,'observed_events':0,'unavailable_events':0,'positive_gross_gaps':0}
+        'events':0,'observed_events':0,'unavailable_events':0,'positive_gross_gaps':0,
+        'sportsbook_gaps':0,'kalshi_sportsbook_gaps':0}
     assert stored['prop-screens:nfl']['execution_ready'] is False
     assert pool.close.await_count==4
 
