@@ -217,12 +217,15 @@ degrade the source instead of producing a quote.
 
 `occurrence_datetime` is retained as market metadata and is not used as kickoff.
 In a real NFL sample it was three hours after the linked milestone start. The
-milestone remains the documented structured game relationship. Player names and
-settlement equivalence are intentionally unresolved: a later exact sportsbook
-match must resolve the player target, re-fetch and review the contract rules, and
-check DNP/void and stat-provider treatment. One listed level is displayed depth,
-not a fill, and every normalized record has `settlement_equivalent=false` and
-`execution_ready=false`.
+milestone remains the documented structured game relationship. The collector
+resolves every distinct player UUID with one public bulk structured-target request,
+requires the exact requested ID set with no cursor, and validates player type,
+league, and team before retaining the canonical Kalshi name. Targets are stored
+once by UUID rather than copied into every contract. Cross-provider identity and
+settlement equivalence remain unresolved: a later exact sportsbook match must
+re-fetch and review the contract rules and check DNP/void and stat-provider
+treatment. One listed level is displayed depth, not a fill, and every normalized
+record has `settlement_equivalent=false` and `execution_ready=false`.
 
 On September 12, 2026, a real public NFL run exhausted all four series and found
 3,073 open contracts across 56 prop events, all linked to 15 upcoming structured
