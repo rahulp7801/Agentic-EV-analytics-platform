@@ -15,6 +15,7 @@ from sportsbet.model_contract import MODEL_VERSION, PROP_MARKETS, QUOTE_PROVENAN
 from sportsbet.quant.backtest import BacktestSignal, BacktestEngine
 
 DEFAULT_PATH = Path('.checkpoints/analytics.sqlite')
+MAX_RECOMMENDATION_FRACTION = Decimal('0.05')
 VERIFIED_SETTLEMENT_SOURCE = 'observed_final_stats'
 SETTLEMENT_REF = re.compile(
     r'^espn_schedule\+(nba|espn|nflverse):([^:]{1,80}):sha256:([0-9a-f]{64})$')
@@ -31,6 +32,15 @@ def json_object(value):
         return decoded if isinstance(decoded, dict) else None
     except (TypeError, ValueError):
         return None
+
+
+def normalized_model_version(payload: dict) -> str:
+    value=payload.get('model_version')
+    if value in (None,''):
+        return 'unversioned'
+    if not isinstance(value,str) or not re.fullmatch(r'[A-Za-z0-9._-]{1,80}',value):
+        raise ValueError('Model version is invalid')
+    return value
 
 
 def quote_evidence_valid(payload: dict) -> bool:
@@ -174,7 +184,9 @@ class Ledger:
                 conn.close()
 
 
-    def reserve(self, signal: EVSignal, line: float | None, limit: float = 0.05, risk_day: str | None = None) -> tuple[bool, str]:
+    def reserve(self, signal: EVSignal, line: float | None,
+                limit: float = float(MAX_RECOMMENDATION_FRACTION),
+                risk_day: str | None = None) -> tuple[bool, str]:
         if not signal.game_id:
             return False, 'missing_game_identity'
         group = json.dumps([signal.game_id, signal.player_name or signal.market_type])
@@ -222,9 +234,21 @@ class Ledger:
 
     def record(self, scan_id: str, payload: dict) -> str:
         payload = dict(payload)
-        if (payload.get('model_version') in QUOTE_PROVENANCE_MODEL_VERSIONS
+        model_version=normalized_model_version(payload)
+        if (model_version in QUOTE_PROVENANCE_MODEL_VERSIONS
                 and not quote_evidence_valid(payload)):
             raise ValueError('Model prediction requires verified quote evidence')
+        accepted=payload.get('accepted')
+        if accepted is not None and type(accepted) is not bool:
+            raise ValueError('Prediction acceptance must be boolean')
+        if accepted is not None:
+            try:
+                stake=Decimal(str(payload.get('stake_fraction')))
+            except (ArithmeticError,ValueError):
+                raise ValueError('Prediction stake is invalid') from None
+            if (not stake.is_finite() or stake < 0 or stake > MAX_RECOMMENDATION_FRACTION
+                    or (accepted and stake == 0) or (not accepted and stake != 0)):
+                raise ValueError('Prediction acceptance and stake are inconsistent')
         for field in ('captured_at','quote_time','game_start_time','model_generated_at'):
             if payload.get(field) is not None:
                 payload[field] = utc_timestamp(payload[field]).isoformat()
@@ -283,12 +307,25 @@ class Ledger:
     def predictions(self) -> list[dict]:
         with self.connect() as db:
             rows = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value,outcome_evidence FROM predictions ORDER BY id').fetchall()
-        return [{'prediction_id':key, **json.loads(payload), 'outcome':json.loads(outcome) if outcome else None,
-            'outcome_source':source,'outcome_ref':ref,
-            'outcome_observed_at':observed.isoformat() if isinstance(observed,datetime) else observed,
-            'actual_value':float(actual) if actual is not None else None,
-            'outcome_evidence':json_object(proof)}
-            for key,payload,outcome,source,ref,observed,actual,proof in rows]
+        result=[]
+        for key,payload,outcome,source,ref,observed,actual,proof in rows:
+            decoded=json_object(payload)
+            if decoded is None:
+                continue
+            try:
+                decoded_outcome=json.loads(outcome) if outcome is not None else None
+            except (TypeError,ValueError):
+                decoded_outcome=None
+            try:
+                decoded_actual=float(actual) if actual is not None else None
+            except (TypeError,ValueError):
+                decoded_actual=None
+            result.append({'prediction_id':key,**decoded,'outcome':decoded_outcome,
+                'outcome_source':source,'outcome_ref':ref,
+                'outcome_observed_at':observed.isoformat() if isinstance(observed,datetime) else observed,
+                'actual_value':decoded_actual,
+                'outcome_evidence':json_object(proof)})
+        return result
 
     def report(self, recommendations_only: bool = False, model_version: str | None = None) -> dict:
         from dataclasses import fields
@@ -304,17 +341,31 @@ class Ledger:
         versions = set()
         unverified_settlements=0
         for prediction_id, raw, outcome, outcome_source, outcome_ref, outcome_observed, actual, proof in records:
-            p = json.loads(raw)
-            version = p.get('model_version') or 'unversioned'
+            p = json_object(raw)
+            if p is None:
+                excluded += 1
+                continue
+            try:
+                version=normalized_model_version(p)
+            except ValueError:
+                excluded += 1
+                continue
             versions.add(version)
             if model_version is not None and version != model_version:
                 continue
-            if recommendations_only and not p.get('accepted'):
+            if recommendations_only and p.get('accepted') is not True:
                 continue
-            if outcome is not None and not verified_settlement_evidence(
-                    p,json.loads(outcome),outcome_source,outcome_ref,outcome_observed,actual,proof):
-                outcome=None
-                unverified_settlements+=1
+            decoded_outcome=None
+            if outcome is not None:
+                try:
+                    decoded_outcome=json.loads(outcome)
+                except (TypeError,ValueError):
+                    unverified_settlements+=1
+                else:
+                    if not verified_settlement_evidence(
+                            p,decoded_outcome,outcome_source,outcome_ref,outcome_observed,actual,proof):
+                        decoded_outcome=None
+                        unverified_settlements+=1
             # Without recorded actual tipoff/entry, no trustworthy historical evaluation.
             if not p.get('game_start_time') or not p.get('captured_at') or p.get('model_probability') is None:
                 excluded += 1
@@ -330,7 +381,17 @@ class Ledger:
                 probability = Decimal(str(p['model_probability']))
                 push = Decimal(str(p.get('push_probability',0)))
                 stake = Decimal(str(p.get('stake_fraction',0))) if recommendations_only else Decimal(1)
-                if not stake.is_finite() or stake < 0:
+                identity_fields=(('game_id',64),('player',100),('prop_type',40),('sportsbook',50))
+                if (any(not isinstance(p.get(field),str) or not p[field].strip()
+                        or len(p[field])>limit for field,limit in identity_fields)
+                        or p.get('direction') not in ('over','under')):
+                    raise ValueError('Invalid selection identity')
+                line=Decimal(str(p['line']))
+                if not line.is_finite() or not 0 <= line <= Decimal('99999.99'):
+                    raise ValueError('Invalid line')
+                if (not stake.is_finite() or stake < 0
+                        or (recommendations_only
+                            and not 0 < stake <= MAX_RECOMMENDATION_FRACTION)):
                     raise ValueError('Invalid recorded stake')
                 if not probability.is_finite() or not push.is_finite() or not 0 <= probability <= 1 or not 0 <= push <= 1-probability:
                     raise ValueError('Invalid model probabilities')
@@ -343,7 +404,7 @@ class Ledger:
             if entered >= start or quote_time > entered or generated > entered or p.get('synthetic_price') or str(p.get('sportsbook','')).lower()=='prizepicks':
                 excluded += 1
                 continue
-            parsed.append((entered,prediction_id,start,p,outcome))
+            parsed.append((entered,prediction_id,start,p,decoded_outcome))
         # UTC chronology, not lexical ISO strings with different offsets.
         parsed.sort(key=lambda row: (row[0], row[1]))
         for entered,_,start,p,outcome in parsed:
@@ -369,7 +430,7 @@ class Ledger:
             signals.append(BacktestSignal(
                 QuantResult(true_probability=Decimal(str(p['model_probability']))),
                 close,
-                json.loads(outcome) if outcome is not None else None,
+                outcome,
                 Decimal(str(p.get('stake_fraction',0))) if recommendations_only else Decimal('1'),
                 quote_terms(p['american_odds'],Decimal(0))[1]+1, start,
                 closing_time, entered,
