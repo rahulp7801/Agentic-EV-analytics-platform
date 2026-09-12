@@ -193,4 +193,7 @@ def test_settlement_constraint_preserves_legacy_and_requires_new_provenance() ->
     with engine.connect() as conn:
         row=conn.execute(sa.text("SELECT outcome,outcome_source,outcome_ref,outcome_observed_at FROM analytics.predictions WHERE id='new'")).one()
         assert tuple(row[:3])==('true','manual','caller_supplied') and row[3] is not None
+    with pytest.raises(sa.exc.IntegrityError):
+        with engine.begin() as conn:
+            conn.execute(sa.text("UPDATE analytics.predictions SET actual_value=-1 WHERE id='new'"))
     engine.dispose();alembic.command.downgrade(cfg,'base')

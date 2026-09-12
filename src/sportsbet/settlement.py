@@ -4,6 +4,8 @@ from __future__ import annotations
 from collections import Counter
 from datetime import date, datetime
 from decimal import Decimal
+import hashlib
+import json
 
 from sportsbet.ledger import Ledger, utc_timestamp
 
@@ -84,7 +86,12 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
                 reasons['invalid_prediction_or_evidence']+=1
     observed=utc_timestamp(schedule['captured_at'])
     for prediction,game,outcome,actual in resolved:
-        reference=f"espn:{game['provider_event_id']}:{prediction['player_id']}:{prediction['prop_type']}"
+        evidence=dict(provider_event_id=game['provider_event_id'],date=game['date'],
+            home_name=game['home_name'],away_name=game['away_name'],completed=True,
+            game_time=game['game_time'],player_id=prediction['player_id'],
+            prop_type=prediction['prop_type'],actual_value=str(actual))
+        digest=hashlib.sha256(json.dumps(evidence,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        reference=f"espn:{game['provider_event_id']}:sha256:{digest}"
         ledger.settle({prediction['prediction_id']:outcome},source=AUTO_SOURCE,source_ref=reference,
             observed_at=observed,actual_values={prediction['prediction_id']:actual})
     return dict(sport=sport,status='complete' if schedule.get('status')=='complete' else 'degraded',

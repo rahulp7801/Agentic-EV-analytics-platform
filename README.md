@@ -73,7 +73,7 @@ uv run python -m sportsbet.ledger --recommendations-only
 uv run python -m sportsbet.ledger --model-version empirical-v2
 ```
 
-`outcomes.json` maps prediction IDs to `true`, `false`, `"push"`, `"void"`, or `null`. Manual settlements retain caller provenance. Hosted metrics snapshots refresh on the next successful daily or scan worker run.
+`outcomes.json` maps prediction IDs to `true`, `false`, `"push"`, `"void"`, or `null`. Manual CLI settlements retain the input file hash. Hosted metrics snapshots refresh on the next successful daily or scan worker run.
 Reports retain the earliest eligible prediction per selection within the chosen
 cohort. Audit timestamps require explicit timezones; conflicting retries cannot
 replace recorded predictions. ROI is hypothetical recorded-stake replay, not

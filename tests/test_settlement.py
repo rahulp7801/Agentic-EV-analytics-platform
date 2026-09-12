@@ -37,7 +37,8 @@ def test_settlement_uses_final_exact_game_and_observed_stat(tmp_path,direction,l
     assert report['settled']==1 and report['pending']==0
     row=next(row for row in ledger.predictions() if row['prediction_id']==key)
     assert row['outcome']==expected and row['actual_value']==actual
-    assert row['outcome_source']=='espn_final_stats' and row['outcome_ref']=='espn:espn-event:7:points'
+    assert row['outcome_source']=='espn_final_stats'
+    assert row['outcome_ref'].startswith('espn:espn-event:sha256:') and len(row['outcome_ref'])==87
     assert datetime.fromisoformat(row['outcome_observed_at']).utcoffset() is not None
 
 

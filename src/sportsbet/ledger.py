@@ -266,7 +266,9 @@ def main():
     parser.add_argument('--model-version',help='Report one recorded model version; use unversioned for legacy rows')
     args=parser.parse_args(); ledger=Ledger(args.path)
     if args.settlements:
-        ledger.settle(json.loads(Path(args.settlements).read_text(encoding='utf-8-sig')))
+        raw=Path(args.settlements).read_bytes()
+        ledger.settle(json.loads(raw.decode('utf-8-sig')),
+            source_ref='sha256:'+hashlib.sha256(raw).hexdigest())
     print(json.dumps(ledger.predictions() if args.list else ledger.report(args.recommendations_only,args.model_version),indent=2))
 
 if __name__=='__main__':

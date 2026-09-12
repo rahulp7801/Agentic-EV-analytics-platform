@@ -1,6 +1,8 @@
 ﻿from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import hashlib
+import json
 import pytest
 from sportsbet.ledger import Ledger
 from sportsbet.graph.models import EVSignal, PropResult
@@ -40,6 +42,20 @@ def test_audit_records_rejected_and_pending_without_fabricated_results(tmp_path)
     assert ledger.report()['brier_score']==pytest.approx(.16)
     assert ledger.report(True)['sample_size']==0
     with pytest.raises(ValueError):ledger.settle({'unknown':False})
+
+
+def test_manual_settlement_cli_hashes_the_exact_input_file(tmp_path,monkeypatch,capsys):
+    path=tmp_path/'audit.sqlite';ledger=Ledger(path);now=datetime.now(timezone.utc)
+    key=ledger.record('scan',dict(game_id='g',player='P',prop_type='points',direction='over',
+        line=20.5,sportsbook='book',american_odds=100,model_probability=.6,
+        captured_at=now.isoformat(),game_start_time=(now+timedelta(hours=1)).isoformat()))
+    raw=json.dumps({key:True},indent=2).encode();outcomes=tmp_path/'outcomes.json';outcomes.write_bytes(raw)
+    monkeypatch.setattr('sys.argv',['ledger','--path',str(path),'--settlements',str(outcomes)])
+    from sportsbet.ledger import main
+    main();capsys.readouterr()
+    row=Ledger(path).predictions()[0]
+    assert row['outcome_source']=='manual'
+    assert row['outcome_ref']=='sha256:'+hashlib.sha256(raw).hexdigest()
 
 @pytest.mark.parametrize('side', ['over','under'])
 async def test_sample_gate_and_synthetic_prices_apply_to_both_sides(side):
