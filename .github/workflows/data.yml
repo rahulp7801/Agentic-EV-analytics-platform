@@ -69,6 +69,8 @@ jobs:
             daily:*|monitor:*|scan:*|watch:all|watch:sportsbook)
               test -n "$ODDS_API_KEY" || { echo 'Configure the odds repository secret for this operation.'; exit 1; } ;;
           esac
+      - name: Verify hosted schema is at the application head
+        run: uv run --locked alembic current --check-heads
       - name: Update market data
         run: |
           case "$OPERATION" in
