@@ -19,6 +19,20 @@ from sportsbet.schedules import collect as collect_schedule
 from sportsbet.settlement import pending_schedule_offsets, settle_final_props
 
 MODES=('daily','monitor','public_daily','public_monitor')
+PUBLIC_SCOPES={
+    'public_daily':(
+        'Public-only daily collection: Kalshi markets, ESPN schedules, NBA/NFL history refresh, '
+        'and settlement evaluation. Sportsbooks, PrizePicks and prop recommendations are not '
+        'requested. Partial market sampling is retained explicitly. This is periodic collection, '
+        'not continuous arbitrage monitoring.'
+    ),
+    'public_monitor':(
+        'Public-only market observation: Kalshi markets and ESPN schedules. History refresh, '
+        'settlement evaluation, sportsbooks, PrizePicks and prop recommendations are not requested. '
+        'Partial market sampling is retained explicitly. This is periodic collection, not continuous '
+        'arbitrage monitoring.'
+    ),
+}
 
 
 class DailyState(TypedDict, total=False):
@@ -126,7 +140,7 @@ def create_daily_graph():
 
     async def settlements(state):
         if state['mode']=='public_monitor':
-            return {'settlements':{sport:{'status':'not_requested','reason':'history_not_refreshed'}
+            return {'settlements':{sport:{'status':'not_requested','reason':'monitor_mode'}
                 for sport in state['sports']}}
         try:
             ledger=Ledger()
@@ -164,7 +178,7 @@ def create_daily_graph():
             settlements=state['settlements'],
             props={s:{k:v for k,v in r.items() if k not in ('attempts','coverage')} for s,r in state['props'].items()})
         if public:
-            result['scope']='Public-only scheduled observation: Kalshi markets and ESPN schedules; daily NBA/NFL history refresh. Sportsbooks, PrizePicks and prop recommendations are not requested. Partial market sampling is retained explicitly. This is periodic collection, not continuous arbitrage monitoring.'
+            result['scope']=PUBLIC_SCOPES[state['mode']]
         publish_snapshot('pipeline:'+state['mode'],result)
         return {'report':result}
 
