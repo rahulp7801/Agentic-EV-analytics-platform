@@ -377,6 +377,49 @@ def book_quotes(event: dict, now: datetime) -> list[dict]:
     return quotes
 
 
+def kalshi_team_aliases(source: dict, sport: str) -> dict[str,list[str]]:
+    """Return only exact captured team names, including one unambiguous ESPN alias."""
+    directory={}
+    sports=(source.get('team_directory') or {}).get('sports') or [{}]
+    for league in sports[0].get('leagues',[]):
+        if league.get('abbreviation','').upper()!=sport.upper():
+            continue
+        for item in league.get('teams',[]):
+            team=item['team']
+            directory.setdefault(team['abbreviation'],set()).add(team['displayName'])
+    aliases={}
+    for target_id,target in source.get('targets',{}).items():
+        names={target.get('name'),target.get('details',{}).get('team_name')}
+        official=directory.get(target.get('details',{}).get('abbreviation'),set())
+        if len(official)==1:
+            names.update(official)
+        aliases[target_id]=sorted(name for name in names if isinstance(name,str) and name.strip())
+    return aliases
+
+
+def kalshi_prop_handoff(source: dict, sport: str, captured_at: str) -> dict:
+    """Build the private worker handoff without exposing full game/order-book payloads."""
+    inventory=source.get('prop_inventory')
+    if not isinstance(inventory,dict):
+        return dict(schema_version=1,sport=sport,captured_at=captured_at,status='unavailable',
+            evidence=None,evidence_sha256=None,execution_ready=False)
+    aliases=kalshi_team_aliases(source,sport)
+    games=[]
+    for item in source.get('games',[]):
+        milestone=item['milestone'];details=milestone['details']
+        home_id,away_id=details['home_team_id'],details['away_team_id']
+        if home_id not in aliases or away_id not in aliases:
+            continue
+        games.append(dict(milestone_id=milestone['id'],scheduled_game_start_time=timestamp(
+            milestone['start_date']).isoformat(),main_game_event_ticker=details['main_game_event_ticker'],
+            home_team_id=home_id,away_team_id=away_id,home_team_aliases=aliases[home_id],
+            away_team_aliases=aliases[away_id]))
+    evidence=dict(quotes=inventory.get('quotes',[]),player_targets=inventory.get('targets',{}),
+        games=games,coverage=inventory.get('coverage',{}),partial_coverage=source.get('partial_coverage',True))
+    return dict(schema_version=1,sport=sport,captured_at=captured_at,status=source.get('status','unavailable'),
+        evidence=evidence,evidence_sha256=digest(evidence),execution_ready=False)
+
+
 def comparisons(evidence: dict) -> list[dict]:
     """Binary win-only algebra, deliberately blocked pending full settlement review."""
     version=evidence.get('schema_version',1)
@@ -397,23 +440,13 @@ def comparisons(evidence: dict) -> list[dict]:
             rows.append(price_row('sportsbooks', event['id'], event['home_team']+' / '+event['away_team'], pair,
                 ['Settlement rules and account limits unverified; tie/void states excluded.']))
     kalshi = evidence['sources'].get('kalshi', {})
-    directory = {}
-    for league in (kalshi.get('team_directory') or {}).get('sports', [{}])[0].get('leagues', []):
-        if league.get('abbreviation', '').upper() != evidence['sport'].upper():
-            continue
-        for item in league.get('teams', []):
-            team = item['team']
-            directory.setdefault(team['abbreviation'], set()).add(team['displayName'])
+    aliases=kalshi_team_aliases(kalshi,evidence['sport'])
     for game in kalshi.get('games', []):
         milestone = game['milestone']
         details = milestone['details']
         # Exact provider names only. Never infer identity from ticker suffixes or fuzzy text.
         def names(side):
-            target = kalshi['targets'][details[side+'_team_id']]
-            aliases = {target['name'], target.get('details', {}).get('team_name')}
-            # Exact same-league abbreviation in a captured team directory; no fuzzy matching.
-            official = directory.get(target.get('details', {}).get('abbreviation'), set())
-            return aliases | official if len(official)==1 else aliases
+            return set(aliases.get(details[side+'_team_id'],[]))
         matched = [(e,q) for e,q in books.values() if e['home_team'] in names('home') and e['away_team'] in names('away')
             and timestamp(e['commence_time']) == timestamp(milestone['start_date'])]
         for snap in game['snapshots']:
@@ -537,6 +570,8 @@ async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: boo
         scope='Observed prices only. Gross gaps exclude fees and full settlement states; they are not verified arbitrage or backtest returns.')
     archive = write_archive(dict(evidence=evidence, summary=summary),directory=Path('.local/market-watch'))
     if publish:
+        if 'kalshi' in selected:
+            publish_snapshot('kalshi-props:'+sport,kalshi_prop_handoff(sources['kalshi'],sport,evidence['captured_at']))
         publish_snapshot('markets:'+sport,summary)
     return summary, archive
 
