@@ -105,6 +105,54 @@ async def test_daily_settles_observed_stats_before_scanning_new_props(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_daily_uses_catchup_evidence_but_publishes_current_schedule_only(monkeypatch):
+    stored={};settled=[]
+    current={'status':'complete','captured_at':datetime.now(timezone.utc).isoformat(),
+        'games':[{'label':'Yesterday'},{'label':'Today'},{'label':'Tomorrow'}],
+        'failures':[],'sources':['current']}
+    older={'status':'complete','captured_at':datetime.now(timezone.utc).isoformat(),
+        'games':[{'label':'2026-09-05'}],'failures':[],'sources':['older']}
+    collector=AsyncMock(side_effect=[current,older])
+    monkeypatch.setattr(daily,'collect_schedule',collector)
+    monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    monkeypatch.setattr(daily,'refresh_history',lambda *args:{'status':'complete'})
+    monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:
+        (settled.append(schedule) or {'status':'complete','settled':0,'pending':0}))
+    monkeypatch.setattr(daily,'watch',AsyncMock(return_value=({'sources':{'kalshi':{
+        'status':'observed','partial_coverage':False}},'captured_at':datetime.now(timezone.utc).isoformat()},None)))
+    monkeypatch.setattr(daily,'scan',AsyncMock(return_value={'nfl':{'status':'complete'}}))
+    report=await daily.run(['nfl'],'daily',25)
+    assert report['status']=='complete'
+    assert collector.await_count==2
+    current_call,older_call=collector.await_args_list
+    assert current_call.args[0]=='nfl' and current_call.args[1] is older_call.args[1]
+    assert current_call.kwargs=={} and older_call.kwargs=={'offsets':tuple(range(-7,-1))}
+    assert [game['label'] for game in stored['schedule:nfl']['games']]==['Yesterday','Today','Tomorrow']
+    assert [game['label'] for game in settled[0]['games']]==['2026-09-05','Yesterday','Today','Tomorrow']
+
+
+@pytest.mark.asyncio
+async def test_catchup_failure_degrades_settlement_without_hiding_current_schedule(monkeypatch):
+    stored={};settled=[]
+    current={'status':'complete','captured_at':datetime.now(timezone.utc).isoformat(),
+        'games':[{'label':'Today'}],'failures':[],'sources':['current']}
+    older={'status':'unavailable','captured_at':datetime.now(timezone.utc).isoformat(),
+        'games':[],'failures':[{'date':'old'}],'sources':[]}
+    monkeypatch.setattr(daily,'collect_schedule',AsyncMock(side_effect=[current,older]))
+    monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    monkeypatch.setattr(daily,'refresh_history',lambda *args:{'status':'complete'})
+    monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:
+        (settled.append(schedule) or {'status':'degraded','settled':0,'pending':1}))
+    monkeypatch.setattr(daily,'watch',AsyncMock(return_value=({'sources':{'kalshi':{
+        'status':'observed','partial_coverage':False}},'captured_at':datetime.now(timezone.utc).isoformat()},None)))
+    scan=AsyncMock(return_value={'nba':{'status':'complete'}});monkeypatch.setattr(daily,'scan',scan)
+    report=await daily.run(['nba'],'daily',25)
+    assert report['status']=='degraded' and report['schedules']['nba']['status']=='complete'
+    assert stored['schedule:nba']==current and settled[0]['status']=='partial'
+    scan.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_settlement_failure_is_redacted_and_degrades_without_suppressing_scan(monkeypatch):
     monkeypatch.setattr(daily,'load_snapshot',lambda key:dict(
         status='complete',finished_at=datetime.now(timezone.utc).isoformat()))

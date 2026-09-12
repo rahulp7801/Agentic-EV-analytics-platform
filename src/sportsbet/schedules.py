@@ -33,15 +33,22 @@ def parse_day(data: dict, day: str, label: str) -> list[dict]:
     return games
 
 
-async def collect(sport: str, now: datetime | None = None) -> dict:
+async def collect(sport: str, now: datetime | None = None, *, offsets: tuple[int, ...] = (-1,0,1)) -> dict:
     if sport not in SPORTS:
         raise ValueError('Unsupported sport')
+    if (not offsets or len(set(offsets))!=len(offsets)
+            or any(type(offset) is not int or not -7 <= offset <= 1 for offset in offsets)):
+        raise ValueError('Schedule offsets must be unique integer days from -7 through 1')
     now=now or datetime.now(timezone.utc)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError('Schedule time requires a timezone')
     today=now.astimezone(ZoneInfo('America/New_York')).date()
     games=[];failures=[];sources=[]
+    labels={-1:'Yesterday',0:'Today',1:'Tomorrow'}
     async with httpx.AsyncClient(timeout=10,follow_redirects=False) as client:
-        for offset,label in [(-1,'Yesterday'),(0,'Today'),(1,'Tomorrow')]:
+        for offset in offsets:
             day=(today+timedelta(days=offset)).strftime('%Y%m%d')
+            label=labels.get(offset,(today+timedelta(days=offset)).isoformat())
             url=f'https://site.api.espn.com/apis/site/v2/sports/{SPORTS[sport]}/scoreboard?dates={day}&limit=1000'
             try:
                 response=await client.get(url)
@@ -51,5 +58,5 @@ async def collect(sport: str, now: datetime | None = None) -> dict:
             except Exception as exc:
                 failures.append(dict(date=day,error_type=type(exc).__name__))
     return dict(sport=sport,captured_at=datetime.now(timezone.utc).isoformat(),as_of_date=str(today),
-        status='complete' if not failures else 'unavailable' if len(failures)==3 else 'partial',
+        status='complete' if not failures else 'unavailable' if len(failures)==len(offsets) else 'partial',
         games=games,partial=bool(failures),failures=failures,sources=sources)

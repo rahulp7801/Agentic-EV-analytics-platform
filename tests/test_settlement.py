@@ -70,6 +70,22 @@ def test_settlement_does_not_rewrite_existing_outcome(tmp_path):
     assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is False
 
 
+def test_automatic_correction_only_rechecks_dates_in_supplied_evidence(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite');key,payload=prediction(ledger)
+    with ledger.connect() as db:
+        db.execute('CREATE TABLE nba_player_gamelogs (player_id INTEGER, game_date TEXT, points INTEGER, rebounds INTEGER, assists INTEGER)')
+        db.execute('INSERT INTO nba_player_gamelogs(player_id,game_date,points) VALUES (?,?,?)',(7,payload['game_date'],21))
+    assert settle_final_props(ledger,'nba',schedule(payload))['settled']==1
+    with ledger.connect() as db:
+        db.execute('UPDATE nba_player_gamelogs SET points=20 WHERE player_id=7')
+    outside={**schedule(payload),'games':[]}
+    assert settle_final_props(ledger,'nba',outside)['candidates']==0
+    assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is True
+    report=settle_final_props(ledger,'nba',schedule(payload))
+    assert report['candidates']==1 and report['settled']==1
+    assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is False
+
+
 def test_nfl_settlement_joins_exact_player_week_team_and_game_date(tmp_path):
     ledger=Ledger(tmp_path/'audit.sqlite')
     key,payload=prediction(ledger,line=250.5,sport='nfl',prop_type='pass_yds',player_id='gsis-7')

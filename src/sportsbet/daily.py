@@ -39,10 +39,23 @@ def create_daily_graph():
     async def schedules(state):
         results={};evidence={}
         for sport in state['sports']:
-            result=await collect_schedule(sport)
-            publish_snapshot('schedule:'+sport,result)
-            results[sport]={'status':result['status'],'captured_at':result['captured_at']}
-            evidence[sport]=result
+            catchup=state['mode'] in ('daily','public_daily')
+            now=datetime.now(timezone.utc)
+            current=await collect_schedule(sport,now)
+            publish_snapshot('schedule:'+sport,current)
+            results[sport]={'status':current['status'],'captured_at':current['captured_at']}
+            if catchup:
+                older=await collect_schedule(sport,now,offsets=tuple(range(-7,-1)))
+                combined={**current,'captured_at':older['captured_at'],
+                    'games':older.get('games',[])+current.get('games',[]),
+                    'failures':older.get('failures',[])+current.get('failures',[]),
+                    'sources':older.get('sources',[])+current.get('sources',[]),
+                    'partial':older.get('status')!='complete' or current.get('status')!='complete'}
+                combined['status']='complete' if not combined['partial'] else 'unavailable' if (
+                    older.get('status')=='unavailable' and current.get('status')=='unavailable') else 'partial'
+                evidence[sport]=combined
+            else:
+                evidence[sport]=current
         return {'schedules':results,'schedule_evidence':evidence}
 
     async def histories(state):
