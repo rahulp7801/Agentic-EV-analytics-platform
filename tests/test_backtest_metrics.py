@@ -21,8 +21,14 @@ def test_metrics_separate_price_model_and_outcome():
     assert report.calibration_positive_count == 1
     assert (report.baseline_zero_brier,report.baseline_50_brier,report.baseline_one_brier)==(.5,.25,.5)
     assert report.log_loss == pytest.approx(-math.log(0.6 * 0.4) / 2)
+    assert report.calibration_error == pytest.approx(0.1)
     assert report.roi == 0
-    assert report.calibration == [dict(lower=0.6, upper=0.7, count=2, predicted=0.6, observed=0.5)]
+    assert report.hit_rate_interval == pytest.approx((0.094531, 0.905469), abs=1e-6)
+    assert [{key:value for key,value in bucket.items() if key!='observed_interval'}
+        for bucket in report.calibration] == [dict(
+            lower=0.6, upper=0.7, count=2, predicted=0.6, observed=0.5)]
+    assert report.calibration[0]['observed_interval'] == pytest.approx(
+        (0.094531, 0.905469), abs=1e-6)
     changed = BacktestEngine().run([signal(quant_result=QuantResult(true_probability=Decimal('0.9')))])
     assert changed.clv_mean == pytest.approx(report.clv_mean)
 
@@ -40,6 +46,7 @@ def test_zero_stake_and_missing_model_do_not_invent_metrics():
     report = BacktestEngine().run([signal(stake=Decimal(0), quant_result=QuantResult())])
     assert report.roi is None and report.brier_score is None
     assert report.calibration_positive_count==0
+    assert report.hit_rate_interval==pytest.approx((0.206549,1),abs=1e-6)
     assert report.baseline_zero_brier is report.baseline_50_brier is report.baseline_one_brier is None
     assert report.clv_mean == pytest.approx(0.05)
 
