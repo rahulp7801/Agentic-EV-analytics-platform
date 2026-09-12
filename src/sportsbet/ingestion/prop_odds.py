@@ -128,10 +128,10 @@ def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None
     return quotes
 
 
-def _persistence_row(snapshot: PlayerPropSnapshotCreate) -> tuple:
-    """Return a complete database row or reject an unauditable quote."""
+def prop_quote_evidence_valid(snapshot: PlayerPropSnapshotCreate) -> bool:
+    """Verify the normalized row commitment and the complete pregame contract."""
     strings = ((snapshot.game_id,64),(snapshot.player_name,100),(snapshot.sportsbook,50),(snapshot.prop_type,40))
-    complete = (snapshot.sport in ('nba','nfl')
+    return (snapshot.sport in ('nba','nfl')
         and all(isinstance(value,str) and bool(value.strip()) and len(value)<=limit for value,limit in strings)
         and isinstance(snapshot.line,Decimal) and snapshot.line.is_finite()
         and Decimal(0)<=snapshot.line<=Decimal('99999.99')
@@ -146,7 +146,11 @@ def _persistence_row(snapshot: PlayerPropSnapshotCreate) -> tuple:
         and isinstance(snapshot.source_sha256,str) and len(snapshot.source_sha256)==64
         and isinstance(snapshot.source_record_sha256,str) and len(snapshot.source_record_sha256)==64
         and snapshot.source_record_sha256==prop_quote_record_sha256(snapshot))
-    if not complete:
+
+
+def _persistence_row(snapshot: PlayerPropSnapshotCreate) -> tuple:
+    """Return a complete database row or reject an unauditable quote."""
+    if not prop_quote_evidence_valid(snapshot):
         raise ValueError('Persistence requires a complete pregame quote')
     return (snapshot.sport,snapshot.game_id,snapshot.player_name,snapshot.sportsbook,
         snapshot.prop_type,snapshot.line,snapshot.price,snapshot.implied_probability,

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from decimal import Decimal
 from sportsbet.graph.models import EVSignal, QuantResult
-from sportsbet.model_contract import MODEL_VERSION, QUOTE_PROVENANCE_MODEL_VERSIONS
+from sportsbet.model_contract import MODEL_VERSION, PROP_MARKETS, QUOTE_PROVENANCE_MODEL_VERSIONS
 from sportsbet.quant.backtest import BacktestSignal, BacktestEngine
 
 DEFAULT_PATH = Path('.checkpoints/analytics.sqlite')
@@ -37,11 +37,38 @@ def quote_evidence_valid(payload: dict) -> bool:
     """Validate source commitments for every scanner cohort that requires them."""
     batch=payload.get('quote_source_sha256')
     record=payload.get('quote_source_record_sha256')
-    return (payload.get('model_version') in QUOTE_PROVENANCE_MODEL_VERSIONS
+    shaped = (payload.get('model_version') in QUOTE_PROVENANCE_MODEL_VERSIONS
         and payload.get('quote_source_provider') == 'the_odds_api'
         and isinstance(payload.get('model_generated_at'),str)
         and isinstance(batch,str) and bool(re.fullmatch('[0-9a-f]{64}',batch))
         and isinstance(record,str) and bool(re.fullmatch('[0-9a-f]{64}',record)))
+    if not shaped:
+        return False
+    try:
+        from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, prop_quote_evidence_valid
+        from sportsbet.quant.vig import american_to_raw_prob
+        sport=payload['sport']
+        markets=PROP_MARKETS[sport]
+        provider_markets=[market for market,prop in markets.items() if prop==payload['prop_type']]
+        if len(provider_markets)!=1:
+            return False
+        price=payload['american_odds']
+        if type(price) is not int:
+            return False
+        snapshot=PlayerPropSnapshotCreate(
+            sport=sport,game_id=payload['game_id'],player_name=payload['player'],
+            sportsbook=payload['sportsbook'],prop_type=provider_markets[0],
+            line=Decimal(str(payload['line'])),price=price,
+            implied_probability=american_to_raw_prob(price),
+            game_start_time=utc_timestamp(payload['game_start_time']),
+            source_provider='the_odds_api',source_sha256=batch,
+            source_record_sha256=record,
+            snapped_at=utc_timestamp(payload['quote_time']),
+            side=str(payload['direction']).title(),
+        )
+        return prop_quote_evidence_valid(snapshot)
+    except (ArithmeticError, KeyError, TypeError, ValueError):
+        return False
 
 
 def verified_settlement_evidence(payload: dict, outcome, source, source_ref,

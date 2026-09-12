@@ -2,6 +2,13 @@
 
 MODEL_VERSION = 'empirical-jeffreys-v4'
 
+PROP_MARKETS = {
+    'nba': {'player_points': 'points', 'player_rebounds': 'rebounds',
+            'player_assists': 'assists'},
+    'nfl': {'player_pass_yds': 'pass_yds', 'player_rush_yds': 'rush_yds',
+            'player_reception_yds': 'rec_yds', 'player_receptions': 'receptions'},
+}
+
 # These scanner cohorts were introduced after quote source and normalized-row
 # commitments became mandatory. Advancing MODEL_VERSION must not make their
 # historical records exempt from provenance validation.
