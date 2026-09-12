@@ -54,6 +54,7 @@ The public website only reads results. It cannot start scans or spend provider c
 
 ## Model and metric contract
 
+- The current `empirical-jeffreys-v3` cohort uses one shared NBA/NFL finite-sample estimator for per-game prop outcomes. It preserves observed push mass and uses a fixed Jeffreys half-count for decided Over/Under outcomes, preventing exact 0%/100% forecasts from finite histories. See [model and validation details](docs/model-validation.md).
 - Target-date queries use only earlier game dates; the most recent 40 qualifying games are selected after filters. Missing or ambiguous player identities are skipped.
 - Quotes must match player, event, market, line and Over/Under side. Synthetic PrizePicks payouts are not treated as bookmaker prices.
 - `ev_pct` is probability edge, displayed in percentage points. `expected_return` is expected net return per unit stake at the quoted payout, including push refunds. Dollar expected profit is stake times expected return.
@@ -71,7 +72,7 @@ To export prediction IDs or record manual audit outcomes:
 uv run python -m sportsbet.ledger --list
 uv run python -m sportsbet.ledger --settlements outcomes.json
 uv run python -m sportsbet.ledger --recommendations-only
-uv run python -m sportsbet.ledger --model-version empirical-v2
+uv run python -m sportsbet.ledger --model-version empirical-jeffreys-v3
 ```
 
 `outcomes.json` maps prediction IDs to `true`, `false`, `"push"`, `"void"`, or `null`. Manual CLI settlements retain the input file hash for audit but stay unverified and cannot enter hosted performance metrics. Hosted metrics snapshots refresh on the next successful daily or scan worker run.
