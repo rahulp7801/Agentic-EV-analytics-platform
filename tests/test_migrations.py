@@ -228,6 +228,10 @@ def test_stat_source_constraints_preserve_legacy_and_require_new_evidence() -> N
     for statement in (
         "INSERT INTO player_stats(player_id,season,week) VALUES ('invalid',2025,1)",
         "INSERT INTO nba_player_gamelogs(player_id,game_id,season) VALUES (3,'invalid',2025)",
+        """INSERT INTO player_stats(player_id,season,week,source_provider,source_sha256,source_observed_at)
+            VALUES ('missing-record-hash',2025,1,'nflverse',repeat('a',64),NOW())""",
+        """INSERT INTO nba_player_gamelogs(player_id,game_id,season,source_provider,source_sha256,source_observed_at)
+            VALUES (3,'missing-record-hash',2025,'nba',repeat('b',64),NOW())""",
     ):
         with pytest.raises(sa.exc.IntegrityError):
             with engine.begin() as conn:
