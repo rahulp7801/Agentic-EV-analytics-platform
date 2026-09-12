@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 
 import pytest
@@ -124,6 +124,19 @@ def test_automatic_correction_only_rechecks_dates_in_supplied_evidence(tmp_path)
     report=settle_final_props(ledger,'nba',schedule(payload))
     assert report['candidates']==1 and report['settled']==1
     assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is False
+
+
+def test_settlement_only_counts_dates_present_in_supplied_schedule(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite');_,payload=prediction(ledger)
+    outside=payload | {'game_id':'older-odds-event',
+        'game_date':(date.fromisoformat(payload['game_date'])-timedelta(days=1)).isoformat()}
+    ledger.record('older-scan',outside)
+    with ledger.connect() as db:
+        create_nba_stats(db)
+    report=settle_final_props(ledger,'nba',schedule(payload))
+    assert report['candidates']==1 and report['pending']==1
+    assert report['reasons']=={'stat_not_found_or_ambiguous':1}
+    assert all(row['outcome'] is None for row in ledger.predictions())
 
 
 def test_nfl_settlement_joins_exact_player_week_team_and_game_date(tmp_path):
