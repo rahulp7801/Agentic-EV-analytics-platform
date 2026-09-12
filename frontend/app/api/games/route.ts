@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     try {
       const { snapshot }=await import('@/lib/database');
       const { scheduleSnapshot }=await import('@/lib/scheduleStatus');
-      const result=scheduleSnapshot(await snapshot('schedule:'+sport));
+      const result=scheduleSnapshot(await snapshot('schedule:'+sport),sport);
       return Response.json(result.body,{status:result.status,headers:{'Cache-Control':'no-store'}});
     } catch {
       return Response.json({games:[],partial:true,error:'Schedules are temporarily unavailable.'},{status:503});
