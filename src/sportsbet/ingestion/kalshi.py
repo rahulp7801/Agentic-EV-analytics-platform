@@ -20,6 +20,9 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from sportsbet.config import settings
 from sportsbet.ingestion.archive import write_archive
 
+RETRYABLE_READ_STATUS = {429, 500, 502, 503, 504}
+READ_RETRY_DELAYS = (0.25, 0.5)
+
 
 def ticker_path(ticker: str) -> str:
     if not re.fullmatch(r'[A-Z0-9_-]{1,150}', ticker):
@@ -78,12 +81,22 @@ class KalshiReader:
 
     async def _get(self, path: str, *, params=None, authenticated=False) -> dict:
         path = '/trade-api/v2' + path
-        headers = self._headers(path) if authenticated else {}
-        # Only GET; requests cannot redirect credentials to another host.
-        response = await self._client.get(path, params=params, headers=headers)
-        if response.status_code != 200:
-            raise RuntimeError(f'Kalshi read failed (HTTP {response.status_code})')
-        return response.json()
+        for attempt in range(len(READ_RETRY_DELAYS)+1):
+            try:
+                # Regenerate signed timestamps on every attempt. Only GET; requests cannot
+                # redirect credentials to another host.
+                headers = self._headers(path) if authenticated else {}
+                response = await self._client.get(path, params=params, headers=headers)
+            except httpx.TransportError:
+                if attempt == len(READ_RETRY_DELAYS):
+                    raise RuntimeError('Kalshi read failed (transport)') from None
+            else:
+                if response.status_code == 200:
+                    return response.json()
+                if response.status_code not in RETRYABLE_READ_STATUS or attempt == len(READ_RETRY_DELAYS):
+                    raise RuntimeError(f'Kalshi read failed (HTTP {response.status_code})')
+            await asyncio.sleep(READ_RETRY_DELAYS[attempt])
+        raise AssertionError('unreachable')
 
     async def check_credentials(self) -> dict:
         data = await self._get('/api_keys', authenticated=True)
