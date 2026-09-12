@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from sportsbet.prop.probability import empirical_outcome_probabilities
+from sportsbet.prop.probability import empirical_outcome_probabilities, outcome_interval_for_side
 
 
 def test_jeffreys_mean_avoids_extreme_finite_sample_forecasts():
@@ -31,3 +31,24 @@ def test_invalid_or_undecided_samples_are_rejected(counts):
 def test_boolean_counts_are_rejected():
     with pytest.raises(TypeError):
         empirical_outcome_probabilities(True, 0, 20)
+
+
+def test_directional_interval_complements_within_non_push_mass():
+    interval = (Decimal("0.20"), Decimal("0.35"))
+    assert outcome_interval_for_side(interval, Decimal("0.10"), "over") == interval
+    assert outcome_interval_for_side(interval, Decimal("0.10"), "under") == (
+        Decimal("0.55"), Decimal("0.70")
+    )
+
+
+@pytest.mark.parametrize(
+    "interval,push,direction",
+    [
+        (None, Decimal("0"), "over"),
+        ((Decimal("0.1"), Decimal("1.1")), Decimal("0"), "over"),
+        ((Decimal("0.1"), Decimal("0.2")), Decimal("NaN"), "over"),
+        ((Decimal("0.1"), Decimal("0.2")), Decimal("0"), "invalid"),
+    ],
+)
+def test_invalid_directional_interval_is_unavailable(interval, push, direction):
+    assert outcome_interval_for_side(interval, push, direction) is None

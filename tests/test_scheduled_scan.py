@@ -48,9 +48,11 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     assert {s['direction'] for s in result['signals']}=={'over','under'}
     assert len(ledger.predictions())==2
     assert all(p['model_version']=='empirical-jeffreys-v3' and p['model_generated_at']==p['captured_at']
+        and p['model_sample_size']==40 and len(p['model_confidence_interval'])==2
         and p['quote_source_provider']=='the_odds_api'
         and len(p['quote_source_sha256'])==len(p['quote_source_record_sha256'])==64
         for p in ledger.predictions())
+    assert {tuple(p['model_confidence_interval']) for p in ledger.predictions()}=={(.55,.65),(.35,.45)}
     assert result['coverage']['counts']['evaluated_selections']==2
     assert result['coverage']['unique_players']==result['coverage']['resolved_players']==1
     assert result['coverage']['model_requests']==2

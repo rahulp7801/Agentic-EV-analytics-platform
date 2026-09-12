@@ -28,7 +28,8 @@ A positive point estimate is insufficient for a recommendation. The LangGraph
 decision node requires the requested side's 95% interval lower bound to exceed
 the quote's break-even win probability after accounting for observed push mass.
 Missing, non-finite, out-of-range, or overlapping bounds return an audited gate
-reason and no signal.
+reason and no signal. Every evaluated selection retains its sample size and
+directional interval in the prediction ledger, including rejected estimates.
 
 For Under, the Over interval `[lo, hi]` is complemented within non-push mass as
 `[1 - push - hi, 1 - push - lo]`. This retains `Over + Under + push = 1` even on

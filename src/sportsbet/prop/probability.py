@@ -9,6 +9,27 @@ _HALF = Decimal("0.5")
 _ONE = Decimal(1)
 
 
+def outcome_interval_for_side(
+    interval: tuple[Decimal, Decimal] | None,
+    push_probability: Decimal,
+    direction: str,
+) -> tuple[Decimal, Decimal] | None:
+    """Return a validated unconditional interval for an Over or Under outcome."""
+    if interval is None or direction not in ("over", "under"):
+        return None
+    if not push_probability.is_finite() or not 0 <= push_probability < 1:
+        return None
+    non_push_probability = _ONE - push_probability
+    lower, upper = interval
+    if not all(value.is_finite() for value in (lower, upper)):
+        return None
+    if not 0 <= lower <= upper <= non_push_probability:
+        return None
+    if direction == "over":
+        return lower, upper
+    return non_push_probability - upper, non_push_probability - lower
+
+
 def empirical_outcome_probabilities(
     successes: int,
     pushes: int,

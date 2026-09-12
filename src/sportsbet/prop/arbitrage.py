@@ -30,6 +30,7 @@ from sportsbet.arbitrage.kelly import fractional_kelly
 from sportsbet.config import settings as _settings
 from sportsbet.graph.models import EVSignal, NBAContextSignals, PropResult
 from sportsbet.graph.state import GraphState
+from sportsbet.prop.probability import outcome_interval_for_side
 
 log = structlog.get_logger()
 
@@ -66,26 +67,6 @@ _PROP_TYPE_ALIAS_MAP: dict[str, str] = {
 _LEAGUE_AVG_DEF_RATING: float = 115.0
 _REST_PENALTY_PP: float = 3.0     # percentage points removed for back-to-back
 _HOME_BOOST_PP: float = 1.5       # percentage points added for home court
-
-
-def _direction_interval(
-    prop_result: PropResult,
-    direction: str,
-) -> tuple[Decimal, Decimal] | None:
-    """Return a validated unconditional interval for the requested side."""
-    interval = prop_result.confidence_interval
-    push_probability = prop_result.push_probability
-    non_push_probability = Decimal("1") - push_probability
-    if interval is None or not 0 <= push_probability < 1:
-        return None
-    lower, upper = interval
-    if not all(value.is_finite() for value in (lower, upper)):
-        return None
-    if not 0 <= lower <= upper <= non_push_probability:
-        return None
-    if direction == "over":
-        return lower, upper
-    return non_push_probability - upper, non_push_probability - lower
 
 
 def _build_prop_trade_plan(
@@ -332,7 +313,9 @@ def make_prop_arbitrage_agent(
             )
             return _NO_SIGNAL
 
-        confidence_interval = _direction_interval(prop_result, direction)
+        confidence_interval = outcome_interval_for_side(
+            prop_result.confidence_interval, push_prob, direction
+        )
         if confidence_interval is None:
             return {**_NO_SIGNAL, "gate_reason": "uncertainty_unavailable"}
         if confidence_interval[0] <= implied_prob:
