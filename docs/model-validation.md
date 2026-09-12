@@ -22,6 +22,22 @@ It has no fitted sports-specific parameter. See
 Brier score and log loss remain the evaluation metrics because they are strictly
 proper scoring rules; see [Gneiting and Raftery (2007)](https://doi.org/10.1198/016214506000001437).
 
+## Signal admission and sizing
+
+A positive point estimate is insufficient for a recommendation. The LangGraph
+decision node requires the requested side's 95% interval lower bound to exceed
+the quote's break-even win probability after accounting for observed push mass.
+Missing, non-finite, out-of-range, or overlapping bounds return an audited gate
+reason and no signal.
+
+For Under, the Over interval `[lo, hi]` is complemented within non-push mass as
+`[1 - push - hi, 1 - push - lo]`. This retains `Over + Under + push = 1` even on
+integer lines. Fractional Kelly sizing uses the admitted side's lower bound,
+conditional on a decided result, rather than the point estimate. The displayed
+expected return continues to use the point estimate and is not a guaranteed
+return. Interval admission is a conservative uncertainty screen; it does not
+establish calibration, independence, market-rule equivalence, fills, or profit.
+
 ## Reproducible research checks
 
 The implementation was rerun through the actual LangGraph nodes against two
