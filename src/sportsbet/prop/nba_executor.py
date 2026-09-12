@@ -252,9 +252,9 @@ async def run_nba_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResu
     NormalDist CDF. Season-aggregate path preserved for unconditional queries.
     """
     # Phase 18 SC-5: route conditional queries to gamelog binary frequency path.
-    # If the conditional query returns 0 rows (e.g. multi-teammate filter eliminates all
-    # historical games), fall back to the season-aggregate path rather than returning
-    # insufficient_sample. This handles the known teammate_out 0-row edge case.
+    # Matchup/availability filters can leave a cohort too small for the downstream
+    # signal gate. Broaden those underpowered cohorts to the same pregame rolling
+    # window instead of returning an estimate that can never be acted on.
     is_conditional = bool(
         params.last_n_games is not None
         or params.teammate_out
@@ -264,16 +264,26 @@ async def run_nba_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResu
     )
     if params.as_of_date is not None or (is_conditional and params.prop_type != "double_double"):
         gamelog_result = await run_nba_gamelog_query(pool, params)
-        if is_conditional and gamelog_result.sample_size == 0 and gamelog_result.data_source == "insufficient_sample":
+        has_narrow_context = bool(
+            params.teammate_out
+            or params.teammate_out_contexts
+            or params.opponent_team is not None
+            or params.home_away is not None
+        )
+        if (
+            has_narrow_context
+            and (gamelog_result.sample_size or 0) < MIN_SAMPLE_GAMES
+        ):
             log.info(
-                "nba_gamelog_fallback_to_season_aggregate",
+                "nba_gamelog_fallback_to_rolling_history",
                 prop_type=params.prop_type,
                 player_id=params.player_id,
-                reason="conditional_filter_returned_zero_rows",
+                filtered_sample_size=gamelog_result.sample_size,
+                reason="conditional_filter_underpowered",
             )
-            # Strip conditional fields so NBAQueryBuilder routes to season-aggregate path
+            # Keep last_n_games and as_of_date so the fallback remains recent and
+            # leakage-safe. Only the sparse matchup/availability filters are removed.
             params = params.model_copy(update={
-                "last_n_games": None,
                 "teammate_out": None,
                 "teammate_out_contexts": None,
                 "opponent_team": None,
