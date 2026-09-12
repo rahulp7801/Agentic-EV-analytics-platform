@@ -291,6 +291,12 @@ the backward-compatible union and may overlap `observed_games`. `quoted_games`
 counts observed events with at least one retained quote, while omitted markets and
 the configured game/sample bounds remain separate incomplete-coverage signals.
 
+Kalshi public reads retry only transport failures and HTTP 429/500/502/503/504,
+at most twice with 250 ms then 500 ms backoff. Permanent 4xx responses fail on the
+first attempt, redirects remain disabled, and authenticated retries generate a
+fresh timestamp/signature. Kalshi documents exponential backoff for 429 responses
+because it does not return `Retry-After`: https://docs.kalshi.com/getting_started/rate_limits
+
 Automatic cross-venue contract mapping, sportsbook account limits, exact fee
 reconciliation, PrizePicks entry ingestion, joint calibration, and fill simulation
 remain prerequisites for executable recommendations. Quoted size is not a fill.
