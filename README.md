@@ -60,6 +60,7 @@ The public website only reads results. It cannot start scans or spend provider c
 - Fractional Kelly uses the actual price. Exposure reservations are durable, atomic, and capped across rescans; recommendations are not executed bets.
 - Every successfully evaluated selection is audited, including rejected estimates. Missing samples, expired quotes, started events, and risk gates cannot recommend stakes.
 - ROI, hit rate, Brier score, log loss, calibration bins and CLV use explicit denominators and real settlements. No result is inferred from missing data. Pending, push and void outcomes are distinct.
+- Daily grading requires an exact final ESPN team/date match and exactly one player-ID/stat match. It records the actual value, source reference and observation time before refreshing metrics. Missing players, DNPs, ambiguous rows and nonfinal games stay pending. This is observed-stat backtest grading; it does not confirm a sportsbook account settlement or cross-venue rule equivalence.
 - Brier reports include fixed 0%, 50%, and 100% probability benchmarks plus the positive-outcome count on exactly the model-scored cohort. These expose class imbalance without fitting a reference to held-out labels. In unpriced Over-threshold checks, 0% means always Under and 100% means always Over. No scored forecasts means unavailable benchmarks, not zero error.
 - Generic NFL play-success probability cannot be substituted for game-win probability. Experimental pace/rest/kinematic adjustments default off.
 
@@ -72,7 +73,7 @@ uv run python -m sportsbet.ledger --recommendations-only
 uv run python -m sportsbet.ledger --model-version empirical-v2
 ```
 
-`outcomes.json` maps prediction IDs to `true`, `false`, `"push"`, `"void"`, or `null`. Hosted metrics snapshots refresh on the next successful worker run.
+`outcomes.json` maps prediction IDs to `true`, `false`, `"push"`, `"void"`, or `null`. Manual settlements retain caller provenance. Hosted metrics snapshots refresh on the next successful daily or scan worker run.
 Reports retain the earliest eligible prediction per selection within the chosen
 cohort. Audit timestamps require explicit timezones; conflicting retries cannot
 replace recorded predictions. ROI is hypothetical recorded-stake replay, not
@@ -231,8 +232,8 @@ ties and applies only to the shown rows; it is not a model performance metric.
 Hosted schedules come from worker-published ESPN snapshots, refreshed by daily
 and monitor operations. Missing, failed, wrong-date or older-than90-minute
 snapshots return unavailable status. The browser does not rely on Vercel reaching
-the upstream schedule service. NBA history refresh currently times out from
-GitHub; that league's prop evaluation stays blocked until refreshed successfully.
+the upstream schedule service. Hosted NBA and NFL refreshes have completed, but
+each current run still fails closed if its league refresh is unavailable.
 
 Free historical outcomes can be collected and used to verify the actual graph:
 
@@ -250,4 +251,4 @@ has replayed exactly against production. Full sportsbook collection still needs
 verified Odds-key rotation, a suitable quota, and measured slate coverage; the
 GitHub scheduler has not demonstrated reliable30-minute cadence.
 
-Automatic settlement, robust historical injury/roster context, NFL game-log presentation, full-slate refresh coverage, and out-of-sample calibration/profitability remain unfinished. A green deployment or unit test is not evidence of model accuracy. Maintain current findings and constraints in `CLAUDE.md`.
+Multi-day settlement catch-up, venue-specific settlement equivalence, robust historical injury/roster context, NFL game-log presentation, full-slate refresh coverage, and out-of-sample calibration/profitability remain unfinished. A green deployment or unit test is not evidence of model accuracy. Maintain current findings and constraints in `CLAUDE.md`.
