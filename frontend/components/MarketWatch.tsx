@@ -1,13 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { Sport } from '@/lib/types';
+import {marketCoverageText, type MarketCoverage} from '@/lib/marketCoverage';
 
 interface Observation {
   captured_at: string;
   scope: string;
   sources: Record<string,{status:string;count:number;partial_coverage:boolean;
-    coverage?:{discovery_complete:boolean;discovered_games:number;attempted_games:number;observed_games:number;quoted_games:number;failed_games:number;omitted_markets:number;
-      prop_discovery_complete?:boolean;prop_series_observed?:number;prop_series_expected?:number;prop_open_markets?:number;prop_open_events?:number;prop_linked_markets?:number;prop_linked_events?:number;prop_structured_quote_markets?:number;prop_two_sided_quote_markets?:number;prop_player_resolved_quote_markets?:number}}>;
+    coverage?:(MarketCoverage & {discovery_complete:boolean;omitted_markets:number;
+      prop_discovery_complete?:boolean;prop_series_observed?:number;prop_series_expected?:number;prop_open_markets?:number;prop_open_events?:number;prop_linked_markets?:number;prop_linked_events?:number;prop_structured_quote_markets?:number;prop_two_sided_quote_markets?:number;prop_player_resolved_quote_markets?:number})}>;
   comparisons: {identity:string;kind:string;title:string;gross_cost:string;gross_gap_to_one_dollar:string;
     reasons:string[];legs:{book:string;team:string;cost:string;observed_at:string}[];
     exchange_fee_scenarios?:{combined_cost:{direct:string;non_direct:string};scope:string; schedule_effective_date:string};
@@ -45,8 +46,7 @@ export default function MarketWatch({sport}:{sport:Sport}) {
       <p>Collection finished {new Date(data.captured_at).toLocaleString()}. Quote freshness is shown for each comparison.</p>
       <ul>{Object.entries(data.sources).map(([name,source])=><li key={name}>
         {name}: {source.status} · {source.count} source records{source.partial_coverage ? ' · partial coverage' : ''}
-        {source.coverage && <span> · {source.coverage.observed_games}/{source.coverage.discovered_games} discovered games inspected,
-          {' '}{source.coverage.quoted_games} with quotes, {source.coverage.failed_games} with collection failures
+        {source.coverage && <span> · {marketCoverageText(source.coverage)}
           {!source.coverage.discovery_complete && ' · discovery incomplete'}
           {source.coverage.omitted_markets>0 && ` · ${source.coverage.omitted_markets} markets omitted`}</span>}
         {source.coverage?.prop_series_expected !== undefined && <span>
