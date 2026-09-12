@@ -32,7 +32,6 @@ from sportsbet.graph.graph import create_graph
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
-from sportsbet.ingestion.free_odds import ESPNPropsPoller
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_quotes
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.config import settings
@@ -252,20 +251,7 @@ async def fetch_all_snapshots(sport: str = "nba") -> list[PlayerPropSnapshotCrea
     snapshots = await _fetch_odds_api_snapshots(sport)
     if snapshots:
         return snapshots
-    print("  Odds API returned 0 props; trying ESPN.", flush=True)
-    try:
-        async with ESPNPropsPoller() as espn:
-            raw_events = await espn.fetch_player_props(sport)
-        if raw_events:
-            snapshots = _normalize_raw_events(raw_events, sport)
-            print(f"  ESPN: {len(snapshots)} prop outcomes across {len(raw_events)} events")
-            return snapshots
-        print("  ESPN: 0 props returned.")
-    except Exception as exc:
-        print(f"  [!] ESPN props unavailable: {type(exc).__name__}: {exc}")
-
-    # ── All sources exhausted ─────────────────────────────────────────────────
-    print("  [!] All prop sources returned 0 results — slate may not be posted yet.")
+    print("  [!] No priced prop quotes are available; unpriced public projections are excluded.")
     return []
 
 

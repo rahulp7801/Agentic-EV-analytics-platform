@@ -6,7 +6,6 @@ import pytest
 from structlog.testing import capture_logs
 
 from sportsbet.ingestion import balldontlie, sleeper
-from sportsbet.ingestion.free_odds import ESPNPropsPoller
 
 CANARY = 'private-provider-diagnostic-canary'
 
@@ -17,7 +16,7 @@ def failure():
         response=httpx.Response(503, request=request))
 
 
-@pytest.mark.parametrize('provider', ['averages', 'games', 'stats', 'injuries', 'espn'])
+@pytest.mark.parametrize('provider', ['averages', 'games', 'stats', 'injuries'])
 async def test_failed_provider_diagnostics_are_sanitized(monkeypatch, provider):
     client = AsyncMock()
     client.__aenter__.return_value = client
@@ -30,21 +29,9 @@ async def test_failed_provider_diagnostics_are_sanitized(monkeypatch, provider):
         'stats': lambda: balldontlie.fetch_player_game_logs(1, 2025),
         'injuries': lambda: sleeper.fetch_sleeper_team_injuries('nfl', 'KC'),
     }
-    healthy = {'id': 'healthy-event', 'bookmakers': []}
     with capture_logs() as logs:
-        if provider == 'espn':
-            client.get.side_effect = None
-            client.get.return_value = httpx.Response(200,
-                request=httpx.Request('GET', 'https://example.invalid/scoreboard'),
-                json={'events': [{'id': 'failed-event'}, {'id': 'healthy-event'}]})
-            async with ESPNPropsPoller() as poller:
-                monkeypatch.setattr(poller, '_fetch_event_props',
-                    AsyncMock(side_effect=[failure(), healthy]))
-                result = await poller.fetch_player_props('nba')
-            assert result == [healthy]
-        else:
-            result = await calls[provider]()
-            assert result == (None if provider == 'averages' else [])
+        result = await calls[provider]()
+        assert result == (None if provider == 'averages' else [])
     warnings = [row for row in logs if row['log_level'] == 'warning']
     assert len(warnings) == 1
     assert CANARY not in repr(logs)
