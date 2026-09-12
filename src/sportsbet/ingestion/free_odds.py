@@ -316,7 +316,7 @@ class ESPNPropsPoller:
         normalised: list[dict[str, Any]] = []
         for result in event_results:
             if isinstance(result, Exception):
-                log.warning("espn_props_event_error", error=str(result))
+                log.warning("espn_props_event_error", error_type=type(result).__name__)
                 continue
             if result:
                 normalised.append(result)
