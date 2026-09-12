@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {signalMetrics,publicSignals,parlayScenario} from '../lib/signalMetrics.ts';
+import {signalMetrics,publicSignals,publicSignalSnapshots,parlayScenario} from '../lib/signalMetrics.ts';
 const now = Date.parse('2026-09-10T12:00:00Z');
 const quote = {true_prob: .6, american_odds: -110, push_probability: 0,
   direction: 'under', sportsbook: 'draftkings', model_version: 'empirical-jeffreys-v3',
@@ -53,6 +53,25 @@ test('public signals never fill missing fields with plausible market data', () =
     {...publicQuote,true_prob:.9,push_probability:.2}]) {
     assert.deepEqual(publicSignals([changed],now),{signals:[],invalid_signals:1});
   }
+});
+test('public signal snapshots project bounded metadata and strip stored internals',()=>{
+  const snapshot={generated_at:new Date(now).toISOString(),signals:[publicQuote],coverage:{internal:true},
+    games:[{game_id:'game',home_team:'Home',away_team:'Away',date:'20260910',sport:'nfl',secret:'hidden'}]};
+  const result=publicSignalSnapshots([snapshot],now);
+  assert.equal(result.generated_at,snapshot.generated_at);assert.equal(result.signals.length,1);
+  assert.deepEqual(result.games,[{game_id:'game',home_team:'Home',away_team:'Away',date:'20260910',sport:'nfl'}]);
+  assert.equal('coverage' in result,false);assert.equal('secret' in result.games[0],false);
+});
+test('public signal snapshots reject malformed envelopes and bound attacker-controlled text',()=>{
+  const snapshot={generated_at:new Date(now).toISOString(),signals:[publicQuote],games:[]};
+  for(const changed of [{...snapshot,generated_at:'today'},
+    {...snapshot,games:[{game_id:'game',home_team:'Home',away_team:'Away',date:'20260231',sport:'nfl'}]},
+    {...snapshot,games:[{game_id:'game',home_team:'Home',away_team:'Away',date:'20260910',sport:'mlb'}]}]) {
+    assert.throws(()=>publicSignalSnapshots([changed],now));
+  }
+  assert.deepEqual(publicSignals([{...publicQuote,player:'x'.repeat(101)}],now),
+    {signals:[],invalid_signals:1});
+  assert.throws(()=>publicSignals(Array(5001).fill(publicQuote),now));
 });
 test('parlay scenario reports dependence bounds, not an optimized joint forecast', () => {
   const s=parlayScenario([.6,.6],3);
