@@ -15,13 +15,29 @@ interface Observation {
     depth_fee_scenarios?:{cases:{contracts_per_kalshi_leg:number;combined_cost:{direct:string;non_direct:string}}[];scope:string}}[];
 }
 
+interface PropFunnel {
+  kalshi_quotes:number;kalshi_exact_markets:number;kalshi_paired_sides:number;
+  kalshi_missing_ask_sides:number;kalshi_missing_sportsbook_sides:number;
+  kalshi_observation_skew_sides:number;
+}
+
+interface PropScreen {status:string;coverage:Partial<PropFunnel>}
+
+function hasPropFunnel(value:Partial<PropFunnel>):value is PropFunnel {
+  return ['kalshi_quotes','kalshi_exact_markets','kalshi_paired_sides','kalshi_missing_ask_sides',
+    'kalshi_missing_sportsbook_sides','kalshi_observation_skew_sides'].every(
+      key=>typeof value[key as keyof PropFunnel] === 'number');
+}
+
 export default function MarketWatch({sport}:{sport:Sport}) {
   const [data,setData] = useState<Observation|null>(null);
   const [error,setError] = useState('');
+  const [propScreen,setPropScreen] = useState<PropScreen|null>(null);
+  const [propError,setPropError] = useState('');
   const [now,setNow] = useState(Date.now());
   useEffect(() => {
     const controller = new AbortController();
-    setData(null); setError('');
+    setData(null); setError(''); setPropScreen(null); setPropError('');
     async function load() {
       try {
         const response=await fetch('/api/markets?sport='+sport,{signal:controller.signal,cache:'no-store'});
@@ -32,8 +48,21 @@ export default function MarketWatch({sport}:{sport:Sport}) {
         if (!controller.signal.aborted) {setError(error instanceof Error ? error.message : 'Market observations unavailable.');setNow(Date.now());}
       }
     }
+    async function loadProps() {
+      try {
+        const response=await fetch('/api/prop-screens?sport='+sport,{signal:controller.signal,cache:'no-store'});
+        const body=await response.json();
+        if (!response.ok) throw new Error(body.error || 'Cross-venue prop scan unavailable.');
+        setPropScreen(body);setPropError('');
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setPropScreen(null);setPropError(error instanceof Error ? error.message : 'Cross-venue prop scan unavailable.');
+        }
+      }
+    }
     void load();
-    const timer=setInterval(()=>void load(),30000);
+    void loadProps();
+    const timer=setInterval(()=>{void load();void loadProps();},30000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[sport]);
   return <section style={{padding:16,height:'100%',overflow:'auto'}}>
@@ -58,6 +87,12 @@ export default function MarketWatch({sport}:{sport:Sport}) {
         </span>}
       </li>)}</ul>
       <p>Positive gross gaps are screening leads, not profit. PrizePicks requires a complete entry payout; projection lines alone cannot establish an arbitrage.</p>
+      {propScreen && hasPropFunnel(propScreen.coverage) && <p>
+        Cross-venue prop pairing ({propScreen.status}): {propScreen.coverage.kalshi_exact_markets}/{propScreen.coverage.kalshi_quotes} Kalshi markets matched an exact sportsbook market;{' '}
+        {propScreen.coverage.kalshi_paired_sides}/{2*propScreen.coverage.kalshi_exact_markets} complementary sides were paired. Unpaired sides: {propScreen.coverage.kalshi_missing_ask_sides} missing Kalshi asks,{' '}
+        {propScreen.coverage.kalshi_missing_sportsbook_sides} missing sportsbook sides, {propScreen.coverage.kalshi_observation_skew_sides} outside the 30-second observation window.
+      </p>}
+      {propError && <p>Cross-venue prop scan: {propError}</p>}
       {data.comparisons.length===0 && <p>No comparisons could be built from this capture.</p>}
       {data.comparisons.map(row=>{
         const age=now-Math.min(...row.legs.map(leg=>Date.parse(leg.observed_at)));

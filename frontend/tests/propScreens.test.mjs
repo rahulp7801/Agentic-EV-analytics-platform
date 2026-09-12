@@ -99,3 +99,17 @@ test('stale public screens retain audit counts but expose no candidate', () => {
   assert.equal(result.coverage.kalshi_sportsbook_gaps,0);
   assert.deepEqual(result.comparisons,[]);
 });
+
+test('cross-venue side coverage is complete before it crosses the public boundary', () => {
+  const changed=snapshot();Object.assign(changed.coverage,{kalshi_quotes:3,kalshi_exact_markets:2,
+    kalshi_paired_sides:2,kalshi_missing_ask_sides:1,kalshi_missing_sportsbook_sides:0,
+    kalshi_observation_skew_sides:1});
+  const result=publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z'));
+  assert.equal(result.coverage.kalshi_exact_markets,2);
+  assert.equal(result.coverage.kalshi_missing_ask_sides,1);
+
+  changed.coverage.kalshi_observation_skew_sides=0;
+  assert.throws(()=>publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z')));
+  delete changed.coverage.kalshi_missing_ask_sides;
+  assert.throws(()=>publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z')));
+});

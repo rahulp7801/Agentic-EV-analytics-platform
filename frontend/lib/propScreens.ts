@@ -35,6 +35,20 @@ function american(value: unknown): number {
   return value;
 }
 
+function sideFunnel(coverage: JsonRecord) {
+  const keys=['kalshi_quotes','kalshi_exact_markets','kalshi_paired_sides',
+    'kalshi_missing_ask_sides','kalshi_missing_sportsbook_sides','kalshi_observation_skew_sides'];
+  const present=keys.filter(key=>coverage[key] !== undefined);
+  if (present.length === 0) return undefined;
+  if (present.length !== keys.length) throw new Error('Invalid prop screen');
+  const result=Object.fromEntries(keys.map(key=>[key,count(coverage[key])])) as Record<string,number>;
+  if (result.kalshi_exact_markets > result.kalshi_quotes
+      || 2*result.kalshi_exact_markets !== result.kalshi_paired_sides
+        +result.kalshi_missing_ask_sides+result.kalshi_missing_sportsbook_sides
+        +result.kalshi_observation_skew_sides) throw new Error('Invalid prop screen');
+  return result;
+}
+
 function leg(value: unknown) {
   const item=record(value);
   if (item.venue === 'kalshi') return {
@@ -102,6 +116,7 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
   const events=count(coverage.events), observed=count(coverage.observed_events);
   const unavailable=count(coverage.unavailable_events), positive=count(coverage.positive_gross_gaps);
   const sportsbook=count(coverage.sportsbook_gaps), kalshi=count(coverage.kalshi_sportsbook_gaps);
+  const funnel=sideFunnel(coverage);
   const suppliedRuleCount=coverage.kalshi_rule_terms_classified === undefined ? undefined
     : count(coverage.kalshi_rule_terms_classified);
   const suppliedFeeCounts=coverage.kalshi_fee_modeled === undefined ? undefined : {
@@ -189,7 +204,8 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
       kalshi_direct_cost_below_one:freshModeled.filter(item =>
         Number(item.modeled_fee_costs?.direct.combined_cost)<1).length,
       kalshi_non_direct_cost_below_one:freshModeled.filter(item =>
-        Number(item.modeled_fee_costs?.non_direct.combined_cost)<1).length},
+        Number(item.modeled_fee_costs?.non_direct.combined_cost)<1).length,
+      ...(funnel ?? {})},
     comparisons:fresh,
     execution_ready:false,
   };
