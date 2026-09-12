@@ -45,7 +45,9 @@ test('public prop screen validates and exposes only compact hypothetical fee cos
   const result=publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z'));
   assert.deepEqual(result.comparisons[0].modeled_fee_costs,{
     direct:{kalshi_exchange_fee:'0.0174',combined_cost:'0.8674'},
-    non_direct:{kalshi_exchange_fee:'0.02',combined_cost:'0.87'},scope:'Hypothetical fee scenario.'});
+    non_direct:{kalshi_exchange_fee:'0.02',combined_cost:'0.87'},
+    scope:'Hypothetical one-contract Kalshi fee scenario. Sportsbook limits, funding charges and actual fills are not included.'});
+  assert.equal('displayed_size' in result.comparisons[0].legs[0],false);
   assert.equal('exchange_fee_scenarios' in result.comparisons[0],false);
   assert.equal(result.coverage.kalshi_fee_modeled,1);
   assert.equal(result.coverage.kalshi_direct_cost_below_one,1);
@@ -112,4 +114,17 @@ test('cross-venue side coverage is complete before it crosses the public boundar
   assert.throws(()=>publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z')));
   delete changed.coverage.kalshi_missing_ask_sides;
   assert.throws(()=>publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z')));
+});
+
+test('public prop screens bound stored collections and text',()=>{
+  const now=Date.parse('2026-09-11T12:01:00Z');
+  for(const change of [value=>{value.comparisons[0].player='x'.repeat(101);},
+    value=>{value.comparisons[0].reasons.push('a','b','c','d');},
+    value=>{value.comparisons[0].event_id='bad\nvalue';},
+    value=>{value.comparisons[0].line='10000.5';}]) {
+    const value=snapshot();change(value);assert.throws(()=>publicPropScreen(value,now));
+  }
+  const oversized=snapshot();oversized.comparisons=Array(201).fill(oversized.comparisons[0]);
+  oversized.coverage.positive_gross_gaps=201;oversized.coverage.kalshi_sportsbook_gaps=201;
+  assert.throws(()=>publicPropScreen(oversized,now));
 });
