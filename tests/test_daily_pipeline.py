@@ -103,7 +103,7 @@ async def test_daily_settles_observed_stats_before_scanning_new_props(monkeypatc
     assert result['status']=='complete' and calls.index(('settle','nba'))<calls.index(('scan','nba'))
     assert stored['metrics:all']['cohort']=='all_predictions'
     assert stored['metrics:recommendations']['cohort']=='recommendations'
-    assert stored['metrics:all']['model_version']==stored['metrics:recommendations']['model_version']=='empirical-jeffreys-v3'
+    assert stored['metrics:all']['model_version']==stored['metrics:recommendations']['model_version']=='empirical-jeffreys-v4'
 
 
 @pytest.mark.asyncio

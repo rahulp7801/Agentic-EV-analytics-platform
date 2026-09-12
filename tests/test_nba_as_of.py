@@ -77,6 +77,31 @@ async def test_empty_matchup_falls_back_to_pre_game_logs_not_season_totals():
     assert "opponent_team =" not in conn.fetchrow.call_args_list[-1].args[0]
 
 
+async def test_underpowered_matchup_falls_back_to_same_rolling_window():
+    conn = AsyncMock()
+    conn.fetchrow.side_effect = [
+        {"total": 5, "successes": 3, "pushes": 0, "mean_val": 22},
+        {"total": 40, "successes": 22, "pushes": 1, "mean_val": 21},
+    ]
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    result = await run_nba_prop_query(
+        pool,
+        params(opponent_team="LAL", home_away="home", last_n_games=40),
+    )
+
+    assert result.sample_size == 40
+    assert result.data_source == "pregame_fallback"
+    fallback_sql, *fallback_args = conn.fetchrow.call_args_list[-1].args
+    assert "opponent_team =" not in fallback_sql
+    assert "is_home =" not in fallback_sql
+    assert "LIMIT" in fallback_sql
+    assert 40 in fallback_args
+    assert date(2026, 1, 10) in fallback_args
+
+
 async def test_agent_forwards_prediction_date():
     run = AsyncMock(return_value=PropResult(data_source="insufficient_sample", sample_size=0))
     with patch("sportsbet.prop.nba_agents.run_nba_prop_query", run):

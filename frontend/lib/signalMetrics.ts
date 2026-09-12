@@ -1,5 +1,7 @@
 import type {EVSignal,PropType,Sport} from './types';
 
+const CURRENT_MODEL_VERSION = 'empirical-jeffreys-v4';
+
 /** Validate display metrics without inventing uncertainty or execution eligibility. */
 export function expectedProfit(expectedReturn: unknown, stake: number): number | null {
   return typeof expectedReturn === 'number' && Number.isFinite(expectedReturn) && Number.isFinite(stake) && stake >= 0
@@ -15,7 +17,7 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
   const sample = Number(s.sample_size), kelly = Number(s.kelly_fraction);
   const valid = typeof s.true_prob === 'number' && typeof s.american_odds === 'number' && Number.isFinite(p) && p >= 0 && p <= 1 && Number.isFinite(push) && push >= 0 && p + push <= 1.000001
     && Number.isInteger(odds) && Math.abs(odds) >= 100 && (s.direction === 'over' || s.direction === 'under');
-  const legacy = s.model_version !== 'empirical-jeffreys-v3';
+  const legacy = s.model_version !== CURRENT_MODEL_VERSION;
   const stale = !Number.isFinite(quoteTime) || now - quoteTime > 300000 || quoteTime > now + 60000;
   const started = !Number.isFinite(start) || start <= now;
   const reason = !valid ? 'invalid_metrics' : legacy ? 'legacy_model' : synthetic ? 'synthetic_price'
