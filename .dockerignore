@@ -1,0 +1,18 @@
+# Default-deny: credentials, Git history, local data and frontend never enter build context.
+**
+!Dockerfile.worker
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!src/sportsbet/
+!src/sportsbet/arbitrage/
+!src/sportsbet/db/
+!src/sportsbet/graph/
+!src/sportsbet/ingestion/
+!src/sportsbet/kinematic/
+!src/sportsbet/prop/
+!src/sportsbet/quant/
+!src/**/*.py
+!certs/
+!certs/supabase-prod-ca-2021.crt

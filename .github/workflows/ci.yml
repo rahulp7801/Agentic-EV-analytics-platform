@@ -99,9 +99,44 @@ jobs:
       - run: uv run --locked pytest tests/test_migrations.py -q
       - run: uv run --locked alembic upgrade head
       - run: uv run --locked pytest tests/test_schema.py tests/test_hosted_storage.py tests/test_worker_postgres.py tests/test_db_access.py -q
+  worker-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify default-deny container context
+        run: |
+          mkdir -p .local/secrets
+          printf 'context-boundary-test' > .env
+          printf 'context-boundary-test' > .local/secrets/context.json
+          printf 'context-boundary-test' > src/sportsbet/context-secret.json
+          printf 'context-boundary-test' > src/sportsbet/context-secret.key
+          docker build --file - --output "type=local,dest=$RUNNER_TEMP/worker-context" . <<'DOCKERFILE'
+          FROM scratch
+          COPY . /
+          DOCKERFILE
+          test ! -e "$RUNNER_TEMP/worker-context/.env"
+          test ! -e "$RUNNER_TEMP/worker-context/.local"
+          test ! -e "$RUNNER_TEMP/worker-context/.git"
+          test ! -e "$RUNNER_TEMP/worker-context/frontend"
+          test ! -e "$RUNNER_TEMP/worker-context/src/sportsbet/context-secret.json"
+          test ! -e "$RUNNER_TEMP/worker-context/src/sportsbet/context-secret.key"
+          test -f "$RUNNER_TEMP/worker-context/src/sportsbet/daily.py"
+          test -f "$RUNNER_TEMP/worker-context/certs/supabase-prod-ca-2021.crt"
+      - name: Build locked worker image
+        run: docker build --file Dockerfile.worker --tag sportsbet-worker:test .
+      - name: Exercise isolated worker and native solver
+        run: |
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --tmpfs /app/.local:rw,nosuid,nodev,uid=10001,gid=10001,size=128m \
+            --volume "$PWD/tests/worker_image_smoke.py:/checks/smoke.py:ro" \
+            sportsbet-worker:test python /checks/smoke.py
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: [secrets, backend, frontend, postgres]
+    needs: [secrets, backend, frontend, postgres, worker-image]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
