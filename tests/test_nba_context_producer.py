@@ -99,6 +99,20 @@ async def test_happy_path_back_to_back():
     assert signals.pace_factor == LEAGUE_AVG_PACE
 
 
+async def test_provider_full_names_are_normalized_for_following_quant_node():
+    pool=make_mock_pool([{'team_abbreviation':'BOS','game_date':date(2025,1,14)}])
+    producer=make_nba_context_signals_producer(pool,target_date=date(2025,1,15))
+    result=await producer(_make_state(home_team='Boston Celtics',away_team='Los Angeles Lakers'))
+    assert result['home_team']=='BOS' and result['away_team']=='LAL'
+    assert result['nba_context_signals'].is_home is True
+
+
+async def test_unknown_provider_team_identity_fails_closed():
+    producer=make_nba_context_signals_producer(make_mock_pool([]),target_date=date(2025,1,15))
+    with pytest.raises(ValueError,match='Unknown NBA team identity'):
+        await producer(_make_state(home_team='Unknown Team'))
+
+
 async def test_cold_db_no_gamelog_rows():
     """Test 2: cold DB — fetchrow returns None (no gamelog rows for player/season).
 

@@ -17,6 +17,7 @@ from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_
 from sportsbet.ledger import Ledger
 from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.nba_agents import make_nba_quant_agent
+from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.quant.vig import american_to_raw_prob
 
@@ -38,7 +39,9 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     game_date=start.astimezone(ZoneInfo('America/New_York')).date()
     season=game_date.year if game_date.month >= (10 if sport=='nba' else 9) else game_date.year-1
     graph=create_graph(nba_quant_node=make_nba_quant_agent(pool),prop_quant_node=make_prop_quant_agent(pool),
-        prop_arbitrage_node=make_prop_arbitrage_agent(sport=sport))
+        prop_arbitrage_node=make_prop_arbitrage_agent(sport=sport),
+        nba_context_producer_node=(make_nba_context_signals_producer(pool,target_date=game_date)
+            if sport=='nba' else None))
     quotes=quotes_from_event(event,sport)
     await write_player_prop_snapshots(pool,quotes)
     export=[]
