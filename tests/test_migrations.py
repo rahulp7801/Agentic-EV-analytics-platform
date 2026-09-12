@@ -112,3 +112,55 @@ def test_prop_table_indexes_exist() -> None:
     )
     # Cleanup
     alembic.command.downgrade(cfg, "base")
+
+
+@pytest.mark.serial
+@pytest.mark.skipif(
+    not os.environ.get("SPORTSBET_TEST_DATABASE_URL"),
+    reason="SPORTSBET_TEST_DATABASE_URL not set",
+)
+def test_new_prop_quote_constraint_preserves_legacy_rows_and_rejects_bad_inserts() -> None:
+    """The unvalidated constraint protects new rows without rewriting legacy evidence."""
+    url = os.environ["SPORTSBET_TEST_DATABASE_URL"]
+    cfg = get_alembic_cfg(url)
+    alembic.command.upgrade(cfg, "0013_nba_stat_provenance")
+    engine = sa.create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(sa.text("""
+            INSERT INTO player_prop_snapshots
+                (sport, player_name, sportsbook, prop_type, implied_probability)
+            VALUES ('nba', 'Legacy Player', 'legacy', 'player_points', 0.5)
+        """))
+    alembic.command.upgrade(cfg, "head")
+    with engine.begin() as conn:
+        validated = conn.execute(sa.text("""
+            SELECT convalidated FROM pg_constraint
+            WHERE conname = 'ck_player_prop_snapshots_complete_quote'
+        """)).scalar_one()
+        assert validated is False
+        assert conn.execute(sa.text(
+            "SELECT COUNT(*) FROM player_prop_snapshots WHERE sportsbook='legacy'"
+        )).scalar_one() == 1
+        conn.execute(sa.text("""
+            INSERT INTO player_prop_snapshots
+                (sport, game_id, player_name, sportsbook, prop_type, line, price,
+                 implied_probability, side, snapped_at, game_start_time)
+            VALUES ('nfl', 'event', 'Player', 'book', 'player_pass_yds', 249.5,
+                    -110, 0.523809, 'Over', '2026-09-12T00:00:00Z',
+                    '2026-09-13T00:00:00Z')
+        """))
+    with pytest.raises(sa.exc.IntegrityError):
+        with engine.begin() as conn:
+            conn.execute(sa.text("""
+                INSERT INTO player_prop_snapshots
+                    (sport, player_name, sportsbook, prop_type, implied_probability)
+                VALUES ('nba', 'New Invalid Player', 'book', 'player_points', 0.5)
+            """))
+    alembic.command.downgrade(cfg, "0013_nba_stat_provenance")
+    with engine.connect() as conn:
+        assert conn.execute(sa.text("""
+            SELECT COUNT(*) FROM pg_constraint
+            WHERE conname = 'ck_player_prop_snapshots_complete_quote'
+        """)).scalar_one() == 0
+    engine.dispose()
+    alembic.command.downgrade(cfg, "base")
