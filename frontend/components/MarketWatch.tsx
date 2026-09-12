@@ -1,14 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { Sport } from '@/lib/types';
-import {marketCoverageText, type MarketCoverage} from '@/lib/marketCoverage';
+import {marketCoverageText,propQuoteCoverageText,type MarketCoverage,type PropQuoteCoverage} from '@/lib/marketCoverage';
 
 interface Observation {
   captured_at: string;
   scope: string;
   sources: Record<string,{status:string;count:number;partial_coverage:boolean;
-    coverage?:(MarketCoverage & {discovery_complete:boolean;omitted_markets:number;
-      prop_discovery_complete?:boolean;prop_series_observed?:number;prop_series_expected?:number;prop_open_markets?:number;prop_open_events?:number;prop_linked_markets?:number;prop_linked_events?:number;prop_structured_quote_markets?:number;prop_two_sided_quote_markets?:number;prop_player_resolved_quote_markets?:number})}>;
+    coverage?:(MarketCoverage & Partial<PropQuoteCoverage> & {discovery_complete:boolean;omitted_markets:number;
+      prop_discovery_complete?:boolean;prop_series_observed?:number;prop_series_expected?:number;prop_open_markets?:number;prop_open_events?:number;prop_linked_markets?:number;prop_linked_events?:number;prop_player_resolved_quote_markets?:number})}>;
   comparisons: {identity:string;kind:string;title:string;gross_cost:string;gross_gap_to_one_dollar:string;
     reasons:string[];legs:{book:string;team:string;cost:string;observed_at:string}[];
     exchange_fee_scenarios?:{combined_cost:{direct:string;non_direct:string};scope:string; schedule_effective_date:string};
@@ -51,7 +51,7 @@ export default function MarketWatch({sport}:{sport:Sport}) {
           {source.coverage.omitted_markets>0 && ` · ${source.coverage.omitted_markets} markets omitted`}</span>}
         {source.coverage?.prop_series_expected !== undefined && <span>
           {' '}· {source.coverage.prop_linked_markets} open player props linked across {source.coverage.prop_linked_events} game/series events
-          {source.coverage.prop_structured_quote_markets !== undefined && ` · ${source.coverage.prop_structured_quote_markets} structured top-of-book quotes (${source.coverage.prop_two_sided_quote_markets} two-sided)`}
+          {source.coverage.prop_structured_quote_markets !== undefined && <> · {propQuoteCoverageText(source.coverage as PropQuoteCoverage)}</>}
           {source.coverage.prop_player_resolved_quote_markets !== undefined && ` · ${source.coverage.prop_player_resolved_quote_markets} player identities resolved`}
           {' '}· {source.coverage.prop_series_observed}/{source.coverage.prop_series_expected} core prop series inventoried
           {!source.coverage.prop_discovery_complete && ' · prop discovery incomplete'}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {marketCoverageText} from '../lib/marketCoverage.ts';
+import {marketCoverageText,propQuoteCoverageText} from '../lib/marketCoverage.ts';
 
 test('stage-specific Kalshi coverage forms two explicit partitions',()=>{
   assert.equal(marketCoverageText({discovered_games:15,attempted_games:15,observed_games:13,
@@ -13,4 +13,18 @@ test('legacy captures keep their original non-partitioned wording',()=>{
   assert.equal(marketCoverageText({discovered_games:15,attempted_games:15,observed_games:13,
     quoted_games:12,failed_games:3}),
   '13/15 discovered games inspected, 12 with quotes, 3 with collection failures');
+});
+
+test('prop quote coverage reports an exact market and ask-side partition',()=>{
+  assert.equal(propQuoteCoverageText({prop_structured_quote_markets:3081,
+    prop_yes_ask_quote_markets:3081,prop_no_ask_quote_markets:2822,
+    prop_two_sided_quote_markets:2822,prop_one_sided_quote_markets:259,
+    prop_unquoted_markets:0}),
+  '3081 structured top-of-book markets · 2822 two-sided (91.6%) · 259 one-sided (3081 YES asks, 2822 NO asks) · 0 without displayed asks');
+});
+
+test('legacy prop captures keep a bounded fallback',()=>{
+  assert.equal(propQuoteCoverageText({prop_structured_quote_markets:3,
+    prop_two_sided_quote_markets:2}),
+  '3 structured top-of-book markets (2 two-sided)');
 });

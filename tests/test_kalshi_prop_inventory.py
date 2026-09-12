@@ -85,7 +85,11 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
         'linked_markets': 3,
         'linked_events': 2,
         'structured_quote_markets': 3,
+        'yes_ask_quote_markets': 3,
+        'no_ask_quote_markets': 3,
         'two_sided_quote_markets': 3,
+        'one_sided_quote_markets': 0,
+        'unquoted_markets': 0,
         'player_resolved_quote_markets': 3,
         'fee_contexts_expected': 2,
         'fee_contexts_observed': 2,
@@ -124,6 +128,19 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
     assert set(result['fee_contexts'])=={passing,rushing}
     assert result['fee_failures']==[]
     assert all(context['event_ticker'] in (passing,rushing) for context in result['fee_contexts'].values())
+
+
+def test_prop_quote_coverage_partitions_market_and_side_availability():
+    quotes=[{'yes_ask':{},'no_ask':{}},{'yes_ask':{},'no_ask':None},
+        {'yes_ask':None,'no_ask':{}},{'yes_ask':None,'no_ask':None}]
+    coverage=market_watch.kalshi_prop_quote_coverage(quotes)
+    assert coverage==dict(structured_quote_markets=4,yes_ask_quote_markets=2,
+        no_ask_quote_markets=2,two_sided_quote_markets=1,one_sided_quote_markets=2,
+        unquoted_markets=1)
+    assert coverage['structured_quote_markets']==sum(coverage[key] for key in (
+        'two_sided_quote_markets','one_sided_quote_markets','unquoted_markets'))
+    assert coverage['yes_ask_quote_markets']+coverage['no_ask_quote_markets']==(
+        2*coverage['two_sided_quote_markets']+coverage['one_sided_quote_markets'])
 
 
 def test_nfl_prop_rule_classifier_preserves_explicit_no_snap_risk():

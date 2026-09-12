@@ -291,6 +291,14 @@ the backward-compatible union and may overlap `observed_games`. `quoted_games`
 counts observed events with at least one retained quote, while omitted markets and
 the configured game/sample bounds remain separate incomplete-coverage signals.
 
+Prop quote availability is also an exact partition. Every normalized structured
+prop is counted as two-sided, one-sided, or without a displayed ask. Separate YES
+and NO ask counts satisfy `yes + no = 2 * two_sided + one_sided`; together these
+explain which complementary cross-venue screens are possible without treating a
+one-sided book as a collection failure. The dashboard derives the two-sided rate
+only when both identities hold. These counts describe one displayed top-of-book
+level and do not establish depth, a fill, contract equivalence, edge, or profit.
+
 Kalshi public reads retry only transport failures and HTTP 429/500/502/503/504,
 at most twice with 250 ms then 500 ms backoff. Permanent 4xx responses fail on the
 first attempt, redirects remain disabled, and authenticated retries generate a
