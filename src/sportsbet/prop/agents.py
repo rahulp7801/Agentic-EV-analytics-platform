@@ -3,11 +3,10 @@
 Delivers the full production path for NFL player prop probability estimation:
 Pydantic gate -> PropQueryBuilder SQL -> finite-sample estimate -> kinematic boost -> PropResult.
 
-Kinematic integration (PROP-04): For receiving props (rec_yds, rec_tds, receptions),
-the agent reads kinematic_result from GraphState and applies a separation-based
-probability boost. When kinematic_result is None for a receiving prop, a WARNING is
-logged — callers must use the PROP-04 two-invocation pattern (kinematic_agent first,
-then prop_quant_agent in the same thread_id) to provide kinematic context.
+Kinematic integration (PROP-04): When experimental probability adjustments are
+enabled, receiving props (rec_yds, rec_tds, receptions) read kinematic_result from
+GraphState and apply a separation-based probability boost. Missing context is a
+warning only in that experimental mode; the default base model does not require it.
 
 Design mirrors make_quant_agent from sportsbet/graph/agents.py:
 - Closure factory binds pool at construction time.
@@ -201,7 +200,11 @@ def make_prop_quant_agent(
 
         # Apply kinematic adjustment — reads kinematic_result from GraphState (Plan 02)
         kinematic_result: Optional[KinematicAnalysis] = state.get("kinematic_result")  # type: ignore[union-attr]
-        if kinematic_result is None and params.prop_type in RECEIVING_PROPS:
+        if (
+            settings.experimental_probability_adjustments
+            and kinematic_result is None
+            and params.prop_type in RECEIVING_PROPS
+        ):
             log.warning(
                 "prop_quant_agent_kinematic_missing",
                 session_id=session_id,

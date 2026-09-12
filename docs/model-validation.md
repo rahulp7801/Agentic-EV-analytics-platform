@@ -77,9 +77,18 @@ used, and no experimental context adjustment was enabled.
 | NFL 2025-09-14 passing yards over 200.5 | 16 | 0.237315 | 0.236471 | 0.668644 | 0.666337 |
 | NBA 2026-01-28 points over 20.5 | 192 | 0.087209 | 0.087149 | 0.434929 | 0.283616 |
 
+Reception support was checked after implementation on two retained archives with
+the unchanged v3 model and a fixed 4.5 threshold:
+
+| Cohort | Candidates | Evaluated | Brier | Log loss | Calibration error | 0% Brier | 50% Brier |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| NFL 2025-09-07 receptions over 4.5 | 205 | 122 | 0.126400 | 0.387913 | 0.097398 | 0.188525 | 0.250000 |
+| NFL 2025-09-14 receptions over 4.5 | 210 | 128 | 0.139957 | 0.435221 | 0.077299 | 0.226562 | 0.250000 |
+
 These are fixed research thresholds, not historical bookmaker lines. The NBA
 cohort is highly imbalanced toward Under, multiple players share games, and both
-datasets were examined while selecting this implementation. They are regression
-evidence rather than fresh holdouts. ROI and CLV are null. Future model changes
+original datasets were examined while selecting this implementation; the reception
+rows were evaluated after adding their ingestion and settlement support. They are
+regression evidence rather than untouched holdouts. ROI and CLV are null. Future model changes
 need forward timestamped priced quotes and later untouched settlements before any
 profitability claim.
