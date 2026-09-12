@@ -37,8 +37,8 @@ async def collect(sport: str, now: datetime | None = None, *, offsets: tuple[int
     if sport not in SPORTS:
         raise ValueError('Unsupported sport')
     if (not offsets or len(set(offsets))!=len(offsets)
-            or any(type(offset) is not int or not -7 <= offset <= 1 for offset in offsets)):
-        raise ValueError('Schedule offsets must be unique integer days from -7 through 1')
+            or any(type(offset) is not int or not -30 <= offset <= 1 for offset in offsets)):
+        raise ValueError('Schedule offsets must be unique integer days from -30 through 1')
     now=now or datetime.now(timezone.utc)
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError('Schedule time requires a timezone')

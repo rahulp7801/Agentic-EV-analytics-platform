@@ -116,6 +116,7 @@ async def test_daily_uses_catchup_evidence_but_publishes_current_schedule_only(m
         'games':[{'label':'2026-09-05'}],'failures':[],'sources':['older']}
     collector=AsyncMock(side_effect=[current,older])
     monkeypatch.setattr(daily,'collect_schedule',collector)
+    monkeypatch.setattr(daily,'pending_schedule_offsets',lambda ledger,sport,now:(-30,-8))
     monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
     monkeypatch.setattr(daily,'refresh_history',lambda *args:{'status':'complete'})
     monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:
@@ -128,7 +129,8 @@ async def test_daily_uses_catchup_evidence_but_publishes_current_schedule_only(m
     assert collector.await_count==2
     current_call,older_call=collector.await_args_list
     assert current_call.args[0]=='nfl' and current_call.args[1] is older_call.args[1]
-    assert current_call.kwargs=={} and older_call.kwargs=={'offsets':tuple(range(-7,-1))}
+    assert current_call.kwargs=={}
+    assert older_call.kwargs=={'offsets':(-30,-8,-7,-6,-5,-4,-3,-2)}
     assert [game['label'] for game in stored['schedule:nfl']['games']]==['Yesterday','Today','Tomorrow']
     assert [game['label'] for game in settled[0]['games']]==['2026-09-05','Yesterday','Today','Tomorrow']
 

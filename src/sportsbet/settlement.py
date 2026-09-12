@@ -7,8 +7,10 @@ from decimal import Decimal
 import hashlib
 import json
 import re
+from zoneinfo import ZoneInfo
 
-from sportsbet.ledger import Ledger, VERIFIED_SETTLEMENT_SOURCE, utc_timestamp
+from sportsbet.ledger import (Ledger, VERIFIED_SETTLEMENT_SOURCE, utc_timestamp,
+    verified_settlement_evidence)
 from sportsbet.ingestion.provenance import STAT_FIELDS, stat_row_sha256
 
 STAT_COLUMNS={
@@ -17,10 +19,37 @@ STAT_COLUMNS={
 }
 AUTO_SOURCE=VERIFIED_SETTLEMENT_SOURCE
 AUTO_SOURCES={AUTO_SOURCE,'espn_final_stats'}
+MAX_CATCHUP_DAYS=30
+MAX_EXTRA_SCHEDULE_DATES=7
 
 
 class StatProvenanceError(ValueError):
     pass
+
+
+def pending_schedule_offsets(ledger: Ledger, sport: str, now: datetime) -> tuple[int, ...]:
+    """Return a bounded oldest-first set of unresolved dates beyond the normal week."""
+    if sport not in STAT_COLUMNS or now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError('Invalid settlement catch-up scope')
+    today=now.astimezone(ZoneInfo('America/New_York')).date()
+    offsets=set()
+    for row in ledger.predictions():
+        if row.get('sport')!=sport or row.get('prop_type') not in STAT_COLUMNS[sport]:
+            continue
+        if row.get('outcome') is not None:
+            if row.get('outcome_source') not in AUTO_SOURCES:
+                continue
+            if row.get('outcome_source')==AUTO_SOURCE and verified_settlement_evidence(
+                    row,row['outcome'],row.get('outcome_source'),row.get('outcome_ref'),
+                    row.get('outcome_observed_at'),row.get('actual_value'),row.get('outcome_evidence')):
+                continue
+        try:
+            offset=(date.fromisoformat(row['game_date'])-today).days
+        except (KeyError,TypeError,ValueError):
+            continue
+        if -MAX_CATCHUP_DAYS <= offset < -7:
+            offsets.add(offset)
+    return tuple(sorted(offsets)[:MAX_EXTRA_SCHEDULE_DATES])
 
 
 def _candidate(prediction: dict, sport: str, games: list[dict]):

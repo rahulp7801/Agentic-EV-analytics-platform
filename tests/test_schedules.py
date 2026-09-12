@@ -43,7 +43,7 @@ async def test_schedule_supports_bounded_seven_day_settlement_catchup(monkeypatc
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('offsets',[(),(-1,-1),(True,),(-8,),(2,)])
+@pytest.mark.parametrize('offsets',[(),(-1,-1),(True,),(-31,),(2,)])
 async def test_schedule_rejects_unbounded_or_ambiguous_lookback(offsets):
     with pytest.raises(ValueError,match='offsets'):
         await schedules.collect('nfl',datetime.now(timezone.utc),offsets=offsets)

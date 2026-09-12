@@ -5,7 +5,7 @@ import pytest
 
 from sportsbet.ledger import Ledger
 from sportsbet.ingestion.provenance import stat_row_sha256
-from sportsbet.settlement import settle_final_props
+from sportsbet.settlement import pending_schedule_offsets, settle_final_props
 
 
 def prediction(ledger, *, direction='over', line=20.5, sport='nba', prop_type='points', player_id='7'):
@@ -184,3 +184,28 @@ def test_settlement_rejects_stat_observation_before_game_or_in_future(tmp_path):
             create_nba_stats(db);add_nba_stat(db,payload,21,observed_at=observed.isoformat())
         report=settle_final_props(ledger,'nba',schedule(payload))
         assert report['settled']==0 and report['reasons']=={'stat_provenance_invalid':1}
+
+
+def test_pending_schedule_catchup_is_bounded_oldest_first(monkeypatch):
+    now=datetime(2026,9,30,16,tzinfo=timezone.utc)
+    rows=[dict(sport='nba',prop_type='points',game_date=f'2026-09-{day:02}',outcome=None)
+        for day in range(1,23)]
+    status_rows=[
+        dict(sport='nba',prop_type='points',game_date='2026-09-10',outcome=True,
+            outcome_source='espn_final_stats'),
+        dict(sport='nba',prop_type='points',game_date='2026-09-11',outcome=True,
+            outcome_source='observed_final_stats'),
+        dict(sport='nba',prop_type='points',game_date='2026-09-12',outcome=True,
+            outcome_source='manual'),
+        dict(sport='nfl',prop_type='pass_yds',game_date='2026-09-01',outcome=None),
+    ]
+    monkeypatch.setattr('sportsbet.settlement.verified_settlement_evidence',
+        lambda *args:args[0].get('game_date')=='2026-09-11')
+    class Audit:
+        def predictions(self): return rows
+    assert pending_schedule_offsets(Audit(),'nba',now)==tuple(range(-29,-22))
+    class StatusAudit:
+        def predictions(self): return status_rows
+    assert pending_schedule_offsets(StatusAudit(),'nba',now)==(-20,)
+    with pytest.raises(ValueError,match='scope'):
+        pending_schedule_offsets(Audit(),'nba',datetime(2026,9,30))

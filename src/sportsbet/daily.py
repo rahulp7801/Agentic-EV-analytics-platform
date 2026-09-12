@@ -16,7 +16,7 @@ from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.refresh import refresh_history
 from sportsbet.scan import run as scan, timestamp
 from sportsbet.schedules import collect as collect_schedule
-from sportsbet.settlement import settle_final_props
+from sportsbet.settlement import pending_schedule_offsets, settle_final_props
 
 MODES=('daily','monitor','public_daily','public_monitor')
 
@@ -46,7 +46,12 @@ def create_daily_graph():
             publish_snapshot('schedule:'+sport,current)
             results[sport]={'status':current['status'],'captured_at':current['captured_at']}
             if catchup:
-                older=await collect_schedule(sport,now,offsets=tuple(range(-7,-1)))
+                try:
+                    extra=pending_schedule_offsets(Ledger(),sport,now)
+                except Exception:
+                    extra=()
+                offsets=tuple(sorted(set(range(-7,-1))|set(extra)))
+                older=await collect_schedule(sport,now,offsets=offsets)
                 combined={**current,'captured_at':older['captured_at'],
                     'games':older.get('games',[])+current.get('games',[]),
                     'failures':older.get('failures',[])+current.get('failures',[]),
