@@ -80,6 +80,14 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
         && bookSides.size === 2 && bookSides.has('Over') && bookSides.has('Under') && new Set(legs.map(leg =>
           leg.venue === 'sportsbook' ? leg.sportsbook : '')).size === 2;
       if (!validKalshi && !validBooks) throw new Error('Invalid prop screen');
+      for (const value of legs) if (value.venue === 'sportsbook') {
+        const odds=value.american_odds;
+        if (odds === undefined) throw new Error('Invalid prop screen');
+        const expected=odds < 0 ? -odds/(100-odds) : 100/(100+odds);
+        if (Math.abs(Number(value.cost)-expected)>1e-12) throw new Error('Invalid prop screen');
+      }
+      if (Math.abs(Date.parse(legs[0].observed_at)-Date.parse(legs[1].observed_at))>30_000)
+        throw new Error('Invalid prop screen');
       const line=decimal(item.line), cost=decimal(item.gross_cost_to_one_dollar,0,1,true);
       const gap=decimal(item.gross_gap_to_one_dollar,0,1,true);
       const allowed=data.sport === 'nfl' ? ['pass_yds','rush_yds','rec_yds','receptions'] : ['points','rebounds','assists'];
@@ -94,12 +102,15 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
   const age=(now-Date.parse(generated))/1000;
   const fresh=0 <= age && age <= 300 ? comparisons.filter(item => item.legs.every(
     leg => 0 <= (now-Date.parse(leg.observed_at))/1000 && (now-Date.parse(leg.observed_at))/1000 <= 300)) : [];
+  const freshSportsbook=fresh.filter(item => item.kind === 'sportsbook_sportsbook_prop').length;
+  const freshKalshi=fresh.length-freshSportsbook;
   return {
     sport:data.sport, generated_at:generated, status:fresh.length || (positive === 0 && age >= 0 && age <= 300)
       ? data.status : 'stale',
     coverage:{events, observed_events:observed, unavailable_events:unavailable,
       captured_positive_gross_gaps:positive, positive_gross_gaps:fresh.length,
-      sportsbook_gaps:sportsbook, kalshi_sportsbook_gaps:kalshi},
+      captured_sportsbook_gaps:sportsbook, captured_kalshi_sportsbook_gaps:kalshi,
+      sportsbook_gaps:freshSportsbook, kalshi_sportsbook_gaps:freshKalshi},
     comparisons:fresh,
     execution_ready:false,
   };

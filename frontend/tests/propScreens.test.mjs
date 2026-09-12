@@ -45,12 +45,18 @@ test('public prop screen rejects profit, settlement, and execution claims', () =
     const changed=snapshot(); changed.comparisons[0][key]=value;
     assert.throws(() => publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z')));
   }
+  const changed=snapshot();changed.comparisons[0].legs[1].cost='0.41';
+  changed.comparisons[0].gross_cost_to_one_dollar='0.86';
+  changed.comparisons[0].gross_gap_to_one_dollar='0.14';
+  assert.throws(() => publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z')));
 });
 
 test('stale public screens retain audit counts but expose no candidate', () => {
   const result=publicPropScreen(snapshot(),Date.parse('2026-09-11T12:06:00Z'));
   assert.equal(result.status,'stale');
   assert.equal(result.coverage.captured_positive_gross_gaps,1);
+  assert.equal(result.coverage.captured_kalshi_sportsbook_gaps,1);
   assert.equal(result.coverage.positive_gross_gaps,0);
+  assert.equal(result.coverage.kalshi_sportsbook_gaps,0);
   assert.deepEqual(result.comparisons,[]);
 });
