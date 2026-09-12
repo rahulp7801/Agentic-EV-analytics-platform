@@ -209,7 +209,8 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
     season = target.year if target.month >= (10 if sport == 'nba' else 9) else target.year-1
     market = 'player_points' if sport == 'nba' else 'player_pass_yds'
     count = 40 if sport == 'nba' else 34
-    event = dict(id=identity, home_team='Home', away_team='Away', commence_time=start.isoformat(),
+    home,away=('Boston Celtics','Los Angeles Lakers') if sport=='nba' else ('Home','Away')
+    event = dict(id=identity, home_team=home, away_team=away, commence_time=start.isoformat(),
         bookmakers=[dict(key='book', last_update=now.isoformat(), markets=[dict(key=market, outcomes=[
             dict(name='Over', description=player, point=20.5, price=100)])])])
     ledger = Ledger(tmp_path / 'audit.sqlite')
@@ -221,8 +222,9 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
                 stat = 30 if i < 24 or i == count else 20
                 if sport == 'nba':
                     await conn.execute('''INSERT INTO nba_player_gamelogs(player_id,player_name,game_id,
-                        game_date,season,points,source_provider,source_sha256,source_record_sha256,
-                        source_observed_at) VALUES($1,$2,$3,$4,$5,$6,'nba',$7,$7,$8)''',
+                        game_date,season,team_abbreviation,opponent_team,is_home,points,source_provider,
+                        source_sha256,source_record_sha256,source_observed_at)
+                        VALUES($1,$2,$3,$4,$5,'BOS','LAL',TRUE,$6,'nba',$7,$7,$8)''',
                         player_id,player,f'{identity}{i:02}',game_date,season-1,stat,'a'*64,now)
                 else:
                     row_season, week = season-2+i//17, i%17+1
@@ -248,6 +250,7 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         if sport == 'nba':
             assert result['signals'][0]['sample_size'] == count
             assert result['signals'][0]['direction'] == 'over'
+            assert predictions[0]['home_team']=='Boston Celtics'
         event['bookmakers'][0]['markets'][0]['outcomes'][0]['point'] = 20
         await evaluate_event(pool,event,sport,ledger,identity+'integer')
         integer = next(p for p in ledger.predictions() if p['line'] == 20)
