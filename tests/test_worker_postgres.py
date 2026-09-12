@@ -14,7 +14,7 @@ from unittest.mock import patch
 from sportsbet.ingestion.upsert import upsert_rows
 from sportsbet.ingestion.provenance import stat_row_sha256
 from sportsbet.ledger import Ledger
-from sportsbet.scan import evaluate_event
+from sportsbet.scan import evaluate_event, quotes_from_event
 from sportsbet.settlement import settle_final_props
 
 pytestmark = pytest.mark.skipif(
