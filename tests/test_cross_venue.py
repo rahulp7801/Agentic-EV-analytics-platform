@@ -77,6 +77,8 @@ def test_exact_complementary_quotes_emit_only_an_unverified_gross_screen():
     row, = result['comparisons']
     assert result['status'] == 'observed'
     assert result['coverage']['exact_markets'] == 1
+    assert result['coverage']['side_funnel'] == {'paired':1,'missing_kalshi_ask':0,
+        'missing_sportsbook_side':1,'observation_skew':0}
     assert row['legs'][0]['side'] == 'yes' and row['legs'][1]['side'] == 'Under'
     assert row['gross_cost_to_one_dollar'] == '0.85'
     assert row['gross_gap_to_one_dollar'] == '0.15'
@@ -165,7 +167,24 @@ def test_player_identity_strike_freshness_and_skew_are_never_fuzzy_matched():
     skewed = screen(event(), 'nfl', [book(observed=NOW+timedelta(seconds=31))], handoff(),
         NOW+timedelta(seconds=31))
     assert skewed['comparisons'] == []
-    assert skewed['coverage']['rejected']['observation_skew_or_missing_side'] == 2
+    assert skewed['coverage']['side_funnel'] == {'paired':0,'missing_kalshi_ask':0,
+        'missing_sportsbook_side':1,'observation_skew':1}
+
+
+def test_each_exact_market_side_has_one_quote_pairing_outcome():
+    changed=handoff();changed['evidence']['quotes'][0]['no_ask']=None
+    missing_ask=screen(event(),'nfl',[book()],rehash(changed),NOW)['coverage']
+    assert missing_ask['side_funnel']=={'paired':1,'missing_kalshi_ask':1,
+        'missing_sportsbook_side':0,'observation_skew':0}
+    assert 2*missing_ask['exact_markets']==sum(missing_ask['side_funnel'].values())
+
+    both_sides=[book('Under',observed=NOW+timedelta(seconds=31)),
+        book('Over',observed=NOW+timedelta(seconds=31))]
+    skewed=screen(event(),'nfl',both_sides,handoff(),NOW+timedelta(seconds=31))['coverage']
+    assert skewed['side_funnel']=={'paired':0,'missing_kalshi_ask':0,
+        'missing_sportsbook_side':0,'observation_skew':2}
+    assert skewed['price_pairs']==0
+    assert 2*skewed['exact_markets']==sum(skewed['side_funnel'].values())
 
 
 def test_malformed_target_or_quote_blocks_the_entire_screen():
