@@ -50,6 +50,14 @@ Unexpected worker fields are omitted. Invalid records are excluded and counted a
 market, direction, venue, price, probability, line, or stake. PrizePicks projections
 cannot enter this priced-signal response until a complete entry payout is captured.
 
+## NBA matchup identity
+
+The NBA LangGraph context node assigns home/away, opponent and rest context only
+when the player's latest gamelog team is one of the two canonical teams in the
+scheduled event. A missing player ID, missing prior gamelog, or third-team record
+returns no matchup context. The as-of base model can still evaluate available
+player history, but it receives no invented venue or opponent filter.
+
 ## Reproducible research checks
 
 The implementation was rerun through the actual LangGraph nodes against two

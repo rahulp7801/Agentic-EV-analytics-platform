@@ -5,12 +5,11 @@ callable compatible with the LangGraph node interface. The returned node reads
 nba_player_gamelogs to compute rest_days and home/away, then writes
 NBAContextSignals into GraphState before make_nba_quant_agent runs.
 
-Purpose: INT-3 gap closure. nba_context_signals is always None in automated
-runs because no pipeline node sets it. The four-stage adjustment in
-_apply_nba_context_adjustments (pace, def_rating, rest, home) is fully
-implemented but receives context=None and returns immediately. This producer
-feeds it game-log context. Defense and pace remain neutral constants until
-actual point-in-time team metrics are available.
+The scheduled scanner wires this node before the NBA quant agent. Matchup context
+is emitted only when the player's latest pregame team belongs to the scheduled
+event. Missing or conflicting identity produces no context, so the quant agent
+cannot invent the player's side or opponent. Defense and pace remain neutral
+constants until actual point-in-time team metrics are available.
 
 Design decisions (Phase 20 locked):
 - Module-level imports for patchability (Phase 8 pattern)
@@ -20,8 +19,7 @@ Design decisions (Phase 20 locked):
 - player_id_raw cast to int() before asyncpg query — prevents DataError on INTEGER column
 - rest_days formula: max(0, (today - last_game_date).days - 1)
   Yesterday (1 day ago) = 0 rest days (back-to-back)
-- opponent_def_rating = LEAGUE_AVG_DEF_RATING * (avg_pts / LEAGUE_AVG_PTS_PER_PLAYER)
-  clamped to [90, 140], wrapped as Decimal
+- opponent_def_rating = LEAGUE_AVG_DEF_RATING until timestamped team defense is available
 - pace_factor = LEAGUE_AVG_PACE (neutral; no possession data in v1 schema)
 
 SQL queries:
@@ -72,28 +70,6 @@ _SQL_LAST_GAME = """
 """
 
 # ---------------------------------------------------------------------------
-# League-average fallback
-# ---------------------------------------------------------------------------
-
-
-def _league_avg_signals(is_home: bool = False) -> dict[str, Any]:
-    """Return NBAContextSignals with league-average defaults.
-
-    Used when:
-    - player_id is empty/invalid (no DB query)
-    - No gamelog rows found for player/season (cold DB)
-    """
-    return {
-        "nba_context_signals": NBAContextSignals(
-            opponent_def_rating=LEAGUE_AVG_DEF_RATING,
-            pace_factor=LEAGUE_AVG_PACE,
-            rest_days=1,
-            is_home=is_home,
-        )
-    }
-
-
-# ---------------------------------------------------------------------------
 # Public factory
 # ---------------------------------------------------------------------------
 
@@ -141,7 +117,7 @@ def make_nba_context_signals_producer(
         player_id_raw: str = state.get("receiver_gsis_id", "")
         if not player_id_raw:
             log.debug("nba_context_producer_empty_player_id")
-            return _league_avg_signals(is_home=False) | normalized_teams
+            return {"nba_context_signals": None} | normalized_teams
 
         try:
             player_id: int = int(player_id_raw)
@@ -165,10 +141,15 @@ def make_nba_context_signals_producer(
                     player_id=player_id,
                     season=season,
                 )
-                return _league_avg_signals(is_home=False) | normalized_teams
+                return {"nba_context_signals": None} | normalized_teams
 
             team_abbr: str = gamelog_row["team_abbreviation"]
             last_game_date: date_cls = gamelog_row["game_date"]
+
+            if team_abbr not in (home_team,away_team):
+                log.warning("nba_context_producer_team_not_in_event",player_id=player_id,
+                    team_abbr=team_abbr)
+                return {"nba_context_signals": None} | normalized_teams
 
             # 2b. Compute rest_days: max(0, days_since - 1)
             # Yesterday = 1 day since game = 0 rest days (back-to-back)
