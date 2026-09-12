@@ -95,6 +95,14 @@ def verified_settlement_evidence(payload: dict, outcome, source, source_ref,
                 or not re.fullmatch('[0-9a-f]{64}', proof.get('stat_source_sha256', ''))
                 or not re.fullmatch('[0-9a-f]{64}', proof.get('stat_record_sha256', ''))):
             return False
+        identity_version=proof.get('schedule_identity_version',1)
+        if identity_version not in (1,2):
+            return False
+        if identity_version==2:
+            from sportsbet.schedules import scheduled_stat_teams
+            team_field='team_abbreviation' if sport=='nba' else 'team'
+            if row.get(team_field) not in scheduled_stat_teams(sport,proof):
+                return False
         from sportsbet.ingestion.provenance import stat_row_sha256
         if stat_row_sha256(sport, row) != proof['stat_record_sha256']:
             return False

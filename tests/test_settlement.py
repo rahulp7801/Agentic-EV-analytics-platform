@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 
 import pytest
@@ -18,10 +18,10 @@ def prediction(ledger, *, direction='over', line=20.5, sport='nba', prop_type='p
     return ledger.record('scan',payload),payload
 
 
-def schedule(payload, *, completed=True, home='Home'):
+def schedule(payload, *, completed=True, home='Home', home_abbr='HOM', away_abbr='AWY'):
     return dict(status='complete',captured_at=datetime.now(timezone.utc).isoformat(),
         games=[dict(provider_event_id='espn-event',date=payload['game_date'],
-        home_name=home,away_name='Away',completed=completed,
+        home_name=home,away_name='Away',home_abbr=home_abbr,away_abbr=away_abbr,completed=completed,
         game_time=payload['game_start_time'])])
 
 
@@ -32,9 +32,9 @@ def create_nba_stats(db):
         source_record_sha256 TEXT, source_observed_at TEXT)''')
 
 
-def add_nba_stat(db,payload,points,*,game_id='stat-game',provider='nba',record_hash=None,observed_at=None):
+def add_nba_stat(db,payload,points,*,game_id='stat-game',team='HOM',provider='nba',record_hash=None,observed_at=None):
     row=dict(player_id=int(payload['player_id']),game_id=game_id,game_date=payload['game_date'],
-        team_abbreviation='H',points=points,rebounds=5,assists=4)
+        team_abbreviation=team,points=points,rebounds=5,assists=4)
     digest=record_hash if record_hash is not None else stat_row_sha256('nba',row)
     db.execute('INSERT INTO nba_player_gamelogs VALUES (?,?,?,?,?,?,?,?,?,?,?)',(
         *row.values(),provider,'a'*64,digest,observed_at or datetime.now(timezone.utc).isoformat()))
@@ -57,6 +57,8 @@ def test_settlement_uses_final_exact_game_and_observed_stat(tmp_path,direction,l
     assert row['outcome_ref'].startswith('espn_schedule+nba:espn-event:sha256:')
     assert datetime.fromisoformat(row['outcome_observed_at']).utcoffset() is not None
     assert row['outcome_evidence']['actual_value']==str(actual)
+    assert row['outcome_evidence']['schedule_identity_version']==2
+    assert (row['outcome_evidence']['home_abbr'],row['outcome_evidence']['away_abbr'])==('HOM','AWY')
     metrics=ledger.report()
     assert metrics['settled_count']==1 and metrics['unverified_settlements']==0
 
@@ -115,7 +117,7 @@ def test_automatic_correction_only_rechecks_dates_in_supplied_evidence(tmp_path)
     ledger.settle({key:True},source='espn_final_stats',source_ref='legacy')
     with ledger.connect() as db:
         corrected=dict(player_id=7,game_id='stat-game',game_date=payload['game_date'],
-            team_abbreviation='H',points=20,rebounds=5,assists=4)
+            team_abbreviation='HOM',points=20,rebounds=5,assists=4)
         db.execute('UPDATE nba_player_gamelogs SET points=20,source_record_sha256=? WHERE player_id=7',
             (stat_row_sha256('nba',corrected),))
     outside={**schedule(payload),'games':[]}
@@ -124,6 +126,28 @@ def test_automatic_correction_only_rechecks_dates_in_supplied_evidence(tmp_path)
     report=settle_final_props(ledger,'nba',schedule(payload))
     assert report['candidates']==1 and report['settled']==1
     assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is False
+
+
+def test_settlement_only_counts_dates_present_in_supplied_schedule(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite');_,payload=prediction(ledger)
+    outside=payload | {'game_id':'older-odds-event',
+        'game_date':(date.fromisoformat(payload['game_date'])-timedelta(days=1)).isoformat()}
+    ledger.record('older-scan',outside)
+    with ledger.connect() as db:
+        create_nba_stats(db)
+    report=settle_final_props(ledger,'nba',schedule(payload))
+    assert report['candidates']==1 and report['pending']==1
+    assert report['reasons']=={'stat_not_found_or_ambiguous':1}
+    assert all(row['outcome'] is None for row in ledger.predictions())
+
+
+def test_settlement_cannot_use_player_stat_from_another_same_day_game(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite');_,payload=prediction(ledger)
+    with ledger.connect() as db:
+        create_nba_stats(db);add_nba_stat(db,payload,99,team='OTH')
+    report=settle_final_props(ledger,'nba',schedule(payload))
+    assert report['settled']==0 and report['pending']==1
+    assert report['reasons']=={'stat_not_found_or_ambiguous':1}
 
 
 def test_nfl_settlement_joins_exact_player_week_team_and_game_date(tmp_path):
@@ -135,13 +159,13 @@ def test_nfl_settlement_joins_exact_player_week_team_and_game_date(tmp_path):
             source_provider TEXT, source_sha256 TEXT, source_record_sha256 TEXT,
             source_observed_at TEXT)''')
         db.execute('CREATE TABLE games (season INTEGER, week INTEGER, home_team TEXT, away_team TEXT, game_date TEXT)')
-        row=dict(player_id='gsis-7',season=2026,week=1,team='H',passing_yards=251,
+        row=dict(player_id='gsis-7',season=2026,week=1,team='LA',passing_yards=251,
             rushing_yards=0,receiving_yards=0,receptions=0)
         db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',(
             *row.values(),'nflverse','b'*64,stat_row_sha256('nfl',row,legacy_nfl=True),
             datetime.now(timezone.utc).isoformat()))
-        db.execute("INSERT INTO games VALUES (2026,1,'H','A',?)",(payload['game_date'],))
-    report=settle_final_props(ledger,'nfl',schedule(payload))
+        db.execute("INSERT INTO games VALUES (2026,1,'LA','SEA',?)",(payload['game_date'],))
+    report=settle_final_props(ledger,'nfl',schedule(payload,home_abbr='LAR',away_abbr='SEA'))
     row=next(item for item in ledger.predictions() if item['prediction_id']==key)
     assert report['settled']==1 and row['outcome'] is True and row['actual_value']==251
     assert ledger.report()['unverified_settlements']==0
@@ -157,11 +181,11 @@ def test_nfl_settlement_preserves_negative_rushing_yards(tmp_path):
             source_provider TEXT, source_sha256 TEXT, source_record_sha256 TEXT,
             source_observed_at TEXT)''')
         db.execute('CREATE TABLE games (season INTEGER, week INTEGER, home_team TEXT, away_team TEXT, game_date TEXT)')
-        row=dict(player_id='gsis-7',season=2026,week=1,team='H',passing_yards=0,
+        row=dict(player_id='gsis-7',season=2026,week=1,team='HOM',passing_yards=0,
             rushing_yards=-2,receiving_yards=0,receptions=0)
         db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',(
             *row.values(),'nflverse','b'*64,stat_row_sha256('nfl',row),datetime.now(timezone.utc).isoformat()))
-        db.execute("INSERT INTO games VALUES (2026,1,'H','A',?)",(payload['game_date'],))
+        db.execute("INSERT INTO games VALUES (2026,1,'HOM','AWY',?)",(payload['game_date'],))
     report=settle_final_props(ledger,'nfl',schedule(payload))
     settled=next(item for item in ledger.predictions() if item['prediction_id']==key)
     assert report['settled']==1 and settled['outcome'] is True and settled['actual_value']==-2
@@ -177,12 +201,12 @@ def test_nfl_reception_settlement_requires_reception_committed_provenance(tmp_pa
             source_provider TEXT, source_sha256 TEXT, source_record_sha256 TEXT,
             source_observed_at TEXT)''')
         db.execute('CREATE TABLE games (season INTEGER, week INTEGER, home_team TEXT, away_team TEXT, game_date TEXT)')
-        row=dict(player_id='gsis-7',season=2026,week=1,team='H',passing_yards=0,
+        row=dict(player_id='gsis-7',season=2026,week=1,team='HOM',passing_yards=0,
             rushing_yards=0,receiving_yards=62,receptions=5)
         digest=stat_row_sha256('nfl',row,legacy_nfl=legacy)
         db.execute('INSERT INTO player_stats VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',(
             *row.values(),'nflverse','b'*64,digest,datetime.now(timezone.utc).isoformat()))
-        db.execute("INSERT INTO games VALUES (2026,1,'H','A',?)",(payload['game_date'],))
+        db.execute("INSERT INTO games VALUES (2026,1,'HOM','AWY',?)",(payload['game_date'],))
     report=settle_final_props(ledger,'nfl',schedule(payload))
     settled=next(item for item in ledger.predictions() if item['prediction_id']==key)
     assert report['settled']==expected

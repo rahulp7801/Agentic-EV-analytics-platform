@@ -33,18 +33,19 @@ def test_final_prop_settlement_uses_real_postgres_and_retains_provenance():
         game_start_time=(now-timedelta(days=1,hours=2)).isoformat(),model_version=identity)
     engine=sa.create_engine(url)
     try:
-        stat=dict(player_id=player_id,game_id=identity,game_date=day,team_abbreviation='H',
+        stat=dict(player_id=player_id,game_id=identity,game_date=day,team_abbreviation='HOM',
             points=21,rebounds=0,assists=0)
         with engine.begin() as conn:
             conn.execute(sa.text("""INSERT INTO nba_player_gamelogs
                 (player_id,player_name,game_id,game_date,season,team_abbreviation,points,rebounds,assists,
                  source_provider,source_sha256,source_record_sha256,source_observed_at)
-                VALUES (:player,:name,:game,:day,2025,'H',21,0,0,'nba',:source,:record,:observed)"""),
+                VALUES (:player,:name,:game,:day,2025,'HOM',21,0,0,'nba',:source,:record,:observed)"""),
                 {'player':player_id,'name':payload['player'],'game':identity,'day':day,
                  'source':'a'*64,'record':stat_row_sha256('nba',stat),'observed':now})
         key=ledger.record(identity,payload)
         schedule=dict(status='complete',captured_at=now.isoformat(),games=[dict(
             provider_event_id='espn-'+identity,date=day.isoformat(),home_name='Home',away_name='Away',
+            home_abbr='HOM',away_abbr='AWY',
             completed=True,game_time=payload['game_start_time'])])
         assert settle_final_props(ledger,'nba',schedule)['settled']==1
         row=next(item for item in ledger.predictions() if item['prediction_id']==key)
@@ -85,6 +86,7 @@ def test_nfl_receptions_settle_with_real_postgres_and_committed_stat():
         key=ledger.record(identity,payload)
         schedule=dict(status='complete',captured_at=now.isoformat(),games=[dict(
             provider_event_id='espn-'+identity,date=day.isoformat(),home_name='Home',away_name='Away',
+            home_abbr='HOM',away_abbr='AWY',
             completed=True,game_time=payload['game_start_time'])])
         assert settle_final_props(ledger,'nfl',schedule)['settled']==1
         row=next(item for item in ledger.predictions() if item['prediction_id']==key)

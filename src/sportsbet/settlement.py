@@ -13,6 +13,7 @@ from sportsbet.ledger import (Ledger, VERIFIED_SETTLEMENT_SOURCE, utc_timestamp,
     verified_settlement_evidence)
 from sportsbet.ingestion.provenance import (
     LEGACY_NFL_STAT_FIELDS, STAT_FIELDS, stat_row_sha256)
+from sportsbet.schedules import scheduled_stat_teams
 
 STAT_COLUMNS={
     'nba':{'points':'points','rebounds':'rebounds','assists':'assists'},
@@ -74,10 +75,11 @@ def _candidate(prediction: dict, sport: str, games: list[dict]):
     if len(matches)!=1:
         return None
     utc_timestamp(matches[0]['game_time'])
+    scheduled_stat_teams(sport,matches[0])
     return matches[0],day,line
 
 
-def _actual(db, prediction: dict, sport: str, day: str):
+def _actual(db, prediction: dict, sport: str, day: str, game: dict):
     column=STAT_COLUMNS[sport][prediction['prop_type']]
     player_id=str(prediction.get('player_id',''))
     if sport=='nba':
@@ -100,6 +102,9 @@ def _actual(db, prediction: dict, sport: str, day: str):
     if len(rows)!=1:
         return None
     record=dict(zip(fields,rows[0][:len(fields)],strict=True))
+    team_field='team_abbreviation' if sport=='nba' else 'team'
+    if record[team_field] not in scheduled_stat_teams(sport,game):
+        return None
     if record[column] is None or type(record[column]) is bool:
         return None
     value=Decimal(str(record[column]))
@@ -139,8 +144,8 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
         raise ValueError('Invalid settlement scope')
     game_dates={game.get('date') for game in schedule['games']}
     candidates=[row for row in ledger.predictions() if row.get('sport')==sport
-        and (row.get('outcome') is None or (row.get('outcome_source') in AUTO_SOURCES
-            and row.get('game_date') in game_dates))]
+        and row.get('game_date') in game_dates
+        and (row.get('outcome') is None or row.get('outcome_source') in AUTO_SOURCES)]
     reasons=Counter();resolved=[]
     with ledger.connect() as db:
         for prediction in candidates:
@@ -150,7 +155,7 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
                     reasons['final_game_not_matched']+=1
                     continue
                 game,day,line=matched
-                observed=_actual(db,prediction,sport,day)
+                observed=_actual(db,prediction,sport,day,game)
                 if observed is None:
                     reasons['stat_not_found_or_ambiguous']+=1
                     continue
@@ -166,7 +171,9 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
                 reasons['invalid_prediction_or_evidence']+=1
     schedule_observed=utc_timestamp(schedule['captured_at'])
     for prediction,game,outcome,actual,provenance in resolved:
-        evidence=dict(provider_event_id=game['provider_event_id'],date=game['date'],
+        evidence=dict(schedule_identity_version=2,
+            provider_event_id=game['provider_event_id'],date=game['date'],
+            home_abbr=game['home_abbr'],away_abbr=game['away_abbr'],
             home_name=game['home_name'],away_name=game['away_name'],completed=True,
             game_time=game['game_time'],player_id=prediction['player_id'],
             prop_type=prediction['prop_type'],actual_value=str(actual),
