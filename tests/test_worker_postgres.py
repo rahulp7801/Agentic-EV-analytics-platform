@@ -14,10 +14,43 @@ from unittest.mock import patch
 from sportsbet.ingestion.upsert import upsert_rows
 from sportsbet.ledger import Ledger
 from sportsbet.scan import evaluate_event
+from sportsbet.settlement import settle_final_props
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get('SPORTSBET_TEST_DATABASE_URL'), reason='Disposable test database required'
 )
+
+
+def test_final_prop_settlement_uses_real_postgres_and_retains_provenance():
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];ledger=Ledger(database_url=url)
+    identity=uuid.uuid4().hex[:16];player_id=int(uuid.uuid4().int%900000000)+1
+    now=datetime.now(timezone.utc);day=(now-timedelta(days=1)).date()
+    payload=dict(game_id=identity,player='Settlement Fixture',player_id=str(player_id),sport='nba',
+        game_date=day.isoformat(),home_team='Home',away_team='Away',prop_type='points',direction='over',
+        line=20.5,sportsbook='book',american_odds=100,model_probability=.6,
+        captured_at=(now-timedelta(days=1,hours=3)).isoformat(),
+        game_start_time=(now-timedelta(days=1,hours=2)).isoformat())
+    engine=sa.create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(sa.text("""INSERT INTO nba_player_gamelogs
+                (player_id,player_name,game_id,game_date,season,points)
+                VALUES (:player,:name,:game,:day,2025,21)"""),
+                {'player':player_id,'name':payload['player'],'game':identity,'day':day})
+        key=ledger.record(identity,payload)
+        schedule=dict(status='complete',captured_at=now.isoformat(),games=[dict(
+            provider_event_id='espn-'+identity,date=day.isoformat(),home_name='Home',away_name='Away',
+            completed=True,game_time=payload['game_start_time'])])
+        assert settle_final_props(ledger,'nba',schedule)['settled']==1
+        row=next(item for item in ledger.predictions() if item['prediction_id']==key)
+        assert row['outcome'] is True and row['actual_value']==21
+        assert row['outcome_source']=='espn_final_stats' and identity in row['outcome_ref']
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text('DELETE FROM nba_player_gamelogs WHERE game_id=:id'),{'id':identity})
+            conn.execute(sa.text('DELETE FROM analytics.predictions WHERE scan_id=:id'),{'id':identity})
+            conn.execute(sa.text('DELETE FROM analytics.quotes WHERE identity=:id'),{'id':ledger.quote_identity(payload)})
+        engine.dispose()
 
 
 def test_nba_fallback_protects_official_rows_and_applies_corrections_atomically():

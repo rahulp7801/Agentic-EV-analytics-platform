@@ -5,7 +5,7 @@ from sportsbet import schedules
 
 
 def board():
-    return {'events':[{'id':'event','date':'2026-09-11T23:00:00Z','competitions':[{'competitors':[
+    return {'events':[{'id':'event','date':'2026-09-11T23:00:00Z','status':{'type':{'completed':True}},'competitions':[{'competitors':[
         {'homeAway':'home','team':{'abbreviation':'H','displayName':'Home'}},
         {'homeAway':'away','team':{'abbreviation':'A','displayName':'Away'}}]}]}]}
 
@@ -13,6 +13,7 @@ def board():
 def test_schedule_preserves_start_and_rejects_ambiguous_identity():
     rows=schedules.parse_day(board(),'20260911','Today')
     assert len(rows)==1 and rows[0]['game_time']=='2026-09-11T23:00:00+00:00'
+    assert rows[0]['completed'] is True
     assert schedules.parse_day(board(),'20260912','Tomorrow')==[]
     data=board();data['events']*=2
     with pytest.raises(ValueError,match='Duplicate'):

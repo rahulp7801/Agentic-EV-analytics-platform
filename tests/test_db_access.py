@@ -49,7 +49,8 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
                               "UPDATE analytics.quotes SET probability=0 WHERE false"):
                 with pytest.raises(psycopg.errors.InsufficientPrivilege):
                     worker.execute(statement)
-            assert worker.execute("SELECT has_column_privilege(current_user,'analytics.predictions','outcome','UPDATE')").fetchone()[0]
+            for column in ('outcome','outcome_source','outcome_ref','outcome_observed_at','actual_value'):
+                assert worker.execute("SELECT has_column_privilege(current_user,'analytics.predictions',%s,'UPDATE')",(column,)).fetchone()[0]
     finally:
         with psycopg.connect(dsn) as admin:
             admin.execute('DELETE FROM dashboard_snapshots WHERE snapshot_key=%s', (key,))

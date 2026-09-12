@@ -18,13 +18,16 @@ def parse_day(data: dict, day: str, label: str) -> list[dict]:
         if start.astimezone(ZoneInfo('America/New_York')).strftime('%Y%m%d')!=day:
             continue  # NFL responses can contain other games from the same week.
         competition,=event['competitions']
+        completed=event.get('status',{}).get('type',{}).get('completed')
+        if type(completed) is not bool:
+            raise ValueError('Schedule completion state is missing')
         home,=[c['team'] for c in competition['competitors'] if c['homeAway']=='home']
         away,=[c['team'] for c in competition['competitors'] if c['homeAway']=='away']
         if not event['id'] or any(not t.get(k) for t in (home,away) for k in ('abbreviation','displayName')):
             raise ValueError('Incomplete schedule identity')
         games.append(dict(provider_event_id=str(event['id']),home_abbr=home['abbreviation'],
             away_abbr=away['abbreviation'],home_name=home['displayName'],away_name=away['displayName'],
-            date=day,label=label,game_time=start.isoformat()))
+            date=day,label=label,game_time=start.isoformat(),completed=completed))
     if len({g['provider_event_id'] for g in games})!=len(games):
         raise ValueError('Duplicate schedule event')
     return games

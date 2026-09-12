@@ -30,7 +30,11 @@ class Ledger:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
-            db.execute('CREATE TABLE IF NOT EXISTS predictions (id TEXT PRIMARY KEY, scan_id TEXT NOT NULL, payload TEXT NOT NULL, outcome TEXT)')
+            db.execute('CREATE TABLE IF NOT EXISTS predictions (id TEXT PRIMARY KEY, scan_id TEXT NOT NULL, payload TEXT NOT NULL, outcome TEXT, outcome_source TEXT, outcome_ref TEXT, outcome_observed_at TEXT, actual_value REAL)')
+            columns={row[1] for row in db.execute('PRAGMA table_info(predictions)').fetchall()}
+            for name,kind in (('outcome_source','TEXT'),('outcome_ref','TEXT'),('outcome_observed_at','TEXT'),('actual_value','REAL')):
+                if name not in columns:
+                    db.execute(f'ALTER TABLE predictions ADD COLUMN {name} {kind}')
             db.execute('CREATE TABLE IF NOT EXISTS exposure (identity TEXT PRIMARY KEY, group_key TEXT NOT NULL, risk_day TEXT NOT NULL, fraction REAL NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS quotes (identity TEXT NOT NULL, captured_at TEXT NOT NULL, probability REAL NOT NULL, PRIMARY KEY(identity,captured_at))')
             db.execute('CREATE TABLE IF NOT EXISTS api_usage (risk_day TEXT PRIMARY KEY, credits INTEGER NOT NULL)')
@@ -134,18 +138,35 @@ class Ledger:
                        (key,scan_id,json.dumps(payload,allow_nan=False)))
         return key
 
-    def settle(self, outcomes: dict) -> None:
+    def settle(self, outcomes: dict, *, source: str = 'manual', source_ref: str = 'caller_supplied',
+               observed_at: datetime | None = None, actual_values: dict | None = None) -> None:
+        if (not isinstance(source,str) or not source.strip() or len(source)>40
+                or not isinstance(source_ref,str) or not source_ref.strip() or len(source_ref)>200):
+            raise ValueError('Settlement provenance is invalid')
+        stamp=observed_at or datetime.now(timezone.utc)
+        if stamp.tzinfo is None or stamp.utcoffset() is None:
+            raise ValueError('Settlement observation time requires a timezone')
+        stamp=stamp.astimezone(timezone.utc)
         with self.connect() as db:
             for key, outcome in outcomes.items():
                 if outcome is not None and type(outcome) is not bool and outcome not in ('push','void'):
                     raise ValueError('Settlement must be true/false/push/void/null')
-                if db.execute('UPDATE predictions SET outcome=? WHERE id=?', (json.dumps(outcome), key)).rowcount != 1:
+                actual=(actual_values or {}).get(key)
+                if actual is not None:
+                    actual=Decimal(str(actual))
+                    if not actual.is_finite() or actual < 0:
+                        raise ValueError('Settlement actual value is invalid')
+                    actual=int(actual) if actual==actual.to_integral_value() else str(actual)
+                if db.execute('UPDATE predictions SET outcome=?,outcome_source=?,outcome_ref=?,outcome_observed_at=?,actual_value=? WHERE id=?',
+                    (json.dumps(outcome),source,source_ref,stamp.isoformat(),actual,key)).rowcount != 1:
                     raise ValueError(f'Unknown prediction ID: {key}')
 
     def predictions(self) -> list[dict]:
         with self.connect() as db:
-            rows = db.execute('SELECT id,payload,outcome FROM predictions ORDER BY id').fetchall()
-        return [{'prediction_id':key, **json.loads(payload), 'outcome':json.loads(outcome) if outcome else None} for key,payload,outcome in rows]
+            rows = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value FROM predictions ORDER BY id').fetchall()
+        return [{'prediction_id':key, **json.loads(payload), 'outcome':json.loads(outcome) if outcome else None,
+            'outcome_source':source,'outcome_ref':ref,'outcome_observed_at':observed,'actual_value':actual}
+            for key,payload,outcome,source,ref,observed,actual in rows]
 
     def report(self, recommendations_only: bool = False, model_version: str | None = None) -> dict:
         from dataclasses import fields
