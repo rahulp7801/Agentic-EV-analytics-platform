@@ -137,11 +137,11 @@ def make_quant_agent(
                 "quant_agent_error",
                 session_id=session_id,
                 error_type=type(exc).__name__,
-                exc_info=True,
             )
             return {
                 "quant_result": QuantResult(data_source="error"),
-                "error": str(exc),
+                "error": "quant_query_failed",
+                "ev_signal": None, "pending_signals": [], "cleared_signals": [],
             }
 
         log.info(
@@ -789,12 +789,12 @@ def make_kinematic_agent(
         season = state["season"]
         log.info("kinematic_agent_invoked", session_id=session_id, season=season)
 
-        available = await check_ngs_availability(pool, season)
-        if not available:
-            log.warning("kinematic_ngs_unavailable", season=season, session_id=session_id)
-            return {"kinematic_result": None}
-
         try:
+            available = await check_ngs_availability(pool, season)
+            if not available:
+                log.warning("kinematic_ngs_unavailable", season=season, session_id=session_id)
+                return {"kinematic_result": None}
+
             receiver_gsis_id: str = state.get("receiver_gsis_id", "")  # type: ignore[union-attr]
             params = KinematicParams(
                 season=season,
@@ -807,9 +807,9 @@ def make_kinematic_agent(
                 "kinematic_agent_error",
                 session_id=session_id,
                 error_type=type(exc).__name__,
-                exc_info=True,
             )
-            return {"kinematic_result": None, "error": str(exc)}
+            return {"kinematic_result": None, "error": "kinematic_query_failed",
+                "ev_signal": None, "pending_signals": [], "cleared_signals": []}
 
         log.info(
             "kinematic_agent_complete",

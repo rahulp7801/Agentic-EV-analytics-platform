@@ -32,14 +32,12 @@ Request routing:
 """
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from datetime import date
 from typing import Any, Callable, Coroutine, Optional
 
 import asyncpg
 import structlog
-from pydantic import ValidationError
-
 from sportsbet.config import settings
 from sportsbet.graph.models import NBAContextSignals, PropParams, PropResult
 from sportsbet.graph.state import GraphState
@@ -155,7 +153,7 @@ def make_nba_quant_agent(
     5. Call _apply_nba_context_adjustments(result, context, prop_type)
     6. Return partial state dict: {"nba_prop_result": result}
 
-    On ValidationError: return {"error": str(exc)} — does not propagate to graph.
+    Invalid inputs clear the estimate and return a stable error code, without raw diagnostics.
 
     Parameters
     ----------
@@ -225,26 +223,27 @@ def make_nba_quant_agent(
                 last_n_games=state.get("last_n_games"),
                 as_of_date=state.get("as_of_date") or target_date or date.today(),
             )
-        except ValidationError as exc:
+        except (ValueError, TypeError, KeyError, AttributeError, DecimalException) as exc:
+            # Validation text can echo input; clear any estimate retained by a checkpoint.
             log.error(
                 "nba_quant_agent_validation_error",
                 session_id=session_id,
-                error=str(exc),
+                error_type=type(exc).__name__,
             )
-            return {"error": str(exc)}
+            return {"nba_prop_result": PropResult(data_source="error"), "error": "nba_prop_input_invalid"}
 
         try:
             result = await run_nba_prop_query(pool, params)
         except Exception as exc:
+            # Driver exceptions/tracebacks may contain connection details or query values.
             log.error(
                 "nba_quant_agent_query_error",
                 session_id=session_id,
-                error=str(exc),
-                exc_info=True,
+                error_type=type(exc).__name__,
             )
             return {
                 "nba_prop_result": PropResult(data_source="error"),
-                "error": str(exc),
+                "error": "nba_prop_query_failed",
             }
 
         # Apply contextual adjustments from NBAContextSignals in GraphState

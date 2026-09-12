@@ -12,7 +12,7 @@ then prop_quant_agent in the same thread_id) to provide kinematic context.
 Design mirrors make_quant_agent from sportsbet/graph/agents.py:
 - Closure factory binds pool at construction time.
 - Inner async function extracts PropParams fields from GraphState.
-- ValidationError caught and returned as {"error": str(e)} — does not propagate to graph.
+- Invalid inputs clear the estimate and return a stable error code without raw diagnostics.
 - Returns partial state dict: {"prop_result": PropResult}.
 
 State key contract (GraphState fields read by this agent):
@@ -27,13 +27,11 @@ State key contract (GraphState fields read by this agent):
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from typing import Any, Callable, Coroutine, Optional
 
 import asyncpg
 import structlog
-from pydantic import ValidationError
-
 from sportsbet.config import settings
 from sportsbet.graph.models import PropParams, PropResult
 from sportsbet.graph.state import GraphState
@@ -121,7 +119,7 @@ def make_prop_quant_agent(
     4. Call _apply_kinematic_adjustment(result, state["kinematic_result"], prop_type) — Plan 02 real boost
     5. Return partial state dict: {"prop_result": result}
 
-    On ValidationError: return {"error": str(e)} — does not propagate to graph.
+    Invalid inputs clear the estimate and return a stable error code without raw diagnostics.
 
     Parameters
     ----------
@@ -177,27 +175,28 @@ def make_prop_quant_agent(
                 teammate_out=teammate_out,
                 teammate_out_contexts=teammate_out_contexts,
             )
-        except ValidationError as exc:
+        except (ValueError, TypeError, KeyError, AttributeError, DecimalException) as exc:
+            # Validation text can echo input; clear any estimate retained by a checkpoint.
             log.error(
                 "prop_quant_agent_validation_error",
                 session_id=session_id,
-                error=str(exc),
+                error_type=type(exc).__name__,
             )
-            return {"error": str(exc)}
+            return {"prop_result": PropResult(data_source="error"), "error": "prop_input_invalid"}
 
         try:
             # Run parameterized SQL query against player_stats
             result = await run_prop_query(pool, params)
         except Exception as exc:
+            # Driver exceptions/tracebacks may contain connection details or query values.
             log.error(
                 "prop_quant_agent_query_error",
                 session_id=session_id,
-                error=str(exc),
-                exc_info=True,
+                error_type=type(exc).__name__,
             )
             return {
                 "prop_result": PropResult(data_source="error"),
-                "error": str(exc),
+                "error": "prop_query_failed",
             }
 
         # Apply kinematic adjustment — reads kinematic_result from GraphState (Plan 02)
