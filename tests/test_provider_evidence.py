@@ -1,10 +1,16 @@
 from copy import deepcopy
 from datetime import datetime, timezone
+import json
 
 import pytest
 
 from sportsbet.ingestion.prop_odds import parse_event_quotes, prop_quote_record_sha256
-from sportsbet.ingestion.prizepicks import PrizePicksUnavailable, parse_projections
+from sportsbet.ingestion.prizepicks import (
+    PrizePicksUnavailable,
+    parse_projections,
+    projection_record_sha256,
+    provider_payload_sha256,
+)
 
 
 def event():
@@ -43,14 +49,41 @@ def test_prizepicks_tiers_do_not_create_prices_or_synthetic_games():
         data=[dict(id='projection', attributes=dict(stat_type='Pass Yards',line_score=200.5,
             start_time='2026-09-13T17:00:00Z',odds_type='demon'),
             relationships={'new_player':{'data':{'id':'p'}}})])
-    projections, skipped = parse_projections(data)
+    observed = datetime(2026,9,10,15,tzinfo=timezone.utc)
+    projections, skipped = parse_projections(data, observed)
     assert skipped == 0 and len(projections) == 1
     assert projections[0]['game_id'] is None
     assert projections[0]['tier'] == 'demon'
+    assert projections[0]['source_provider'] == 'prizepicks'
+    assert projections[0]['source_sha256'] == provider_payload_sha256(data)
+    assert projections[0]['source_record_sha256'] == projection_record_sha256(projections[0])
+    assert projections[0]['source_observed_at'] == observed.isoformat().replace('+00:00','Z')
     assert not {'price','american_odds','implied_probability','payout'} & projections[0].keys()
     data['data'].append(deepcopy(data['data'][0]))
     with pytest.raises(ValueError, match='Duplicate'):
-        parse_projections(data)
+        parse_projections(data, observed)
+
+
+@pytest.mark.asyncio
+async def test_prizepicks_archive_reproduces_payload_and_projection_hashes(monkeypatch,tmp_path):
+    import httpx
+    from sportsbet.ingestion import prizepicks
+    data = dict(included=[dict(type='new_player',id='p',attributes={'name':'Player'})],
+        data=[dict(id='projection',attributes=dict(stat_type='Pass Yards',line_score=200.5,
+            start_time='2026-09-13T17:00:00Z'),
+            relationships={'new_player':{'data':{'id':'p'}}})])
+    client = httpx.AsyncClient(transport=httpx.MockTransport(
+        lambda request:httpx.Response(200,json=data)))
+    monkeypatch.setattr(prizepicks.httpx, 'AsyncClient', lambda **kwargs: client)
+    output = tmp_path/'capture.json'
+    report = await prizepicks.capture('nfl',output)
+    archived = json.loads(output.read_text(encoding='utf-8'))
+    assert archived == report
+    assert archived['source_encoding'] == 'canonical-json-v1'
+    assert archived['source_sha256'] == provider_payload_sha256(archived['raw'])
+    assert all(row['source_sha256'] == archived['source_sha256']
+        and row['source_record_sha256'] == projection_record_sha256(row)
+        for row in archived['projections'])
 
 
 @pytest.mark.asyncio
