@@ -61,6 +61,7 @@ async def test_budget_rotation_covers_both_leagues_and_unseen_events(monkeypatch
             'kalshi_rule_terms_classified':0,
             'kalshi_direct_cost_below_one':0,'kalshi_non_direct_cost_below_one':0}
     assert stored['prop-screens:nfl']['execution_ready'] is False
+    assert stored['metrics:all']['model_version']==stored['metrics:recommendations']['model_version']=='empirical-v2'
     assert pool.close.await_count==4
 
 

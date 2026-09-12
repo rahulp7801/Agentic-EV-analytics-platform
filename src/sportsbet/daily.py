@@ -13,7 +13,7 @@ from sportsbet.dashboard import load_snapshot, publish_snapshot
 from sportsbet.market_watch import run as watch, DEFAULT_GAME_LIMIT
 from sportsbet.ledger import Ledger
 from sportsbet.refresh import refresh_history
-from sportsbet.scan import run as scan, timestamp
+from sportsbet.scan import MODEL_VERSION, run as scan, timestamp
 from sportsbet.schedules import collect as collect_schedule
 from sportsbet.settlement import settle_final_props
 
@@ -138,8 +138,8 @@ def create_daily_graph():
             except Exception as exc:
                 results[sport]={'status':'failed','error_type':type(exc).__name__}
         try:
-            publish_snapshot('metrics:all',ledger.report())
-            publish_snapshot('metrics:recommendations',ledger.report(True))
+            publish_snapshot('metrics:all',ledger.report(model_version=MODEL_VERSION))
+            publish_snapshot('metrics:recommendations',ledger.report(True,model_version=MODEL_VERSION))
         except Exception as exc:
             for result in results.values():
                 if result['status']=='complete':

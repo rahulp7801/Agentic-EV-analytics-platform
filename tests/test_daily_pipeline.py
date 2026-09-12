@@ -15,8 +15,9 @@ def schedule_source(monkeypatch):
     monkeypatch.setattr(daily,'collect_schedule',AsyncMock(return_value={
         'status':'complete','captured_at':datetime.now(timezone.utc).isoformat(),'games':[]}))
     class Audit:
-        def report(self,recommendations_only=False):
-            return {'cohort':'recommendations' if recommendations_only else 'all_predictions'}
+        def report(self,recommendations_only=False,model_version=None):
+            return {'cohort':'recommendations' if recommendations_only else 'all_predictions',
+                'model_version':model_version}
     monkeypatch.setattr(daily,'Ledger',Audit)
     monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:{
         'sport':sport,'status':'complete','candidates':0,'settled':0,'pending':0,
@@ -102,6 +103,7 @@ async def test_daily_settles_observed_stats_before_scanning_new_props(monkeypatc
     assert result['status']=='complete' and calls.index(('settle','nba'))<calls.index(('scan','nba'))
     assert stored['metrics:all']['cohort']=='all_predictions'
     assert stored['metrics:recommendations']['cohort']=='recommendations'
+    assert stored['metrics:all']['model_version']==stored['metrics:recommendations']['model_version']=='empirical-v2'
 
 
 @pytest.mark.asyncio
