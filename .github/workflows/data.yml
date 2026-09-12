@@ -18,6 +18,10 @@ on:
   schedule:
     - cron: '17 13 * * *'
     - cron: '7,37 * * * *'
+    # Public-only recovery slots. GitHub may delay or drop scheduled events;
+    # these give the 90-minute snapshot gate two more chances each hour without
+    # doubling future paid-provider polling.
+    - cron: '22,52 * * * *'
 permissions:
   contents: read
 concurrency:
@@ -26,7 +30,7 @@ concurrency:
 jobs:
   update:
     # Enable only after database migration/backfill and provider-budget verification.
-    if: github.ref == 'refs/heads/master' && (github.event_name == 'workflow_dispatch' || vars.DATA_PIPELINE_ENABLED == 'true' || vars.PUBLIC_DATA_PIPELINE_ENABLED == 'true')
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'workflow_dispatch' || (vars.DATA_PIPELINE_ENABLED == 'true' && github.event.schedule != '22,52 * * * *') || vars.PUBLIC_DATA_PIPELINE_ENABLED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -35,10 +39,10 @@ jobs:
       DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
       ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # Public-only collection and stat refreshes do not receive the paid-provider key.
-      ODDS_API_KEY: ${{ ((github.event_name == 'schedule' && vars.DATA_PIPELINE_ENABLED == 'true') || inputs.operation == 'daily' || inputs.operation == 'monitor' || inputs.operation == 'scan' || (inputs.operation == 'watch' && (inputs.provider == 'all' || inputs.provider == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
+      ODDS_API_KEY: ${{ ((github.event_name == 'schedule' && vars.DATA_PIPELINE_ENABLED == 'true' && github.event.schedule != '22,52 * * * *') || inputs.operation == 'daily' || inputs.operation == 'monitor' || inputs.operation == 'scan' || (inputs.operation == 'watch' && (inputs.provider == 'all' || inputs.provider == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
       SPORT: ${{ inputs.sport || 'both' }}
       # Full collection takes precedence if both scheduler flags are enabled.
-      OPERATION: ${{ inputs.operation || (vars.DATA_PIPELINE_ENABLED == 'true' && (github.event.schedule == '17 13 * * *' && 'daily' || 'monitor') || (github.event.schedule == '17 13 * * *' && 'public_daily' || 'public_monitor')) }}
+      OPERATION: ${{ inputs.operation || (vars.DATA_PIPELINE_ENABLED == 'true' && github.event.schedule != '22,52 * * * *' && (github.event.schedule == '17 13 * * *' && 'daily' || 'monitor') || (github.event.schedule == '17 13 * * *' && 'public_daily' || 'public_monitor')) }}
       PROVIDER: ${{ inputs.provider || 'all' }}
       DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '25' }}
       ODDS_ROLLING_CREDIT_LIMIT: ${{ vars.ODDS_ROLLING_CREDIT_LIMIT || '450' }}
