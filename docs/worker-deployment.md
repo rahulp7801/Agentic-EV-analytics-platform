@@ -52,6 +52,13 @@ model requests, and the concurrency limit. This reduces avoidable serial work wh
 keeping database demand bounded; provider requests and separate events remain
 serialized by the existing credit and event timeout controls.
 
+Scan health separates observed quotes, distinct selections, model requests and
+usable model estimates. A quoted event is model-complete only when every selection
+has a resolved player and a usable estimate. Partial or unavailable model coverage
+degrades the run and the published prop screen; an event timeout retains the quote
+coverage already observed instead of turning it into an unexplained zero. A valid
+empty slate and an event with no usable provider quotes remain separate states.
+
 Cut over only after a hosted public monitor and daily refresh both pass, their archives replay, production matches the captures, and an automatic host-triggered run is observed. Then unset `PUBLIC_DATA_PIPELINE_ENABLED` in GitHub to stop duplicate scheduled collection; keep manual Actions runs available for recovery. Keep `DATA_PIPELINE_ENABLED` off until full-provider readiness is verified. Roll back by disabling the new schedule before restoring the public GitHub flag.
 
 ## Hosting decision remains open
