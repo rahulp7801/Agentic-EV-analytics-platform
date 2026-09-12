@@ -87,6 +87,22 @@ async def test_snapshot_preserves_evidence_and_observation_interval():
     assert snapshot['same_contract_pair'] is None  # One empty side cannot be hedged.
 
 
+@pytest.mark.asyncio
+async def test_bulk_targets_use_repeated_validated_ids_without_authentication():
+    ids=['10000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000002']
+    def handle(request):
+        assert request.url.path.endswith('/structured_targets')
+        assert request.url.params.get_list('ids')==ids
+        assert request.url.params['page_size']=='2'
+        assert 'KALSHI-ACCESS-KEY' not in request.headers
+        return httpx.Response(200,json={'structured_targets':[],'cursor':''})
+    async with KalshiReader(transport=httpx.MockTransport(handle)) as reader:
+        assert await reader.targets(ids)=={'structured_targets':[],'cursor':''}
+        for invalid in ([],ids+ids[:1],['invalid']):
+            with pytest.raises(ValueError):
+                await reader.targets(invalid)
+
+
 def test_repeated_captures_never_overwrite_prior_evidence(tmp_path, monkeypatch):
     import json
     from sportsbet.ingestion.kalshi import write_archive

@@ -38,11 +38,18 @@ def market(series: str, event: str, suffix: str) -> dict:
     }
 
 
+def configure_targets(reader: AsyncMock) -> None:
+    reader.targets.return_value={'structured_targets':[{
+        'id':'30000000-0000-0000-0000-000000000003','name':'Player Name','type':'football_player',
+        'details':{'league':'NFL','team_id':'10000000-0000-0000-0000-000000000001'}}],'cursor':''}
+
+
 @pytest.mark.asyncio
 async def test_prop_inventory_links_structured_events_and_reports_complete_pages():
     passing = 'KXNFLPASSYDS-26SEP13ATLPIT'
     rushing = 'KXNFLRSHYDS-26SEP13ATLPIT'
     reader = AsyncMock()
+    configure_targets(reader)
 
     async def pages(series, *, limit, cursor=None):
         assert limit == market_watch.PROP_PAGE_LIMIT
@@ -73,6 +80,7 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
         'linked_events': 2,
         'structured_quote_markets': 3,
         'two_sided_quote_markets': 3,
+        'player_resolved_quote_markets': 3,
         'discovery_complete': True,
     }
     assert result['series']['KXNFLPASSYDS']['pages'] == 2
@@ -94,6 +102,11 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
         'rules_sha256':market_watch.digest({'primary':'Primary settlement rule.','secondary':'Secondary settlement rule.'}),
         'settlement_equivalent':False,'execution_ready':False}
     assert datetime.fromisoformat(quote['request_started_at']) <= datetime.fromisoformat(quote['received_at'])
+    target=result['targets']['30000000-0000-0000-0000-000000000003']
+    assert target['player_name']=='Player Name'
+    assert target['team_target_id']=='10000000-0000-0000-0000-000000000001'
+    assert target['target_sha256']==market_watch.digest(reader.targets.return_value['structured_targets'][0])
+    assert datetime.fromisoformat(target['target_request_started_at']) <= datetime.fromisoformat(target['target_received_at'])
     assert reader.markets.await_count == 5
 
 
@@ -101,6 +114,7 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
 async def test_prop_inventory_preserves_counts_but_fails_closed_on_incomplete_or_bad_pages():
     event = 'KXNFLPASSYDS-26SEP13ATLPIT'
     reader = AsyncMock()
+    configure_targets(reader)
 
     async def pages(series, *, limit, cursor=None):
         if series == 'KXNFLPASSYDS':
@@ -120,6 +134,7 @@ async def test_prop_inventory_preserves_counts_but_fails_closed_on_incomplete_or
     assert result['partial_coverage'] is True
     assert result['coverage']['linked_markets'] == 1
     assert result['coverage']['structured_quote_markets'] == 1
+    assert result['coverage']['player_resolved_quote_markets'] == 1
     assert result['coverage']['discovery_complete'] is False
     assert result['series']['KXNFLPASSYDS']['complete'] is False
     assert result['series']['KXNFLRSHYDS']['status'] == 'invalid'
@@ -176,3 +191,18 @@ async def test_prop_inventory_rejects_inconsistent_quote_or_structured_identity(
     assert result['coverage']['structured_quote_markets']==0
     assert result['series']['KXNFLPASSYDS']['status']=='invalid'
     assert result['failures']==[{'stage':'prop_discovery','series':'KXNFLPASSYDS','error_type':'ValueError'}]
+
+
+@pytest.mark.asyncio
+async def test_prop_target_failure_retains_quotes_but_blocks_cross_provider_identity():
+    event='KXNFLPASSYDS-26SEP13ATLPIT';reader=AsyncMock()
+    async def pages(series,**kwargs):
+        return {'markets':[market(series,event,'PLAYER-250')] if series=='KXNFLPASSYDS' else [],'cursor':''}
+    reader.markets.side_effect=pages
+    reader.targets.return_value={'structured_targets':[],'cursor':''}
+    result=await market_watch.kalshi_prop_inventory(reader,'nfl',[game(1,event)])
+    assert result['status']=='degraded' and result['coverage']['structured_quote_markets']==1
+    assert result['coverage']['player_resolved_quote_markets']==0
+    assert 'player_name' not in result['quotes'][0]
+    assert result['targets']=={}
+    assert result['failures']==[{'stage':'prop_targets','error_type':'ValueError'}]

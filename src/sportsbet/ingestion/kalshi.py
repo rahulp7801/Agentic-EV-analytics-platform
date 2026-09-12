@@ -143,6 +143,13 @@ class KalshiReader:
     async def target(self, target_id: str) -> dict:
         return (await self._get('/structured_targets/'+str(UUID(target_id))))['structured_target']
 
+    async def targets(self, target_ids: list[str]) -> dict:
+        if not 1 <= len(target_ids) <= 2000 or len(set(target_ids)) != len(target_ids):
+            raise ValueError('Request 1..2000 distinct structured target IDs')
+        ids=[str(UUID(target_id)) for target_id in target_ids]
+        return await self._get('/structured_targets',params=[*(('ids',target_id) for target_id in ids),
+            ('page_size',str(len(ids)))])
+
     async def snapshot(self, ticker: str) -> dict:
         ticker = ticker_path(ticker)
         started = datetime.now(timezone.utc)

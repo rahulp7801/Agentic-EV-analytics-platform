@@ -178,14 +178,47 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
         results[series]=dict(status=status,complete=complete,pages=len(pages),open_markets=len(tickers),
             open_events=len(events),linked_markets=len(linked),linked_events=len(linked_event_set),
             response_sha256=digest(pages) if pages else None)
+    target_records={}
+    if quotes:
+        try:
+            request_started=datetime.now(timezone.utc)
+            target_page=await reader.targets(sorted({quote['player_target_id'] for quote in quotes}))
+            received_at=datetime.now(timezone.utc)
+            targets=target_page['structured_targets']
+            if not isinstance(targets,list) or target_page.get('cursor') or len({target['id'] for target in targets})!=len(targets):
+                raise ValueError('Invalid structured target page')
+            by_id={str(UUID(target['id'])):target for target in targets}
+            expected={quote['player_target_id'] for quote in quotes}
+            if set(by_id)!=expected:
+                raise ValueError('Incomplete structured target page')
+            page_sha256=digest(target_page)
+            teams_by_player={}
+            for quote in quotes:
+                teams_by_player.setdefault(quote['player_target_id'],set()).add(quote['team_target_id'])
+            for target_id,target in by_id.items():
+                name=target['name'].strip()
+                team_id=str(UUID(target['details']['team_id']))
+                kind='football' if sport=='nfl' else 'basketball'
+                if (target.get('type')!=kind+'_player' or target['details'].get('league')!=sport.upper()
+                        or not name or teams_by_player[target_id]!={team_id}):
+                    raise ValueError('Structured target does not match prop')
+                target_records[target_id]=dict(player_name=name,team_target_id=team_id,
+                    target_sha256=digest(target),
+                    target_page_sha256=page_sha256,target_request_started_at=request_started.isoformat(),
+                    target_received_at=received_at.isoformat())
+        except (KeyError,ValueError,TypeError,AttributeError) as exc:
+            failures.append(dict(stage='prop_targets',error_type=type(exc).__name__))
+        except Exception as exc:
+            failures.append(dict(stage='prop_targets',error_type=type(exc).__name__))
     coverage=dict(series_expected=len(supported),series_observed=sum(r['status']=='observed' for r in results.values()),
         open_markets=len(all_markets),open_events=len(all_events),linked_markets=len(linked_markets),
         linked_events=len(linked_events),structured_quote_markets=len(quotes),
         two_sided_quote_markets=sum(bool(q['yes_ask'] and q['no_ask']) for q in quotes),
+        player_resolved_quote_markets=sum(quote['player_target_id'] in target_records for quote in quotes),
         discovery_complete=not failures and all(r['complete'] for r in results.values()))
-    return dict(status='degraded' if failures else 'observed',series=results,quotes=quotes,coverage=coverage,
+    return dict(status='degraded' if failures else 'observed',series=results,quotes=quotes,targets=target_records,coverage=coverage,
         failures=failures,partial_coverage=not coverage['discovery_complete'],
-        scope='Open-market top-of-book observations linked by Kalshi structured milestone, player and team IDs. Full pages are hashed but omitted. One displayed level is not a fill; player-name matching, fees and settlement equivalence remain unverified, and no profit is inferred.')
+        scope='Open-market top-of-book observations linked by Kalshi structured milestone, player and team IDs. Kalshi player names are resolved in one bulk structured-target read. Full pages are hashed but omitted. One displayed level is not a fill; cross-provider identity, fees and settlement equivalence remain unverified, and no profit is inferred.')
 
 
 def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
@@ -316,7 +349,8 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
             prop_open_markets=prop_coverage['open_markets'],prop_open_events=prop_coverage['open_events'],
             prop_linked_markets=prop_coverage['linked_markets'],prop_linked_events=prop_coverage['linked_events'],
             prop_structured_quote_markets=prop_coverage['structured_quote_markets'],
-            prop_two_sided_quote_markets=prop_coverage['two_sided_quote_markets']))
+            prop_two_sided_quote_markets=prop_coverage['two_sided_quote_markets'],
+            prop_player_resolved_quote_markets=prop_coverage['player_resolved_quote_markets']))
 
 
 def book_quotes(event: dict, now: datetime) -> list[dict]:
