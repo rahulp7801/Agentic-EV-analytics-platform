@@ -26,6 +26,22 @@ test('public prop screen omits internal evidence and retains all non-executable 
   assert.equal('evidence_sha256' in result.comparisons[0],false);
 });
 
+test('public prop screen validates and exposes only compact hypothetical fee costs', () => {
+  const changed=snapshot();changed.comparisons[0].exchange_fee_scenarios={
+    kalshi_leg:{direct:{principal:'0.45',exchange_fee:'0.0174',total_cost:'0.4674',trade_fee:'internal'},
+      non_direct:{principal:'0.45',exchange_fee:'0.02',total_cost:'0.47',rounding_fee:'internal'}},
+    combined_cost:{direct:'0.8674',non_direct:'0.87'},
+    schedule_ref:'https://kalshi.com/regulatory/fee-schedule',scope:'Hypothetical fee scenario.'};
+  const result=publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z'));
+  assert.deepEqual(result.comparisons[0].modeled_fee_costs,{
+    direct:{kalshi_exchange_fee:'0.0174',combined_cost:'0.8674'},
+    non_direct:{kalshi_exchange_fee:'0.02',combined_cost:'0.87'},scope:'Hypothetical fee scenario.'});
+  assert.equal('exchange_fee_scenarios' in result.comparisons[0],false);
+  const invalid=snapshot();invalid.comparisons[0].exchange_fee_scenarios=changed.comparisons[0].exchange_fee_scenarios;
+  invalid.comparisons[0].exchange_fee_scenarios.combined_cost.direct='0.8';
+  assert.throws(()=>publicPropScreen(invalid,Date.parse('2026-09-11T12:01:00Z')));
+});
+
 test('public prop screen accepts distinct-book complements without adding profit fields', () => {
   const changed=snapshot(), row=changed.comparisons[0];
   row.kind='sportsbook_sportsbook_prop';delete row.milestone_id;

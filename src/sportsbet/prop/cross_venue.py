@@ -7,6 +7,7 @@ from collections import Counter
 from datetime import datetime
 from decimal import Decimal
 
+from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
 from sportsbet.quant.vig import american_to_raw_prob
 
@@ -61,10 +62,11 @@ def _unavailable(sport: str, now: datetime, reason: str) -> dict:
         reason=reason, coverage={}, comparisons=[], execution_ready=False)
 
 
-def _evidence(handoff: dict | None, sport: str, now: datetime) -> tuple[dict, datetime]:
+def _evidence(handoff: dict | None, sport: str, now: datetime) -> tuple[dict, datetime, int]:
     if not isinstance(handoff, dict):
         raise InvalidHandoff('missing_handoff')
-    if (type(handoff.get('schema_version')) is not int or handoff['schema_version'] != 1
+    version=handoff.get('schema_version')
+    if (type(version) is not int or version not in (1,2)
             or handoff.get('sport') != sport or handoff.get('status') != 'observed'
             or handoff.get('execution_ready') is not False):
         raise InvalidHandoff('handoff_not_observed')
@@ -88,7 +90,16 @@ def _evidence(handoff: dict | None, sport: str, now: datetime) -> tuple[dict, da
     if not isinstance(evidence.get('quotes'), list) or not isinstance(evidence.get('games'), list) \
             or not isinstance(evidence.get('player_targets'), dict):
         raise InvalidHandoff('handoff_incomplete_or_corrupt')
-    return evidence, captured
+    if version==2:
+        contexts=evidence.get('fee_contexts')
+        fee_counts=[coverage.get(key) for key in ('fee_contexts_expected','fee_contexts_observed')]
+        if (not isinstance(contexts,dict)
+                or any(type(value) is not int or value<0 for value in fee_counts)
+                or coverage['fee_contexts_observed']!=len(contexts)
+                or coverage['fee_contexts_expected']<coverage['fee_contexts_observed']
+                or any(not isinstance(event,str) or not event for event in contexts)):
+            raise InvalidHandoff('handoff_incomplete_or_corrupt')
+    return evidence, captured, version
 
 
 def _game(event: dict, evidence: dict) -> dict | None:
@@ -130,6 +141,35 @@ def _ask(value) -> tuple[Decimal, Decimal] | None:
     if not 0 < cost < 1 or size <= 0:
         raise InvalidHandoff('invalid_quote')
     return cost, size
+
+
+def _fee_scenario(evidence: dict, quote: dict, ask: tuple[Decimal, Decimal],
+        sportsbook_cost: Decimal, observed_at: datetime) -> dict | None:
+    """Price one hypothetical Kalshi taker contract from captured public fee terms."""
+    if ask[1] < 1:
+        return None
+    event=quote.get('event_ticker');series=quote.get('series_ticker')
+    context=evidence['fee_contexts'].get(event)
+    if not isinstance(event,str) or not event or not isinstance(series,str) or not series \
+            or not isinstance(context,dict):
+        return None
+    if (context.get('event_ticker')!=event or context.get('series',{}).get('ticker')!=series
+            or not all(_sha256(context.get(key)) for key in (
+                'series_sha256','series_changes_sha256','event_changes_sha256'))
+            or _timestamp(context.get('received_at'))>observed_at):
+        return None
+    waiver=quote.get('fee_waiver_expiration_time')
+    if waiver is not None and _timestamp(waiver)>observed_at:
+        return None
+    _,multiplier=fee_terms(context,event,observed_at)
+    legs={label:taker_buy_cost(ask[0],Decimal(1),multiplier,precision)
+        for label,precision in (('direct',Decimal('.0001')),('non_direct',Decimal('.01')))}
+    return dict(kalshi_leg=legs,combined_cost={label:str(
+        sportsbook_cost+Decimal(cost['total_cost'])) for label,cost in legs.items()},
+        schedule_ref='https://kalshi.com/regulatory/fee-schedule',
+        scope='One hypothetical Kalshi taker fill for one contract using captured fee terms. '
+            'The sportsbook leg uses its quoted payout cost. Account limits, fills, funding, '
+            'exceptional charges and settlement differences are excluded.')
 
 
 def screen_sportsbooks(event: dict, sport: str, quotes: list[PlayerPropSnapshotCreate],
@@ -202,7 +242,7 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
     if sport not in PROP_MARKETS or now.utcoffset() is None:
         raise ValueError('Invalid screening request')
     try:
-        evidence, captured = _evidence(handoff, sport, now)
+        evidence, captured, version = _evidence(handoff, sport, now)
         game = _game(event, evidence)
     except (InvalidHandoff, KeyError, TypeError, ValueError, AttributeError) as exc:
         reason = str(exc) if isinstance(exc, InvalidHandoff) else 'invalid_handoff'
@@ -252,6 +292,9 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
                     or quote.get('settlement_equivalent') is not False
                     or quote.get('execution_ready') is not False):
                 raise InvalidHandoff('invalid_quote_identity')
+            if version==2 and (not isinstance(quote.get('event_ticker'),str)
+                    or not isinstance(quote.get('series_ticker'),str)):
+                raise InvalidHandoff('invalid_quote_identity')
             target = targets.get(quote.get('player_target_id'))
             if (not isinstance(target, dict) or target.get('team_target_id') != quote.get('team_target_id')
                     or target.get('team_target_id') not in team_ids):
@@ -286,7 +329,13 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
                 gross_cost = ask[0] + book.implied_probability
                 if gross_cost >= 1:
                     continue
-                comparisons.append(dict(kind='kalshi_sportsbook_prop', status='unverified',
+                fee_scenario=None
+                if version==2:
+                    try:
+                        fee_scenario=_fee_scenario(evidence,quote,ask,book.implied_probability,received)
+                    except (InvalidHandoff,KeyError,TypeError,ValueError,ArithmeticError,AttributeError):
+                        pass
+                row=dict(kind='kalshi_sportsbook_prop', status='unverified',
                     event_id=event['id'], milestone_id=game['milestone_id'], player=target['player_name'],
                     prop_type=quote['prop_type'], line=str(line),
                     legs=[dict(venue='kalshi', ticker=quote['ticker'], side=kalshi_side,
@@ -300,8 +349,12 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
                     source_page_sha256=quote['source_page_sha256'],
                     fee_adjusted_profit=None, realized_profit=None, execution_ready=False,
                     reasons=['Settlement rules, DNP/void treatment, and stat provider are unreviewed.',
-                        'Kalshi fees and sportsbook limits are not included.',
-                        'One displayed Kalshi level is not a fill.']))
+                        ('Captured Kalshi fee terms model one hypothetical contract; sportsbook limits are not included.'
+                            if fee_scenario else 'Kalshi fees and sportsbook limits are not included.'),
+                        'One displayed Kalshi level is not a fill.'])
+                if fee_scenario:
+                    row['exchange_fee_scenarios']=fee_scenario
+                comparisons.append(row)
     except (InvalidHandoff, KeyError, TypeError, ValueError, AttributeError):
         return _unavailable(sport, now, 'invalid_quote_evidence')
 

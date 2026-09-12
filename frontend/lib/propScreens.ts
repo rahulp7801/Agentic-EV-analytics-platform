@@ -49,6 +49,28 @@ function leg(value: unknown) {
   throw new Error('Invalid prop screen');
 }
 
+function feeScenarios(value: unknown, kalshiCost: string, sportsbookCost: string) {
+  if (value === undefined) return undefined;
+  const scenario=record(value), kalshi=record(scenario.kalshi_leg), combined=record(scenario.combined_cost);
+  const result:Record<string,{kalshi_exchange_fee:string;combined_cost:string}>={};
+  for (const label of ['direct','non_direct']) {
+    const detail=record(kalshi[label]);
+    const principal=decimal(detail.principal,0,1,true);
+    const fee=decimal(detail.exchange_fee,0);
+    const total=decimal(detail.total_cost,0);
+    const cost=decimal(combined[label],0);
+    if (Math.abs(Number(principal)-Number(kalshiCost))>1e-12
+        || Math.abs(Number(total)-Number(principal)-Number(fee))>1e-12
+        || Math.abs(Number(cost)-Number(total)-Number(sportsbookCost))>1e-12) {
+      throw new Error('Invalid prop screen');
+    }
+    result[label]={kalshi_exchange_fee:fee,combined_cost:cost};
+  }
+  if (scenario.schedule_ref !== 'https://kalshi.com/regulatory/fee-schedule')
+    throw new Error('Invalid prop screen');
+  return {direct:result.direct,non_direct:result.non_direct,scope:text(scenario.scope)};
+}
+
 export function publicPropScreen(value: unknown, now=Date.now()) {
   const data=record(value);
   if (data.schema_version !== 1 || (data.sport !== 'nfl' && data.sport !== 'nba')
@@ -94,9 +116,13 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
       if (!allowed.includes(text(item.prop_type)) || Number(line)%1 !== .5
           || Math.abs(Number(legs[0].cost)+Number(legs[1].cost)-Number(cost)) > 1e-12
           || Math.abs(Number(cost)+Number(gap)-1) > 1e-12) throw new Error('Invalid prop screen');
+      const modeled_fee_costs=validKalshi ? feeScenarios(item.exchange_fee_scenarios,
+        legs[0].cost,legs[1].cost) : undefined;
+      if (!validKalshi && item.exchange_fee_scenarios !== undefined) throw new Error('Invalid prop screen');
       return {kind:item.kind,event_id:text(item.event_id), player:text(item.player), prop_type:item.prop_type as string,
         line, gross_cost_to_one_dollar:cost, gross_gap_to_one_dollar:gap, legs,
-        limitations:item.reasons.map(text), status:'unverified', execution_ready:false};
+        ...(modeled_fee_costs ? {modeled_fee_costs} : {}),limitations:item.reasons.map(text),
+        status:'unverified', execution_ready:false};
     });
   if (!Number.isFinite(now)) throw new Error('Invalid prop screen');
   const age=(now-Date.parse(generated))/1000;

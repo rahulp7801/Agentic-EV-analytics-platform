@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate
 from sportsbet.market_watch import digest
+from sportsbet.arbitrage.kalshi_fees import taker_buy_cost
 from sportsbet.prop.cross_venue import screen, screen_sportsbooks
 from sportsbet.quant.vig import american_to_raw_prob
 
@@ -41,7 +42,8 @@ def handoff() -> dict:
             main_game_event_ticker='KXNFLGAME', home_team_id='home', away_team_id='away',
             home_team_aliases=['KC', 'Kansas City Chiefs'], away_team_aliases=['BUF', 'Buffalo Bills'])],
         coverage=dict(discovery_complete=True, series_observed=4, series_expected=4,
-            structured_quote_markets=1, player_resolved_quote_markets=1), partial_coverage=False)
+            structured_quote_markets=1, player_resolved_quote_markets=1,
+            fee_contexts_expected=0,fee_contexts_observed=0), partial_coverage=False)
     return dict(schema_version=1, sport='nfl', captured_at=NOW.isoformat(), status='observed',
         evidence=evidence, evidence_sha256=digest(evidence), execution_ready=False)
 
@@ -49,6 +51,24 @@ def handoff() -> dict:
 def rehash(value: dict) -> dict:
     value['evidence_sha256'] = digest(value['evidence'])
     return value
+
+
+def fee_handoff() -> dict:
+    value=handoff();value['schema_version']=2
+    quote=value['evidence']['quotes'][0]
+    quote['event_ticker']='KXNFLPASSYDS-26SEP13KCBUF'
+    quote['series_ticker']='KXNFLPASSYDS'
+    sha='b'*64
+    value['evidence']['fee_contexts']={quote['event_ticker']:dict(status='observed',
+        received_at=(NOW-timedelta(seconds=3)).isoformat(),event_ticker=quote['event_ticker'],
+        series={'ticker':quote['series_ticker'],'fee_type':'quadratic','fee_multiplier':1,
+            'last_updated_ts':(NOW-timedelta(days=1)).isoformat()},
+        series_changes={'series_fee_change_arr':[]},
+        event_changes={'event_fee_changes':[],'cursor':''},series_sha256=sha,
+        series_changes_sha256=sha,event_changes_sha256=sha)}
+    value['evidence']['coverage']['fee_contexts_expected']=1
+    value['evidence']['coverage']['fee_contexts_observed']=1
+    return rehash(value)
 
 
 def test_exact_complementary_quotes_emit_only_an_unverified_gross_screen():
@@ -61,6 +81,33 @@ def test_exact_complementary_quotes_emit_only_an_unverified_gross_screen():
     assert row['gross_gap_to_one_dollar'] == '0.15'
     assert row['settlement_equivalent'] is False and row['execution_ready'] is False
     assert row['fee_adjusted_profit'] is None and row['realized_profit'] is None
+
+
+def test_captured_prop_fees_add_a_cost_scenario_without_claiming_profit():
+    result=screen(event(),'nfl',[book()],fee_handoff(),NOW)
+    row,=result['comparisons'];scenario=row['exchange_fee_scenarios']
+    expected=taker_buy_cost(Decimal('.45'),Decimal(1),Decimal(1),Decimal('.0001'))
+    assert scenario['kalshi_leg']['direct']==expected
+    assert Decimal(scenario['combined_cost']['direct'])==Decimal(expected['total_cost'])+Decimal('.4')
+    assert scenario['schedule_ref']=='https://kalshi.com/regulatory/fee-schedule'
+    assert row['fee_adjusted_profit'] is None and row['settlement_equivalent'] is False
+    assert row['execution_ready'] is False
+
+
+def test_missing_ambiguous_or_waived_prop_fees_preserve_only_the_gross_screen():
+    cases=[]
+    missing=fee_handoff();missing['evidence']['fee_contexts']={}
+    missing['evidence']['coverage']['fee_contexts_observed']=0;cases.append(rehash(missing))
+    incomplete=fee_handoff();context=next(iter(incomplete['evidence']['fee_contexts'].values()))
+    context['event_changes']['cursor']='next';cases.append(rehash(incomplete))
+    waived=fee_handoff();waived['evidence']['quotes'][0]['fee_waiver_expiration_time']=(
+        NOW+timedelta(hours=1)).isoformat();cases.append(rehash(waived))
+    small=fee_handoff();small['evidence']['quotes'][0]['yes_ask']['displayed_size']='0.5';cases.append(rehash(small))
+    for changed in cases:
+        row,=screen(event(),'nfl',[book()],changed,NOW)['comparisons']
+        assert 'exchange_fee_scenarios' not in row
+        assert row['gross_gap_to_one_dollar']=='0.15'
+        assert row['fee_adjusted_profit'] is None
 
 
 def test_all_collected_core_nfl_prop_series_have_a_sportsbook_market():

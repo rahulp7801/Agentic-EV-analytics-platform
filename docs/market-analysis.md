@@ -87,9 +87,12 @@ The input schema is `MarketAnalysisRequest` in `arbitrage/portfolio.py`. Settlem
 map candidate IDs to `state`, `source_ref`, and timezone-aware `resolved_at`. The
 replay reports individual simulated payoff bounds, source/code hashes, and missing
 settlements; realized ROI remains null. It does not invent fills or execution latency.
-Synthetic test fixtures validate arithmetic and graph routing only. Automatic
-conversion of live sportsbook/Kalshi/PrizePicks feeds to reviewed candidates is
-not yet implemented; raw Kalshi archives must not be described as executable inputs.
+Synthetic test fixtures validate arithmetic and graph routing only. The production
+scanner now creates exact, non-executable price screens for sportsbook pairs and
+Kalshi/sportsbook props. It still does not turn those screens into optimizer
+candidates because account capacity and settlement-state equivalence are unresolved.
+PrizePicks entries are not automatically converted. Raw Kalshi archives must not
+be described as executable inputs.
 
 ## Research that changes implementation
 
@@ -214,6 +217,19 @@ This uses the already-fetched [Get Markets](https://docs.kalshi.com/api-referenc
 pages, avoiding thousands of extra order-book calls. Missing one-sided liquidity
 is preserved as missing; inconsistent prices, identities, UUIDs, rules, or pages
 degrade the source instead of producing a quote.
+
+Each linked prop event also gets a bounded public fee-evidence read before its
+market quotes. The internal version-2 handoff retains only current series terms,
+historical scheduled changes, event overrides, timestamps, and source hashes.
+Fee reads use at most eight concurrent requests. Missing fee evidence is reported
+separately and preserves the gross quote inventory. When the fee history is
+complete, unambiguous, older than the quote, and fresh, the exact prop matcher
+adds direct-account and non-direct-account cost scenarios for one displayed
+contract. Active fee waivers and displayed size below one contract suppress the
+scenario. The public API exposes only the modeled Kalshi exchange fee, combined
+cost, and scope; it does not expose raw fee evidence or label the result profit.
+Settlement equivalence, sportsbook limits, actual fills, and realized profit
+remain false or unavailable.
 
 `occurrence_datetime` is retained as market metadata and is not used as kickoff.
 In a real NFL sample it was three hours after the linked milestone start. The

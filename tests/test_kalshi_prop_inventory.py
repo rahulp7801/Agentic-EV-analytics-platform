@@ -42,6 +42,12 @@ def configure_targets(reader: AsyncMock) -> None:
     reader.targets.return_value={'structured_targets':[{
         'id':'30000000-0000-0000-0000-000000000003','name':'Player Name','type':'football_player',
         'details':{'league':'NFL','team_id':'10000000-0000-0000-0000-000000000001'}}],'cursor':''}
+    async def series(name):
+        return {'ticker':name,'fee_type':'quadratic','fee_multiplier':1,
+            'last_updated_ts':(NOW-timedelta(days=1)).isoformat()}
+    reader.series.side_effect=series
+    reader.series_fee_changes.return_value={'series_fee_change_arr':[]}
+    reader.event_fee_changes.return_value={'event_fee_changes':[],'cursor':''}
 
 
 @pytest.mark.asyncio
@@ -81,6 +87,8 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
         'structured_quote_markets': 3,
         'two_sided_quote_markets': 3,
         'player_resolved_quote_markets': 3,
+        'fee_contexts_expected': 2,
+        'fee_contexts_observed': 2,
         'discovery_complete': True,
     }
     assert result['series']['KXNFLPASSYDS']['pages'] == 2
@@ -108,6 +116,9 @@ async def test_prop_inventory_links_structured_events_and_reports_complete_pages
     assert target['target_sha256']==market_watch.digest(reader.targets.return_value['structured_targets'][0])
     assert datetime.fromisoformat(target['target_request_started_at']) <= datetime.fromisoformat(target['target_received_at'])
     assert reader.markets.await_count == 5
+    assert set(result['fee_contexts'])=={passing,rushing}
+    assert result['fee_failures']==[]
+    assert all(context['event_ticker'] in (passing,rushing) for context in result['fee_contexts'].values())
 
 
 @pytest.mark.asyncio
@@ -206,3 +217,22 @@ async def test_prop_target_failure_retains_quotes_but_blocks_cross_provider_iden
     assert 'player_name' not in result['quotes'][0]
     assert result['targets']=={}
     assert result['failures']==[{'stage':'prop_targets','error_type':'ValueError'}]
+
+
+@pytest.mark.asyncio
+async def test_fee_failure_preserves_quote_inventory_and_is_reported_separately():
+    event='KXNFLPASSYDS-26SEP13ATLPIT';reader=AsyncMock()
+    configure_targets(reader)
+    async def pages(series,**kwargs):
+        return {'markets':[market(series,event,'PLAYER-250')] if series=='KXNFLPASSYDS' else [],'cursor':''}
+    reader.markets.side_effect=pages
+    reader.event_fee_changes.side_effect=RuntimeError('private provider detail')
+    result=await market_watch.kalshi_prop_inventory(reader,'nfl',[game(1,event)])
+    assert result['status']=='observed' and result['partial_coverage'] is False
+    assert result['coverage']['structured_quote_markets']==1
+    assert result['coverage']['fee_contexts_expected']==1
+    assert result['coverage']['fee_contexts_observed']==0
+    assert result['fee_contexts']=={}
+    assert result['fee_failures']==[{'stage':'prop_fees','series':'KXNFLPASSYDS',
+        'event_ticker':event,'error_type':'RuntimeError'}]
+    assert 'private provider detail' not in str(result)
