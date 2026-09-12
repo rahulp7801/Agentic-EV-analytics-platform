@@ -253,3 +253,37 @@ def test_stat_source_constraints_preserve_legacy_and_require_new_evidence() -> N
     columns={column['name'] for column in sa.inspect(engine).get_columns('player_stats')}
     assert not {'source_provider','source_sha256','source_record_sha256','source_observed_at'} & columns
     engine.dispose();alembic.command.downgrade(cfg,'base')
+
+
+@pytest.mark.serial
+@pytest.mark.skipif(
+    not os.environ.get("SPORTSBET_TEST_DATABASE_URL"),
+    reason="SPORTSBET_TEST_DATABASE_URL not set",
+)
+def test_verified_settlement_evidence_constraint_preserves_legacy_rows() -> None:
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];cfg=get_alembic_cfg(url)
+    alembic.command.upgrade(cfg,'0019_prop_quote_provenance')
+    engine=sa.create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(sa.text("""INSERT INTO analytics.predictions
+            (id,scan_id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at)
+            VALUES ('legacy-proof','s','{}','true','observed_final_stats','legacy',NOW())"""))
+    alembic.command.upgrade(cfg,'head')
+    with engine.connect() as conn:
+        row=conn.execute(sa.text("""SELECT outcome,outcome_evidence FROM analytics.predictions
+            WHERE id='legacy-proof'""")).one()
+        assert tuple(row)==('true',None)
+        assert conn.execute(sa.text("""SELECT convalidated FROM pg_constraint
+            WHERE conname='ck_verified_settlement_evidence'""")).scalar_one() is False
+    with pytest.raises(sa.exc.IntegrityError):
+        with engine.begin() as conn:
+            conn.execute(sa.text("""UPDATE analytics.predictions SET outcome='false'
+                WHERE id='legacy-proof'"""))
+    with engine.begin() as conn:
+        conn.execute(sa.text("""UPDATE analytics.predictions SET outcome='false',outcome_evidence='{}'
+            WHERE id='legacy-proof'"""))
+    alembic.command.downgrade(cfg,'0019_prop_quote_provenance')
+    with engine.connect() as conn:
+        assert 'outcome_evidence' not in {
+            column['name'] for column in sa.inspect(engine).get_columns('predictions',schema='analytics')}
+    engine.dispose();alembic.command.downgrade(cfg,'base')

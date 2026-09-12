@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import json
 
 import pytest
 
@@ -55,6 +56,24 @@ def test_settlement_uses_final_exact_game_and_observed_stat(tmp_path,direction,l
     assert row['outcome_source']=='observed_final_stats'
     assert row['outcome_ref'].startswith('espn_schedule+nba:espn-event:sha256:')
     assert datetime.fromisoformat(row['outcome_observed_at']).utcoffset() is not None
+    assert row['outcome_evidence']['actual_value']==str(actual)
+    metrics=ledger.report()
+    assert metrics['settled_count']==1 and metrics['unverified_settlements']==0
+
+
+def test_metrics_reject_tampered_retained_settlement_evidence(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite');key,payload=prediction(ledger)
+    with ledger.connect() as db:
+        create_nba_stats(db);add_nba_stat(db,payload,21)
+    assert settle_final_props(ledger,'nba',schedule(payload))['settled']==1
+    with ledger.connect() as db:
+        proof=json.loads(db.execute('SELECT outcome_evidence FROM predictions WHERE id=?',(key,)).fetchone()[0])
+        proof['actual_value']='99'
+        db.execute('UPDATE predictions SET outcome_evidence=? WHERE id=?',
+            (json.dumps(proof,sort_keys=True,separators=(',',':')),key))
+    metrics=ledger.report()
+    assert metrics['settled_count']==0 and metrics['pending_count']==1
+    assert metrics['unverified_settlements']==1 and metrics['roi'] is None
 
 
 @pytest.mark.parametrize(('schedule_change','stats','reason'),[

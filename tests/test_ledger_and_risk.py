@@ -39,7 +39,8 @@ def test_audit_records_rejected_and_pending_without_fabricated_results(tmp_path)
     assert ledger.report()['pending_count']==1
     assert ledger.report()['roi'] is None
     ledger.settle({key:True})
-    assert ledger.report()['brier_score']==pytest.approx(.16)
+    assert ledger.report()['brier_score'] is None
+    assert ledger.report()['unverified_settlements']==1
     assert ledger.report(True)['sample_size']==0
     with pytest.raises(ValueError):ledger.settle({'unknown':False})
 
@@ -58,7 +59,7 @@ def test_manual_settlement_cli_hashes_the_exact_input_file(tmp_path,monkeypatch,
     assert row['outcome_ref']=='sha256:'+hashlib.sha256(raw).hexdigest()
 
 
-def test_legacy_automatic_outcomes_remain_unscored_until_verified(tmp_path):
+def test_claimed_automatic_outcomes_require_retained_evidence(tmp_path):
     ledger=Ledger(tmp_path/'audit.sqlite');now=datetime.now(timezone.utc)
     key=ledger.record('scan',dict(game_id='g',player='P',prop_type='points',direction='over',
         line=20.5,sportsbook='book',american_odds=100,model_probability=.6,
@@ -67,9 +68,8 @@ def test_legacy_automatic_outcomes_remain_unscored_until_verified(tmp_path):
     legacy=ledger.report()
     assert legacy['settled_count']==0 and legacy['pending_count']==1
     assert legacy['unverified_settlements']==1
-    ledger.settle({key:True},source='observed_final_stats',source_ref='verified')
-    verified=ledger.report()
-    assert verified['settled_count']==1 and verified['unverified_settlements']==0
+    with pytest.raises(ValueError,match='evidence'):
+        ledger.settle({key:True},source='observed_final_stats',source_ref='verified')
 
 @pytest.mark.parametrize('side', ['over','under'])
 async def test_sample_gate_and_synthetic_prices_apply_to_both_sides(side):

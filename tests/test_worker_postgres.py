@@ -50,6 +50,8 @@ def test_final_prop_settlement_uses_real_postgres_and_retains_provenance():
         row=next(item for item in ledger.predictions() if item['prediction_id']==key)
         assert row['outcome'] is True and row['actual_value']==21
         assert row['outcome_source']=='observed_final_stats' and identity in row['outcome_ref']
+        assert row['outcome_evidence']['stat_record_sha256']==stat_row_sha256('nba',stat)
+        assert ledger.report()['unverified_settlements']==0
     finally:
         with engine.begin() as conn:
             conn.execute(sa.text('DELETE FROM nba_player_gamelogs WHERE game_id=:id'),{'id':identity})
