@@ -11,9 +11,11 @@ from langgraph.graph import END, START, StateGraph
 
 from sportsbet.dashboard import load_snapshot, publish_snapshot
 from sportsbet.market_watch import run as watch, DEFAULT_GAME_LIMIT
+from sportsbet.ledger import Ledger
 from sportsbet.refresh import refresh_history
 from sportsbet.scan import run as scan, timestamp
 from sportsbet.schedules import collect as collect_schedule
+from sportsbet.settlement import settle_final_props
 
 MODES=('daily','monitor','public_daily','public_monitor')
 
@@ -25,6 +27,8 @@ class DailyState(TypedDict, total=False):
     histories: dict
     markets: dict
     schedules: dict
+    schedule_evidence: dict
+    settlements: dict
     props: dict
     report: dict
 
@@ -33,12 +37,13 @@ def create_daily_graph():
     graph=StateGraph(DailyState)
 
     async def schedules(state):
-        results={}
+        results={};evidence={}
         for sport in state['sports']:
             result=await collect_schedule(sport)
             publish_snapshot('schedule:'+sport,result)
             results[sport]={'status':result['status'],'captured_at':result['captured_at']}
-        return {'schedules':results}
+            evidence[sport]=result
+        return {'schedules':results,'schedule_evidence':evidence}
 
     async def histories(state):
         results={}
@@ -100,15 +105,44 @@ def create_daily_graph():
                     results[sport]=result
         return {'props':results}
 
+    async def settlements(state):
+        if state['mode']=='public_monitor':
+            return {'settlements':{sport:{'status':'not_requested','reason':'history_not_refreshed'}
+                for sport in state['sports']}}
+        try:
+            ledger=Ledger()
+        except Exception as exc:
+            return {'settlements':{sport:{'status':'failed','error_type':type(exc).__name__}
+                for sport in state['sports']}}
+        results={}
+        for sport in state['sports']:
+            if state['histories'][sport]['status']!='complete':
+                results[sport]={'status':'blocked','reason':'history_refresh_unavailable'}
+                continue
+            try:
+                results[sport]=await asyncio.to_thread(
+                    settle_final_props,ledger,sport,state['schedule_evidence'][sport])
+            except Exception as exc:
+                results[sport]={'status':'failed','error_type':type(exc).__name__}
+        try:
+            publish_snapshot('metrics:all',ledger.report())
+            publish_snapshot('metrics:recommendations',ledger.report(True))
+        except Exception as exc:
+            for result in results.values():
+                if result['status']=='complete':
+                    result.update(status='failed',error_type=type(exc).__name__)
+        return {'settlements':results}
+
     def report(state):
         public=state['mode'].startswith('public_')
-        groups=('markets','schedules') if public else ('histories','markets','props','schedules')
-        if state['mode']=='public_daily':groups+=('histories',)
+        groups=('markets','schedules') if public else ('histories','markets','props','schedules','settlements')
+        if state['mode']=='public_daily':groups+=('histories','settlements')
         accepted=('complete','observed') if public else ('complete',)
         healthy=all(r['status'] in accepted for group in groups for r in state[group].values())
         result=dict(mode=state['mode'],finished_at=datetime.now(timezone.utc).isoformat(),
             status=('observed' if public else 'complete') if healthy else 'degraded',execution_ready=False,
             histories=state['histories'],markets=state['markets'],schedules=state['schedules'],
+            settlements=state['settlements'],
             props={s:{k:v for k,v in r.items() if k not in ('attempts','coverage')} for s,r in state['props'].items()})
         if public:
             result['scope']='Public-only scheduled observation: Kalshi markets and ESPN schedules; daily NBA/NFL history refresh. Sportsbooks, PrizePicks and prop recommendations are not requested. Partial market sampling is retained explicitly. This is periodic collection, not continuous arbitrage monitoring.'
@@ -118,13 +152,15 @@ def create_daily_graph():
     graph.add_node('histories',histories)
     graph.add_node('markets',markets)
     graph.add_node('schedules',schedules)
+    graph.add_node('settlements',settlements)
     graph.add_node('props',props)
     graph.add_node('report',report)
     graph.add_edge(START,'histories')
     graph.add_edge(START,'markets')
     graph.add_edge(START,'schedules')
     # Collect market prices before props compete for the remaining paid allowance.
-    graph.add_edge(['histories','markets','schedules'],'props')
+    graph.add_edge(['histories','schedules'],'settlements')
+    graph.add_edge(['markets','settlements'],'props')
     graph.add_edge('props','report')
     graph.add_edge('report',END)
     return graph.compile()

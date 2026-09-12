@@ -165,7 +165,9 @@ class Ledger:
         with self.connect() as db:
             rows = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value FROM predictions ORDER BY id').fetchall()
         return [{'prediction_id':key, **json.loads(payload), 'outcome':json.loads(outcome) if outcome else None,
-            'outcome_source':source,'outcome_ref':ref,'outcome_observed_at':observed,'actual_value':actual}
+            'outcome_source':source,'outcome_ref':ref,
+            'outcome_observed_at':observed.isoformat() if isinstance(observed,datetime) else observed,
+            'actual_value':float(actual) if actual is not None else None}
             for key,payload,outcome,source,ref,observed,actual in rows]
 
     def report(self, recommendations_only: bool = False, model_version: str | None = None) -> dict:

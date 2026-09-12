@@ -21,6 +21,9 @@ def test_schedule_preserves_start_and_rejects_ambiguous_identity():
     data=board();data['events'][0]['date']='2026-09-11T23:00:00'
     with pytest.raises(ValueError,match='timezone'):
         schedules.parse_day(data,'20260911','Today')
+    data=board();del data['events'][0]['status']
+    with pytest.raises(ValueError,match='completion'):
+        schedules.parse_day(data,'20260911','Today')
 
 
 @pytest.mark.asyncio

@@ -13,7 +13,14 @@ from sportsbet.config import settings
 @pytest.fixture(autouse=True)
 def schedule_source(monkeypatch):
     monkeypatch.setattr(daily,'collect_schedule',AsyncMock(return_value={
-        'status':'complete','captured_at':datetime.now(timezone.utc).isoformat()}))
+        'status':'complete','captured_at':datetime.now(timezone.utc).isoformat(),'games':[]}))
+    class Audit:
+        def report(self,recommendations_only=False):
+            return {'cohort':'recommendations' if recommendations_only else 'all_predictions'}
+    monkeypatch.setattr(daily,'Ledger',Audit)
+    monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:{
+        'sport':sport,'status':'complete','candidates':0,'settled':0,'pending':0,
+        'reasons':{},'execution_ready':False})
 
 
 @pytest.mark.asyncio
@@ -39,6 +46,8 @@ async def test_actual_daily_graph_isolates_refresh_failure_and_orders_paid_stage
     assert report['status']=='degraded'
     assert report['props']['nfl']['status']=='blocked'
     assert report['props']['nba']['status']=='complete'
+    assert report['settlements']['nfl']['status']=='blocked'
+    assert report['settlements']['nba']['status']=='complete'
     assert report['markets']['nba']['status']=='degraded'  # Unspecified coverage is not complete.
     assert stored['scan:nfl']['reason']=='history_refresh_unavailable'
     assert 'secret' not in str(report)
@@ -73,6 +82,43 @@ async def test_monitor_uses_recent_history_and_refreshes_markets_before_props(mo
     monkeypatch.setattr(daily,'scan',scan);monkeypatch.setattr(daily,'watch',watch)
     assert (await daily.run(['nba'],'monitor',25))['status']=='complete'
     scan.assert_awaited_once_with(['nba'],25)
+
+
+@pytest.mark.asyncio
+async def test_daily_settles_observed_stats_before_scanning_new_props(monkeypatch):
+    calls=[];stored={}
+    monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    monkeypatch.setattr(daily,'refresh_history',lambda sport,day:(calls.append(('refresh',sport)) or {'status':'complete'}))
+    monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:
+        (calls.append(('settle',sport)) or {'status':'complete','settled':1,'pending':0}))
+    monkeypatch.setattr(daily,'watch',AsyncMock(return_value=({'sources':{'kalshi':{
+        'status':'observed','partial_coverage':False}},'captured_at':datetime.now(timezone.utc).isoformat()},None)))
+    async def scan(sports,limit):
+        assert ('settle','nba') in calls
+        calls.append(('scan','nba'))
+        return {'nba':{'status':'complete'}}
+    monkeypatch.setattr(daily,'scan',scan)
+    result=await daily.run(['nba'],'daily',25)
+    assert result['status']=='complete' and calls.index(('settle','nba'))<calls.index(('scan','nba'))
+    assert stored['metrics:all']['cohort']=='all_predictions'
+    assert stored['metrics:recommendations']['cohort']=='recommendations'
+
+
+@pytest.mark.asyncio
+async def test_settlement_failure_is_redacted_and_degrades_without_suppressing_scan(monkeypatch):
+    monkeypatch.setattr(daily,'load_snapshot',lambda key:dict(
+        status='complete',finished_at=datetime.now(timezone.utc).isoformat()))
+    monkeypatch.setattr(daily,'publish_snapshot',lambda *args:None)
+    monkeypatch.setattr(daily,'settle_final_props',lambda *args:(_ for _ in ()).throw(
+        RuntimeError('provider URL with secret')))
+    monkeypatch.setattr(daily,'watch',AsyncMock(return_value=({'sources':{'kalshi':{
+        'status':'observed','partial_coverage':False}},'captured_at':datetime.now(timezone.utc).isoformat()},None)))
+    scan=AsyncMock(return_value={'nba':{'status':'complete'}});monkeypatch.setattr(daily,'scan',scan)
+    result=await daily.run(['nba'],'monitor',25)
+    assert result['status']=='degraded' and result['settlements']['nba']=={
+        'status':'failed','error_type':'RuntimeError'}
+    assert 'secret' not in str(result)
+    scan.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -160,6 +206,8 @@ async def test_public_modes_use_real_graph_and_collector_without_paid_or_prop_ca
     assert kalshi.await_count==2
     books.assert_not_called();prizepicks.assert_not_called();props.assert_not_called()
     assert all(value['status']=='not_requested' for value in result['props'].values())
+    expected='complete' if mode=='public_daily' else 'not_requested'
+    assert all(value['status']==expected for value in result['settlements'].values())
     assert not any(key.startswith('scan:') for key in stored)
     assert {'schedule:nfl','schedule:nba','markets:nfl','markets:nba','pipeline:'+mode}<=set(stored)
     for sport in ('nfl','nba'):
