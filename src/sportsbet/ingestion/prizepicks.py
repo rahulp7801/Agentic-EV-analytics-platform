@@ -18,6 +18,26 @@ SOURCE = 'https://api.prizepicks.com/projections'
 LEAGUES = {'nba': 7, 'nfl': 9}
 
 
+class PrizePicksUnavailable(RuntimeError):
+    """A projection request failed with a safe public reason."""
+
+    def __init__(self, reason: str):
+        if reason not in {'access_denied','rate_limited','upstream_unavailable','request_rejected'}:
+            raise ValueError('Invalid public provider failure reason')
+        super().__init__('Projection source unavailable')
+        self.reason = reason
+
+
+def _failure_reason(status_code: int) -> str:
+    if status_code in (401,403):
+        return 'access_denied'
+    if status_code == 429:
+        return 'rate_limited'
+    if 500 <= status_code <= 599:
+        return 'upstream_unavailable'
+    return 'request_rejected'
+
+
 class Projection(BaseModel):
     projection_id: str = Field(min_length=1)
     player_id: str = Field(min_length=1)
@@ -58,7 +78,7 @@ async def capture(sport: str, output: Path | None = None):
     async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
         response = await client.get(SOURCE, params={'league_id':LEAGUES[sport], 'per_page':500, 'single_stat':'true'})
         if response.status_code != 200:
-            raise RuntimeError(f'Projection source unavailable (HTTP {response.status_code})')
+            raise PrizePicksUnavailable(_failure_reason(response.status_code))
         data = response.json()
     projections, skipped = parse_projections(data)
     report = dict(provider='prizepicks', sport=sport, captured_at=datetime.now(timezone.utc).isoformat(),

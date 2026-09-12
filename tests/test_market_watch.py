@@ -169,7 +169,20 @@ async def test_unavailable_source_is_retained_without_discarding_other_evidence(
     assert path.exists()
     assert report['sources']['sportsbook']['status']=='observed'
     assert report['sources']['prizepicks']['status']=='unavailable'
+    assert 'reason' not in report['sources']['prizepicks']
     assert 'secrets' not in path.read_text()
+
+
+@pytest.mark.asyncio
+async def test_prizepicks_access_denial_is_safely_classified(monkeypatch,tmp_path):
+    from sportsbet import market_watch
+    from sportsbet.ingestion.prizepicks import PrizePicksUnavailable
+    async def blocked(*args):raise PrizePicksUnavailable('access_denied')
+    monkeypatch.setattr(market_watch,'capture_projections',blocked)
+    monkeypatch.chdir(tmp_path)
+    report,_=await market_watch.run('nfl',25,1,False,'prizepicks')
+    assert report['sources']['prizepicks']==dict(
+        status='unavailable',count=0,partial_coverage=True,reason='access_denied')
 
 
 def test_captured_event_fees_change_pair_and_cross_venue_costs_without_claiming_profit():

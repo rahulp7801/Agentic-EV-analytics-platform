@@ -1,12 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { Sport } from '@/lib/types';
-import {marketCoverageText,propQuoteCoverageText,type MarketCoverage,type PropQuoteCoverage} from '@/lib/marketCoverage';
+import {marketCoverageText,propQuoteCoverageText,sourceFailureText,type MarketCoverage,type PropQuoteCoverage} from '@/lib/marketCoverage';
 
 interface Observation {
   captured_at: string;
   scope: string;
-  sources: Record<string,{status:string;count:number;partial_coverage:boolean;
+  sources: Record<string,{status:string;count:number;partial_coverage:boolean;reason?:string;
     coverage?:(MarketCoverage & Partial<PropQuoteCoverage> & {discovery_complete:boolean;omitted_markets:number;
       prop_discovery_complete?:boolean;prop_series_observed?:number;prop_series_expected?:number;prop_open_markets?:number;prop_open_events?:number;prop_linked_markets?:number;prop_linked_events?:number;prop_player_resolved_quote_markets?:number})}>;
   comparisons: {identity:string;kind:string;title:string;gross_cost:string;gross_gap_to_one_dollar:string;
@@ -75,6 +75,7 @@ export default function MarketWatch({sport}:{sport:Sport}) {
       <p>Collection finished {new Date(data.captured_at).toLocaleString()}. Quote freshness is shown for each comparison.</p>
       <ul>{Object.entries(data.sources).map(([name,source])=><li key={name}>
         {name}: {source.status} · {source.count} source records{source.partial_coverage ? ' · partial coverage' : ''}
+        {sourceFailureText(source.reason) && ` · ${sourceFailureText(source.reason)}`}
         {source.coverage && <span> · {marketCoverageText(source.coverage)}
           {!source.coverage.discovery_complete && ' · discovery incomplete'}
           {source.coverage.omitted_markets>0 && ` · ${source.coverage.omitted_markets} markets omitted`}</span>}

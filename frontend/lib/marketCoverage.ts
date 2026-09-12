@@ -18,6 +18,14 @@ export interface PropQuoteCoverage {
   prop_unquoted_markets?:number;
 }
 
+export function sourceFailureText(reason:unknown):string|null {
+  if (reason==='access_denied') return 'provider access denied';
+  if (reason==='rate_limited') return 'provider rate limited';
+  if (reason==='upstream_unavailable') return 'provider temporarily unavailable';
+  if (reason==='request_rejected') return 'provider rejected the request';
+  return null;
+}
+
 export function marketCoverageText(coverage:MarketCoverage):string {
   const {attempted_games:attempted,observed_games:observed,event_failed_games:eventFailed,
     market_failed_games:marketFailed,sample_complete_games:complete,quoted_games:quoted}=coverage;

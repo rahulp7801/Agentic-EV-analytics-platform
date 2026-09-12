@@ -17,7 +17,7 @@ from sportsbet.dashboard import publish_snapshot
 from sportsbet.ingestion.archive import write_archive
 from sportsbet.ingestion.kalshi import KalshiReader
 from sportsbet.ingestion.kalshi_history import SERIES as KALSHI_PROP_SERIES
-from sportsbet.ingestion.prizepicks import capture as capture_projections
+from sportsbet.ingestion.prizepicks import PrizePicksUnavailable, capture as capture_projections
 from sportsbet.ledger import Ledger
 from sportsbet.scan import SPORT_KEYS, timestamp
 from sportsbet.quant.vig import american_to_raw_prob
@@ -699,14 +699,21 @@ async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: boo
     # Independent source failures are retained; a blocked endpoint is not an empty successful scan.
     results = await asyncio.gather(*(collectors[name]() for name in selected),return_exceptions=True)
     for name, result in zip(selected,results):
-        sources[name] = dict(status='unavailable', error_type=type(result).__name__) if isinstance(result,Exception) else result
+        if isinstance(result,Exception):
+            sources[name]=dict(status='unavailable',partial_coverage=True)
+            if isinstance(result,PrizePicksUnavailable):
+                sources[name]['reason']=result.reason
+        else:
+            sources[name]=result
         if name=='prizepicks' and not isinstance(result,Exception):
             sources[name]['status']='observed'
     evidence = dict(schema_version=2, sport=sport, captured_at=datetime.now(timezone.utc).isoformat(), sources=sources)
     rows = comparisons(evidence)
     summary = dict(schema_version=2, sport=sport, captured_at=evidence['captured_at'], evidence_sha256=digest(evidence),
         sources={name:dict(status=source['status'], count=len(source.get('events',source.get('games',source.get('projections',[])))),
-            partial_coverage=source.get('partial_coverage',True),**({'coverage':source['coverage']} if 'coverage' in source else {})) for name,source in sources.items()},
+            partial_coverage=source.get('partial_coverage',True),
+            **({'reason':source['reason']} if 'reason' in source else {}),
+            **({'coverage':source['coverage']} if 'coverage' in source else {})) for name,source in sources.items()},
         comparisons=rows, execution_ready=False, realized_profit=None,
         scope='Observed prices only. Gross gaps exclude fees and full settlement states; they are not verified arbitrage or backtest returns.')
     archive = write_archive(dict(evidence=evidence, summary=summary),directory=Path('.local/market-watch'))
