@@ -13,6 +13,12 @@ def _schedules(source: str) -> set[str]:
     return set(re.findall(r"^\s+- cron: '([^']+)'$", source, re.MULTILINE))
 
 
+def _step(source: str, name: str) -> str:
+    start = source.index(f"      - name: {name}")
+    end = source.find("\n      - ", start + 1)
+    return source[start:] if end == -1 else source[start:end]
+
+
 def test_paid_and_public_schedules_are_isolated() -> None:
     paid = WORKFLOW.read_text(encoding="utf-8")
     public = PUBLIC_WORKFLOW.read_text(encoding="utf-8")
@@ -64,3 +70,27 @@ def test_public_collection_verifies_the_deployed_contract_before_success() -> No
     assert "DATA_PIPELINE_ENABLED: 'false'" in public
     assert "PUBLIC_DATA_PIPELINE_ENABLED: 'true'" in public
     assert "PUBLIC_DATA_REPORT_PATH: ${{ runner.temp }}/public-report.json" in public
+
+
+def test_provider_credentials_are_scoped_to_the_steps_that_need_them() -> None:
+    paid = WORKFLOW.read_text(encoding="utf-8")
+    public = PUBLIC_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "secrets." not in paid[:paid.index("    steps:")]
+    assert "secrets." not in public[:public.index("    steps:")]
+
+    for source, update, evidence in (
+        (paid, "Update market data", "Stage public evidence without configured credentials"),
+        (public, "Update public market data", "Stage public evidence without configured provider credentials"),
+    ):
+        assert "secrets.DATABASE_URL" in _step(source, "Check worker configuration")
+        assert "secrets.DATABASE_URL" in _step(source, "Verify hosted schema is at the application head")
+        assert "secrets.DATABASE_URL" in _step(source, update)
+        assert "secrets.DATABASE_URL" in _step(source, evidence)
+        assert "secrets." not in _step(source, "Install checksum-pinned secret scanner")
+        assert "secrets." not in _step(source, "Scan public evidence")
+        assert "secrets." not in _step(source, "Retain public market evidence for replay")
+
+    assert "secrets." not in _step(public, "Verify deployed public readiness")
+    assert "secrets.ODDS_API_KEY" in _step(paid, "Update market data")
+    assert "ODDS_API_KEY" not in public

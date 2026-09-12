@@ -29,9 +29,6 @@ jobs:
     timeout-minutes: 20
     environment: production
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
-      ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SPORT: ${{ inputs.sport || 'both' }}
       OPERATION: ${{ inputs.operation || ((github.event.schedule == '17 13 * * *' || github.event.schedule == '47 13 * * *') && 'public_daily' || 'public_monitor') }}
     steps:
@@ -47,14 +44,23 @@ jobs:
       - run: pip install uv==0.11.32
       - run: uv sync --locked
       - name: Check worker configuration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
         run: |
           test -n "$DATABASE_URL" && test -n "$DATABASE_URL_ASYNC" || {
             echo 'Configure the database repository secrets before running public updates.'
             exit 1
           }
       - name: Verify hosted schema is at the application head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: uv run --locked alembic current --check-heads
       - name: Update public market data
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
+          ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" | tee "$RUNNER_TEMP/public-report.json"
       - name: Verify deployed public readiness
         env:
@@ -65,6 +71,10 @@ jobs:
       - name: Stage public evidence without configured provider credentials
         if: always()
         id: evidence
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
+          ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: uv run --locked python -m sportsbet.ingestion.public_artifacts --output "$RUNNER_TEMP/public-evidence"
       - name: Install checksum-pinned secret scanner
         if: always() && steps.evidence.outcome == 'success'
