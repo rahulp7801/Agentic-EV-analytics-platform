@@ -369,7 +369,7 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
         failures.extend(prop_inventory['failures'])
         games = []
         targets = {}
-        failed_games=set();omitted_markets=0
+        event_failed_games=set();market_failed_games=set();omitted_markets=0
         for milestone in eligible[:limit]:
             details = milestone['details']
             identity=details['main_game_event_ticker']
@@ -386,7 +386,7 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
                         targets[target_id] = await reader.target(target_id)
             except Exception as exc:
                 failures.append(dict(stage='event',event_ticker=identity,error_type=type(exc).__name__))
-                failed_games.add(identity)
+                event_failed_games.add(identity)
                 continue
             fee_context={'status':'unavailable'}
             if series_data is not None and series_changes is not None:
@@ -407,7 +407,7 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
                     snapshots.append(snapshot)
                 except Exception as exc:
                     failures.append(dict(stage='market',event_ticker=identity,market_ticker=market['ticker'],error_type=type(exc).__name__))
-                    failed_games.add(identity)
+                    market_failed_games.add(identity)
             games.append(dict(milestone=milestone, event=event, snapshots=snapshots,fee_context=fee_context))
     teams = None
     try:
@@ -422,10 +422,14 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
     return dict(status='degraded' if failures else 'observed', games=games, targets=targets,
         discovery_pages=pages,team_directory=teams,failures=failures,
         prop_inventory=prop_inventory,
-        partial_coverage=not discovery_complete or len(eligible)>limit or bool(failed_games) or bool(omitted_markets)
+        partial_coverage=not discovery_complete or len(eligible)>limit or bool(event_failed_games)
+            or bool(market_failed_games) or bool(omitted_markets)
             or prop_inventory['partial_coverage'],
         coverage=dict(discovery_complete=discovery_complete,discovered_games=len(eligible),
-            attempted_games=min(limit,len(eligible)),observed_games=len(games),failed_games=len(failed_games),
+            attempted_games=min(limit,len(eligible)),observed_games=len(games),
+            event_failed_games=len(event_failed_games),market_failed_games=len(market_failed_games),
+            sample_complete_games=len(games)-len(market_failed_games),
+            failed_games=len(event_failed_games|market_failed_games),
             quoted_games=sum(bool(game['snapshots']) for game in games),omitted_markets=omitted_markets,
             prop_discovery_complete=prop_coverage['discovery_complete'],
             prop_series_observed=prop_coverage['series_observed'],prop_series_expected=prop_coverage['series_expected'],

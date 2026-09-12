@@ -83,12 +83,17 @@ async def test_one_failed_game_or_market_does_not_discard_other_observations(mon
     source=await market_watch.kalshi_games('nfl',NOW,20)
     assert source['status']=='degraded' and source['partial_coverage'] is True
     assert source['coverage']==dict(discovery_complete=True,discovered_games=4,attempted_games=4,
-        observed_games=3,quoted_games=1,failed_games=3,omitted_markets=0,
+        observed_games=3,event_failed_games=1,market_failed_games=2,sample_complete_games=1,
+        quoted_games=1,failed_games=3,omitted_markets=0,
         prop_discovery_complete=True,prop_series_observed=4,prop_series_expected=4,
         prop_open_markets=0,prop_open_events=0,prop_linked_markets=0,prop_linked_events=0,
         prop_structured_quote_markets=0,prop_two_sided_quote_markets=0,
         prop_player_resolved_quote_markets=0,prop_fee_contexts_expected=0,
         prop_fee_contexts_observed=0,prop_fee_failures=0)
+    assert source['coverage']['attempted_games'] == (
+        source['coverage']['observed_games'] + source['coverage']['event_failed_games'])
+    assert source['coverage']['observed_games'] == (
+        source['coverage']['sample_complete_games'] + source['coverage']['market_failed_games'])
     rows=market_watch.comparisons(dict(sport='nfl',schema_version=2,captured_at=datetime.now(timezone.utc).isoformat(),sources={'kalshi':source}))
     assert len(rows)==1 and rows[0]['identity']=='KXNFLGAME-TEST1-HOME'
     assert rows[0]['execution_ready'] is False
