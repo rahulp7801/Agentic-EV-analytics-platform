@@ -263,10 +263,10 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
             failures.append(dict(stage='prop_targets',error_type=type(exc).__name__))
         except Exception as exc:
             failures.append(dict(stage='prop_targets',error_type=type(exc).__name__))
+    quote_coverage=kalshi_prop_quote_coverage(quotes)
     coverage=dict(series_expected=len(supported),series_observed=sum(r['status']=='observed' for r in results.values()),
         open_markets=len(all_markets),open_events=len(all_events),linked_markets=len(linked_markets),
-        linked_events=len(linked_events),structured_quote_markets=len(quotes),
-        two_sided_quote_markets=sum(bool(q['yes_ask'] and q['no_ask']) for q in quotes),
+        linked_events=len(linked_events),**quote_coverage,
         player_resolved_quote_markets=sum(quote['player_target_id'] in target_records for quote in quotes),
         fee_contexts_expected=len(linked_games),fee_contexts_observed=len(fee_contexts),
         discovery_complete=not failures and all(r['complete'] for r in results.values()))
@@ -274,6 +274,19 @@ async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[di
         fee_contexts=fee_contexts,coverage=coverage,failures=failures,fee_failures=fee_failures,
         partial_coverage=not coverage['discovery_complete'],
         scope='Open-market top-of-book observations linked by Kalshi structured milestone, player and team IDs. Kalshi player names are resolved in one bulk structured-target read. Exact settlement rules are retained in the immutable archive; full pages are hashed but omitted. Public series and event fee terms are captured independently; missing fee evidence does not discard prices. One displayed level is not a fill; cross-provider settlement equivalence remains unverified, and no profit is inferred.')
+
+
+def kalshi_prop_quote_coverage(quotes: list[dict]) -> dict:
+    """Partition normalized prop markets by the displayed ask sides available."""
+    if not isinstance(quotes,list) or not all(isinstance(quote,dict) for quote in quotes):
+        raise ValueError('Invalid Kalshi prop quotes')
+    yes=sum(quote.get('yes_ask') is not None for quote in quotes)
+    no=sum(quote.get('no_ask') is not None for quote in quotes)
+    two=sum(quote.get('yes_ask') is not None and quote.get('no_ask') is not None for quote in quotes)
+    one=yes+no-(2*two)
+    return dict(structured_quote_markets=len(quotes),yes_ask_quote_markets=yes,
+        no_ask_quote_markets=no,two_sided_quote_markets=two,
+        one_sided_quote_markets=one,unquoted_markets=len(quotes)-two-one)
 
 
 def kalshi_prop_quote(market: dict, series: str, prop_type: str, game: dict,
@@ -436,7 +449,11 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
             prop_open_markets=prop_coverage['open_markets'],prop_open_events=prop_coverage['open_events'],
             prop_linked_markets=prop_coverage['linked_markets'],prop_linked_events=prop_coverage['linked_events'],
             prop_structured_quote_markets=prop_coverage['structured_quote_markets'],
+            prop_yes_ask_quote_markets=prop_coverage['yes_ask_quote_markets'],
+            prop_no_ask_quote_markets=prop_coverage['no_ask_quote_markets'],
             prop_two_sided_quote_markets=prop_coverage['two_sided_quote_markets'],
+            prop_one_sided_quote_markets=prop_coverage['one_sided_quote_markets'],
+            prop_unquoted_markets=prop_coverage['unquoted_markets'],
             prop_player_resolved_quote_markets=prop_coverage['player_resolved_quote_markets'],
             prop_fee_contexts_expected=prop_coverage['fee_contexts_expected'],
             prop_fee_contexts_observed=prop_coverage['fee_contexts_observed'],
