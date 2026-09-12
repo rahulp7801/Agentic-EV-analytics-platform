@@ -90,6 +90,9 @@ def test_captured_prop_fees_add_a_cost_scenario_without_claiming_profit():
     assert scenario['kalshi_leg']['direct']==expected
     assert Decimal(scenario['combined_cost']['direct'])==Decimal(expected['total_cost'])+Decimal('.4')
     assert scenario['schedule_ref']=='https://kalshi.com/regulatory/fee-schedule'
+    assert result['coverage']['fee_modeled_gaps']==1
+    assert result['coverage']['direct_fee_cost_below_one']==1
+    assert result['coverage']['non_direct_fee_cost_below_one']==1
     assert row['fee_adjusted_profit'] is None and row['settlement_equivalent'] is False
     assert row['execution_ready'] is False
 
@@ -108,6 +111,9 @@ def test_missing_ambiguous_or_waived_prop_fees_preserve_only_the_gross_screen():
         assert 'exchange_fee_scenarios' not in row
         assert row['gross_gap_to_one_dollar']=='0.15'
         assert row['fee_adjusted_profit'] is None
+        coverage=screen(event(),'nfl',[book()],changed,NOW)['coverage']
+        assert coverage['fee_modeled_gaps']==coverage['direct_fee_cost_below_one']==0
+        assert coverage['non_direct_fee_cost_below_one']==0
 
 
 def test_all_collected_core_nfl_prop_series_have_a_sportsbook_market():

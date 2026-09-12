@@ -24,6 +24,8 @@ test('public prop screen omits internal evidence and retains all non-executable 
   assert.equal('scan_id' in result,false);
   assert.equal('milestone_id' in result.comparisons[0],false);
   assert.equal('evidence_sha256' in result.comparisons[0],false);
+  assert.equal(result.coverage.kalshi_fee_modeled,0);
+  assert.equal(result.coverage.kalshi_direct_cost_below_one,0);
 });
 
 test('public prop screen validates and exposes only compact hypothetical fee costs', () => {
@@ -32,11 +34,15 @@ test('public prop screen validates and exposes only compact hypothetical fee cos
       non_direct:{principal:'0.45',exchange_fee:'0.02',total_cost:'0.47',rounding_fee:'internal'}},
     combined_cost:{direct:'0.8674',non_direct:'0.87'},
     schedule_ref:'https://kalshi.com/regulatory/fee-schedule',scope:'Hypothetical fee scenario.'};
+  Object.assign(changed.coverage,{kalshi_fee_modeled:1,kalshi_direct_cost_below_one:1,
+    kalshi_non_direct_cost_below_one:1});
   const result=publicPropScreen(changed,Date.parse('2026-09-11T12:01:00Z'));
   assert.deepEqual(result.comparisons[0].modeled_fee_costs,{
     direct:{kalshi_exchange_fee:'0.0174',combined_cost:'0.8674'},
     non_direct:{kalshi_exchange_fee:'0.02',combined_cost:'0.87'},scope:'Hypothetical fee scenario.'});
   assert.equal('exchange_fee_scenarios' in result.comparisons[0],false);
+  assert.equal(result.coverage.kalshi_fee_modeled,1);
+  assert.equal(result.coverage.kalshi_direct_cost_below_one,1);
   const invalid=snapshot();invalid.comparisons[0].exchange_fee_scenarios=changed.comparisons[0].exchange_fee_scenarios;
   invalid.comparisons[0].exchange_fee_scenarios.combined_cost.direct='0.8';
   assert.throws(()=>publicPropScreen(invalid,Date.parse('2026-09-11T12:01:00Z')));

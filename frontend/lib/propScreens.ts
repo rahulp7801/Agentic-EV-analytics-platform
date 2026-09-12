@@ -80,6 +80,10 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
   const events=count(coverage.events), observed=count(coverage.observed_events);
   const unavailable=count(coverage.unavailable_events), positive=count(coverage.positive_gross_gaps);
   const sportsbook=count(coverage.sportsbook_gaps), kalshi=count(coverage.kalshi_sportsbook_gaps);
+  const suppliedFeeCounts=coverage.kalshi_fee_modeled === undefined ? undefined : {
+    modeled:count(coverage.kalshi_fee_modeled),direct:count(coverage.kalshi_direct_cost_below_one),
+    nonDirect:count(coverage.kalshi_non_direct_cost_below_one),
+  };
   if (observed+unavailable !== events || positive !== data.comparisons.length
       || positive !== sportsbook+kalshi) throw new Error('Invalid prop screen');
   const generated=timestamp(data.generated_at);
@@ -124,19 +128,35 @@ export function publicPropScreen(value: unknown, now=Date.now()) {
         ...(modeled_fee_costs ? {modeled_fee_costs} : {}),limitations:item.reasons.map(text),
         status:'unverified', execution_ready:false};
     });
+  const capturedModeled=comparisons.filter(item => 'modeled_fee_costs' in item);
+  const capturedDirect=capturedModeled.filter(item => Number(item.modeled_fee_costs?.direct.combined_cost)<1).length;
+  const capturedNonDirect=capturedModeled.filter(item => Number(item.modeled_fee_costs?.non_direct.combined_cost)<1).length;
+  if (suppliedFeeCounts && (suppliedFeeCounts.modeled !== capturedModeled.length
+      || suppliedFeeCounts.direct !== capturedDirect || suppliedFeeCounts.nonDirect !== capturedNonDirect)) {
+    throw new Error('Invalid prop screen');
+  }
   if (!Number.isFinite(now)) throw new Error('Invalid prop screen');
   const age=(now-Date.parse(generated))/1000;
   const fresh=0 <= age && age <= 300 ? comparisons.filter(item => item.legs.every(
     leg => 0 <= (now-Date.parse(leg.observed_at))/1000 && (now-Date.parse(leg.observed_at))/1000 <= 300)) : [];
   const freshSportsbook=fresh.filter(item => item.kind === 'sportsbook_sportsbook_prop').length;
   const freshKalshi=fresh.length-freshSportsbook;
+  const freshModeled=fresh.filter(item => 'modeled_fee_costs' in item);
   return {
     sport:data.sport, generated_at:generated, status:fresh.length || (positive === 0 && age >= 0 && age <= 300)
       ? data.status : 'stale',
     coverage:{events, observed_events:observed, unavailable_events:unavailable,
       captured_positive_gross_gaps:positive, positive_gross_gaps:fresh.length,
       captured_sportsbook_gaps:sportsbook, captured_kalshi_sportsbook_gaps:kalshi,
-      sportsbook_gaps:freshSportsbook, kalshi_sportsbook_gaps:freshKalshi},
+      sportsbook_gaps:freshSportsbook, kalshi_sportsbook_gaps:freshKalshi,
+      captured_kalshi_fee_modeled:capturedModeled.length,
+      captured_kalshi_direct_cost_below_one:capturedDirect,
+      captured_kalshi_non_direct_cost_below_one:capturedNonDirect,
+      kalshi_fee_modeled:freshModeled.length,
+      kalshi_direct_cost_below_one:freshModeled.filter(item =>
+        Number(item.modeled_fee_costs?.direct.combined_cost)<1).length,
+      kalshi_non_direct_cost_below_one:freshModeled.filter(item =>
+        Number(item.modeled_fee_costs?.non_direct.combined_cost)<1).length},
     comparisons:fresh,
     execution_ready:false,
   };

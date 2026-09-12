@@ -300,6 +300,11 @@ The read-only `/api/prop-screens?sport=nfl|nba` response omits internal scan,
 milestone, and evidence identifiers. It revalidates the complementary legs and
 price arithmetic at the public boundary and removes candidates more than five
 minutes after observation. Captured counts remain visible when candidates expire.
+Gross-positive Kalshi/sportsbook counts are separate from the number with a
+complete one-contract fee model and the number whose modeled combined cost stays
+below one dollar for direct and non-direct account precision. These are cost
+coverage metrics. They remain independent of settlement equivalence, sportsbook
+limits and fills, so none is labeled arbitrage or profit.
 
 The same scan also screens sportsbook Over and Under prices for the identical
 event, canonical player, stat, and half-point line. Legs must come from distinct
