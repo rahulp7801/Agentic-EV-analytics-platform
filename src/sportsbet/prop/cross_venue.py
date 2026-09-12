@@ -358,10 +358,15 @@ def screen(event: dict, sport: str, sportsbook_quotes: list[PlayerPropSnapshotCr
     except (InvalidHandoff, KeyError, TypeError, ValueError, AttributeError):
         return _unavailable(sport, now, 'invalid_quote_evidence')
 
+    fee_modeled=[row for row in comparisons if 'exchange_fee_scenarios' in row]
     return dict(schema_version=1, sport=sport, screened_at=now.isoformat(), status='observed',
         handoff_captured_at=captured.isoformat(), event_id=event['id'],
         coverage=dict(sportsbook_quotes=len(sportsbook_quotes), eligible_sportsbook_quotes=len(books),
             kalshi_quotes=sum(q.get('milestone_id') == game['milestone_id'] for q in evidence['quotes']),
             exact_markets=exact_markets, price_pairs=price_pairs,
-            positive_gross_gaps=len(comparisons), rejected=dict(rejected)),
+            positive_gross_gaps=len(comparisons),fee_modeled_gaps=len(fee_modeled),
+            direct_fee_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['direct'])<1
+                for row in fee_modeled),
+            non_direct_fee_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['non_direct'])<1
+                for row in fee_modeled),rejected=dict(rejected)),
         comparisons=comparisons, execution_ready=False)

@@ -183,7 +183,12 @@ async def run(sports: list[str], daily_credit_limit: int):
                         unavailable_events=sum(screen['status']=='unavailable' for screen in screens[sport]),
                         positive_gross_gaps=len(comparisons),
                         sportsbook_gaps=sum(row['kind']=='sportsbook_sportsbook_prop' for row in comparisons),
-                        kalshi_sportsbook_gaps=sum(row['kind']=='kalshi_sportsbook_prop' for row in comparisons)),
+                        kalshi_sportsbook_gaps=sum(row['kind']=='kalshi_sportsbook_prop' for row in comparisons),
+                        kalshi_fee_modeled=sum('exchange_fee_scenarios' in row for row in comparisons),
+                        kalshi_direct_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['direct'])<1
+                            for row in comparisons if 'exchange_fee_scenarios' in row),
+                        kalshi_non_direct_cost_below_one=sum(Decimal(row['exchange_fee_scenarios']['combined_cost']['non_direct'])<1
+                            for row in comparisons if 'exchange_fee_scenarios' in row)),
                     comparisons=comparisons,execution_ready=False))
         publish_snapshot('metrics:all',ledger.report())
         publish_snapshot('metrics:recommendations',ledger.report(True))
