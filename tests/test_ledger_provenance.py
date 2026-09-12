@@ -3,6 +3,7 @@ import json
 import pytest
 
 from sportsbet.ledger import Ledger
+from sportsbet.model_contract import MODEL_VERSION
 
 
 def payload(**overrides):
@@ -64,3 +65,21 @@ def test_invalid_legacy_closing_quote_cannot_crash_or_fabricate_clv(tmp_path):
     report=ledger.report()
     assert report['sample_size']==1 and report['pending_count']==1
     assert report['clv_mean'] is None and report['excluded_closing_quotes']==1
+
+
+def test_current_model_predictions_require_quote_source_commitments(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    current=payload(model_version=MODEL_VERSION,
+        model_generated_at='2026-01-01T15:00:00+00:00',quote_source_provider='the_odds_api',
+        quote_source_sha256='a'*64,quote_source_record_sha256='b'*64)
+    key=ledger.record('valid',current)
+    assert ledger.predictions()[0]['prediction_id']==key
+    with ledger.connect() as db:
+        db.execute('INSERT INTO predictions(id,scan_id,payload) VALUES (?,?,?)',
+            ('legacy-current','legacy',json.dumps(payload(model_version=MODEL_VERSION))))
+    report=ledger.report(model_version=MODEL_VERSION)
+    assert report['sample_size']==1 and report['excluded_missing_metadata']==1
+    for missing in ('model_generated_at','quote_source_provider','quote_source_sha256','quote_source_record_sha256'):
+        invalid=current | {missing:None}
+        with pytest.raises(ValueError,match='verified quote evidence'):
+            ledger.record('missing-'+missing,invalid)
