@@ -43,6 +43,24 @@ def normalized_model_version(payload: dict) -> str:
     return value
 
 
+def validated_selection(payload: dict) -> tuple[str,str,str,str,Decimal,str]:
+    limits=(('game_id',64),('player',100),('prop_type',40),('sportsbook',50))
+    if any(not isinstance(payload.get(field),str) or not payload[field].strip()
+            or len(payload[field])>limit for field,limit in limits):
+        raise ValueError('Selection identity is invalid')
+    direction=payload.get('direction')
+    if direction not in ('over','under'):
+        raise ValueError('Selection direction is invalid')
+    try:
+        line=Decimal(str(payload['line']))
+    except (ArithmeticError,KeyError,ValueError):
+        raise ValueError('Selection line is invalid') from None
+    if not line.is_finite() or not 0 <= line <= Decimal('99999.99'):
+        raise ValueError('Selection line is invalid')
+    return (payload['game_id'],payload['player'],payload['prop_type'],direction,line,
+        payload['sportsbook'])
+
+
 def quote_evidence_valid(payload: dict) -> bool:
     """Validate source commitments for every scanner cohort that requires them."""
     batch=payload.get('quote_source_sha256')
@@ -234,6 +252,9 @@ class Ledger:
 
     def record(self, scan_id: str, payload: dict) -> str:
         payload = dict(payload)
+        if not isinstance(scan_id,str) or not scan_id.strip() or len(scan_id)>80:
+            raise ValueError('Scan identity is invalid')
+        validated_selection(payload)
         model_version=normalized_model_version(payload)
         if (model_version in QUOTE_PROVENANCE_MODEL_VERSIONS
                 and not quote_evidence_valid(payload)):
@@ -381,14 +402,7 @@ class Ledger:
                 probability = Decimal(str(p['model_probability']))
                 push = Decimal(str(p.get('push_probability',0)))
                 stake = Decimal(str(p.get('stake_fraction',0))) if recommendations_only else Decimal(1)
-                identity_fields=(('game_id',64),('player',100),('prop_type',40),('sportsbook',50))
-                if (any(not isinstance(p.get(field),str) or not p[field].strip()
-                        or len(p[field])>limit for field,limit in identity_fields)
-                        or p.get('direction') not in ('over','under')):
-                    raise ValueError('Invalid selection identity')
-                line=Decimal(str(p['line']))
-                if not line.is_finite() or not 0 <= line <= Decimal('99999.99'):
-                    raise ValueError('Invalid line')
+                selection=validated_selection(p)[:5]
                 if (not stake.is_finite() or stake < 0
                         or (recommendations_only
                             and not 0 < stake <= MAX_RECOMMENDATION_FRACTION)):
@@ -404,11 +418,10 @@ class Ledger:
             if entered >= start or quote_time > entered or generated > entered or p.get('synthetic_price') or str(p.get('sportsbook','')).lower()=='prizepicks':
                 excluded += 1
                 continue
-            parsed.append((entered,prediction_id,start,p,decoded_outcome))
+            parsed.append((entered,prediction_id,start,p,decoded_outcome,selection))
         # UTC chronology, not lexical ISO strings with different offsets.
         parsed.sort(key=lambda row: (row[0], row[1]))
-        for entered,_,start,p,outcome in parsed:
-            selection = tuple(p.get(k) for k in ('game_id','player','prop_type','direction','line'))
+        for entered,_,start,p,outcome,selection in parsed:
             if selection in seen:
                 duplicate += 1
                 continue

@@ -163,3 +163,15 @@ def test_recommendation_metrics_require_boolean_acceptance_and_bounded_stake(tmp
     assert recommendations['sample_size']==0
     assert recommendations['excluded_missing_metadata']==1
     assert ledger.report()['sample_size']==1
+
+
+@pytest.mark.parametrize('scan_id,change',[
+    ('',{}),('x'*81,{}),('scan',{'game_id':''}),('scan',{'player':['Player']}),
+    ('scan',{'prop_type':'x'*41}),('scan',{'direction':'yes'}),
+    ('scan',{'line':'NaN'}),('scan',{'sportsbook':' '}),
+])
+def test_record_rejects_invalid_selection_identity(scan_id,change,tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    with pytest.raises(ValueError,match='identity|direction|line'):
+        ledger.record(scan_id,payload(**change))
+    assert ledger.predictions()==[]
