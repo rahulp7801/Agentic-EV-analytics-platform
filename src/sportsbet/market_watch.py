@@ -15,6 +15,7 @@ from sportsbet.config import settings
 from sportsbet.dashboard import publish_snapshot
 from sportsbet.ingestion.archive import write_archive
 from sportsbet.ingestion.kalshi import KalshiReader
+from sportsbet.ingestion.kalshi_history import SERIES as KALSHI_PROP_SERIES
 from sportsbet.ingestion.prizepicks import capture as capture_projections
 from sportsbet.ledger import Ledger
 from sportsbet.scan import SPORT_KEYS, timestamp
@@ -23,6 +24,8 @@ from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost, taker_dep
 
 DEFAULT_GAME_LIMIT=20
 MAX_GAME_LIMIT=40
+PROP_PAGE_LIMIT=1000
+MAX_PROP_PAGES=3
 
 
 def digest(value) -> str:
@@ -87,6 +90,95 @@ async def discover_kalshi_games(reader: KalshiReader, sport: str, now: datetime)
     return ordered,pages,failures,not cursor and not failures
 
 
+async def kalshi_prop_inventory(reader: KalshiReader, sport: str, games: list[dict]) -> dict:
+    """Count open core props and link them to exact structured game milestones.
+
+    Full market pages are hashed but not retained in the periodic dashboard snapshot.
+    Quote/depth capture belongs at the later exact cross-venue matching boundary.
+    """
+    if sport not in KALSHI_PROP_SERIES or not isinstance(games,list):
+        raise ValueError('Invalid Kalshi prop inventory request')
+    supported=KALSHI_PROP_SERIES[sport]
+    linked_games={};conflicts=set();failures=[]
+    for game in games:
+        try:
+            game_id=game['id']
+            related=game['related_event_tickers']
+            if (not isinstance(game_id,str) or not game_id or not isinstance(related,list)
+                    or game['details']['league']!=sport.upper()):
+                raise ValueError
+        except (KeyError,ValueError,TypeError):
+            failures.append(dict(stage='prop_link',error_type='InvalidMilestone'))
+            continue
+        for event in related:
+            if not isinstance(event,str):
+                failures.append(dict(stage='prop_link',error_type='InvalidEvent'))
+                continue
+            series=event.split('-',1)[0]
+            if series not in supported:
+                continue
+            if event in conflicts:
+                continue
+            if event in linked_games and linked_games[event]!=game_id:
+                del linked_games[event]
+                conflicts.add(event)
+                failures.append(dict(stage='prop_link',error_type='ConflictingEvent'))
+            else:
+                linked_games[event]=game_id
+
+    results={}
+    all_markets=set();all_events=set();linked_markets=set();linked_events=set()
+    for series in supported:
+        cursor=None;seen_cursors=set();pages=[];tickers=set();events=set();linked=set();linked_event_set=set()
+        status='observed';complete=False
+        try:
+            for _ in range(MAX_PROP_PAGES):
+                page=await reader.markets(series,limit=PROP_PAGE_LIMIT,cursor=cursor)
+                if not isinstance(page,dict) or not isinstance(page.get('markets'),list):
+                    raise ValueError('Invalid market page')
+                page_cursor=page.get('cursor')
+                if page_cursor is not None and not isinstance(page_cursor,str):
+                    raise ValueError('Invalid market cursor')
+                pages.append(page)
+                for market in page['markets']:
+                    event=market['event_ticker'];ticker=market['ticker']
+                    if (not isinstance(event,str) or not isinstance(ticker,str)
+                            or not event.startswith(series+'-') or not ticker.startswith(event+'-')
+                            or market.get('status')!='active' or market.get('market_type')!='binary'
+                            or Decimal(market['notional_value_dollars'])!=1 or ticker in tickers):
+                        raise ValueError('Invalid prop market identity')
+                    tickers.add(ticker);events.add(event)
+                    if event in linked_games:
+                        linked.add(ticker);linked_event_set.add(event)
+                cursor=page_cursor
+                if not cursor:
+                    complete=True
+                    break
+                if cursor in seen_cursors:
+                    raise ValueError('Repeated market cursor')
+                seen_cursors.add(cursor)
+            if not complete:
+                status='partial'
+                failures.append(dict(stage='prop_discovery',series=series,error_type='PageLimitExceeded'))
+        except (KeyError,ValueError,TypeError,ArithmeticError) as exc:
+            status='invalid'
+            failures.append(dict(stage='prop_discovery',series=series,error_type=type(exc).__name__))
+        except Exception as exc:
+            status='unavailable'
+            failures.append(dict(stage='prop_discovery',series=series,error_type=type(exc).__name__))
+        all_markets.update(tickers);all_events.update(events)
+        linked_markets.update(linked);linked_events.update(linked_event_set)
+        results[series]=dict(status=status,complete=complete,pages=len(pages),open_markets=len(tickers),
+            open_events=len(events),linked_markets=len(linked),linked_events=len(linked_event_set),
+            response_sha256=digest(pages) if pages else None)
+    coverage=dict(series_expected=len(supported),series_observed=sum(r['status']=='observed' for r in results.values()),
+        open_markets=len(all_markets),open_events=len(all_events),linked_markets=len(linked_markets),
+        linked_events=len(linked_events),discovery_complete=not failures and all(r['complete'] for r in results.values()))
+    return dict(status='degraded' if failures else 'observed',series=results,coverage=coverage,
+        failures=failures,partial_coverage=not coverage['discovery_complete'],
+        scope='Aggregate open-market inventory linked only by Kalshi structured milestone event IDs. Full pages are hashed but omitted; no quote, depth, fill, settlement equivalence or profit is inferred.')
+
+
 async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
     if sport not in ('nfl','nba') or now.utcoffset() is None or type(limit) is not int or not 1<=limit<=MAX_GAME_LIMIT:
         raise ValueError('Invalid Kalshi collection request')
@@ -98,6 +190,8 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
         except Exception:
             series_data=series_changes=None
         eligible,pages,failures,discovery_complete=await discover_kalshi_games(reader,sport,now)
+        prop_inventory=await kalshi_prop_inventory(reader,sport,eligible[:limit])
+        failures.extend(prop_inventory['failures'])
         games = []
         targets = {}
         failed_games=set();omitted_markets=0
@@ -149,12 +243,19 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
             teams = response.json()
     except (httpx.HTTPError, ValueError):
         pass  # Same-contract observations remain valid; cross-venue identity stays unmatched.
+    prop_coverage=prop_inventory['coverage']
     return dict(status='degraded' if failures else 'observed', games=games, targets=targets,
         discovery_pages=pages,team_directory=teams,failures=failures,
-        partial_coverage=not discovery_complete or len(eligible)>limit or bool(failed_games) or bool(omitted_markets),
+        prop_inventory=prop_inventory,
+        partial_coverage=not discovery_complete or len(eligible)>limit or bool(failed_games) or bool(omitted_markets)
+            or prop_inventory['partial_coverage'],
         coverage=dict(discovery_complete=discovery_complete,discovered_games=len(eligible),
             attempted_games=min(limit,len(eligible)),observed_games=len(games),failed_games=len(failed_games),
-            quoted_games=sum(bool(game['snapshots']) for game in games),omitted_markets=omitted_markets))
+            quoted_games=sum(bool(game['snapshots']) for game in games),omitted_markets=omitted_markets,
+            prop_discovery_complete=prop_coverage['discovery_complete'],
+            prop_series_observed=prop_coverage['series_observed'],prop_series_expected=prop_coverage['series_expected'],
+            prop_open_markets=prop_coverage['open_markets'],prop_open_events=prop_coverage['open_events'],
+            prop_linked_markets=prop_coverage['linked_markets'],prop_linked_events=prop_coverage['linked_events']))
 
 
 def book_quotes(event: dict, now: datetime) -> list[dict]:

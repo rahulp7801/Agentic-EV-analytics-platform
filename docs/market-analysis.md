@@ -198,6 +198,24 @@ Exact captured team-directory aliases and start times produced real cross-venue
 matches. No ticker-date parsing, fuzzy name matching, or close-time-as-kickoff
 substitution is used. Matching events still require separate settlement review.
 
+The periodic collector also inventories the core player-prop series already used
+by the historical collector: NFL passing yards, rushing yards, receiving yards,
+and receptions; NBA points, rebounds, and assists. It follows at most three pages
+of 1,000 open markets per series, validates active binary one-dollar market and
+event identities, and links events only through each selected structured game
+milestone's `related_event_tickers`. The dashboard reports series, market, and
+linked-event counts plus whether every cursor was exhausted. Full provider pages
+are hashed and discarded so a half-hourly status snapshot does not publish
+thousands of contracts. This aggregate inventory contains no quote timestamp,
+depth, settlement-equivalence decision, or executable candidate. Exact contracts
+will be captured later at the cross-venue matching boundary.
+
+On September 12, 2026, a real public NFL run exhausted all four series and found
+3,073 open contracts across 56 prop events, all linked to 15 upcoming structured
+games. The same run retained 30 game-market comparisons and replayed them exactly.
+The three core NBA series were empty during the offseason. These counts establish
+collector coverage at that observation time, not liquidity, edge, or profitability.
+
 Research agents may eventually propose mappings and summarize rules with source
 references. They must not invent prices, probability calibration, fills, or
 settlement equivalence. The current graph uses deterministic Python specialists,

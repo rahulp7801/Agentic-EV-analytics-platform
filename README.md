@@ -134,7 +134,10 @@ one PrizePicks projection page. Kalshi discovery follows at most three pages of
 500 milestones, then inspects at most three active markets per selected game.
 Coverage reports discovered, inspected, quoted and failed games; discovery or
 sampling limits remain explicit. A failed event or market preserves other valid
-observations. Quote freshness uses each comparison's oldest leg, not collection
+observations. It also reports bounded open player-prop inventory for four core NFL
+and three core NBA series, linked only through structured milestone event IDs.
+Those aggregate counts are coverage evidence, not captured prop quotes or arb
+candidates. Quote freshness uses each comparison's oldest leg, not collection
 completion time. Team matching uses captured
 Kalshi structured targets, an ESPN team directory, and exact home/away/start
 agreement. Matching names does not establish settlement equivalence. Gross gaps
