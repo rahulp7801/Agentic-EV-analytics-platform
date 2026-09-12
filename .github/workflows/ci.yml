@@ -113,16 +113,19 @@ jobs:
           printf 'context-boundary-test' > .local/secrets/context.json
           printf 'context-boundary-test' > src/sportsbet/context-secret.json
           printf 'context-boundary-test' > src/sportsbet/context-secret.key
+          printf 'context-boundary-test' > src/sportsbet/arbitrage/context-secret.json
+          printf 'context-boundary-test' > certs/context-secret.pem
           docker build --file - --output "type=local,dest=$RUNNER_TEMP/worker-context" . <<'DOCKERFILE'
           FROM scratch
           COPY . /
           DOCKERFILE
-          test ! -e "$RUNNER_TEMP/worker-context/.env"
-          test ! -e "$RUNNER_TEMP/worker-context/.local"
-          test ! -e "$RUNNER_TEMP/worker-context/.git"
-          test ! -e "$RUNNER_TEMP/worker-context/frontend"
-          test ! -e "$RUNNER_TEMP/worker-context/src/sportsbet/context-secret.json"
-          test ! -e "$RUNNER_TEMP/worker-context/src/sportsbet/context-secret.key"
+          for path in .env .local .git frontend src/sportsbet/context-secret.json \
+            src/sportsbet/context-secret.key src/sportsbet/arbitrage/context-secret.json certs/context-secret.pem; do
+            if test -e "$RUNNER_TEMP/worker-context/$path"; then
+              echo "::error::Forbidden build context path: $path"
+              exit 1
+            fi
+          done
           test -f "$RUNNER_TEMP/worker-context/src/sportsbet/daily.py"
           test -f "$RUNNER_TEMP/worker-context/certs/supabase-prod-ca-2021.crt"
       - name: Build locked worker image
