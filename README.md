@@ -214,6 +214,12 @@ Clean evidence passes the credential/secret scan before public artifact upload.
 GitHub's periodic schedule remains unsuitable for continuous or low-latency arbitrage monitoring;
 the dashboard continues to identify stale quotes between captures.
 
+The public market API validates sport, source status, coverage partitions,
+timestamps, identity and complementary cost arithmetic, then returns only the
+fields rendered by the dashboard. Evidence digests, fee accumulators, modeled
+fill ladders, internal calculation legs, and profit/execution fields remain in
+worker evidence and do not cross the public boundary.
+
 Paid requests share both a daily ceiling and `ODDS_ROLLING_CREDIT_LIMIT` (default450
 credits across31 UTC dates), enforced atomically in the persistent ledger. This
 counts this application's reservations, including failed requests, not usage by
