@@ -284,6 +284,13 @@ stale quotes. A real NFL collection produced 3,073 quotes, 190 normalized player
 targets, and complete exact aliases for all 15 game contexts in about 3.24 MB.
 Every handoff remains `execution_ready=false`.
 
+Game-market coverage uses two explicit partitions. Attempted games equal observed
+event records plus terminal event failures; observed games equal sample-complete
+games plus games with at least one sampled market failure. `failed_games` remains
+the backward-compatible union and may overlap `observed_games`. `quoted_games`
+counts observed events with at least one retained quote, while omitted markets and
+the configured game/sample bounds remain separate incomplete-coverage signals.
+
 Automatic cross-venue contract mapping, sportsbook account limits, exact fee
 reconciliation, PrizePicks entry ingestion, joint calibration, and fill simulation
 remain prerequisites for executable recommendations. Quoted size is not a fill.
