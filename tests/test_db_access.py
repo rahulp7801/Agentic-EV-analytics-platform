@@ -9,6 +9,7 @@ from sqlalchemy.engine import make_url
 
 from sportsbet.db.access import (
     ANALYTICS_TABLES,
+    APPEND_TABLES,
     READER,
     READ_TABLES,
     WORKER,
@@ -39,7 +40,7 @@ def test_provisioning_locks_policy_tables_before_reading_or_writing_role_catalog
     first_statement = connection.statements[0][0]
     assert first_statement.startswith('LOCK TABLE ')
     assert first_statement.endswith(' IN ACCESS EXCLUSIVE MODE')
-    for table in ('alembic_version', *READ_TABLES, *ANALYTICS_TABLES):
+    for table in ('alembic_version', *READ_TABLES, *APPEND_TABLES, *ANALYTICS_TABLES):
         assert f'"{table}"' in first_statement
     assert connection.statements[1][0].startswith('SELECT 1 FROM pg_roles')
 
@@ -79,12 +80,32 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
                 assert worker.execute("UPDATE dashboard_snapshots SET payload='{}' WHERE snapshot_key=%s", (key,)).rowcount == 1
                 worker.execute('SELECT * FROM player_stats LIMIT 1')
                 worker.execute('SELECT * FROM analytics.predictions LIMIT 1')
+                assert worker.execute("""INSERT INTO player_prop_snapshots
+                    (sport,game_id,player_name,sportsbook,prop_type,line,price,implied_probability,
+                     snapped_at,side,game_start_time,source_provider,source_sha256,source_record_sha256)
+                    VALUES ('nfl',%s,'Fixture','book','player_pass_yds',200.5,-110,0.523810,
+                            NOW(),'Over',NOW()+INTERVAL '1 day','the_odds_api',%s,%s) RETURNING id""",
+                    (key, 'a'*64, 'b'*64)).fetchone()[0]
+                assert worker.execute("""INSERT INTO odds_snapshots
+                    (sportsbook,market_type,line,price,outcome_name,game_start_time,snapped_at)
+                    VALUES ('book','h2h',NULL,-110,'Fixture',NOW()+INTERVAL '1 day',NOW())
+                    RETURNING id""").fetchone()[0]
             for statement in ('DELETE FROM dashboard_snapshots WHERE false',
                               'UPDATE public.alembic_version SET version_num=version_num',
+                              'UPDATE player_prop_snapshots SET line=line WHERE false',
+                              'DELETE FROM player_prop_snapshots WHERE false',
+                              'UPDATE odds_snapshots SET line=line WHERE false',
                               "UPDATE analytics.predictions SET payload='{}' WHERE false",
                               "UPDATE analytics.quotes SET probability=0 WHERE false"):
                 with pytest.raises(psycopg.errors.InsufficientPrivilege):
                     worker.execute(statement)
+            for table in APPEND_TABLES:
+                assert worker.execute('SELECT has_table_privilege(current_user,%s,\'INSERT\')',
+                                      ('public.'+table,)).fetchone()[0]
+                assert not worker.execute('SELECT has_table_privilege(current_user,%s,\'UPDATE,DELETE\')',
+                                          ('public.'+table,)).fetchone()[0]
+                assert worker.execute("SELECT has_sequence_privilege(current_user,"
+                    "pg_get_serial_sequence(%s,'id'),'USAGE')", ('public.'+table,)).fetchone()[0]
             for column in ('outcome','outcome_source','outcome_ref','outcome_observed_at','actual_value',
                            'outcome_evidence'):
                 assert worker.execute("SELECT has_column_privilege(current_user,'analytics.predictions',%s,'UPDATE')",(column,)).fetchone()[0]

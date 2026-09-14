@@ -243,7 +243,9 @@ enabled. The existing30-minute schedule is unsuitable for short-lived arbitrage.
 Hosted credentials must use restricted roles from `python -m sportsbet.db.access`:
 the dashboard receives only the reader's `DATABASE_URL`; the worker receives
 its own `DATABASE_URL` and `DATABASE_URL_ASYNC` as repository secrets. Keep owner
-credentials local. For IPv4-only Vercel/GitHub runners, use the provider's exact
+credentials local. The worker can append provider quote snapshots and use their
+ID sequences, but cannot update or delete that immutable evidence. For IPv4-only
+Vercel/GitHub runners, use the provider's exact
 Supabase **Session pooler** host and role/project username, with verified TLS;
 the local direct IPv6 endpoint cannot serve these runners. Never commit generated
 credentials or private keys.

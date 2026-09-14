@@ -18,6 +18,7 @@ READ_TABLES = ('games', 'player_stats', 'nba_player_gamelogs', 'nba_player_stats
                'play_by_play', 'ngs_stats', 'injury_reports', 'odds_snapshots',
                'player_prop_snapshots', 'dashboard_snapshots')
 WRITE_TABLES = ('games', 'player_stats', 'nba_player_gamelogs', 'dashboard_snapshots')
+APPEND_TABLES = ('odds_snapshots', 'player_prop_snapshots')
 ANALYTICS_TABLES = ('predictions', 'exposure', 'quotes', 'api_usage')
 
 
@@ -54,6 +55,12 @@ def apply_access(conn):
             conn.execute(sql.SQL('DROP POLICY IF EXISTS {} ON {}').format(policy, target))
             clause = sql.SQL('WITH CHECK (true)' if command == 'INSERT' else 'USING (true) WITH CHECK (true)')
             conn.execute(sql.SQL('CREATE POLICY {} ON {} FOR {} TO {} {}').format(policy, target, sql.SQL(command), sql.Identifier(WORKER), clause))
+    for table in APPEND_TABLES:
+        target = sql.Identifier('public', table)
+        conn.execute(sql.SQL('GRANT INSERT ON {} TO {}').format(target, sql.Identifier(WORKER)))
+        conn.execute(sql.SQL('DROP POLICY IF EXISTS sportsbet_worker_insert ON {}').format(target))
+        conn.execute(sql.SQL('CREATE POLICY sportsbet_worker_insert ON {} FOR INSERT TO {} WITH CHECK (true)')
+                     .format(target, sql.Identifier(WORKER)))
     conn.execute(sql.SQL('GRANT USAGE ON SCHEMA analytics TO {}').format(sql.Identifier(WORKER)))
     for table in ANALYTICS_TABLES:
         target = sql.Identifier('analytics', table)
@@ -65,7 +72,7 @@ def apply_access(conn):
     for table in ('exposure', 'api_usage'):
         conn.execute(sql.SQL('GRANT UPDATE ON {} TO {}').format(sql.Identifier('analytics', table), sql.Identifier(WORKER)))
     # Only sequences attached to writable public tables, not every current/future sequence.
-    for table in WRITE_TABLES:
+    for table in (*WRITE_TABLES, *APPEND_TABLES):
         rows = conn.execute("SELECT pg_get_serial_sequence(%s, column_name) FROM information_schema.columns "
                             "WHERE table_schema='public' AND table_name=%s", (f'public.{table}', table)).fetchall()
         for (sequence,) in rows:
