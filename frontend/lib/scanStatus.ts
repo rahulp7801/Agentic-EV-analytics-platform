@@ -1,5 +1,5 @@
 export function scanStatus(data: Record<string, unknown> | null, now = Date.now()) {
-  if (!data) return {state:'not_run',label:'No scan recorded',updated_at:null,eligible:null,completed:null,deferred:null,quotes:null,selections:null,model_requests:null,model_estimates:null};
+  if (!data) return {state:'not_run',label:'No scan recorded',updated_at:null,eligible:null,completed:null,deferred:null,quotes:null,selections:null,model_requests:null,model_estimates:null,unresolved_selections:null,missing_estimates:null};
   const stamp=String(data.finished_at || data.started_at || '');
   const age=now-Date.parse(stamp);
   const count=(value:unknown)=>typeof value==='number' && Number.isInteger(value) && value>=0 ? value : null;
@@ -8,6 +8,9 @@ export function scanStatus(data: Record<string, unknown> | null, now = Date.now(
   const quotes=coverage.reduce((total,item)=>total+(count(item.quotes) || 0),0);
   const total=(field:'selections'|'model_requests'|'model_estimates')=>coverage.reduce((sum,item)=>sum+(count(item[field]) || 0),0);
   const selections=total('selections'), model_requests=total('model_requests'), model_estimates=total('model_estimates');
+  const modelCountsValid=model_requests<=selections && model_estimates<=model_requests;
+  const unresolved_selections=modelCountsValid ? selections-model_requests : null;
+  const missing_estimates=modelCountsValid ? model_requests-model_estimates : null;
   let state='unknown',label='Scan status unavailable';
   if (Number.isFinite(age) && age>=-60000) {
     if (data.status==='running') {
@@ -17,11 +20,17 @@ export function scanStatus(data: Record<string, unknown> | null, now = Date.now(
     else if (data.status==='blocked') {state='blocked';label='Waiting for refreshed history';}
     else if (data.status==='failed') {state='failed';label='Scan failed';}
     else if (Array.isArray(data.failures) && data.failures.length) {state='degraded';label='Scan had failures';}
-    else if (data.status==='degraded') {state='degraded';label='Model coverage incomplete';}
+    else if (!modelCountsValid) {state='unknown';label='Scan coverage invalid';}
+    else if (data.status==='complete' && (unresolved_selections || missing_estimates)) {state='unknown';label='Scan coverage invalid';}
+    else if (data.status==='degraded') {
+      state='degraded';
+      label=unresolved_selections ? 'Player history coverage incomplete'
+        : missing_estimates ? 'Model estimates incomplete' : 'Model coverage incomplete';
+    }
     else if (deferred && deferred>0) {state='partial';label='Budget limited coverage';}
     else if (data.status==='complete' && eligible===0) {state='no_games';label='No games in next 24 hours';}
     else if (data.status==='complete' && completed && quotes===0) {state='no_quotes';label='No usable prop quotes';}
     else if (data.status==='complete' && completed===eligible && completed!==null) {state='complete';label='Scan complete';}
   }
-  return {state,label,updated_at:Number.isFinite(Date.parse(stamp)) ? stamp : null,eligible,completed,deferred,quotes,selections,model_requests,model_estimates};
+  return {state,label,updated_at:Number.isFinite(Date.parse(stamp)) ? stamp : null,eligible,completed,deferred,quotes,selections,model_requests,model_estimates,unresolved_selections,missing_estimates};
 }
