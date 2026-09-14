@@ -60,6 +60,28 @@ def test_event_prediction_batch_is_atomic(tmp_path):
     assert all(row['game_id']!='rollback-game' for row in ledger.predictions())
 
 
+def test_report_bulk_loads_closing_quotes_instead_of_connecting_per_prediction(tmp_path,monkeypatch):
+    ledger=Ledger(tmp_path/'report.sqlite');now=datetime.now(timezone.utc)
+    base=dict(game_id='closing-game',prop_type='points',direction='over',line=20.5,
+        sportsbook='book',american_odds=100,model_probability=.6,accepted=False,stake_fraction=0,
+        captured_at=now.isoformat(),game_start_time=(now+timedelta(hours=2)).isoformat())
+    ledger.record_many('entry',[base|{'player':f'Player {i}'} for i in range(12)])
+    ledger.record_many('close',[(base|{'player':f'Player {i}',
+        'captured_at':(now+timedelta(hours=1)).isoformat(),'american_odds':-150}) for i in range(12)])
+
+    original=ledger.connect;connections=0
+    def counted_connect():
+        nonlocal connections
+        connections+=1
+        return original()
+    monkeypatch.setattr(ledger,'connect',counted_connect)
+
+    report=ledger.report()
+    assert report['sample_size']==12 and report['pending_count']==12
+    assert report['clv_mean'] is not None
+    assert connections==2
+
+
 def test_manual_settlement_cli_hashes_the_exact_input_file(tmp_path,monkeypatch,capsys):
     path=tmp_path/'audit.sqlite';ledger=Ledger(path);now=datetime.now(timezone.utc)
     key=ledger.record('scan',dict(game_id='g',player='P',prop_type='points',direction='over',

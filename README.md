@@ -82,6 +82,8 @@ Reports retain the earliest eligible prediction per selection within the chosen
 cohort. Audit timestamps require explicit timezones; conflicting retries cannot
 replace recorded predictions. ROI is hypothetical recorded-stake replay, not
 realized account profit. Model-version filtering keeps comparisons reproducible.
+Closing-line lookup loads only the report cohort's exact quote identities in
+bounded batches; timestamp and immutable selection validation still fail closed.
 
 ## Verification and deployment
 
