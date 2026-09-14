@@ -45,6 +45,21 @@ def test_audit_records_rejected_and_pending_without_fabricated_results(tmp_path)
     with pytest.raises(ValueError):ledger.settle({'unknown':False})
 
 
+def test_event_prediction_batch_is_atomic(tmp_path):
+    ledger=Ledger(tmp_path/'batch.sqlite');now=datetime.now(timezone.utc)
+    base=dict(game_id='batch-game',player='A',prop_type='points',direction='over',line=20.5,
+        sportsbook='book',american_odds=100,model_probability=.6,accepted=False,stake_fraction=0,
+        captured_at=now.isoformat(),game_start_time=(now+timedelta(hours=1)).isoformat())
+    keys=ledger.record_many('batch',[base,base|{'player':'B'}])
+    assert len(keys)==len(set(keys))==2
+    assert {row['player'] for row in ledger.predictions()}=={'A','B'}
+
+    conflict=base|{'game_id':'rollback-game'}
+    with pytest.raises(ValueError,match='different immutable evidence'):
+        ledger.record_many('rollback',[conflict,conflict|{'model_probability':.7}])
+    assert all(row['game_id']!='rollback-game' for row in ledger.predictions())
+
+
 def test_manual_settlement_cli_hashes_the_exact_input_file(tmp_path,monkeypatch,capsys):
     path=tmp_path/'audit.sqlite';ledger=Ledger(path);now=datetime.now(timezone.utc)
     key=ledger.record('scan',dict(game_id='g',player='P',prop_type='points',direction='over',

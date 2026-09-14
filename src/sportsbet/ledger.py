@@ -250,7 +250,7 @@ class Ledger:
     def quote_identity(payload):
         return json.dumps([payload.get(k) for k in ('game_id','player','prop_type','direction','line','sportsbook')])
 
-    def record(self, scan_id: str, payload: dict) -> str:
+    def _prepare_record(self, scan_id: str, payload: dict) -> tuple[str, dict]:
         payload = dict(payload)
         if not isinstance(scan_id,str) or not scan_id.strip() or len(scan_id)>80:
             raise ValueError('Scan identity is invalid')
@@ -276,23 +276,34 @@ class Ledger:
         # Immutable per-scan, per-selection record; rescans retain separate predictions.
         identity = [scan_id, payload['game_id'], payload['player'], payload['prop_type'], payload['direction'], payload['line'], payload.get('sportsbook')]
         key = hashlib.sha256(json.dumps(identity).encode()).hexdigest()
+        return key,payload
+
+    def record_many(self, scan_id: str, payloads: list[dict]) -> list[str]:
+        """Validate and persist one event's predictions in a single transaction."""
+        prepared=[self._prepare_record(scan_id,payload) for payload in payloads]
+        if not prepared:
+            return []
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
-            existing = db.execute('SELECT payload FROM predictions WHERE id=?', (key,)).fetchone()
-            if existing:
-                if json.loads(existing[0]) != payload:
-                    raise ValueError('Prediction identity already has different immutable evidence')
-                return key
-            if type(payload.get('american_odds')) is int and abs(payload['american_odds']) >= 100 and not payload.get('synthetic_price') and str(payload.get('sportsbook','')).lower() != 'prizepicks':
-                from sportsbet.arbitrage.ev import quote_terms
-                captured = payload.get('quote_time') or payload.get('captured_at')
-                if captured and (not payload.get('captured_at') or utc_timestamp(captured) <= utc_timestamp(payload['captured_at'])):
-                    captured = utc_timestamp(captured).isoformat()
-                    probability = float(quote_terms(payload['american_odds'],Decimal(0))[0])
-                    db.execute('INSERT INTO quotes VALUES (?,?,?) ON CONFLICT DO NOTHING', (self.quote_identity(payload),captured,probability))
-            db.execute('INSERT INTO predictions(id,scan_id,payload) VALUES (?,?,?) ON CONFLICT DO NOTHING',
-                       (key,scan_id,json.dumps(payload,allow_nan=False)))
-        return key
+            for key,payload in prepared:
+                existing = db.execute('SELECT payload FROM predictions WHERE id=?', (key,)).fetchone()
+                if existing:
+                    if json.loads(existing[0]) != payload:
+                        raise ValueError('Prediction identity already has different immutable evidence')
+                    continue
+                if type(payload.get('american_odds')) is int and abs(payload['american_odds']) >= 100 and not payload.get('synthetic_price') and str(payload.get('sportsbook','')).lower() != 'prizepicks':
+                    from sportsbet.arbitrage.ev import quote_terms
+                    captured = payload.get('quote_time') or payload.get('captured_at')
+                    if captured and (not payload.get('captured_at') or utc_timestamp(captured) <= utc_timestamp(payload['captured_at'])):
+                        captured = utc_timestamp(captured).isoformat()
+                        probability = float(quote_terms(payload['american_odds'],Decimal(0))[0])
+                        db.execute('INSERT INTO quotes VALUES (?,?,?) ON CONFLICT DO NOTHING', (self.quote_identity(payload),captured,probability))
+                db.execute('INSERT INTO predictions(id,scan_id,payload) VALUES (?,?,?) ON CONFLICT DO NOTHING',
+                           (key,scan_id,json.dumps(payload,allow_nan=False)))
+        return [key for key,_ in prepared]
+
+    def record(self, scan_id: str, payload: dict) -> str:
+        return self.record_many(scan_id,[payload])[0]
 
     def settle(self, outcomes: dict, *, source: str = 'manual', source_ref: str = 'caller_supplied',
                observed_at: datetime | None = None, actual_values: dict | None = None,

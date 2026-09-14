@@ -52,7 +52,7 @@ def test_hosted_schema_must_match_before_collection_and_deploy() -> None:
     public = PUBLIC_WORKFLOW.read_text(encoding="utf-8")
     ci = CI_WORKFLOW.read_text(encoding="utf-8")
     check = "uv run --locked alembic current --check-heads"
-    assert data.index(check) < data.index("name: Update market data")
+    assert data.index(check) < data.index("name: Collect live market data")
     assert public.index(check) < public.index("name: Update public market data")
     assert ci.count(check) == 1
     assert "needs: [secrets, backend, frontend, postgres, worker-image, production-schema]" in ci
@@ -80,7 +80,7 @@ def test_provider_credentials_are_scoped_to_the_steps_that_need_them() -> None:
     assert "secrets." not in public[:public.index("    steps:")]
 
     for source, update, evidence in (
-        (paid, "Update market data", "Stage public evidence without configured credentials"),
+        (paid, "Collect live market data", "Stage public evidence without configured credentials"),
         (public, "Update public market data", "Stage public evidence without configured provider credentials"),
     ):
         assert "secrets.DATABASE_URL" in _step(source, "Check worker configuration")
@@ -92,5 +92,16 @@ def test_provider_credentials_are_scoped_to_the_steps_that_need_them() -> None:
         assert "secrets." not in _step(source, "Retain public market evidence for replay")
 
     assert "secrets." not in _step(public, "Verify deployed public readiness")
-    assert "secrets.ODDS_API_KEY" in _step(paid, "Update market data")
+    assert "secrets.ODDS_API_KEY" in _step(paid, "Collect live market data")
     assert "ODDS_API_KEY" not in public
+
+
+def test_paid_collection_reports_degraded_coverage_without_masking_fatal_errors() -> None:
+    paid = WORKFLOW.read_text(encoding="utf-8")
+    step = _step(paid, "Collect live market data")
+
+    assert "status=$?" in step
+    assert 'if [ "$status" -eq 2 ]' in step
+    assert "::warning title=Live data coverage is degraded::" in step
+    assert '>> "$GITHUB_STEP_SUMMARY"' in step
+    assert 'exit "$status"' in step

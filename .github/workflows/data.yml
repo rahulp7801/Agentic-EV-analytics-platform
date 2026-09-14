@@ -1,4 +1,4 @@
-name: Market data
+name: Live paid market data
 on:
   workflow_dispatch:
     inputs:
@@ -67,13 +67,14 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: uv run --locked alembic current --check-heads
-      - name: Update market data
+      - name: Collect live market data
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
           ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ODDS_API_KEY: ${{ (github.event_name == 'schedule' || inputs.operation == 'daily' || inputs.operation == 'monitor' || inputs.operation == 'scan' || (inputs.operation == 'watch' && (inputs.provider == 'all' || inputs.provider == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
         run: |
+          set +e
           case "$OPERATION" in
             daily|monitor|public_daily|public_monitor) uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
             scan) uv run --locked python -m sportsbet.scan --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
@@ -82,6 +83,18 @@ jobs:
             backfill) uv run --locked python -m sportsbet.refresh --sport "$SPORT" --backfill ;;
             *) exit 1 ;;
           esac
+          status=$?
+          set -e
+          if [ "$status" -eq 2 ]; then
+            echo '::warning title=Live data coverage is degraded::The worker completed and published an honest degraded report. Inspect this step and the dashboard coverage endpoints for the unavailable provider, model, or market.'
+            {
+              echo '### Live data collection: degraded coverage'
+              echo ''
+              echo 'The worker completed and published its report, but one or more requested providers, models, or markets were incomplete. This is an operational coverage warning; CI tests and deployment are separate workflows.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit "$status"
       - name: Stage public evidence without configured credentials
         if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'public_daily' || env.OPERATION == 'public_monitor' || env.OPERATION == 'refresh')
         id: evidence

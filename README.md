@@ -48,7 +48,7 @@ uv run python -m sportsbet.scan --sport both --daily-credit-limit 25
 
 `refresh` selects season years from the current date, uses regular-season samples, and upserts stats to apply provider corrections. Initial NFL backfill covers three season years; NBA covers current/prior season. Daily refresh covers the active season. NFL schedules must be present for pre-game cutoffs.
 
-The **Market data** Actions workflow offers `scan`, `refresh`, and `backfill` dispatches. When explicitly enabled, it refreshes stats daily and attempts scans every 30 minutes. Scans share a persistent daily credit budget and recommendation-exposure ledger. The default 25-credit ceiling does **not** cover a full slate repeatedly; a capped worker stops requesting additional events. Establish an appropriate provider plan and measured coverage before enabling schedules. Published quotes older than five minutes cannot recommend a stake.
+The **Live paid market data** Actions workflow offers `scan`, `refresh`, and `backfill` dispatches. When explicitly enabled, it refreshes stats daily and attempts scans every 30 minutes. Scans share a persistent daily credit budget and recommendation-exposure ledger. The default 25-credit ceiling does **not** cover a full slate repeatedly; a capped worker stops requesting additional events. Establish an appropriate provider plan and measured coverage before enabling schedules. Published quotes older than five minutes cannot recommend a stake. A completed worker with partial provider/model coverage leaves a GitHub warning and keeps the published dashboard state degraded; crashes, configuration errors, schema drift, and evidence-scan failures still fail the workflow.
 
 The public website only reads results. It cannot start scans or spend provider credits. The older `scan_game_ev.py` remains a local NBA CLI; use `sportsbet.scan` for durable hosted snapshots.
 
@@ -114,6 +114,10 @@ output. This builds a point-in-time dataset from future scans; it does not repai
 or infer fields for old rows, and collection must remain disabled until its
 credential and quota are ready.
 
+After modeling, the scanner validates and writes the event's prediction audit
+rows in one atomic database transaction. An immutable-evidence conflict rolls
+back the event batch, and no partially persisted event can be published.
+
 Reports include input hashes, sample coverage, and an explicit evaluation scope. Empty usable datasets exit unsuccessfully with null performance metrics. Replay evaluates the supplied selections; it does not rerun the current model historically or establish profitability. Unit-test fixtures verify arithmetic only.
 
 CI runs the Python suite, dependency audits, frontend metric/access tests, TypeScript/build checks, and an isolated PostgreSQL service for migrations, concurrency, stat upserts, and actual NFL/NBA graph SQL. On protected `master`, both production deployment and scheduled collection first require the hosted database revision to match the application Alembic head. Apply migrations separately with the owner/DDL connection; the restricted worker can read only the migration version and cannot change schema. Production deployment depends on these jobs. Its post-deploy gate requires public market, schedule, and game-log endpoints whenever public or full collection is enabled; paid signal, metric, scan, and prop-screen endpoints become mandatory with full collection. Vercel's root directory is `frontend`; automatic Git deployments are disabled so they cannot bypass CI. The CLI uses direct deployment because `vercel pull` currently rejects project-scoped tokens during team lookup.
@@ -174,7 +178,7 @@ empty slate differs from a failed or interrupted scan. The dashboard marks old
 scan reports stale and refreshes the signal ticker every30 seconds. This is
 budgeted coverage, not a promise that every available market is scanned.
 
-GitHub's **Market data → daily** operation runs a deterministic LangGraph workflow:
+GitHub's **Live paid market data → daily** operation runs a deterministic LangGraph workflow:
 history refresh and market collection run independently, then eligible prop scans
 run after both finish. A failed history refresh blocks that league's prop scan.
 The half-hourly `monitor` operation refreshes market observations and requires a
@@ -207,7 +211,7 @@ workflow attempts `public_daily` at 13:17 and 13:47 UTC and `public_monitor` at
 restricted database credentials, and does not reference the Odds API or Kalshi
 trading secrets. The redundant attempts reduce the chance that GitHub scheduler
 delays leave the 90-minute snapshot window uncovered; they do not make GitHub
-Actions a guaranteed or low-latency scheduler. The separate **Market data**
+Actions a guaranteed or low-latency scheduler. The separate **Live paid market data**
 schedule depends only on `DATA_PIPELINE_ENABLED=true` and retains the paid
 provider path. The public flag cannot enable sportsbook, PrizePicks, prop scans,
 or paid polling. Each successful public job also requires production to expose
@@ -234,7 +238,7 @@ other clients of the same API key or the provider's billing cycle. The free plan
 [provider's plans](https://the-odds-api.com/). Set limits deliberately for the
 subscribed plan and measured coverage. Never clear usage records to reset a budget.
 
-GitHub's **Market data → watch** operation publishes snapshots and retains public
+GitHub's **Live paid market data → watch** operation publishes snapshots and retains public
 evidence artifacts for90 days. Download archives for longer retention. Replay
 checks the capture hash and recomputes the same comparisons without network
 access; it does not infer fills or returns. Scheduled watch polling is not yet

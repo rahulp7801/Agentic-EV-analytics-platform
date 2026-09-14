@@ -55,6 +55,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     quotes=quotes_from_event(event,sport)
     await write_player_prop_snapshots(pool,quotes)
     export=[]
+    audited=[]
     counts=Counter()
     # A separate model evaluation per line; prices are compared only for identical outcomes.
     selections=sorted({(q.player_name,q.prop_type,q.line,q.side) for q in quotes})
@@ -118,10 +119,10 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             quote_source_provider=quote.source_provider,quote_source_sha256=quote.source_sha256,
             quote_source_record_sha256=quote.source_record_sha256,accepted=accepted,gate_reason=reason,
             stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version=MODEL_VERSION)
-        prediction_id=ledger.record(scan_id,payload)
         counts[reason] += 1
+        public_signal=None
         if signal:
-            export.append(dict(id=prediction_id,prediction_id=prediction_id,player=player,sport=sport,
+            public_signal=dict(player=player,sport=sport,
                 game_id=event['id'],prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
                 team='',opponent='',home_team=event['home_team'],away_team=event['away_team'],
                 true_prob=float(probability),implied_prob=float(signal.implied_probability),ev_pct=float(signal.ev_percentage),
@@ -130,7 +131,12 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 sportsbook=quote.sportsbook,american_odds=quote.price,snapped_at=quote.snapped_at.isoformat(),
                 game_start_time=start.isoformat(),sample_size=prop.sample_size,mean_stat=float(prop.mean_stat) if prop.mean_stat is not None else None,
                 confidence_interval=[float(x) for x in signal.confidence_interval] if signal.confidence_interval else None,
-                model_version=MODEL_VERSION,strength='unrated',trade_plan=[],injury_flags={},market_type=market))
+                model_version=MODEL_VERSION,strength='unrated',trade_plan=[],injury_flags={},market_type=market)
+        audited.append((payload,public_signal))
+    prediction_ids=ledger.record_many(scan_id,[payload for payload,_ in audited])
+    for prediction_id,(_,public_signal) in zip(prediction_ids,audited,strict=True):
+        if public_signal is not None:
+            export.append(dict(id=prediction_id,prediction_id=prediction_id,**public_signal))
     estimates=counts['evaluated_selections']
     model_status=('no_quotes' if not selections else 'unavailable' if not prepared or not estimates
         else 'complete' if len(prepared)==len(selections) and estimates==len(prepared) else 'partial')
