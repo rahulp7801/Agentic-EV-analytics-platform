@@ -432,16 +432,34 @@ class Ledger:
             parsed.append((entered,prediction_id,start,p,decoded_outcome,selection))
         # UTC chronology, not lexical ISO strings with different offsets.
         parsed.sort(key=lambda row: (row[0], row[1]))
+        closing_quotes={}
+        identities=sorted({self.quote_identity(row[3]) for row in parsed})
+        if identities:
+            with self.connect() as db:
+                for offset in range(0,len(identities),250):
+                    batch=identities[offset:offset+250]
+                    placeholders=','.join('?' for _ in batch)
+                    rows=db.execute(
+                        f'SELECT identity,captured_at,probability FROM quotes '
+                        f'WHERE identity IN ({placeholders}) ORDER BY captured_at DESC',batch).fetchall()
+                    for identity,captured,probability in rows:
+                        closing_quotes.setdefault(identity,[]).append((captured,probability))
         for entered,_,start,p,outcome,selection in parsed:
             if selection in seen:
                 duplicate += 1
                 continue
             seen.add(selection)
-            with self.connect() as db:
-                closing = db.execute('SELECT captured_at,probability FROM quotes WHERE identity=? AND captured_at>? AND captured_at<? ORDER BY captured_at DESC LIMIT 1',
-                    (self.quote_identity(p), entered.astimezone(timezone.utc).isoformat(),start.astimezone(timezone.utc).isoformat())).fetchone()
             close = None
             closing_time = entered
+            closing=None
+            entered_text=entered.astimezone(timezone.utc).isoformat()
+            start_text=start.astimezone(timezone.utc).isoformat()
+            for candidate in closing_quotes.get(self.quote_identity(p),()):
+                # Preserve the legacy TEXT-column range and newest-row behavior;
+                # timestamp validation below still rejects malformed retained rows.
+                if isinstance(candidate[0],str) and entered_text < candidate[0] < start_text:
+                    closing=candidate
+                    break
             if closing:
                 try:
                     closing_time = utc_timestamp(closing[0])
