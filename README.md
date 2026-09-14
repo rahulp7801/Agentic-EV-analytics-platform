@@ -114,6 +114,10 @@ output. This builds a point-in-time dataset from future scans; it does not repai
 or infer fields for old rows, and collection must remain disabled until its
 credential and quota are ready.
 
+After modeling, the scanner validates and writes the event's prediction audit
+rows in one atomic database transaction. An immutable-evidence conflict rolls
+back the event batch, and no partially persisted event can be published.
+
 Reports include input hashes, sample coverage, and an explicit evaluation scope. Empty usable datasets exit unsuccessfully with null performance metrics. Replay evaluates the supplied selections; it does not rerun the current model historically or establish profitability. Unit-test fixtures verify arithmetic only.
 
 CI runs the Python suite, dependency audits, frontend metric/access tests, TypeScript/build checks, and an isolated PostgreSQL service for migrations, concurrency, stat upserts, and actual NFL/NBA graph SQL. On protected `master`, both production deployment and scheduled collection first require the hosted database revision to match the application Alembic head. Apply migrations separately with the owner/DDL connection; the restricted worker can read only the migration version and cannot change schema. Production deployment depends on these jobs. Its post-deploy gate requires public market, schedule, and game-log endpoints whenever public or full collection is enabled; paid signal, metric, scan, and prop-screen endpoints become mandatory with full collection. Vercel's root directory is `frontend`; automatic Git deployments are disabled so they cannot bypass CI. The CLI uses direct deployment because `vercel pull` currently rejects project-scoped tokens during team lookup.
