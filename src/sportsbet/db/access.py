@@ -21,6 +21,14 @@ WRITE_TABLES = ('games', 'player_stats', 'nba_player_gamelogs', 'dashboard_snaps
 ANALYTICS_TABLES = ('predictions', 'exposure', 'quotes', 'api_usage')
 
 
+def _lock_policy_tables(conn):
+    """Acquire policy-table locks before role/catalog writes can form a deadlock."""
+    targets = [sql.Identifier('public', 'alembic_version')]
+    targets.extend(sql.Identifier('public', table) for table in READ_TABLES)
+    targets.extend(sql.Identifier('analytics', table) for table in ANALYTICS_TABLES)
+    conn.execute(sql.SQL('LOCK TABLE {} IN ACCESS EXCLUSIVE MODE').format(sql.SQL(', ').join(targets)))
+
+
 def apply_access(conn):
     """Explicit grants and role-specific RLS policies; no rights for anonymous users."""
     conn.execute(sql.SQL('GRANT SELECT ON public.alembic_version TO {}').format(sql.Identifier(WORKER)))
@@ -67,6 +75,10 @@ def apply_access(conn):
 
 
 def provision_roles(conn, passwords: dict[str, str]):
+    # RLS policy DDL needs ACCESS EXCLUSIVE locks. Take every required lock before
+    # CREATE ROLE writes the system catalogs, otherwise autovacuum can deadlock
+    # while it waits on this transaction and this transaction waits on its table.
+    _lock_policy_tables(conn)
     for role in (READER, WORKER):
         if conn.execute('SELECT 1 FROM pg_roles WHERE rolname=%s', (role,)).fetchone():
             raise ValueError('Application roles already exist; refuse implicit credential rotation')

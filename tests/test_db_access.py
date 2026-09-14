@@ -7,7 +7,41 @@ from psycopg import sql
 import pytest
 from sqlalchemy.engine import make_url
 
-from sportsbet.db.access import READER, WORKER, provision_roles, role_url
+from sportsbet.db.access import (
+    ANALYTICS_TABLES,
+    READER,
+    READ_TABLES,
+    WORKER,
+    provision_roles,
+    role_url,
+)
+
+
+class _ExistingRolesConnection:
+    def __init__(self):
+        self.statements = []
+
+    def execute(self, statement, params=None):
+        rendered = statement.as_string(None) if hasattr(statement, 'as_string') else statement
+        self.statements.append((rendered, params))
+        return self
+
+    def fetchone(self):
+        return (1,)
+
+
+def test_provisioning_locks_policy_tables_before_reading_or_writing_role_catalogs():
+    connection = _ExistingRolesConnection()
+
+    with pytest.raises(ValueError, match='already exist'):
+        provision_roles(connection, {READER: 'reader', WORKER: 'worker'})
+
+    first_statement = connection.statements[0][0]
+    assert first_statement.startswith('LOCK TABLE ')
+    assert first_statement.endswith(' IN ACCESS EXCLUSIVE MODE')
+    for table in ('alembic_version', *READ_TABLES, *ANALYTICS_TABLES):
+        assert f'"{table}"' in first_statement
+    assert connection.statements[1][0].startswith('SELECT 1 FROM pg_roles')
 
 
 def test_role_urls_preserve_exact_provider_endpoint_and_escape_passwords():
