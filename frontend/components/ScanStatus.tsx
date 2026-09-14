@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 
 type Status = {label:string;updated_at:string|null;eligible:number|null;completed:number|null;deferred:number|null;
-  selections:number|null;model_requests:number|null;model_estimates:number|null};
+  selections:number|null;model_requests:number|null;model_estimates:number|null;
+  unresolved_selections:number|null;missing_estimates:number|null};
 export default function ScanStatus() {
   const [data,setData]=useState<Record<string,Status>|null>(null);
   const [error,setError]=useState('');
@@ -23,6 +24,8 @@ export default function ScanStatus() {
       <strong>{sport.toUpperCase()} props:</strong> {status.label}
       {status.eligible!==null && status.completed!==null && ` · ${status.completed}/${status.eligible} games`}
       {status.selections!==null && status.selections>0 && ` · ${status.model_estimates}/${status.selections} modeled selections`}
+      {status.unresolved_selections!==null && status.unresolved_selections>0 && ` · ${status.unresolved_selections} lacked an exact player-history match`}
+      {status.missing_estimates!==null && status.missing_estimates>0 && ` · ${status.missing_estimates} model estimates unavailable`}
       {status.updated_at && ` · ${new Date(status.updated_at).toLocaleTimeString()}`}
     </span>))}
   </div>;

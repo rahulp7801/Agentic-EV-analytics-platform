@@ -175,6 +175,9 @@ hashes and one provider observation time; tier labels remain unpriced metadata.
 Daily prop scans publish per-league coverage at `/api/scans`: attempted/completed
 games, missing estimates, budget exclusions, failures, and completion time. A
 provider/model failure is isolated so other games and the other league continue.
+The public status derives unresolved player-history selections and unavailable
+model estimates from the validated selection/request/estimate funnel; impossible
+or falsely complete count relationships fail closed.
 Saved attempt times rotate limited credits across games and leagues; a successful
 empty slate differs from a failed or interrupted scan. The dashboard marks old
 scan reports stale and refreshes the signal ticker every30 seconds. This is

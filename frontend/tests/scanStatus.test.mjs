@@ -4,7 +4,7 @@ import {scanStatus} from '../lib/scanStatus.ts';
 
 const now=Date.parse('2026-09-11T12:00:00Z');
 const completed={status:'complete',finished_at:'2026-09-11T11:59:00Z',eligible_events:2,completed_events:2,
-  budget_skipped_events:0,failures:[],coverage:{game:{quotes:12,selections:10,model_requests:10,model_estimates:9}}};
+  budget_skipped_events:0,failures:[],coverage:{game:{quotes:12,selections:10,model_requests:10,model_estimates:10}}};
 test('scan health distinguishes missing, partial, empty and stale evidence',()=>{
   assert.equal(scanStatus(null,now).state,'not_run');
   assert.equal(scanStatus(completed,now).state,'complete');
@@ -19,11 +19,18 @@ test('scan health distinguishes missing, partial, empty and stale evidence',()=>
   assert.equal(scanStatus({...completed,finished_at:'invalid'},now).state,'unknown');
 });
 test('scan health exposes quote and model coverage separately',()=>{
-  const status=scanStatus(completed,now);
+  const status=scanStatus({...completed,status:'degraded',coverage:{game:{quotes:12,selections:10,model_requests:8,model_estimates:7}}},now);
   assert.equal(status.quotes,12);
   assert.equal(status.selections,10);
-  assert.equal(status.model_requests,10);
-  assert.equal(status.model_estimates,9);
+  assert.equal(status.model_requests,8);
+  assert.equal(status.model_estimates,7);
+  assert.equal(status.unresolved_selections,2);
+  assert.equal(status.missing_estimates,1);
+  assert.equal(status.label,'Player history coverage incomplete');
+});
+test('scan health rejects impossible or falsely complete model funnels',()=>{
+  assert.equal(scanStatus({...completed,coverage:{game:{selections:2,model_requests:3,model_estimates:3}}},now).state,'unknown');
+  assert.equal(scanStatus({...completed,coverage:{game:{selections:3,model_requests:3,model_estimates:2}}},now).state,'unknown');
 });
 test('interrupted scans do not stay green or running indefinitely',()=>{
   const running={...completed,status:'running',finished_at:null,started_at:completed.finished_at};
