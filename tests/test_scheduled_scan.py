@@ -42,8 +42,10 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     quant=AsyncMock(side_effect=concurrent_quant)
     target='sportsbet.prop.nba_agents.run_nba_prop_query' if sport=='nba' else 'sportsbet.prop.agents.run_prop_query'
     ledger=Ledger(tmp_path/'audit.sqlite')
-    with patch(target,quant):
+    with patch(target,quant),patch.object(ledger,'record_many',wraps=ledger.record_many) as record_many:
         result=await evaluate_event(pool,event(sport),sport,ledger,'scan')
+    record_many.assert_called_once()
+    assert len(record_many.call_args.args[1])==2
     assert len(result['signals'])==2
     assert {s['direction'] for s in result['signals']}=={'over','under'}
     assert len(ledger.predictions())==2
