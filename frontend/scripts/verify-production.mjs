@@ -20,7 +20,7 @@ export const publicPipelinePaths = [
 ];
 
 export const requiredCssMarkers = [
-  '--accent-mint:#d9ff43',
+  '--accent:#5e5ce6',
   '.terminal-layout{',
   '__hero h1{',
 ];

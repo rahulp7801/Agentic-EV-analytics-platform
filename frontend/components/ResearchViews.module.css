@@ -230,3 +230,21 @@
 @media (prefers-reduced-motion: reduce) {
   .emptyState { background-image: none; }
 }
+
+/* Product-wide surface refinements. Existing view-specific layout stays intact. */
+.view, .toolView { background: var(--bg-base); }
+.viewHeader, .toolHeader { border-bottom: 0; }
+.viewHeader small, .toolHeader small { color: var(--accent); font-size: 11px; letter-spacing: 0; text-transform: none; }
+.viewHeader h2, .toolHeader h2 { color: var(--text-primary); font-family: var(--font-sans), sans-serif; font-weight: 600; letter-spacing: -.045em; text-transform: none; }
+.viewHeader p, .toolHeader p { font-size: 13px; }
+.sourceGrid { gap: 10px; border: 0; }
+.sourceCard { border: 1px solid var(--border-dim); border-radius: 16px; background: var(--bg-surface); box-shadow: var(--shadow-sm); }
+.sourceCard:last-child { border-right: 1px solid var(--border-dim); }
+.sourceCardHeader { font-size: 12px; text-transform: none; }.sourceCardHeader span:last-child { color: var(--accent); font-family: var(--font-sans), sans-serif; font-size: 10px; }
+.sourceCard p { color: var(--text-secondary); font-size: 10px; }
+.notice { border: 1px solid rgba(217,142,4,.18); border-radius: 13px; background: rgba(255,250,240,.72); font-size: 11px; }
+.funnel { gap: 1px; overflow: hidden; border-color: var(--border-dim); border-radius: 16px; background: var(--border-dim); }.funnel div { border: 0; background: var(--bg-surface); }.funnel strong { font-family: var(--font-sans), sans-serif; }
+.comparisonList { gap: 12px; }.comparison { overflow: hidden; border-radius: 18px; background: var(--bg-surface); box-shadow: var(--shadow-sm); }.comparisonHeader, .comparisonCost, .legList li { border-color: var(--border-dim); }.comparisonCost strong { color: var(--accent); }
+.panel { overflow: hidden; border-color: var(--border-dim); border-radius: 18px; background: var(--bg-surface); box-shadow: var(--shadow-sm); }
+.panelHeader, .controlBar { border-color: var(--border-dim); }.analysisReadout { border-color: var(--border-dim); border-radius: 13px; background: var(--bg-surface); }.analysisReadout strong { color: var(--accent); }
+.emptyState, .loadingState { background: var(--bg-base); }.emptyPanel { overflow: hidden; border-color: var(--border-dim); border-radius: 22px; background: var(--bg-surface); box-shadow: var(--shadow-md); }.emptyCopy h2 { color: var(--text-primary); font-family: var(--font-sans), sans-serif; font-weight: 600; letter-spacing: -.045em; text-transform: none; }.emptyChecks, .emptyChecks div, .emptyEyebrow { border-color: var(--border-dim); }.emptyEyebrow { color: var(--accent-amber); }
