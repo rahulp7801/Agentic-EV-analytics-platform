@@ -99,6 +99,17 @@ def test_settlement_never_guesses_game_dnp_or_ambiguous_stat(tmp_path,schedule_c
     assert next(row for row in ledger.predictions() if row['prediction_id']==key)['outcome'] is None
 
 
+def test_settlement_reports_incomplete_recorded_game_identity_as_invalid(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite');_,payload=prediction(ledger)
+    with ledger.connect() as db:
+        row=db.execute('SELECT id,payload FROM predictions').fetchone()
+        stored=json.loads(row[1]);stored.pop('home_team')
+        db.execute('UPDATE predictions SET payload=? WHERE id=?',(json.dumps(stored),row[0]))
+    report=settle_final_props(ledger,'nba',schedule(payload))
+    assert report['settled']==0 and report['pending']==1
+    assert report['reasons']=={'invalid_prediction_or_evidence':1}
+
+
 def test_settlement_does_not_rewrite_existing_outcome(tmp_path):
     ledger=Ledger(tmp_path/'audit.sqlite');key,payload=prediction(ledger)
     ledger.settle({key:False})

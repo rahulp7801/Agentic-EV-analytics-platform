@@ -110,7 +110,8 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             elif not -60 <= (now-quote.snapped_at).total_seconds() <= 300: reason='stale_quote'
             else: accepted,reason=ledger.reserve(signal,float(line))
         payload=dict(game_id=event['id'],player=player,player_id=player_id,sport=sport,
-            game_date=game_date.isoformat(),prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
+            game_date=game_date.isoformat(),home_team=event['home_team'],away_team=event['away_team'],
+            prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
             sportsbook=quote.sportsbook,american_odds=quote.price,model_probability=float(probability),
             push_probability=float(prop.push_probability),model_sample_size=prop.sample_size,
             model_confidence_interval=[float(x) for x in model_interval] if model_interval else None,

@@ -7,7 +7,7 @@ import re
 import sqlite3
 from contextlib import contextmanager
 from sportsbet.config import settings
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from decimal import Decimal
 from sportsbet.graph.models import EVSignal, QuantResult
@@ -59,6 +59,24 @@ def validated_selection(payload: dict) -> tuple[str,str,str,str,Decimal,str]:
         raise ValueError('Selection line is invalid')
     return (payload['game_id'],payload['player'],payload['prop_type'],direction,line,
         payload['sportsbook'])
+
+
+def settlement_identity_valid(payload: dict) -> bool:
+    """Require the exact immutable identity needed for automatic result matching."""
+    sport=payload.get('sport')
+    player_id=payload.get('player_id')
+    home=payload.get('home_team')
+    away=payload.get('away_team')
+    game_date=payload.get('game_date')
+    if (sport not in STAT_COLUMNS or not isinstance(player_id,str) or not player_id.strip()
+            or len(player_id)>20 or not isinstance(home,str) or not home.strip() or len(home)>100
+            or not isinstance(away,str) or not away.strip() or len(away)>100 or home==away
+            or not isinstance(game_date,str)):
+        return False
+    try:
+        return date.fromisoformat(game_date).isoformat()==game_date
+    except ValueError:
+        return False
 
 
 def quote_evidence_valid(payload: dict) -> bool:
@@ -259,6 +277,9 @@ class Ledger:
         if (model_version in QUOTE_PROVENANCE_MODEL_VERSIONS
                 and not quote_evidence_valid(payload)):
             raise ValueError('Model prediction requires verified quote evidence')
+        if (model_version in QUOTE_PROVENANCE_MODEL_VERSIONS
+                and not settlement_identity_valid(payload)):
+            raise ValueError('Model prediction requires exact settlement identity')
         accepted=payload.get('accepted')
         if accepted is not None and type(accepted) is not bool:
             raise ValueError('Prediction acceptance must be boolean')
@@ -406,6 +427,9 @@ class Ledger:
                 if (version in QUOTE_PROVENANCE_MODEL_VERSIONS
                         and not quote_evidence_valid(p)):
                     raise ValueError('Model quote evidence required')
+                if (version in QUOTE_PROVENANCE_MODEL_VERSIONS
+                        and not settlement_identity_valid(p)):
+                    raise ValueError('Model settlement identity required')
                 start = utc_timestamp(p['game_start_time'])
                 entered = utc_timestamp(p['captured_at'])
                 quote_time = utc_timestamp(p.get('quote_time') or p['captured_at'])

@@ -40,6 +40,7 @@ type Metrics = {
   sample_size: number;
   settled_count: number;
   pending_count: number;
+  excluded_missing_metadata: number;
   clv_count: number;
   clv_mean: number | null;
 };
@@ -129,7 +130,7 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
     { label: 'Games observed', value: data.games?.length ?? null, note: `${sport.toUpperCase()} schedule window`, tone: 'blue' },
     { label: 'Kalshi player props', value: kalshi ? linkedProps : null, note: kalshi ? `${twoSided} with two-sided quotes` : 'No market capture', tone: 'violet' },
     { label: 'Model estimates', value: data.scan?.model_estimates ?? null, note: data.scan?.label ?? 'No model scan', tone: data.scan?.state === 'complete' ? 'green' : 'amber' },
-    { label: 'Evaluation sample', value: data.metrics?.sample_size ?? null, note: data.metrics ? `${data.metrics.pending_count} pending · ${data.metrics.settled_count} settled` : 'No metrics snapshot', tone: 'slate' },
+    { label: 'Evaluation sample', value: data.metrics?.sample_size ?? null, note: data.metrics ? `${data.metrics.pending_count} pending · ${data.metrics.settled_count} settled · ${data.metrics.excluded_missing_metadata} excluded` : 'No metrics snapshot', tone: 'slate' },
   ], [data, kalshi, linkedProps, sport, twoSided]);
 
   return (
@@ -198,7 +199,7 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
                   <CircleAlert size={20} />
                 </div>
                 <div className={styles.truthList}>
-                  <div><span>01</span><p><strong>Outcome metrics need final results.</strong> {data.metrics?.pending_count ?? 'Recorded'} predictions are pending settlement, so ROI and hit rate are intentionally withheld.</p></div>
+                  <div><span>01</span><p><strong>Outcome metrics need final results.</strong> {data.metrics?.pending_count ?? 'Recorded'} predictions are pending settlement and {data.metrics?.excluded_missing_metadata ?? 'some'} incomplete records are excluded, so ROI and hit rate are intentionally withheld.</p></div>
                   <div><span>02</span><p><strong>League schedules are seasonal.</strong> An empty NBA slate in September is valid coverage, not a fabricated zero.</p></div>
                   <div><span>03</span><p><strong>Paid provider scans are independent.</strong> A stale model scan does not erase current public Kalshi observations.</p></div>
                 </div>
