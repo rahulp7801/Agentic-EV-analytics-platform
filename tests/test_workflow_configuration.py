@@ -65,7 +65,8 @@ def test_public_collection_verifies_the_deployed_contract_before_success() -> No
     evidence = "name: Stage public evidence without configured provider credentials"
 
     assert public.index(update) < public.index(readiness) < public.index(evidence)
-    assert '| tee "$RUNNER_TEMP/public-report.json"' in public
+    assert '--report-output "$RUNNER_TEMP/public-report.json"' in public
+    assert '| tee ' not in _step(public, "Update public market data")
     assert "node frontend/scripts/verify-production.mjs" in public
     assert "DATA_PIPELINE_ENABLED: 'false'" in public
     assert "PUBLIC_DATA_PIPELINE_ENABLED: 'true'" in public

@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -205,14 +206,25 @@ async def run(sports: list[str], mode: str, daily_credit_limit: int):
     return (await create_daily_graph().ainvoke(dict(sports=sports,mode=mode,daily_credit_limit=daily_credit_limit)))['report']
 
 
+def _write_report(path: str, report: dict) -> None:
+    destination=Path(path)
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    temporary=destination.with_name(destination.name+'.tmp')
+    temporary.write_text(json.dumps(report,separators=(',',':'))+'\n',encoding='utf-8')
+    temporary.replace(destination)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport',choices=['nba','nfl','both'],default='both')
     parser.add_argument('--mode',choices=MODES,default='daily')
     parser.add_argument('--daily-credit-limit',type=int,default=25)
+    parser.add_argument('--report-output',help='Write the final machine-readable report to this file')
     args=parser.parse_args()
     try:
         report=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.mode,args.daily_credit_limit))
+        if args.report_output:
+            _write_report(args.report_output,report)
         print(json.dumps(report))
         # Degraded provider coverage must remain visible as a failed scheduled run.
         if report['status'] not in ('complete','observed'):

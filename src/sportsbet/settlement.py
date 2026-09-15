@@ -30,6 +30,16 @@ class StatProvenanceError(ValueError):
     pass
 
 
+def _canonical_date(value) -> str:
+    if not isinstance(value,(str,date,datetime)):
+        raise ValueError('Invalid game date')
+    if isinstance(value,datetime):
+        return value.date().isoformat()
+    if isinstance(value,date):
+        return value.isoformat()
+    return date.fromisoformat(value).isoformat()
+
+
 def pending_schedule_offsets(ledger: Ledger, sport: str, now: datetime) -> tuple[int, ...]:
     """Return a bounded oldest-first set of unresolved dates beyond the normal week."""
     if sport not in STAT_COLUMNS or now.tzinfo is None or now.utcoffset() is None:
@@ -47,7 +57,7 @@ def pending_schedule_offsets(ledger: Ledger, sport: str, now: datetime) -> tuple
                     row.get('outcome_observed_at'),row.get('actual_value'),row.get('outcome_evidence')):
                 continue
         try:
-            offset=(date.fromisoformat(row['game_date'])-today).days
+            offset=(date.fromisoformat(_canonical_date(row['game_date']))-today).days
         except (KeyError,TypeError,ValueError):
             continue
         if -MAX_CATCHUP_DAYS <= offset < -7:
@@ -63,15 +73,22 @@ def _candidate(prediction: dict, sport: str, games: list[dict]):
     line=Decimal(str(prediction.get('line')))
     if not line.is_finite() or line < 0:
         raise ValueError('Invalid line')
-    day=date.fromisoformat(prediction['game_date']).isoformat()
+    day=_canonical_date(prediction['game_date'])
     start=utc_timestamp(prediction['game_start_time'])
     captured=utc_timestamp(prediction['captured_at'])
     if captured >= start:
         raise ValueError('Invalid prediction chronology')
-    matches=[game for game in games if game.get('completed') is True
-        and game.get('date')==day and game.get('home_name')==prediction.get('home_team')
-        and game.get('away_name')==prediction.get('away_team')
-        and isinstance(game.get('provider_event_id'),str) and game['provider_event_id'].strip()]
+    matches=[]
+    for game in games:
+        try:
+            game_day=_canonical_date(game.get('date'))
+        except ValueError:
+            continue
+        if (game.get('completed') is True and game_day==day
+                and game.get('home_name')==prediction.get('home_team')
+                and game.get('away_name')==prediction.get('away_team')
+                and isinstance(game.get('provider_event_id'),str) and game['provider_event_id'].strip()):
+            matches.append(game)
     if len(matches)!=1:
         return None
     utc_timestamp(matches[0]['game_time'])
@@ -142,10 +159,25 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
     """Settle supported props; uncertain finality, identity, or stats stay pending."""
     if sport not in STAT_COLUMNS or not isinstance(schedule.get('games'),list):
         raise ValueError('Invalid settlement scope')
-    game_dates={game.get('date') for game in schedule['games']}
-    candidates=[row for row in ledger.predictions() if row.get('sport')==sport
-        and row.get('game_date') in game_dates
-        and (row.get('outcome') is None or row.get('outcome_source') in AUTO_SOURCES)]
+    game_dates=set()
+    for game in schedule['games']:
+        try:
+            game_dates.add(_canonical_date(game.get('date')))
+        except ValueError:
+            continue
+    recheckable=[]
+    invalid_dates=0
+    for row in ledger.predictions():
+        if (row.get('sport')!=sport or row.get('prop_type') not in STAT_COLUMNS[sport]
+                or (row.get('outcome') is not None and row.get('outcome_source') not in AUTO_SOURCES)):
+            continue
+        try:
+            row_day=_canonical_date(row.get('game_date'))
+        except ValueError:
+            invalid_dates+=1
+            continue
+        recheckable.append((row,row_day))
+    candidates=[row for row,row_day in recheckable if row_day in game_dates]
     reasons=Counter();resolved=[]
     with ledger.connect() as db:
         for prediction in candidates:
@@ -172,7 +204,7 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
     schedule_observed=utc_timestamp(schedule['captured_at'])
     for prediction,game,outcome,actual,provenance in resolved:
         evidence=dict(schedule_identity_version=2,
-            provider_event_id=game['provider_event_id'],date=game['date'],
+            provider_event_id=game['provider_event_id'],date=_canonical_date(game['date']),
             home_abbr=game['home_abbr'],away_abbr=game['away_abbr'],
             home_name=game['home_name'],away_name=game['away_name'],completed=True,
             game_time=game['game_time'],player_id=prediction['player_id'],
@@ -186,6 +218,11 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
             observed_at=max(schedule_observed,provenance['observed_at']),
             actual_values={prediction['prediction_id']:actual},
             evidence={prediction['prediction_id']:evidence})
+    recheckable_dates=sorted({row_day for _,row_day in recheckable})
     return dict(sport=sport,status='complete' if schedule.get('status')=='complete' else 'degraded',
         candidates=len(candidates),settled=len(resolved),pending=len(candidates)-len(resolved),
+        recheckable_total=len(recheckable),outside_schedule=len(recheckable)-len(candidates),
+        invalid_game_dates=invalid_dates,schedule_dates=len(game_dates),
+        oldest_recheckable_date=recheckable_dates[0] if recheckable_dates else None,
+        newest_recheckable_date=recheckable_dates[-1] if recheckable_dates else None,
         reasons=dict(sorted(reasons.items())),execution_ready=False)

@@ -61,7 +61,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
           ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" | tee "$RUNNER_TEMP/public-report.json"
+        run: uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" --report-output "$RUNNER_TEMP/public-report.json"
       - name: Verify deployed public readiness
         env:
           DATA_PIPELINE_ENABLED: 'false'

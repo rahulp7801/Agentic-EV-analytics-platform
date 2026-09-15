@@ -141,6 +141,21 @@ def test_settlement_only_counts_dates_present_in_supplied_schedule(tmp_path):
     assert all(row['outcome'] is None for row in ledger.predictions())
 
 
+def test_settlement_normalizes_compact_provider_dates_and_reports_coverage(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite');_,payload=prediction(ledger)
+    with ledger.connect() as db:
+        create_nba_stats(db);add_nba_stat(db,payload,21)
+    provider_schedule=schedule(payload)
+    provider_schedule['games'][0]['date']=payload['game_date'].replace('-','')
+    report=settle_final_props(ledger,'nba',provider_schedule)
+    assert report['settled']==1
+    assert report['recheckable_total']==1
+    assert report['outside_schedule']==0
+    assert report['schedule_dates']==1
+    assert report['oldest_recheckable_date']==payload['game_date']
+    assert report['newest_recheckable_date']==payload['game_date']
+
+
 def test_settlement_cannot_use_player_stat_from_another_same_day_game(tmp_path):
     ledger=Ledger(tmp_path/'audit.sqlite');_,payload=prediction(ledger)
     with ledger.connect() as db:
