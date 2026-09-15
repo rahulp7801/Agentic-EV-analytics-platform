@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { metricInterval, rateInterval } from '@/lib/performanceMetrics';
+import styles from './ResearchViews.module.css';
 
 type MetricReport = Record<string, unknown>;
 
@@ -16,19 +17,36 @@ function count(metrics: MetricReport, key: string) {
   return typeof metrics[key] === 'number' ? String(metrics[key]) : 'Unavailable';
 }
 
+function KeyMetric({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className={styles.keyMetric}><span>{label}</span><strong>{children}</strong></div>;
+}
+
 function MetricBlock({ title, metrics }: { title: string; metrics: MetricReport | null }) {
-  if (!metrics) return <article><h3>{title}</h3><p>Metrics loading…</p></article>;
-  if (typeof metrics.error === 'string') return <article><h3>{title}</h3><p>{metrics.error}</p></article>;
-  return <article>
-    <h3>{title}</h3>
-    <p>Settled: {count(metrics, 'settled_count')} · Pending: {count(metrics, 'pending_count')} · Calibration sample: {count(metrics, 'calibration_count')}</p>
-    <p>ROI: {value(metrics, 'roi', true)} · Hit rate: {value(metrics, 'hit_rate', true)} (95% Wilson {rateInterval(metrics, 'hit_rate_interval')}) · Brier: {value(metrics, 'brier_score')} · Log loss: {value(metrics, 'log_loss')}</p>
-    <p>10-bin calibration error: {value(metrics, 'calibration_error')}. Lower is better; each populated calibration bin also retains a nominal 95% Wilson interval for its observed outcome rate.</p>
-    <p>Brier benchmarks: always predict loss {value(metrics, 'baseline_zero_brier')} · 50/50 {value(metrics, 'baseline_50_brier')} · always predict win {value(metrics, 'baseline_one_brier')}.</p>
-    <p>Scored outcomes: {count(metrics, 'calibration_positive_count')} wins among {count(metrics, 'calibration_count')} forecasts. Lower Brier is better. Benchmarks use the same sample, excluding pushes, voids, pending outcomes and missing forecasts.</p>
-    <p>Game-cluster 95% intervals: ROI {metricInterval(metrics, 'roi_game_cluster_interval', true)} ({count(metrics, 'roi_game_cluster_count')} games) · hit rate {rateInterval(metrics, 'hit_rate_game_cluster_interval')} ({count(metrics, 'hit_rate_game_cluster_count')} games) · Brier {metricInterval(metrics, 'brier_score_game_cluster_interval')} and log loss {metricInterval(metrics, 'log_loss_game_cluster_interval')} ({count(metrics, 'calibration_game_cluster_count')} games) · CLV {metricInterval(metrics, 'clv_mean_game_cluster_interval', true, 'pp')} ({count(metrics, 'clv_game_cluster_count')} games).</p>
-    <p>CLV point estimate: {value(metrics, 'clv_mean', true, 'pp')} ({count(metrics, 'clv_count')} matched quotes). Missing outcomes remain unsettled. Wilson intervals treat selections as independent. Game-cluster robust t intervals require at least two games, allow dependence within a game, and do not adjust for the same player appearing across games.</p>
-  </article>;
+  if (!metrics) {
+    return <article className={styles.metricBlock}><p className={styles.metricError}>Loading evaluation…</p></article>;
+  }
+  if (typeof metrics.error === 'string') {
+    return <article className={styles.metricBlock}><p className={styles.metricError}>{metrics.error}</p></article>;
+  }
+
+  return (
+    <article className={styles.metricBlock}>
+      <header className={styles.metricBlockHeader}>
+        <h3>{title}</h3>
+        <span>{count(metrics, 'settled_count')} settled · {count(metrics, 'pending_count')} pending</span>
+      </header>
+      <div className={styles.keyMetrics}>
+        <KeyMetric label="ROI">{value(metrics, 'roi', true)}</KeyMetric>
+        <KeyMetric label="Hit rate">{value(metrics, 'hit_rate', true)}</KeyMetric>
+        <KeyMetric label="Brier">{value(metrics, 'brier_score')}</KeyMetric>
+        <KeyMetric label="CLV">{value(metrics, 'clv_mean', true, 'pp')}</KeyMetric>
+      </div>
+      <div className={styles.metricNotes}>
+        <p><b>95% intervals</b> · ROI {metricInterval(metrics, 'roi_game_cluster_interval', true)} · hit rate {rateInterval(metrics, 'hit_rate_game_cluster_interval')} · Brier {metricInterval(metrics, 'brier_score_game_cluster_interval')} · CLV {metricInterval(metrics, 'clv_mean_game_cluster_interval', true, 'pp')}</p>
+        <p><b>Calibration</b> · n={count(metrics, 'calibration_count')} · error {value(metrics, 'calibration_error')} · log loss {value(metrics, 'log_loss')} · 50/50 Brier benchmark {value(metrics, 'baseline_50_brier')}</p>
+      </div>
+    </article>
+  );
 }
 
 export default function Performance() {
@@ -36,6 +54,7 @@ export default function Performance() {
     all: null,
     recommendations: null,
   });
+
   useEffect(() => {
     let active = true;
     Promise.all(['all', 'recommendations'].map(async cohort => {
@@ -53,10 +72,19 @@ export default function Performance() {
   }, []);
 
   const version = metrics.all && typeof metrics.all.model_version === 'string'
-    ? metrics.all.model_version : 'model cohort unavailable';
-  return <section style={{padding: 12, border: '1px solid var(--border-dim)', margin: '8px 0'}}>
-    <div className="section-header">Historical evaluation · {version}</div>
-    <MetricBlock title="All eligible predictions · unit stakes" metrics={metrics.all} />
-    <MetricBlock title="Accepted recommendations · recorded stake fractions" metrics={metrics.recommendations} />
-  </section>;
+    ? metrics.all.model_version
+    : 'model cohort unavailable';
+
+  return (
+    <section className={styles.performance} aria-labelledby="evaluation-title">
+      <header className={styles.performanceHeader}>
+        <h2 id="evaluation-title">Historical evaluation</h2>
+        <span>{version} · game-cluster intervals where available</span>
+      </header>
+      <div className={styles.metricGrid}>
+        <MetricBlock title="All eligible predictions · unit stakes" metrics={metrics.all} />
+        <MetricBlock title="Accepted recommendations · recorded stakes" metrics={metrics.recommendations} />
+      </div>
+    </section>
+  );
 }

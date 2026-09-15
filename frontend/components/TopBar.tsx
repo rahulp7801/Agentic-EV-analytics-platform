@@ -1,87 +1,93 @@
 'use client';
+
 import { useEffect, useState } from 'react';
+import styles from './TerminalChrome.module.css';
+
+type TickerSignal = {
+  player: string;
+  prop_type: string;
+  line: number;
+  ev_pct: number;
+  direction: string;
+  sport: string;
+  gated?: boolean;
+};
 
 export default function TopBar() {
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
+  const [signals, setSignals] = useState<TickerSignal[]>([]);
+  const [available, setAvailable] = useState(false);
 
   useEffect(() => {
     const update = () => {
       const now = new Date();
-      setTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
+      setTime(now.toLocaleTimeString('en-US', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }));
       setDate(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
     };
     update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  const [signals, setSignals] = useState<{ player: string; prop_type: string; line: number; ev_pct: number; direction: string; sport: string; gated?: boolean }[]>([]);
-  const [available,setAvailable]=useState(false);
   useEffect(() => {
-    const controller=new AbortController();
+    const controller = new AbortController();
     async function load() {
       try {
-        const response=await fetch('/api/signals',{cache:'no-store',signal:controller.signal});
+        const response = await fetch('/api/signals', { cache: 'no-store', signal: controller.signal });
         if (!response.ok) throw new Error('Unavailable');
-        const data=await response.json();
-        setSignals((data.signals || []).filter((s:{gated?:boolean})=>!s.gated));setAvailable(true);
-      } catch {if (!controller.signal.aborted) {setSignals([]);setAvailable(false);}}
+        const data = await response.json();
+        setSignals((data.signals || []).filter((signal: TickerSignal) => !signal.gated));
+        setAvailable(true);
+      } catch {
+        if (!controller.signal.aborted) {
+          setSignals([]);
+          setAvailable(false);
+        }
+      }
     }
-    void load();const timer=setInterval(()=>void load(),30000);
-    return ()=>{controller.abort();clearInterval(timer);};
+    void load();
+    const timer = setInterval(() => void load(), 30_000);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
   }, []);
-  const tickerItems = [...signals, ...signals];
+
+  const ticker = (hidden: boolean) => signals.map((signal, index) => (
+    <span className={styles.tickerItem} key={`${hidden ? 'copy' : 'source'}-${index}`} aria-hidden={hidden || undefined}>
+      <span>{signal.sport?.toUpperCase()}</span>
+      <strong>{signal.player?.split(' ').pop()?.toUpperCase()} {signal.prop_type?.replace('_', ' ').toUpperCase()}</strong>
+      <span>{signal.direction === 'under' ? 'U' : 'O'} {signal.line}</span>
+      <em>+{(signal.ev_pct * 100).toFixed(1)}pp</em>
+    </span>
+  ));
 
   return (
-    <div style={{
-      height: 36, minHeight: 36,
-      background: 'var(--bg-surface)',
-      borderBottom: '1px solid var(--border-dim)',
-      display: 'flex', alignItems: 'stretch',
-      overflow: 'hidden',
-    }}>
-      {/* Left: status */}
-      <div className="topbar-item" style={{ gap: 8, minWidth: 160 }}>
-        <span style={{ width: 8, height: 8, borderRadius:'50%', background:available && signals.length ? 'var(--accent-mint)' : 'var(--text-muted)' }} />
-        <span style={{ color: 'var(--accent-mint)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em' }}>
-          MARKET ESTIMATES
-        </span>
-      </div>
-
-      {/* Ticker — real signals */}
-      <div className="ticker-wrap" style={{ flex: 1, borderRight: '1px solid var(--border-dim)', borderLeft: '1px solid var(--border-dim)' }}>
-        <div className="ticker-inner" style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 0 }}>
-          {tickerItems.length === 0 ? (
-            <span style={{ color: 'var(--text-dim)', fontSize: 10, padding: '0 20px' }}>Waiting for fresh market estimates</span>
-          ) : tickerItems.map((item, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, paddingRight: 32 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{item.sport?.toUpperCase()}</span>
-              <span style={{ color: 'var(--text-secondary)', fontSize: 10 }}>
-                {item.player?.split(' ').pop()?.toUpperCase()} {item.prop_type?.toUpperCase()} {item.direction === 'under' ? 'U' : 'O'}{item.line}
-              </span>
-              <span style={{ color: 'var(--accent-mint)', fontSize: 10, fontWeight: 600 }}>
-                +{(item.ev_pct * 100).toFixed(1)}pp
-              </span>
-              <span style={{ color: 'var(--border-bright)', fontSize: 10 }}>·</span>
-            </span>
-          ))}
+    <header className={styles.topbar}>
+      <div className={styles.marketState}>
+        <span className={`${styles.statusDot} ${available && signals.length ? styles.statusLive : ''}`} />
+        <div>
+          <small>Market pulse</small>
+          <strong>{available ? 'Evidence connected' : 'Awaiting estimates'}</strong>
         </div>
       </div>
-
-      {/* Right: stats + time */}
-      <div className="topbar-item" style={{ gap: 6 }}>
-        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>SIGNALS</span>
-        <span style={{ color: 'var(--accent-mint)', fontSize: 11, fontWeight: 600 }}>
-          {available ? signals.length : '—'}
-        </span>
+      <div className={styles.tickerViewport} aria-label="Current eligible market estimates">
+        {signals.length ? (
+          <div className={styles.tickerTrack}>{ticker(false)}{ticker(true)}</div>
+        ) : (
+          <span className={styles.tickerEmpty}>No fresh eligible estimates in the published snapshot</span>
+        )}
       </div>
-      <div className="topbar-item" style={{ gap: 8, borderRight: 'none' }}>
-        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{date}</span>
-        <span style={{ color: 'var(--text-primary)', fontSize: 11, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
-          {time}
-        </span>
+      <div className={styles.signalCount}>
+        <small>Signals</small>
+        <strong>{available ? signals.length : '—'}</strong>
       </div>
-    </div>
+      <time className={styles.clock} dateTime={time ? new Date().toISOString() : undefined}>
+        <span>{date}</span><strong>{time}</strong>
+      </time>
+    </header>
   );
 }

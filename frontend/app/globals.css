@@ -1,43 +1,81 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Syne:wght@600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
-  --bg-void:       #05070f;
-  --bg-base:       #090c18;
-  --bg-surface:    #0d1220;
-  --bg-card:       #111828;
-  --bg-raised:     #162038;
-  --bg-hover:      #1c2a48;
-  --border-dim:    #192235;
-  --border-mid:    #223048;
-  --border-bright: #2e4068;
+  --font-display:   'Archivo Black';
+  --font-sans:      'DM Sans Variable';
+  --font-mono:      'IBM Plex Mono';
+  --bg-void:       #0b0c0b;
+  --bg-base:       #101210;
+  --bg-surface:    #141714;
+  --bg-card:       #181b18;
+  --bg-raised:     #1d211d;
+  --bg-hover:      #242924;
+  --border-dim:    #242824;
+  --border-mid:    #303630;
+  --border-bright: #454d45;
 
-  --accent-mint:   #00e5a0;
-  --accent-cyan:   #00c8e0;
-  --accent-blue:   #4488ff;
-  --accent-amber:  #f5a623;
-  --accent-red:    #f03d3d;
-  --accent-purple: #9b6dff;
+  --accent-mint:   #d9ff43;
+  --accent-cyan:   #73dded;
+  --accent-blue:   #78a8ff;
+  --accent-amber:  #ffb84d;
+  --accent-red:    #ff6542;
+  --accent-purple: #b79cff;
 
-  --text-primary:  #ccd8ee;
-  --text-secondary:#7890b8;
-  --text-muted:    #445070;
-  --text-dim:      #2a3850;
+  --text-primary:  #f1efe9;
+  --text-secondary:#a7afa7;
+  --text-muted:    #697269;
+  --text-dim:      #434a43;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   height: 100%;
-  overflow: hidden;
   background: var(--bg-void);
   color: var(--text-primary);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 12.5px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+html { scroll-behavior: smooth; }
+body { min-height: 100%; }
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.terminal-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  overflow: hidden;
+  background: var(--bg-void);
+}
+
+.terminal-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.terminal-main { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-base); }
+.terminal-view { flex: 1; min-height: 0; overflow: hidden; }
+.terminal-breadcrumb {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--border-dim);
+  background: var(--bg-void);
+  color: var(--text-dim);
+  font-size: 8px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.terminal-breadcrumb strong { color: var(--accent-mint); font-weight: 600; }
 
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -152,17 +190,17 @@ html, body {
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
 }
 .card-surface {
   background: var(--bg-surface);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
 }
 .card-raised {
   background: var(--bg-raised);
   border: 1px solid var(--border-mid);
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 /* ─── Nav items ─── */
@@ -171,7 +209,7 @@ html, body {
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  border-radius: 3px;
+  border-radius: 0;
   cursor: pointer;
   color: var(--text-muted);
   font-size: 10px;
@@ -243,7 +281,7 @@ html, body {
 
 /* ─── Section header ─── */
 .section-header {
-  font-family: 'Syne', sans-serif;
+  font-family: var(--font-sans), sans-serif;
   font-weight: 700;
   font-size: 10px;
   letter-spacing: 0.18em;
@@ -272,7 +310,7 @@ html, body {
 /* ─── Sport toggle ─── */
 .sport-toggle {
   display: flex; border: 1px solid var(--border-dim);
-  border-radius: 3px; overflow: hidden; background: var(--bg-surface);
+  border-radius: 0; overflow: hidden; background: var(--bg-surface);
 }
 .sport-btn {
   flex: 1; padding: 5px 10px; font-size: 10px; font-weight: 600;
@@ -285,7 +323,7 @@ html, body {
 
 /* ─── Stat number display ─── */
 .stat-num {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-weight: 600; letter-spacing: -0.01em;
 }
 
@@ -315,9 +353,9 @@ html, body {
 .term-input {
   background: var(--bg-surface);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
   color: var(--text-primary);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 12px;
   padding: 6px 10px;
   outline: none;
@@ -330,9 +368,9 @@ html, body {
 .term-select {
   background: var(--bg-surface);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
   color: var(--text-primary);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 11px;
   padding: 5px 8px;
   outline: none;
@@ -346,9 +384,9 @@ html, body {
   background: rgba(0,229,160,0.12);
   color: var(--accent-mint);
   border: 1px solid rgba(0,229,160,0.3);
-  border-radius: 3px;
+  border-radius: 0;
   padding: 6px 14px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -365,11 +403,16 @@ html, body {
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
   padding: 5px 12px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 10.5px;
   cursor: pointer;
   transition: all 0.12s ease;
 }
 .btn-ghost:hover { background: var(--bg-raised); color: var(--text-primary); }
+
+@media (max-width: 720px) {
+  .terminal-main { padding-bottom: 66px; }
+  .terminal-breadcrumb { padding-inline: 12px; }
+}
