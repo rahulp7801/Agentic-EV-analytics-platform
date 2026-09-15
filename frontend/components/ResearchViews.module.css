@@ -209,8 +209,9 @@
   .view { padding: 15px; }
   .viewHeader { grid-template-columns: 1fr; gap: 12px; }
   .viewHeader h2 { font-size: 34px; }
-  .sourceGrid { display: flex; overflow-x: auto; }
-  .sourceCard { min-width: 260px; }
+  .sourceGrid { grid-template-columns: 1fr; }
+  .sourceCard { min-width: 0; min-height: auto; border-right: 0; border-bottom: 1px solid var(--border-mid); }
+  .sourceCard:last-child { border-bottom: 0; }
   .funnel { grid-template-columns: repeat(2, 1fr); }
   .funnel div:nth-child(2) { border-right: 0; }
   .funnel div:nth-child(-n+2) { border-bottom: 1px solid var(--border-mid); }
