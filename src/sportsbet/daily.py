@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -21,9 +22,9 @@ from sportsbet.settlement import pending_schedule_offsets, settle_final_props
 MODES=('daily','monitor','public_daily','public_monitor')
 PUBLIC_SCOPES={
     'public_daily':(
-        'Public-only daily collection: Kalshi markets, ESPN schedules, NBA/NFL history refresh, '
-        'and settlement evaluation. Sportsbooks, PrizePicks and prop recommendations are not '
-        'requested. Partial market sampling is retained explicitly. This is periodic collection, '
+        'Public-only daily collection: Kalshi markets, PrizePicks projections when publicly available, '
+        'ESPN schedules, NBA/NFL history refresh, and settlement evaluation. Sportsbooks and prop '
+        'recommendations are not requested. Partial market sampling is retained explicitly. This is periodic collection, '
         'not continuous arbitrage monitoring.'
     ),
     'public_monitor':(
@@ -103,7 +104,9 @@ def create_daily_graph():
         public=state['mode'].startswith('public_')
         for sport in state['sports']:
             try:
-                summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,**({'provider':'kalshi'} if public else {}))
+                public_provider='public' if state['mode']=='public_daily' else 'kalshi'
+                summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,
+                    **({'provider':public_provider} if public else {}))
                 complete = bool(summary['sources']) and all(
                     source['status']=='observed' and not source.get('partial_coverage',True)
                     for source in summary['sources'].values()
@@ -205,14 +208,25 @@ async def run(sports: list[str], mode: str, daily_credit_limit: int):
     return (await create_daily_graph().ainvoke(dict(sports=sports,mode=mode,daily_credit_limit=daily_credit_limit)))['report']
 
 
+def _write_report(path: str, report: dict) -> None:
+    destination=Path(path)
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    temporary=destination.with_name(destination.name+'.tmp')
+    temporary.write_text(json.dumps(report,separators=(',',':'))+'\n',encoding='utf-8')
+    temporary.replace(destination)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport',choices=['nba','nfl','both'],default='both')
     parser.add_argument('--mode',choices=MODES,default='daily')
     parser.add_argument('--daily-credit-limit',type=int,default=25)
+    parser.add_argument('--report-output',help='Write the final machine-readable report to this file')
     args=parser.parse_args()
     try:
         report=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.mode,args.daily_credit_limit))
+        if args.report_output:
+            _write_report(args.report_output,report)
         print(json.dumps(report))
         # Degraded provider coverage must remain visible as a failed scheduled run.
         if report['status'] not in ('complete','observed'):

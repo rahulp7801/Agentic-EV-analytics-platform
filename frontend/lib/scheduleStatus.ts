@@ -64,7 +64,9 @@ export function scheduleSnapshot(data: Row | null, sport:Sport, now=Date.now()) 
       throw new Error('Invalid schedule');
     }
     const captured=timestamp(data.captured_at), age=now-Date.parse(captured);
-    if (!Number.isFinite(age) || age<0 || age>90*60000) throw new Error('Invalid schedule');
+    // Schedules change far less often than prices. Keep a same-day snapshot usable
+    // across ordinary GitHub Actions scheduling delays while prices retain tighter gates.
+    if (!Number.isFinite(age) || age<0 || age>4*60*60000) throw new Error('Invalid schedule');
     return {status:200,body:{games:publicGames(data.games,today),partial:data.status==='partial',
       captured_at:captured}};
   } catch {

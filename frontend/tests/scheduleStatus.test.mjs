@@ -8,8 +8,9 @@ test('hosted schedules require recent evidence for the current Eastern date',()=
     as_of_date:'2026-09-11',games:[]};
   assert.equal(scheduleSnapshot(data,'nfl',now).status,200);
   assert.equal(scheduleSnapshot({...data,status:'partial',partial:true},'nfl',now).body.partial,true);
+  assert.equal(scheduleSnapshot({...data,captured_at:'2026-09-11T15:00:01Z'},'nfl',now).status,200);
   for (const value of [null,{...data,sport:'nba'},{...data,status:'unavailable'},{...data,as_of_date:'2026-09-10'},
-    {...data,captured_at:'2026-09-11T15:00:00Z'},{...data,captured_at:'2026-09-11T19:00:00Z'}]) {
+    {...data,captured_at:'2026-09-11T13:59:59Z'},{...data,captured_at:'2026-09-11T19:00:00Z'}]) {
     assert.equal(scheduleSnapshot(value,'nfl',now).status,503);
   }
 });

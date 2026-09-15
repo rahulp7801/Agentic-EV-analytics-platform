@@ -245,7 +245,8 @@ async def test_public_modes_use_real_graph_and_collector_without_paid_or_prop_ca
     def unexpected_read(*args):raise AssertionError('Public monitor must not load history or spend credits')
     monkeypatch.setattr(daily,'load_snapshot',unexpected_read)
     monkeypatch.setattr(Ledger,'reserve_api_credits',unexpected_read)
-    books=AsyncMock();prizepicks=AsyncMock();props=AsyncMock()
+    books=AsyncMock();prizepicks=AsyncMock(return_value={
+        'status':'observed','projections':[],'partial_coverage':False});props=AsyncMock()
     monkeypatch.setattr(market_watch,'sportsbooks',books)
     monkeypatch.setattr(market_watch,'capture_projections',prizepicks)
     monkeypatch.setattr(daily,'scan',props)
@@ -256,7 +257,8 @@ async def test_public_modes_use_real_graph_and_collector_without_paid_or_prop_ca
     assert result['scope']==daily.PUBLIC_SCOPES[mode]
     assert refreshed==(['nfl','nba'] if mode=='public_daily' else [])
     assert kalshi.await_count==2
-    books.assert_not_called();prizepicks.assert_not_called();props.assert_not_called()
+    books.assert_not_called();props.assert_not_called()
+    assert prizepicks.await_count==(2 if mode=='public_daily' else 0)
     assert all(value['status']=='not_requested' for value in result['props'].values())
     expected='complete' if mode=='public_daily' else 'not_requested'
     assert all(value['status']==expected for value in result['settlements'].values())
@@ -270,6 +272,8 @@ async def test_public_modes_use_real_graph_and_collector_without_paid_or_prop_ca
     for sport in ('nfl','nba'):
         assert result['markets'][sport]['sources']['kalshi']['partial_coverage'] is True
         assert result['markets'][sport]['sources']['sportsbook']['status']=='not_requested'
+        assert result['markets'][sport]['sources']['prizepicks']['status']==(
+            'observed' if mode=='public_daily' else 'not_requested')
     assert len(list((tmp_path/'.local/market-watch').glob('*.json')))==2
 
 

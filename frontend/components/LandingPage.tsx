@@ -1,303 +1,179 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, Database, Eye, Radar, ShieldCheck } from 'lucide-react';
-import { LazyMotion, MotionConfig, domAnimation, m, useReducedMotion, useScroll, useTransform } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRight, ArrowUpRight, Check, Database, Eye, Layers3, ShieldCheck, Sparkles } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import styles from './LandingPage.module.css';
 
-type LeagueScan = {
-  state: string;
-  label: string;
-  updated_at: string | null;
-  quotes: number;
-  selections: number;
-  model_requests: number;
-  model_estimates: number;
-  unresolved_selections: number;
-  missing_estimates: number;
+type Pulse = {
+  games: number | null;
+  props: number | null;
+  twoSided: number | null;
+  capturedAt: string | null;
+  scan: string;
 };
 
-type ScanResponse = Partial<Record<'nfl' | 'nba', LeagueScan>>;
-
-const process = [
-  { number: '01', title: 'Observe', copy: 'Timestamped market snapshots enter with source and identity evidence.' },
-  { number: '02', title: 'Estimate', copy: 'Sport-specific models use only history available before the event cutoff.' },
-  { number: '03', title: 'Compare', copy: 'Exact lines meet across books, Kalshi, and available fantasy boards.' },
-  { number: '04', title: 'Verify', copy: 'Fees, freshness, settlement rules, and uncertainty decide what survives.' },
+const method = [
+  { icon: Eye, title: 'Observe the offer', copy: 'Capture the line, price, event, player identity, and provider timestamp as one piece of evidence.' },
+  { icon: Layers3, title: 'Resolve the market', copy: 'Match the exact outcome across sportsbooks, Kalshi contracts, and projection boards.' },
+  { icon: Database, title: 'Estimate honestly', copy: 'Use only history available before the event and retain the model version and uncertainty.' },
+  { icon: ShieldCheck, title: 'Gate the result', copy: 'Freshness, fees, liquidity, rules, and settlement coverage decide what reaches the dashboard.' },
 ];
 
-const paths = [
-  'M48 90 C150 90 144 212 270 212 S390 132 502 132',
-  'M48 212 C164 212 156 132 270 132 S398 212 502 212',
-  'M48 334 C170 334 156 252 270 252 S388 292 502 292',
-];
+function count(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 
-function LiveReadout() {
-  const [scans, setScans] = useState<ScanResponse | null>(null);
+function MarketPulse() {
+  const [pulse, setPulse] = useState<Pulse>({ games: null, props: null, twoSided: null, capturedAt: null, scan: 'Checking model scan' });
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/scans', { cache: 'no-store', signal: controller.signal })
-      .then(response => response.ok ? response.json() : Promise.reject(new Error('scan unavailable')))
-      .then((body: ScanResponse) => setScans(body))
-      .catch(() => {
-        if (!controller.signal.aborted) setScans({});
+    Promise.allSettled([
+      fetch('/api/markets?sport=nfl', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
+      fetch('/api/games?sport=nfl', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
+      fetch('/api/scans', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
+    ]).then(([markets, games, scans]) => {
+      if (controller.signal.aborted) return;
+      const market = markets.status === 'fulfilled' ? markets.value : null;
+      const coverage = market?.sources?.kalshi?.coverage;
+      setPulse({
+        games: games.status === 'fulfilled' && Array.isArray(games.value.games) ? games.value.games.length : null,
+        props: count(coverage?.prop_linked_markets),
+        twoSided: count(coverage?.prop_two_sided_quote_markets),
+        capturedAt: typeof market?.captured_at === 'string' ? market.captured_at : null,
+        scan: scans.status === 'fulfilled' ? scans.value?.nfl?.label ?? 'Model state unavailable' : 'Model state unavailable',
       });
+    });
     return () => controller.abort();
   }, []);
 
-  const active = useMemo(() => {
-    const rows = Object.entries(scans ?? {}) as Array<['nfl' | 'nba', LeagueScan]>;
-    return rows
-      .filter(([, scan]) => scan?.updated_at)
-      .sort((left, right) => Date.parse(right[1].updated_at ?? '') - Date.parse(left[1].updated_at ?? ''))[0];
-  }, [scans]);
-
   return (
-    <div className={styles.readout} aria-live="polite">
-      <div className={styles.readoutHeader}>
-        <span className={styles.pulse} />
-        <span>Latest verified pipeline state</span>
-        <span>{active?.[0].toUpperCase() ?? 'SYNC'}</span>
+    <div className={styles.pulseCard}>
+      <div className={styles.pulseHeader}><span><i /> Live evidence</span><span>NFL</span></div>
+      <div className={styles.pulseStats}>
+        <div><strong>{pulse.games ?? '—'}</strong><span>games in view</span></div>
+        <div><strong>{pulse.props ?? '—'}</strong><span>linked Kalshi props</span></div>
+        <div><strong>{pulse.twoSided ?? '—'}</strong><span>two-sided markets</span></div>
       </div>
-      {scans === null ? (
-        <div className={styles.readoutLoading}>Reading the evidence ledger…</div>
-      ) : active ? (
-        <>
-          <div className={styles.readoutStatus}>{active[1].label}</div>
-          <div className={styles.readoutGrid}>
-            <div><span>Quotes</span><strong>{active[1].quotes.toLocaleString()}</strong></div>
-            <div><span>Selections</span><strong>{active[1].selections.toLocaleString()}</strong></div>
-            <div><span>Estimates</span><strong>{active[1].model_estimates.toLocaleString()}</strong></div>
-            <div><span>Unresolved</span><strong>{active[1].unresolved_selections.toLocaleString()}</strong></div>
-          </div>
-        </>
-      ) : (
-        <div className={styles.readoutLoading}>Live scan evidence is currently unavailable.</div>
-      )}
+      <div className={styles.pulseFoot}>
+        <span>{pulse.scan}</span>
+        <span>{pulse.capturedAt ? new Date(pulse.capturedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Awaiting capture'}</span>
+      </div>
     </div>
   );
 }
 
-function MarketTopology({ reduceMotion }: { reduceMotion: boolean }) {
+function ProductFrame() {
   return (
-    <div className={styles.topology}>
-      <div className={styles.topologyMeta}>
-        <span>Market topology / 001</span>
-        <span>Read only</span>
-      </div>
-      <svg viewBox="0 0 550 390" role="img" aria-label="Sportsbooks, prediction markets, and fantasy boards flow through an evidence model">
-        <defs>
-          <filter id="landing-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-        {paths.map((path, index) => (
-          <m.path
-            key={path}
-            d={path}
-            className={styles.flowPath}
-            initial={false}
-            animate={reduceMotion
-              ? { pathLength: 1, opacity: 1 }
-              : { pathLength: [0, 1], opacity: [0.25, 1] }}
-            transition={{ duration: 1.3, delay: 0.25 + index * 0.13, ease: [0.22, 1, 0.36, 1] }}
-          />
-        ))}
-        <g className={styles.sourceNodes}>
-          <circle cx="48" cy="90" r="6" /><circle cx="48" cy="212" r="6" /><circle cx="48" cy="334" r="6" />
-        </g>
-        <g className={styles.destinationNodes}>
-          <circle cx="502" cy="132" r="7" /><circle cx="502" cy="212" r="7" /><circle cx="502" cy="292" r="7" />
-        </g>
-        <m.g
-          className={styles.modelNode}
-          initial={false}
-          animate={reduceMotion ? { scale: 1, opacity: 1 } : { scale: [0.8, 1], opacity: [0.4, 1] }}
-          transition={{ type: 'spring', stiffness: 130, damping: 18, delay: 0.6 }}
-          style={{ transformOrigin: '270px 212px' }}
-        >
-          <circle cx="270" cy="212" r="60" />
-          <circle cx="270" cy="212" r="42" />
-          <circle cx="270" cy="212" r="7" filter="url(#landing-glow)" />
-        </m.g>
-        <g className={styles.svgLabels}>
-          <text x="30" y="70">BOOKS</text><text x="30" y="192">KALSHI</text><text x="30" y="314">FANTASY</text>
-          <text x="472" y="112">PRICE</text><text x="472" y="192">EDGE</text><text x="472" y="272">PROOF</text>
-          <text x="239" y="216">MODEL</text>
-        </g>
-      </svg>
-      <div className={styles.topologyFoot}>
-        <span>Evidence in</span><span>Decision support out</span>
+    <div className={styles.productFrame}>
+      <div className={styles.frameBar}><span /><span /><span /><b>quant / live markets</b></div>
+      <div className={styles.frameBody}>
+        <div className={styles.frameSide}>
+          <div className={styles.miniBrand}>Q</div>
+          <span className={styles.activeNav} /><span /><span /><span /><span />
+        </div>
+        <div className={styles.frameMain}>
+          <div className={styles.frameTitle}><span>Current NFL coverage</span><strong>Every state has a reason.</strong></div>
+          <div className={styles.frameMetrics}><div><span>Games</span><b>16</b></div><div><span>Markets</span><b>231</b></div><div><span>Two-sided</span><b>230</b></div></div>
+          <div className={styles.frameGrid}>
+            <div className={styles.frameList}><span>VENUE STATUS</span><p><i className={styles.green} />Kalshi <b>Observed</b></p><p><i />Sportsbooks <b>Next scan</b></p><p><i />PrizePicks <b>Not requested</b></p></div>
+            <div className={styles.frameDark}><span>EVIDENCE POLICY</span><strong>No price without provenance.</strong><p>Source, time, identity, fees, and settlement logic stay attached.</p></div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 export default function LandingPage() {
+  const root = useRef<HTMLDivElement>(null);
   const reduceMotion = Boolean(useReducedMotion());
-  const { scrollYProgress } = useScroll();
-  const drift = useTransform(scrollYProgress, [0, 0.45], [0, reduceMotion ? 0 : 110]);
+
+  useEffect(() => {
+    if (reduceMotion || !root.current) return;
+    let context: { revert: () => void } | undefined;
+    let cancelled = false;
+    Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(([gsapModule, triggerModule]) => {
+      if (cancelled || !root.current) return;
+      const gsap = gsapModule.gsap;
+      const ScrollTrigger = triggerModule.ScrollTrigger;
+      gsap.registerPlugin(ScrollTrigger);
+      context = gsap.context(() => {
+        gsap.timeline({ scrollTrigger: { trigger: `.${styles.hero}`, start: 'top top', end: 'bottom top', scrub: 0.7 } })
+          .to(`.${styles.heroCopy}`, { yPercent: -18, opacity: .18, scale: .94, ease: 'none' }, 0)
+          .to(`.${styles.heroOrb}`, { yPercent: 30, scale: 1.22, opacity: .15, ease: 'none' }, 0);
+
+        const story = gsap.timeline({ scrollTrigger: { trigger: `.${styles.story}`, start: 'top top', end: '+=240%', scrub: 0.65, pin: true, anticipatePin: 1 } });
+        story.fromTo(`.${styles.productFrame}`, { scale: .78, rotateX: 7, y: 80 }, { scale: 1, rotateX: 0, y: 0, ease: 'power2.out' })
+          .to(`.${styles.storyWord}:nth-child(1)`, { opacity: .2, y: -30 }, .65)
+          .fromTo(`.${styles.storyWord}:nth-child(2)`, { opacity: .15, y: 36 }, { opacity: 1, y: 0 }, .65)
+          .to(`.${styles.frameMetrics} > div`, { y: -5, stagger: .08, boxShadow: '0 16px 40px rgba(50,50,75,.12)' }, .8)
+          .to(`.${styles.storyWord}:nth-child(2)`, { opacity: .2, y: -30 }, 1.45)
+          .fromTo(`.${styles.storyWord}:nth-child(3)`, { opacity: .15, y: 36 }, { opacity: 1, y: 0 }, 1.45)
+          .to(`.${styles.frameDark}`, { scale: 1.025, backgroundColor: '#2c2b38' }, 1.55);
+
+        gsap.from(`.${styles.methodCard}`, { scrollTrigger: { trigger: `.${styles.methodGrid}`, start: 'top 76%' }, opacity: 0, y: 42, stagger: .1, duration: .8, ease: 'power3.out' });
+      }, root);
+    });
+    return () => { cancelled = true; context?.revert(); };
+  }, [reduceMotion]);
 
   return (
-    <MotionConfig reducedMotion="user" transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}>
-      <LazyMotion features={domAnimation} strict>
-        <div className={styles.page}>
-          <header className={styles.nav}>
-            <Link className={styles.brand} href="/" aria-label="QUANT home">
-              <span>Q</span>
-              <strong>QUANT</strong>
-              <small>Market intelligence</small>
-            </Link>
-            <nav aria-label="Landing navigation">
-              <a href="#method">Method</a>
-              <a href="#integrity">Integrity</a>
-              <Link className={styles.navCta} href="/terminal">Open terminal <ArrowUpRight size={15} aria-hidden="true" /></Link>
-            </nav>
-          </header>
+    <div className={styles.page} ref={root}>
+      <header className={styles.nav}>
+        <Link className={styles.brand} href="/"><span>Q</span><strong>Quant</strong></Link>
+            <nav aria-label="Landing navigation"><a href="#platform">Platform</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton}><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
+      </header>
 
-          <main>
-            <section className={styles.hero}>
-              <div className={styles.heroIndex}>
-                <span>01—04</span>
-                <span>NBA / NFL</span>
-                <span>Pacific time</span>
-              </div>
-              <m.div className={styles.heroCopy} style={{ y: drift }}>
-                <m.p
-                  className={styles.eyebrow}
-                  initial={false}
-                  animate={reduceMotion ? undefined : { opacity: [0.45, 1], y: [16, 0] }}
-                >
-                  A research instrument for fragmented sports markets
-                </m.p>
-                <h1>
-                  <m.span initial={false} animate={reduceMotion ? undefined : { y: ['105%', '0%'] }} transition={{ delay: 0.05 }}>Markets</m.span>
-                  <m.span className={styles.titleAccent} initial={false} animate={reduceMotion ? undefined : { y: ['105%', '0%'] }} transition={{ delay: 0.13 }}>disagree.</m.span>
-                </h1>
-                <m.div
-                  className={styles.heroBottom}
-                  initial={false}
-                  animate={reduceMotion ? undefined : { opacity: [0, 1] }}
-                  transition={{ delay: 0.45 }}
-                >
-                  <p>QUANT maps where sportsbook prices, prediction markets, and player projections diverge—then shows the evidence that made the comparison possible.</p>
-                  <Link className={styles.primaryCta} href="/terminal">
-                    Enter the live terminal <ArrowRight size={18} />
-                  </Link>
-                </m.div>
-              </m.div>
-              <m.div
-                className={styles.heroVisual}
-                initial={false}
-                animate={reduceMotion ? undefined : { opacity: [0, 1], x: [40, 0] }}
-                transition={{ delay: 0.2, duration: 0.8 }}
-              >
-                <MarketTopology reduceMotion={reduceMotion} />
-                <LiveReadout />
-              </m.div>
-              <a className={styles.scrollCue} href="#method">
-                Follow the signal <ArrowDownRight size={16} />
-              </a>
-            </section>
+      <main>
+        <section className={styles.hero}>
+          <div className={styles.heroOrb} aria-hidden="true" />
+          <motion.div className={styles.heroCopy} initial={reduceMotion ? false : { opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .9, ease: [.2, .8, .2, 1] }}>
+            <div className={styles.eyebrow}><Sparkles size={14} /> Evidence-first sports intelligence</div>
+            <h1>An edge you<br />can <span>inspect.</span></h1>
+            <p>One clear view of sportsbook prices, prediction markets, player projections, and model evidence—built to show what is live, what is stale, and what is still unknown.</p>
+            <div className={styles.heroActions}><Link href="/terminal">Explore live markets <ArrowRight size={17} /></Link><a href="#platform">See how it works</a></div>
+          </motion.div>
+          <motion.div className={styles.heroPulse} initial={reduceMotion ? false : { opacity: 0, y: 35 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .28, duration: .8 }}><MarketPulse /></motion.div>
+          <div className={styles.heroFine}><span>NBA + NFL</span><span>Sportsbooks · Kalshi · PrizePicks</span><span>Read-only analysis</span></div>
+        </section>
 
-            <section className={styles.statement} id="method">
-              <div className={styles.statementRail} aria-hidden="true">
-                <span>Observe</span><span>Price</span><span>Test</span><span>Verify</span>
-              </div>
-              <m.div
-                className={styles.statementCopy}
-                initial={false}
-                whileInView={reduceMotion ? undefined : { opacity: [0.62, 1], y: [36, 0] }}
-                viewport={{ once: true, amount: 0.45 }}
-              >
-                <span className={styles.sectionNumber}>02</span>
-                <h2>One surface.<br />Every disagreement.</h2>
-                <p>The useful signal is rarely a single number. It is the relationship between price, probability, time, rules, and what the market actually offered.</p>
-              </m.div>
-            </section>
+        <section className={styles.story} id="platform">
+          <div className={styles.storyCopy}>
+            <p className={`${styles.storyWord} ${styles.wordActive}`}>See the market.</p>
+            <p className={styles.storyWord}>Understand the gap.</p>
+            <p className={styles.storyWord}>Keep the proof.</p>
+          </div>
+          <div className={styles.productWrap}><ProductFrame /></div>
+        </section>
 
-            <section className={styles.processSection} aria-labelledby="process-title">
-              <div className={styles.sectionHeader}>
-                <span id="process-title">Signal path</span>
-                <span>Four gates / zero invented inputs</span>
-              </div>
-              <div className={styles.processGrid}>
-                {process.map((step, index) => (
-                  <m.article
-                    key={step.number}
-                    className={styles.processCard}
-                    initial={false}
-                    whileInView={reduceMotion ? undefined : { opacity: [0.55, 1], y: [24, 0] }}
-                    viewport={{ once: true, amount: 0.5 }}
-                    transition={{ delay: index * 0.08 }}
-                  >
-                    <span>{step.number}</span>
-                    <h3>{step.title}</h3>
-                    <p>{step.copy}</p>
-                    <ArrowDownRight aria-hidden="true" />
-                  </m.article>
-                ))}
-              </div>
-            </section>
+        <section className={styles.method} id="method">
+          <div className={styles.methodIntro}><span>How it works</span><h2>Signal without the theatre.</h2><p>The interface stays calm because the system underneath is strict. Each stage can block a result instead of filling the screen with false certainty.</p></div>
+          <div className={styles.methodGrid}>
+            {method.map((item, index) => {
+              const Icon = item.icon;
+              return <article className={styles.methodCard} key={item.title}><div><span>0{index + 1}</span><Icon /></div><h3>{item.title}</h3><p>{item.copy}</p></article>;
+            })}
+          </div>
+        </section>
 
-            <section className={styles.integrity} id="integrity">
-              <div className={styles.integrityIntro}>
-                <span className={styles.sectionNumber}>03</span>
-                <p className={styles.kicker}>Built for the moment before a decision</p>
-                <h2>Make uncertainty visible.</h2>
-                <p className={styles.integrityLead}>A polished number can still be wrong. QUANT keeps source health, sample depth, fee assumptions, freshness, and settlement uncertainty attached to every result.</p>
-              </div>
-              <div className={styles.integrityGrid}>
-                <article className={styles.integrityCard}>
-                  <Eye />
-                  <span>01</span>
-                  <h3>Observable</h3>
-                  <p>Every public result carries enough context to understand what was seen and when.</p>
-                </article>
-                <article className={`${styles.integrityCard} ${styles.cardDark}`}>
-                  <Database />
-                  <span>02</span>
-                  <h3>Reproducible</h3>
-                  <p>Immutable quote evidence and model lineage make later evaluation possible.</p>
-                </article>
-                <article className={`${styles.integrityCard} ${styles.cardSignal}`}>
-                  <Radar />
-                  <span>03</span>
-                  <h3>Current</h3>
-                  <p>Stale observations leave the opportunity surface instead of lingering as leads.</p>
-                </article>
-                <article className={styles.integrityCard}>
-                  <ShieldCheck />
-                  <span>04</span>
-                  <h3>Read only</h3>
-                  <p>The system analyzes and backtests. It does not place orders.</p>
-                </article>
-              </div>
-            </section>
+        <section className={styles.integrity}>
+          <div className={styles.integrityGlow} aria-hidden="true" />
+          <span>Designed for evidence</span>
+          <h2>Unknown is a valid answer.</h2>
+          <p>Quant does not turn missing outcomes into performance, stale quotes into opportunities, or public projections into invented payouts.</p>
+          <div className={styles.checks}><span><Check /> No order execution</span><span><Check /> Immutable evidence</span><span><Check /> Explicit provider health</span></div>
+        </section>
 
-            <section className={styles.finalCta}>
-              <div className={styles.finalMark} aria-hidden="true">Q</div>
-              <div>
-                <span className={styles.sectionNumber}>04</span>
-                <h2>Read the market<br />between the lines.</h2>
-              </div>
-              <Link className={styles.finalButton} href="/terminal">
-                <span>Launch QUANT</span>
-                <ArrowRight />
-              </Link>
-            </section>
-          </main>
+        <section className={styles.finalCta}>
+          <div><span>Ready when the data is.</span><h2>Read the market<br />with context.</h2></div>
+          <Link href="/terminal">Open the dashboard <ArrowUpRight /></Link>
+        </section>
+      </main>
 
-          <footer className={styles.footer}>
-            <div><strong>QUANT</strong><span>Evidence before edge.</span></div>
-            <div><span>Sportsbooks</span><span>Kalshi</span><span>PrizePicks</span></div>
-            <div><span>Research only</span><span>© {new Date().getFullYear()}</span></div>
-          </footer>
-        </div>
-      </LazyMotion>
-    </MotionConfig>
+      <footer className={styles.footer}><Link href="/" className={styles.brand}><span>Q</span><strong>Quant</strong></Link><p>Sports market intelligence with source, time, and uncertainty attached.</p><span>Research only · {new Date().getFullYear()}</span></footer>
+    </div>
   );
 }

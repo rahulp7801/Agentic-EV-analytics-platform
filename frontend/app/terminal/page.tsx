@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
-import EVDashboard from '@/components/EVDashboard';
+import Overview from '@/components/Overview';
 import PropsAnalysis from '@/components/PropsAnalysis';
 import GameLogs from '@/components/GameLogs';
 import MarketWatch from '@/components/MarketWatch';
@@ -14,13 +14,8 @@ import type { EVSignal, Sport } from '@/lib/types';
 
 export default function Terminal() {
   const [view, setView] = useState('dashboard');
-  const [sport, setSport] = useState<Sport>('nba');
+  const [sport, setSport] = useState<Sport>('nfl');
   const [parlayLegs, setParlayLegs] = useState<EVSignal[]>([]);
-
-  const addToParlay = (signal: EVSignal) =>
-    setParlayLegs(previous => previous.some(item => item.id === signal.id)
-      ? previous
-      : [...previous, signal]);
 
   return (
     <div className="terminal-shell">
@@ -43,11 +38,7 @@ export default function Terminal() {
           <ScanStatus />
           <div className="terminal-view">
             {view === 'dashboard' && (
-              <EVDashboard
-                sport={sport}
-                onAddToParlay={addToParlay}
-                parlayIds={new Set(parlayLegs.map(signal => signal.id))}
-              />
+              <Overview key={sport} sport={sport} onOpenMarkets={() => setView('arbitrage')} />
             )}
             {view === 'props' && <PropsAnalysis sport={sport} />}
             {view === 'gamelogs' && <GameLogs sport={sport} />}
