@@ -49,13 +49,14 @@ type DashboardData = {
   games?: Array<unknown>;
   metrics?: Metrics;
   errors: string[];
+  checkedAt: number;
 };
 
 const SOURCE_LABELS = { sportsbook: 'Sportsbooks', kalshi: 'Kalshi', prizepicks: 'PrizePicks' } as const;
 
-function elapsed(value?: string | null) {
+function elapsed(value: string | null | undefined, now: number) {
   if (!value) return 'No capture';
-  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60_000));
+  const minutes = Math.max(0, Math.floor((now - Date.parse(value)) / 60_000));
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
@@ -80,7 +81,7 @@ async function json<T>(path: string): Promise<T> {
 
 export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpenMarkets: () => void }) {
   const reduceMotion = useReducedMotion();
-  const [data, setData] = useState<DashboardData>({ errors: [] });
+  const [data, setData] = useState<DashboardData>({ errors: [], checkedAt: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -101,16 +102,16 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
       games: results[2].status === 'fulfilled' ? results[2].value.games : undefined,
       metrics: results[3].status === 'fulfilled' ? results[3].value : undefined,
       errors,
+      checkedAt: Date.now(),
     });
     setLoading(false);
   }, [sport]);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    void load();
-    const timer = window.setInterval(() => active && void load(), 30_000);
-    return () => { active = false; window.clearInterval(timer); };
+    const initial = window.setTimeout(() => { if (active) void load(); }, 0);
+    const timer = window.setInterval(() => { if (active) void load(); }, 30_000);
+    return () => { active = false; window.clearTimeout(initial); window.clearInterval(timer); };
   }, [load]);
 
   const refresh = async () => {
@@ -122,7 +123,8 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
   const kalshi = data.markets?.sources.kalshi;
   const linkedProps = Number(kalshi?.coverage?.prop_linked_markets ?? 0);
   const twoSided = Number(kalshi?.coverage?.prop_two_sided_quote_markets ?? 0);
-  const marketAge = data.markets?.captured_at ? Date.now() - Date.parse(data.markets.captured_at) : Infinity;
+  const marketAge = data.markets?.captured_at && data.checkedAt
+    ? data.checkedAt - Date.parse(data.markets.captured_at) : Infinity;
   const current = marketAge >= 0 && marketAge <= 90 * 60_000;
   const cards = useMemo(() => [
     { label: 'Games observed', value: data.games?.length ?? null, note: `${sport.toUpperCase()} schedule window`, tone: 'blue' },
@@ -150,7 +152,7 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
           <button type="button" className={styles.primary} onClick={onOpenMarkets}>
             Explore markets <ArrowUpRight size={17} />
           </button>
-          <span>{data.markets ? `Captured ${elapsed(data.markets.captured_at)}` : 'Awaiting market capture'}</span>
+          <span>{data.markets ? `Captured ${elapsed(data.markets.captured_at, data.checkedAt)}` : 'Awaiting market capture'}</span>
         </div>
       </header>
 

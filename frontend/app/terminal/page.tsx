@@ -38,7 +38,7 @@ export default function Terminal() {
           <ScanStatus />
           <div className="terminal-view">
             {view === 'dashboard' && (
-              <Overview sport={sport} onOpenMarkets={() => setView('arbitrage')} />
+              <Overview key={sport} sport={sport} onOpenMarkets={() => setView('arbitrage')} />
             )}
             {view === 'props' && <PropsAnalysis sport={sport} />}
             {view === 'gamelogs' && <GameLogs sport={sport} />}
