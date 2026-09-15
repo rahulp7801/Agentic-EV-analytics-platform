@@ -18,7 +18,8 @@ def payload(**overrides):
 
 
 def verified_payload(model_version=MODEL_VERSION):
-    value=payload(model_version=model_version,
+    value=payload(model_version=model_version,player_id='7',sport='nba',game_date='2026-01-01',
+        home_team='Boston Celtics',away_team='Los Angeles Lakers',
         model_generated_at='2026-01-01T15:00:00+00:00',
         quote_time='2026-01-01T15:00:00+00:00',
         quote_source_provider='the_odds_api',quote_source_sha256='a'*64)
@@ -115,6 +116,25 @@ def test_provenance_model_versions_keep_requiring_quote_source_commitments(tmp_p
         ledger.record('missing-historical',payload(model_version='empirical-jeffreys-v3'))
     with pytest.raises(ValueError,match='verified quote evidence'):
         ledger.record('tampered-historical',historical | {'line':21.5})
+
+
+@pytest.mark.parametrize('missing',['player_id','game_date','home_team','away_team'])
+def test_provenance_models_require_settleable_game_identity(tmp_path,missing):
+    value=verified_payload()
+    value.pop(missing)
+    with pytest.raises(ValueError,match='settlement identity'):
+        Ledger(tmp_path/'audit.sqlite').record('scan',value)
+
+
+def test_metrics_exclude_legacy_provenance_rows_without_settlement_identity(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    value=verified_payload()
+    value.pop('home_team')
+    with ledger.connect() as db:
+        db.execute('INSERT INTO predictions(id,scan_id,payload) VALUES (?,?,?)',
+            ('legacy','legacy',json.dumps(value)))
+    report=ledger.report(model_version=MODEL_VERSION)
+    assert report['sample_size']==0 and report['excluded_missing_metadata']==1
 
 
 def test_malformed_retained_json_fails_closed_without_suppressing_metrics(tmp_path):

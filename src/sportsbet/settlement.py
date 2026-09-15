@@ -70,6 +70,11 @@ def _candidate(prediction: dict, sport: str, games: list[dict]):
         raise ValueError('Unsupported prediction')
     if prediction.get('direction') not in ('over','under'):
         raise ValueError('Unsupported direction')
+    home=prediction.get('home_team')
+    away=prediction.get('away_team')
+    if (not isinstance(home,str) or not home.strip() or not isinstance(away,str)
+            or not away.strip() or home==away):
+        raise ValueError('Invalid prediction game identity')
     line=Decimal(str(prediction.get('line')))
     if not line.is_finite() or line < 0:
         raise ValueError('Invalid line')
@@ -85,8 +90,8 @@ def _candidate(prediction: dict, sport: str, games: list[dict]):
         except ValueError:
             continue
         if (game.get('completed') is True and game_day==day
-                and game.get('home_name')==prediction.get('home_team')
-                and game.get('away_name')==prediction.get('away_team')
+                and game.get('home_name')==home
+                and game.get('away_name')==away
                 and isinstance(game.get('provider_event_id'),str) and game['provider_event_id'].strip()):
             matches.append(game)
     if len(matches)!=1:
