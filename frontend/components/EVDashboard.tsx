@@ -146,7 +146,7 @@ function SignalDetailPanel({ signal, onClose, onAddToParlay, inParlay }: {
       {/* Header */}
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-dim)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>
+          <div style={{ fontFamily: 'var(--font-sans), sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>
             {signal.player}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>

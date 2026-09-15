@@ -1,49 +1,93 @@
-"use client";
+'use client';
+
 import { useEffect, useState } from 'react';
 import type { EVSignal } from '@/lib/types';
 import { parlayScenario, signalMetrics } from '@/lib/signalMetrics';
-const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+import styles from './ResearchViews.module.css';
+
+const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
+
 export default function ParlayBuilder({ externalLegs = [], onRemoveExternal }: {
-  externalLegs?: EVSignal[]; onRemoveExternal?: (id: string) => void;
+  externalLegs?: EVSignal[];
+  onRemoveExternal?: (id: string) => void;
 }) {
   const [signals, setSignals] = useState<EVSignal[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [payout, setPayout] = useState('');
   const [error, setError] = useState('');
   const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
-    fetch('/api/signals').then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(data => setSignals(data.signals ?? [])).catch(() => setError('Signals unavailable.'));
-    const timer = setInterval(() => setNow(Date.now()), 15000);
+    fetch('/api/signals')
+      .then(response => { if (!response.ok) throw new Error(); return response.json(); })
+      .then(data => setSignals(data.signals ?? []))
+      .catch(() => setError('Signals unavailable.'));
+    const timer = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(timer);
   }, []);
-  const candidates = [...new Map([...signals, ...externalLegs].map(s => [s.id, s])).values()]
-    .filter(s => !signalMetrics({...s}, now).gated && !(s.push_probability ?? 0));
-  const legs = candidates.filter(s => selected.includes(s.id) || externalLegs.some(e => e.id === s.id));
-  const scenario = parlayScenario(legs.map(s => s.true_prob), Number(payout));
-  return <div style={{padding: 20, overflow: 'auto'}}>
-    <h2>Parlay scenario calculator</h2>
-    <p>Choose at least two legs and enter the offered total return per unit staked, including your stake.</p>
-    <p>The independence estimate assumes the legs do not affect each other. This model has no validated joint forecast; the probability range shows all dependence structures compatible with the individual estimates. Push markets are excluded.</p>
-    <label>Offered total return (3 means $3 returned per $1 staked):{' '}
-      <input aria-label="Offered total return" type="number" min="1.01" step="0.01" value={payout} onChange={e => setPayout(e.target.value)} />
-    </label>
-    {error && <p>{error}</p>}
-    {!candidates.length && <p>No eligible fresh signals. Run a scan with supported sportsbook prices.</p>}
-    <div style={{margin: '16px 0', display: 'grid', gap: 8}}>
-      {candidates.map(s => <label key={s.id}>
-        <input type="checkbox" checked={legs.some(l => l.id === s.id)} onChange={e => {
-          if (!e.target.checked) onRemoveExternal?.(s.id);
-          setSelected(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id));
-        }} />{' '}{s.player} {s.direction} {s.line} {s.prop_type} ({s.sportsbook}) - estimated {pct(s.true_prob)}
-      </label>)}
-    </div>
-    {scenario && <section style={{border: '1px solid var(--border-dim)', padding: 16}}>
-      <p>{legs.length} legs | Independence scenario probability: {pct(scenario.independent)}</p>
-      <p>Probability bounds with unknown dependence: {pct(scenario.lower)} to {pct(scenario.upper)}</p>
-      <p>Expected return assuming independence: {pct(scenario.expectedReturn)}</p>
-      <p>Expected return bounds: {pct(scenario.lower * Number(payout) - 1)} to {pct(scenario.upper * Number(payout) - 1)}</p>
-      <p>These are scenarios based on unvalidated individual estimates, not a stake recommendation.</p>
-    </section>}
-  </div>;
+
+  const candidates = [...new Map([...signals, ...externalLegs].map(signal => [signal.id, signal])).values()]
+    .filter(signal => !signalMetrics({ ...signal }, now).gated && !(signal.push_probability ?? 0));
+  const legs = candidates.filter(signal => selected.includes(signal.id) || externalLegs.some(item => item.id === signal.id));
+  const scenario = parlayScenario(legs.map(signal => signal.true_prob), Number(payout));
+
+  return (
+    <section className={styles.toolView} aria-labelledby="scenario-title">
+      <header className={styles.toolHeader}>
+        <div>
+          <small>Dependence stress test</small>
+          <h2 id="scenario-title">Scenario lab</h2>
+        </div>
+        <p>Combine recorded individual estimates and inspect the full probability range allowed by unknown dependence. This is a bound analysis, not a validated joint forecast.</p>
+      </header>
+
+      <div className={styles.scenarioGrid}>
+        <section className={`${styles.panel} ${styles.scenarioControls}`}>
+          <div className={styles.inputField}>
+            <label htmlFor="scenario-payout">Offered total return per $1</label>
+            <input id="scenario-payout" aria-label="Offered total return" className="term-input" type="number" min="1.01" step="0.01" value={payout} onChange={event => setPayout(event.target.value)} placeholder="e.g. 3.00" />
+            <small>Include the returned stake. Enter 3 when a $1 stake returns $3 total.</small>
+          </div>
+          {error && <div className={styles.notice} role="alert">{error}</div>}
+          {!candidates.length ? (
+            <div className={styles.notice}>No eligible fresh signals are available. The lab will populate after supported sportsbook prices produce publishable estimates.</div>
+          ) : (
+            <div className={styles.candidateList}>
+              {candidates.map(signal => (
+                <label className={styles.candidate} key={signal.id}>
+                  <input type="checkbox" checked={legs.some(leg => leg.id === signal.id)} onChange={event => {
+                    if (!event.target.checked) onRemoveExternal?.(signal.id);
+                    setSelected(ids => event.target.checked ? [...new Set([...ids, signal.id])] : ids.filter(id => id !== signal.id));
+                  }} />
+                  <span>{signal.player} · {signal.direction} {signal.line} {signal.prop_type}</span>
+                  <small>{signal.sportsbook} · {pct(signal.true_prob)}</small>
+                </label>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className={`${styles.panel} ${styles.scenarioResult}`} aria-live="polite">
+          <h3 className={styles.panelHeader}>Dependence envelope</h3>
+          {!scenario ? (
+            <div className={styles.resultEmpty}>Select at least two eligible legs and enter the offered total return.</div>
+          ) : (
+            <>
+              <div className={styles.scenarioHero}>
+                <span>Independence scenario probability · {legs.length} legs</span>
+                <strong>{pct(scenario.independent)}</strong>
+              </div>
+              <div className={styles.scenarioMetrics}>
+                <div><span>Probability lower bound</span><strong>{pct(scenario.lower)}</strong></div>
+                <div><span>Probability upper bound</span><strong>{pct(scenario.upper)}</strong></div>
+                <div><span>Independence expected return</span><strong>{pct(scenario.expectedReturn)}</strong></div>
+                <div><span>Expected-return bounds</span><strong>{pct(scenario.lower * Number(payout) - 1)} to {pct(scenario.upper * Number(payout) - 1)}</strong></div>
+              </div>
+              <p className={styles.scenarioWarning}>These are mathematical scenarios from individual estimates. Unknown correlation can span the displayed bounds, so this result is not a stake recommendation.</p>
+            </>
+          )}
+        </section>
+      </div>
+    </section>
+  );
 }
