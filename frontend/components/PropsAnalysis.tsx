@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import type { Sport, PropType, EVSignal } from '@/lib/types';
+import styles from './ResearchViews.module.css';
 
 // PropAnalysis is derived from real EV signals — no mock data
 interface PropsAnalysisProps { sport: Sport; }
@@ -80,21 +81,18 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   });
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10 }}>
-      <span className="live-dot" style={{ width: 8, height: 8 }} />
-      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Loading from pipeline...</span>
+    <div className={styles.loadingState}>
+      <div className={styles.loadingPanel}>
+        <span className="live-dot" style={{ width: 8, height: 8 }} />
+        <span>Loading recorded prop estimates…</span>
+      </div>
     </div>
   );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
-      <div style={{
-        padding: '10px 14px',
-        borderBottom: '1px solid var(--border-dim)',
-        background: 'var(--bg-base)',
-        display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-      }}>
+      <div className={styles.propsHeader}>
         <div className="section-header">Prop Analysis</div>
         <div style={{ flex: 1 }} />
 
@@ -141,8 +139,8 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
             {props.map(p => <PropRow key={p.id} prop={p} />)}
             {props.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 0' }}>
-                  No props match current filters
+                <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '48px 16px' }}>
+                  No recorded props match the current filters.
                 </td>
               </tr>
             )}

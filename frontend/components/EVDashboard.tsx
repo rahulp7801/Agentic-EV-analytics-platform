@@ -2,6 +2,7 @@
 import Performance from "@/components/Performance";
 import { useState, useEffect, useCallback } from 'react';
 import type { EVSignal, Sport } from '@/lib/types';
+import styles from './ResearchViews.module.css';
 
 interface EVDashboardProps {
   sport: Sport;
@@ -390,20 +391,30 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
-        <span className="live-dot" style={{ width: 10, height: 10 }} />
-        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Loading market estimates...</span>
+      <div className={styles.loadingState}>
+        <div className={styles.loadingPanel}>
+          <span className="live-dot" style={{ width: 10, height: 10 }} />
+          <span>Loading recorded market estimates…</span>
+        </div>
       </div>
     );
   }
 
   if (data?.error && !data.signals.length && _allPickerGames.length === 0) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 14 }}>
-        <div style={{ color: 'var(--accent-amber)', fontSize: 13, fontWeight: 600 }}>Market estimates unavailable</div>
-        <div style={{ color: 'var(--text-muted)', fontSize: 11, textAlign: 'center', maxWidth: 360 }}>
-          Market estimates will appear after the next successful update.
-        </div>
+      <div className={styles.emptyState}>
+        <section className={styles.emptyPanel} aria-labelledby="empty-estimates-title">
+          <div className={styles.emptyEyebrow}>Publication gate closed</div>
+          <div className={styles.emptyCopy}>
+            <h2 id="empty-estimates-title">No publishable estimates.</h2>
+            <p>The terminal only displays recorded quotes that survive collection, identity, model, and freshness checks. The next successful update will populate this workspace.</p>
+          </div>
+          <div className={styles.emptyChecks} aria-label="Estimate publication requirements">
+            <div><span>01 · Observe</span><strong>Capture a verifiable market quote</strong></div>
+            <div><span>02 · Resolve</span><strong>Match the exact player and market</strong></div>
+            <div><span>03 · Publish</span><strong>Pass model and freshness gates</strong></div>
+          </div>
+        </section>
       </div>
     );
   }
@@ -411,14 +422,10 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
   const _selGame = _allPickerGames.find(g => g.game_id === selectedGameId);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+    <div className={styles.dashboard}>
       {/* Game Picker */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px',
-        borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-void)',
-        flexShrink: 0, flexWrap: 'wrap',
-      }}>
-        <span style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', flexShrink: 0 }}>Game</span>
+      <div className={styles.gamePicker}>
+        <span className={styles.fieldLabel}>Game</span>
         {_allPickerGames.length === 0 ? (
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>No games available — checking schedule...</span>
         ) : (
@@ -440,7 +447,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
             </button>
           ))
         )}
-        <div style={{ flex: 1 }} />
+        <div className={styles.pickerSpacer} />
         <button
           className="btn-ghost"
           style={{ fontSize: 9, padding: '2px 8px' }}
@@ -454,7 +461,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
       </div>
 
       {/* Summary row */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', flexShrink: 0 }}>
+      <div className={styles.summaryRail}>
         <SummaryCard label="Cached estimates" value={String(signals.length)} sub="observed quotes" accent="mint" />
         <SummaryCard label="With uncertainty" value={String(highConf)} sub="reported intervals" accent="cyan" />
         <SummaryCard label="Avg probability edge" value={signals.length ? '+' + (avgEV * 100).toFixed(1) + 'pp' : '—'} sub="percentage points" accent="cyan" />
@@ -463,13 +470,13 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
           value={_selGame ? `${_selGame.away} @ ${_selGame.home}` : (data?.game ? `${data.game.away_team} @ ${data.game.home_team}` : '—')}
           sub={_selGame?.date || data?.game?.date || ''}
         />
-        <div style={{ flex: 1, padding: '10px 14px', borderRight: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
-          <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Cache Age</div>
-          <div style={{ fontSize: 11, color: data?.generated_at ? 'var(--text-secondary)' : 'var(--accent-red)' }}>
+        <div className={styles.cacheSummary}>
+          <span>Cache age</span>
+          <strong style={{ color: data?.generated_at ? undefined : 'var(--accent-red)' }}>
             {data?.generated_at ? time_ago(data.generated_at) : 'No cache'}
-          </div>
+          </strong>
           {data?.scan_note && (
-            <div style={{ fontSize: 9, color: 'var(--accent-amber)', maxWidth: 220 }}>{data.scan_note}</div>
+            <small>{data.scan_note}</small>
           )}
         </div>
       </div>
@@ -477,44 +484,40 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
       <Performance />
 
       {/* Toolbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px',
-        borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-base)', flexShrink: 0,
-      }}>
+      <div className={styles.toolbar}>
         <div className="section-header">EV Signals · Model Estimates</div>
         <div style={{ flex: 1 }} />
-        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Filter:</span>
-        {(['all', 'eligible', 'gated'] as const).map(f => (
-          <button key={f} className="btn-ghost" onClick={() => setFilter(f)}
-            style={{ fontSize: 10, padding: '3px 10px', color: filter === f ? 'var(--accent-mint)' : undefined, borderColor: filter === f ? 'rgba(0,229,160,0.3)' : undefined }}>
-            {f.toUpperCase()}
-          </button>
-        ))}
-        <div className="divider-v" style={{ margin: '0 4px' }} />
-        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>Sort:</span>
-        {([['ev', 'Edge (pp)'], ['kelly', 'Kelly'], ['prob', 'Prob']] as const).map(([key, label]) => (
-          <button key={key} className="btn-ghost" onClick={() => setSortBy(key)}
-            style={{ fontSize: 10, padding: '3px 10px', color: sortBy === key ? 'var(--accent-mint)' : undefined, borderColor: sortBy === key ? 'rgba(0,229,160,0.3)' : undefined }}>
-            {label}
-          </button>
-        ))}
+        <div className={styles.toolbarGroup}>
+          <span className={styles.toolbarLabel}>Filter</span>
+          {(['all', 'eligible', 'gated'] as const).map(f => (
+            <button key={f} className="btn-ghost" onClick={() => setFilter(f)}
+              style={{ fontSize: 10, padding: '3px 10px', color: filter === f ? 'var(--accent-mint)' : undefined, borderColor: filter === f ? 'var(--accent-mint)' : undefined }}>
+              {f.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        <div className={styles.toolbarGroup}>
+          <span className={styles.toolbarLabel}>Sort</span>
+          {([['ev', 'Edge (pp)'], ['kelly', 'Kelly'], ['prob', 'Prob']] as const).map(([key, label]) => (
+            <button key={key} className="btn-ghost" onClick={() => setSortBy(key)}
+              style={{ fontSize: 10, padding: '3px 10px', color: sortBy === key ? 'var(--accent-mint)' : undefined, borderColor: sortBy === key ? 'var(--accent-mint)' : undefined }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Pipeline provenance notice */}
-      <div style={{
-        padding: '5px 14px', fontSize: 10, color: 'var(--text-dim)',
-        background: 'var(--bg-void)', borderBottom: '1px solid var(--border-dim)',
-        display: 'flex', gap: 8, flexShrink: 0,
-      }}>
-        <span style={{ color: 'var(--accent-mint)' }}>✓</span>
+      <div className={styles.provenance}>
+        <b>✓</b>
         Historical estimates with recorded quotes; performance requires settled outcomes.
-        {data?.generated_at && <span style={{ marginLeft: 'auto' }}>Generated {new Date(data.generated_at).toLocaleString()}</span>}
+        {data?.generated_at && <time dateTime={data.generated_at}>Generated {new Date(data.generated_at).toLocaleString()}</time>}
       </div>
 
       {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+      <div className={styles.tableViewport}>
         {signals.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80%', gap: 10 }}>
+          <div className={styles.noRows}>
             {_selGame && !_selGame.cached ? (
               <>
                 <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>No cached signals for {_selGame.away} @ {_selGame.home}</span>
@@ -558,12 +561,12 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
 }
 
 function SummaryCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: 'mint' | 'cyan' | 'amber' }) {
-  const color = accent === 'mint' ? 'var(--accent-mint)' : accent === 'cyan' ? 'var(--accent-cyan)' : accent === 'amber' ? 'var(--accent-amber)' : 'var(--text-primary)';
+  const tone = accent === 'mint' ? styles.summaryMint : accent === 'cyan' ? styles.summaryCyan : accent === 'amber' ? styles.summaryAmber : '';
   return (
-    <div style={{ flex: 1, padding: '10px 16px', borderRight: '1px solid var(--border-dim)' }}>
-      <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
-      <div style={{ color, fontWeight: 700, fontSize: 20, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>{sub}</div>
+    <div className={`${styles.summaryCard} ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{sub}</small>
     </div>
   );
 }
