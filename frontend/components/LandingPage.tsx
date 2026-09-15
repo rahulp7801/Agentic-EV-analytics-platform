@@ -12,6 +12,17 @@ type Pulse = {
   twoSided: number | null;
   capturedAt: string | null;
   scan: string;
+  sources: {
+    sportsbook: { count: number | null; label: string; observed: boolean };
+    kalshi: { count: number | null; label: string; observed: boolean };
+    prizepicks: { count: number | null; label: string; observed: boolean };
+  };
+};
+
+const emptySources: Pulse['sources'] = {
+  sportsbook: { count: null, label: 'Checking', observed: false },
+  kalshi: { count: null, label: 'Checking', observed: false },
+  prizepicks: { count: null, label: 'Checking', observed: false },
 };
 
 const method = [
@@ -25,8 +36,20 @@ function count(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-function MarketPulse() {
-  const [pulse, setPulse] = useState<Pulse>({ games: null, props: null, twoSided: null, capturedAt: null, scan: 'Checking model scan' });
+function sourceState(value: unknown) {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const status = typeof source.status === 'string' ? source.status : 'unavailable';
+  const reason = typeof source.reason === 'string' ? source.reason : null;
+  const labels: Record<string, string> = {
+    observed: 'Observed',
+    not_requested: 'Not requested',
+    unavailable: reason === 'access_denied' ? 'Access denied' : 'Unavailable',
+  };
+  return { count: count(source.count), label: labels[status] ?? 'Unavailable', observed: status === 'observed' };
+}
+
+function useMarketPulse() {
+  const [pulse, setPulse] = useState<Pulse>({ games: null, props: null, twoSided: null, capturedAt: null, scan: 'Checking model scan', sources: emptySources });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,11 +67,20 @@ function MarketPulse() {
         twoSided: count(coverage?.prop_two_sided_quote_markets),
         capturedAt: typeof market?.captured_at === 'string' ? market.captured_at : null,
         scan: scans.status === 'fulfilled' ? scans.value?.nfl?.label ?? 'Model state unavailable' : 'Model state unavailable',
+        sources: {
+          sportsbook: sourceState(market?.sources?.sportsbook),
+          kalshi: sourceState(market?.sources?.kalshi),
+          prizepicks: sourceState(market?.sources?.prizepicks),
+        },
       });
     });
     return () => controller.abort();
   }, []);
 
+  return pulse;
+}
+
+function MarketPulse({ pulse }: { pulse: Pulse }) {
   return (
     <div className={styles.pulseCard}>
       <div className={styles.pulseHeader}><span><i /> Live evidence</span><span>NFL</span></div>
@@ -65,7 +97,13 @@ function MarketPulse() {
   );
 }
 
-function ProductFrame() {
+function ProductFrame({ pulse }: { pulse: Pulse }) {
+  const venueRows = [
+    ['Kalshi', pulse.sources.kalshi],
+    ['Sportsbooks', pulse.sources.sportsbook],
+    ['PrizePicks', pulse.sources.prizepicks],
+  ] as const;
+
   return (
     <div className={styles.productFrame}>
       <div className={styles.frameBar}><span /><span /><span /><b>quant / live markets</b></div>
@@ -76,9 +114,9 @@ function ProductFrame() {
         </div>
         <div className={styles.frameMain}>
           <div className={styles.frameTitle}><span>Current NFL coverage</span><strong>Every state has a reason.</strong></div>
-          <div className={styles.frameMetrics}><div><span>Games</span><b>16</b></div><div><span>Markets</span><b>231</b></div><div><span>Two-sided</span><b>230</b></div></div>
+          <div className={styles.frameMetrics}><div><span>Games</span><b>{pulse.games ?? '—'}</b></div><div><span>Markets</span><b>{pulse.props ?? '—'}</b></div><div><span>Two-sided</span><b>{pulse.twoSided ?? '—'}</b></div></div>
           <div className={styles.frameGrid}>
-            <div className={styles.frameList}><span>VENUE STATUS</span><p><i className={styles.green} />Kalshi <b>Observed</b></p><p><i />Sportsbooks <b>Next scan</b></p><p><i />PrizePicks <b>Not requested</b></p></div>
+            <div className={styles.frameList}><span>VENUE STATUS</span>{venueRows.map(([name, source]) => <p key={name}><i className={source.observed ? styles.green : undefined} />{name} <b>{source.label}{source.count === null ? '' : ` · ${source.count}`}</b></p>)}</div>
             <div className={styles.frameDark}><span>EVIDENCE POLICY</span><strong>No price without provenance.</strong><p>Source, time, identity, fees, and settlement logic stay attached.</p></div>
           </div>
         </div>
@@ -90,6 +128,7 @@ function ProductFrame() {
 export default function LandingPage() {
   const root = useRef<HTMLDivElement>(null);
   const reduceMotion = Boolean(useReducedMotion());
+  const pulse = useMarketPulse();
 
   useEffect(() => {
     if (reduceMotion || !root.current) return;
@@ -136,7 +175,7 @@ export default function LandingPage() {
             <p>One clear view of sportsbook prices, prediction markets, player projections, and model evidence—built to show what is live, what is stale, and what is still unknown.</p>
             <div className={styles.heroActions}><Link href="/terminal">Explore live markets <ArrowRight size={17} /></Link><a href="#platform">See how it works</a></div>
           </motion.div>
-          <motion.div className={styles.heroPulse} initial={reduceMotion ? false : { opacity: 0, y: 35 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .28, duration: .8 }}><MarketPulse /></motion.div>
+          <motion.div className={styles.heroPulse} initial={reduceMotion ? false : { opacity: 0, y: 35 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .28, duration: .8 }}><MarketPulse pulse={pulse} /></motion.div>
           <div className={styles.heroFine}><span>NBA + NFL</span><span>Sportsbooks · Kalshi · PrizePicks</span><span>Read-only analysis</span></div>
         </section>
 
@@ -146,7 +185,7 @@ export default function LandingPage() {
             <p className={styles.storyWord}>Understand the gap.</p>
             <p className={styles.storyWord}>Keep the proof.</p>
           </div>
-          <div className={styles.productWrap}><ProductFrame /></div>
+          <div className={styles.productWrap}><ProductFrame pulse={pulse} /></div>
         </section>
 
         <section className={styles.method} id="method">
