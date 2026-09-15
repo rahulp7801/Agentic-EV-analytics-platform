@@ -236,7 +236,7 @@ def test_captured_event_fees_change_pair_and_cross_venue_costs_without_claiming_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('provider',['sportsbook','kalshi','prizepicks'])
+@pytest.mark.parametrize('provider',['sportsbook','kalshi','prizepicks','public'])
 async def test_selected_provider_does_not_call_or_invent_coverage_for_others(monkeypatch,tmp_path,provider):
     from unittest.mock import AsyncMock
     from sportsbet import market_watch
@@ -246,7 +246,7 @@ async def test_selected_provider_does_not_call_or_invent_coverage_for_others(mon
     monkeypatch.chdir(tmp_path)
     report,_=await market_watch.run('nfl',25,1,False,provider)
     for name,mock in mocks.items():
-        if name==provider:
+        if name==provider or provider=='public' and name in ('kalshi','prizepicks'):
             mock.assert_awaited_once()
             assert report['sources'][name]['status']=='observed'
         else:

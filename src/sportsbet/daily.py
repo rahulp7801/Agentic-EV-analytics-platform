@@ -22,9 +22,9 @@ from sportsbet.settlement import pending_schedule_offsets, settle_final_props
 MODES=('daily','monitor','public_daily','public_monitor')
 PUBLIC_SCOPES={
     'public_daily':(
-        'Public-only daily collection: Kalshi markets, ESPN schedules, NBA/NFL history refresh, '
-        'and settlement evaluation. Sportsbooks, PrizePicks and prop recommendations are not '
-        'requested. Partial market sampling is retained explicitly. This is periodic collection, '
+        'Public-only daily collection: Kalshi markets, PrizePicks projections when publicly available, '
+        'ESPN schedules, NBA/NFL history refresh, and settlement evaluation. Sportsbooks and prop '
+        'recommendations are not requested. Partial market sampling is retained explicitly. This is periodic collection, '
         'not continuous arbitrage monitoring.'
     ),
     'public_monitor':(
@@ -104,7 +104,9 @@ def create_daily_graph():
         public=state['mode'].startswith('public_')
         for sport in state['sports']:
             try:
-                summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,**({'provider':'kalshi'} if public else {}))
+                public_provider='public' if state['mode']=='public_daily' else 'kalshi'
+                summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,
+                    **({'provider':public_provider} if public else {}))
                 complete = bool(summary['sources']) and all(
                     source['status']=='observed' and not source.get('partial_coverage',True)
                     for source in summary['sources'].values()

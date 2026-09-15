@@ -32,6 +32,9 @@ def test_paid_and_public_schedules_are_isolated() -> None:
     }
 
     assert "vars.DATA_PIPELINE_ENABLED == 'true'" in paid
+    assert "vars.PAID_MONITOR_ENABLED == 'true'" in paid
+    assert "github.event.schedule == '17 13 * * *'" in paid
+    assert "github.event.schedule == '7,37 * * * *'" in paid
     assert "PUBLIC_DATA_PIPELINE_ENABLED" not in paid
     assert "vars.PUBLIC_DATA_PIPELINE_ENABLED == 'true'" in public
     assert "vars.DATA_PIPELINE_ENABLED" not in public

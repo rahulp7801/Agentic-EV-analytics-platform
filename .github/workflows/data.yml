@@ -26,7 +26,12 @@ concurrency:
 jobs:
   update:
     # Enable only after database migration/backfill and provider-budget verification.
-    if: github.ref == 'refs/heads/master' && (github.event_name == 'workflow_dispatch' || vars.DATA_PIPELINE_ENABLED == 'true')
+    if: >-
+      github.ref == 'refs/heads/master' && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.schedule == '17 13 * * *' && vars.DATA_PIPELINE_ENABLED == 'true') ||
+        (github.event.schedule == '7,37 * * * *' && vars.PAID_MONITOR_ENABLED == 'true')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
