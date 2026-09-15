@@ -41,12 +41,13 @@ function expectedPublicCapture(path, report) {
 }
 
 export async function verifyProduction({
-  base = 'https://agentic-ev-analytics-platform.vercel.app',
+  base = process.env.PRODUCTION_BASE_URL || 'https://agentic-ev-analytics-platform.vercel.app',
   fetchImpl = fetch,
   paidEnabled = process.env.DATA_PIPELINE_ENABLED === 'true',
   publicEnabled = process.env.PUBLIC_DATA_PIPELINE_ENABLED === 'true',
   expectedPublicReport,
 } = {}) {
+  base = base.replace(/\/$/, '');
   async function check(path, expected, options = {}) {
     const response = await fetchImpl(base + path, {
       ...options,
@@ -59,7 +60,11 @@ export async function verifyProduction({
     return response;
   }
 
-  const home = await check('/', [200]);
+  const cacheKey = encodeURIComponent(process.env.GITHUB_SHA || Date.now().toString());
+  const home = await check(`/?readiness=${cacheKey}`, [200], {
+    cache: 'no-store',
+    headers: { 'cache-control': 'no-cache' },
+  });
   if (home.headers.get('x-content-type-options') !== 'nosniff' || !home.headers.get('content-security-policy')) {
     throw new Error('Production security headers are missing');
   }
@@ -94,9 +99,38 @@ export async function verifyProduction({
   }
 }
 
+export async function verifyProductionWithRetry(
+  options = {},
+  {
+    attempts = 1,
+    delayMs = 0,
+    wait = delay => new Promise(resolve => setTimeout(resolve, delay)),
+  } = {},
+) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await verifyProduction(options);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+      console.log(`::warning::Production verification attempt ${attempt}/${attempts} failed: ${error.message}`);
+      await wait(delayMs);
+    }
+  }
+  throw lastError;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const expectedPublicReport = process.env.PUBLIC_DATA_REPORT_PATH
     ? JSON.parse(await readFile(process.env.PUBLIC_DATA_REPORT_PATH, 'utf8'))
     : undefined;
-  await verifyProduction({ expectedPublicReport });
+  const attempts = Number.parseInt(process.env.PRODUCTION_VERIFY_ATTEMPTS || '1', 10);
+  const delayMs = Number.parseInt(process.env.PRODUCTION_VERIFY_DELAY_MS || '0', 10);
+  await verifyProductionWithRetry(
+    { expectedPublicReport },
+    { attempts: Number.isInteger(attempts) && attempts > 0 ? attempts : 1,
+      delayMs: Number.isInteger(delayMs) && delayMs >= 0 ? delayMs : 0 },
+  );
 }
