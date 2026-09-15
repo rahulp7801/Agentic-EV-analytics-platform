@@ -105,6 +105,7 @@ export async function verifyProductionWithRetry(
     attempts = 1,
     delayMs = 0,
     wait = delay => new Promise(resolve => setTimeout(resolve, delay)),
+    log = message => console.log(message),
   } = {},
 ) {
   let lastError;
@@ -115,7 +116,7 @@ export async function verifyProductionWithRetry(
     } catch (error) {
       lastError = error;
       if (attempt === attempts) break;
-      console.log(`::warning::Production verification attempt ${attempt}/${attempts} failed: ${error.message}`);
+      log(`::warning::Production verification attempt ${attempt}/${attempts} failed: ${error.message}`);
       await wait(delayMs);
     }
   }
