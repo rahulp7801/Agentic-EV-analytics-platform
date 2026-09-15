@@ -189,7 +189,8 @@ jobs:
           JS
       # CLI pull requires team lookup that project-scoped tokens cannot perform.
       # Direct deploy supports restricted tokens; Vercel builds after all CI gates pass.
-      - run: vercel deploy --yes --prod --token="$VERCEL_TOKEN"
+      # A forced build prevents a stale global CSS bundle from being reused across UI releases.
+      - run: vercel deploy --yes --prod --force --token="$VERCEL_TOKEN"
       - name: Verify deployed access controls and data readiness
         env:
           DATA_PIPELINE_ENABLED: ${{ vars.DATA_PIPELINE_ENABLED }}

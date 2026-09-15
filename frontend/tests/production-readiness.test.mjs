@@ -4,9 +4,13 @@ import test from 'node:test';
 import {
   paidPipelinePaths,
   publicPipelinePaths,
+  requiredCssMarkers,
   readinessStatuses,
   verifyProduction,
 } from '../scripts/verify-production.mjs';
+
+const deploymentHtml = '<html><head><link rel="stylesheet" href="/app.css"></head></html>';
+const deploymentCss = requiredCssMarkers.join(' ');
 
 test('public pipeline makes public endpoints mandatory without requiring paid endpoints', () => {
   const flags = { paidEnabled: false, publicEnabled: true };
@@ -24,10 +28,12 @@ test('paid pipeline makes all data endpoints mandatory', () => {
 test('production verification rejects unavailable public data when its pipeline is enabled', async () => {
   const fetchImpl = async (url) => {
     const path = new URL(url).pathname + new URL(url).search;
+    if (path === '/app.css') return { status: 200, text: async () => deploymentCss };
     const status = path === '/api/markets?sport=nfl' ? 503 : path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200;
     return {
       status,
       headers: { get: (name) => name === 'x-content-type-options' ? 'nosniff' : name === 'content-security-policy' ? "default-src 'self'" : null },
+      text: async () => deploymentHtml,
     };
   };
 
@@ -45,6 +51,7 @@ test('production verification binds public endpoints to the current collection r
   const fetchImpl = async (url) => {
     const parsed = new URL(url);
     const path = parsed.pathname + parsed.search;
+    if (path === '/app.css') return { status: 200, text: async () => deploymentCss };
     const captured_at = path === '/api/markets?sport=nfl'
       ? '2026-09-12T23:14:02Z'
       : path === '/api/games?sport=nfl'
@@ -53,6 +60,7 @@ test('production verification binds public endpoints to the current collection r
     return {
       status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
       headers: { get: (name) => name === 'x-content-type-options' ? 'nosniff' : name === 'content-security-policy' ? "default-src 'self'" : null },
+      text: async () => deploymentHtml,
       json: async () => ({ captured_at }),
     };
   };
@@ -75,5 +83,23 @@ test('production verification binds public endpoints to the current collection r
       expectedPublicReport,
     }),
     /deployed capture does not match this collection run/,
+  );
+});
+
+test('production verification rejects a stale or incomplete stylesheet bundle', async () => {
+  const fetchImpl = async (url) => {
+    const path = new URL(url).pathname + new URL(url).search;
+    if (path === '/app.css') return { status: 200, text: async () => ':root{--accent-mint:#00e5a0}' };
+    return {
+      status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
+      headers: { get: (name) => name === 'x-content-type-options' ? 'nosniff' : name === 'content-security-policy' ? "default-src 'self'" : null },
+      text: async () => deploymentHtml,
+      json: async () => ({}),
+    };
+  };
+
+  await assert.rejects(
+    verifyProduction({ base: 'https://example.test', fetchImpl }),
+    /Production stylesheet is stale or incomplete/,
   );
 });

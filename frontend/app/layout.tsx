@@ -4,7 +4,7 @@ import "@fontsource-variable/dm-sans";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource/ibm-plex-mono/600.css";
-import "./globals.css";
+import "./theme.css";
 
 export const metadata: Metadata = {
   title: "QUANT — Sports market intelligence",
