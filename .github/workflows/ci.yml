@@ -195,4 +195,8 @@ jobs:
         env:
           DATA_PIPELINE_ENABLED: ${{ vars.DATA_PIPELINE_ENABLED }}
           PUBLIC_DATA_PIPELINE_ENABLED: ${{ vars.PUBLIC_DATA_PIPELINE_ENABLED }}
+          # Vercel's production alias can briefly resolve to the previous edge deployment.
+          # Cache-busted, bounded retries keep that propagation window from creating a false failure.
+          PRODUCTION_VERIFY_ATTEMPTS: '12'
+          PRODUCTION_VERIFY_DELAY_MS: '5000'
         run: node frontend/scripts/verify-production.mjs

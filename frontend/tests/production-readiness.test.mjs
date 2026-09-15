@@ -7,6 +7,7 @@ import {
   requiredCssMarkers,
   readinessStatuses,
   verifyProduction,
+  verifyProductionWithRetry,
 } from '../scripts/verify-production.mjs';
 
 const deploymentHtml = '<html><head><link rel="stylesheet" href="/app.css"></head></html>';
@@ -102,4 +103,29 @@ test('production verification rejects a stale or incomplete stylesheet bundle', 
     verifyProduction({ base: 'https://example.test', fetchImpl }),
     /Production stylesheet is stale or incomplete/,
   );
+});
+
+test('production verification retries a transient deployment propagation mismatch', async () => {
+  let stylesheetRequests = 0;
+  const fetchImpl = async (url) => {
+    const path = new URL(url).pathname + new URL(url).search;
+    if (path === '/app.css') {
+      stylesheetRequests += 1;
+      return { status: 200, text: async () => stylesheetRequests === 1 ? ':root{}' : deploymentCss };
+    }
+    return {
+      status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
+      headers: { get: (name) => name === 'x-content-type-options' ? 'nosniff' : name === 'content-security-policy' ? "default-src 'self'" : null },
+      text: async () => deploymentHtml,
+      json: async () => ({}),
+    };
+  };
+
+  const waits = [];
+  await verifyProductionWithRetry(
+    { base: 'https://example.test', fetchImpl },
+    { attempts: 2, delayMs: 25, wait: async delay => waits.push(delay) },
+  );
+  assert.equal(stylesheetRequests, 2);
+  assert.deepEqual(waits, [25]);
 });
