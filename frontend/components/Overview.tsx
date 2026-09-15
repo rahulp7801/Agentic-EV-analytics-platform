@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, CheckCircle2, CircleAlert, Clock3, Database, RefreshCw } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
+import { marketFreshness } from '@/lib/marketFreshness';
 import type { Sport } from '@/lib/types';
 import styles from './Overview.module.css';
 
@@ -123,9 +124,7 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
   const kalshi = data.markets?.sources.kalshi;
   const linkedProps = Number(kalshi?.coverage?.prop_linked_markets ?? 0);
   const twoSided = Number(kalshi?.coverage?.prop_two_sided_quote_markets ?? 0);
-  const marketAge = data.markets?.captured_at && data.checkedAt
-    ? data.checkedAt - Date.parse(data.markets.captured_at) : Infinity;
-  const current = marketAge >= 0 && marketAge <= 90 * 60_000;
+  const current = marketFreshness(data.markets?.captured_at, data.checkedAt) === 'current';
   const cards = useMemo(() => [
     { label: 'Games observed', value: data.games?.length ?? null, note: `${sport.toUpperCase()} schedule window`, tone: 'blue' },
     { label: 'Kalshi player props', value: kalshi ? linkedProps : null, note: kalshi ? `${twoSided} with two-sided quotes` : 'No market capture', tone: 'violet' },

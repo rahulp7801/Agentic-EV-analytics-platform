@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Check, Database, Eye, Layers3, ShieldCheck, Sparkles } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
+import { marketFreshness, type MarketFreshness } from '@/lib/marketFreshness';
 import styles from './LandingPage.module.css';
 
 type Pulse = {
@@ -11,6 +12,7 @@ type Pulse = {
   props: number | null;
   twoSided: number | null;
   capturedAt: string | null;
+  freshness: MarketFreshness;
   scan: string;
   sources: {
     sportsbook: { count: number | null; label: string; observed: boolean };
@@ -49,41 +51,49 @@ function sourceState(value: unknown) {
 }
 
 function useMarketPulse() {
-  const [pulse, setPulse] = useState<Pulse>({ games: null, props: null, twoSided: null, capturedAt: null, scan: 'Checking model scan', sources: emptySources });
+  const [pulse, setPulse] = useState<Pulse>({ games: null, props: null, twoSided: null, capturedAt: null, freshness: 'unavailable', scan: 'Checking model scan', sources: emptySources });
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.allSettled([
-      fetch('/api/markets?sport=nfl', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
-      fetch('/api/games?sport=nfl', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
-      fetch('/api/scans', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
-    ]).then(([markets, games, scans]) => {
-      if (controller.signal.aborted) return;
-      const market = markets.status === 'fulfilled' ? markets.value : null;
-      const coverage = market?.sources?.kalshi?.coverage;
-      setPulse({
-        games: games.status === 'fulfilled' && Array.isArray(games.value.games) ? games.value.games.length : null,
-        props: count(coverage?.prop_linked_markets),
-        twoSided: count(coverage?.prop_two_sided_quote_markets),
-        capturedAt: typeof market?.captured_at === 'string' ? market.captured_at : null,
-        scan: scans.status === 'fulfilled' ? scans.value?.nfl?.label ?? 'Model state unavailable' : 'Model state unavailable',
-        sources: {
-          sportsbook: sourceState(market?.sources?.sportsbook),
-          kalshi: sourceState(market?.sources?.kalshi),
-          prizepicks: sourceState(market?.sources?.prizepicks),
-        },
+    const load = () => {
+      Promise.allSettled([
+        fetch('/api/markets?sport=nfl', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
+        fetch('/api/games?sport=nfl', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
+        fetch('/api/scans', { cache: 'no-store', signal: controller.signal }).then(async response => response.ok ? response.json() : Promise.reject()),
+      ]).then(([markets, games, scans]) => {
+        if (controller.signal.aborted) return;
+        const market = markets.status === 'fulfilled' ? markets.value : null;
+        const coverage = market?.sources?.kalshi?.coverage;
+        const capturedAt = typeof market?.captured_at === 'string' ? market.captured_at : null;
+        setPulse({
+          games: games.status === 'fulfilled' && Array.isArray(games.value.games) ? games.value.games.length : null,
+          props: count(coverage?.prop_linked_markets),
+          twoSided: count(coverage?.prop_two_sided_quote_markets),
+          capturedAt,
+          freshness: marketFreshness(capturedAt),
+          scan: scans.status === 'fulfilled' ? scans.value?.nfl?.label ?? 'Model state unavailable' : 'Model state unavailable',
+          sources: {
+            sportsbook: sourceState(market?.sources?.sportsbook),
+            kalshi: sourceState(market?.sources?.kalshi),
+            prizepicks: sourceState(market?.sources?.prizepicks),
+          },
+        });
       });
-    });
-    return () => controller.abort();
+    };
+    load();
+    const timer = window.setInterval(load, 60_000);
+    return () => { controller.abort(); window.clearInterval(timer); };
   }, []);
 
   return pulse;
 }
 
 function MarketPulse({ pulse }: { pulse: Pulse }) {
+  const evidenceLabel = pulse.freshness === 'current' ? 'Current evidence'
+    : pulse.freshness === 'stale' ? 'Last published evidence' : 'Evidence unavailable';
   return (
     <div className={styles.pulseCard}>
-      <div className={styles.pulseHeader}><span><i /> Live evidence</span><span>NFL</span></div>
+      <div className={styles.pulseHeader}><span><i data-current={pulse.freshness === 'current'} /> {evidenceLabel}</span><span>NFL</span></div>
       <div className={styles.pulseStats}>
         <div><strong>{pulse.games ?? '—'}</strong><span>games in view</span></div>
         <div><strong>{pulse.props ?? '—'}</strong><span>linked Kalshi props</span></div>
@@ -113,7 +123,7 @@ function ProductFrame({ pulse }: { pulse: Pulse }) {
           <span className={styles.activeNav} /><span /><span /><span /><span />
         </div>
         <div className={styles.frameMain}>
-          <div className={styles.frameTitle}><span>Current NFL coverage</span><strong>Every state has a reason.</strong></div>
+          <div className={styles.frameTitle}><span>{pulse.freshness === 'current' ? 'Current NFL coverage' : 'Last published NFL coverage'}</span><strong>Every state has a reason.</strong></div>
           <div className={styles.frameMetrics}><div><span>Games</span><b>{pulse.games ?? '—'}</b></div><div><span>Markets</span><b>{pulse.props ?? '—'}</b></div><div><span>Two-sided</span><b>{pulse.twoSided ?? '—'}</b></div></div>
           <div className={styles.frameGrid}>
             <div className={styles.frameList}><span>VENUE STATUS</span>{venueRows.map(([name, source]) => <p key={name}><i className={source.observed ? styles.green : undefined} />{name} <b>{source.label}{source.count === null ? '' : ` · ${source.count}`}</b></p>)}</div>

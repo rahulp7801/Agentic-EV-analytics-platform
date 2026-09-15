@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Sport } from '@/lib/types';
+import { marketFreshness } from '@/lib/marketFreshness';
 import {
   marketCoverageText,
   propQuoteCoverageText,
@@ -92,6 +93,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
   }, [sport]);
 
   const funnel = propScreen && hasPropFunnel(propScreen.coverage) ? propScreen.coverage : null;
+  const freshness = marketFreshness(data?.captured_at, now);
 
   return (
     <section className={styles.view} aria-labelledby="market-watch-title">
@@ -126,7 +128,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
           </div>
 
           <div className={styles.notice}>
-            Captured {new Date(data.captured_at).toLocaleString()} · {data.scope} Positive gross gaps are screening leads, not profit. PrizePicks projection lines require a complete entry payout before arbitrage can be established.
+            {freshness === 'current' ? 'Current capture' : 'Historical capture'} from {new Date(data.captured_at).toLocaleString()} · {data.scope} Positive gross gaps are screening leads, not profit. PrizePicks projection lines require a complete entry payout before arbitrage can be established.
           </div>
 
           {funnel && (
