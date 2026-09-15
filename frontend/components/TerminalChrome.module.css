@@ -1,0 +1,122 @@
+.topbar {
+  z-index: 10;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 230px 1fr auto auto;
+  background: #0b0c0b;
+  border-bottom: 1px solid var(--border-mid);
+  color: var(--text-primary);
+}
+
+.marketState, .signalCount, .clock {
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--border-mid);
+}
+
+.marketState { gap: 12px; padding: 0 18px; }
+.marketState div { display: flex; flex-direction: column; gap: 3px; }
+.marketState small, .signalCount small { color: var(--text-muted); font-size: 8px; line-height: 1; letter-spacing: .13em; text-transform: uppercase; }
+.marketState strong { color: var(--text-secondary); font: 500 10px/1 var(--font-mono), monospace; text-transform: uppercase; }
+.statusDot { width: 8px; aspect-ratio: 1; border-radius: 50%; background: var(--text-muted); box-shadow: 0 0 0 4px rgba(255,255,255,.035); }
+.statusLive { background: var(--accent-mint); box-shadow: 0 0 0 4px rgba(216,255,67,.1), 0 0 16px rgba(216,255,67,.32); }
+
+.tickerViewport { min-width: 0; display: flex; align-items: center; overflow: hidden; border-right: 1px solid var(--border-mid); }
+.tickerTrack { width: max-content; display: flex; align-items: center; animation: terminalTicker 42s linear infinite; }
+.tickerItem { display: inline-flex; align-items: center; gap: 9px; padding: 0 22px; border-right: 1px solid var(--border-dim); white-space: nowrap; font-size: 9px; }
+.tickerItem > span:first-child { color: var(--accent-cyan); font-weight: 600; }
+.tickerItem strong { color: var(--text-primary); font-weight: 500; }
+.tickerItem > span:nth-child(3) { color: var(--text-muted); }
+.tickerItem em { color: var(--accent-mint); font-style: normal; font-weight: 600; }
+.tickerEmpty { padding: 0 18px; color: var(--text-muted); font-size: 9px; letter-spacing: .04em; }
+
+.signalCount { min-width: 90px; justify-content: center; gap: 9px; padding: 0 14px; }
+.signalCount strong { color: var(--accent-mint); font-size: 13px; }
+.clock { min-width: 177px; justify-content: flex-end; gap: 12px; padding: 0 17px; border-right: 0; font-size: 9px; }
+.clock span { color: var(--text-muted); }
+.clock strong { color: var(--text-primary); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.sidebar {
+  width: 230px;
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  background: #0b0c0b;
+  border-right: 1px solid var(--border-mid);
+  user-select: none;
+}
+
+.terminalBrand { height: 92px; display: flex; align-items: center; gap: 13px; padding: 0 18px; border-bottom: 1px solid var(--border-mid); color: var(--text-primary); text-decoration: none; }
+.terminalBrand > span { width: 40px; aspect-ratio: 1; display: grid; place-items: center; background: var(--accent-mint); color: #0b0c0b; font: 400 19px/1 var(--font-display), sans-serif; }
+.terminalBrand div { display: flex; flex-direction: column; gap: 5px; }
+.terminalBrand strong { font: 400 17px/1 var(--font-display), sans-serif; letter-spacing: -.025em; }
+.terminalBrand small { color: var(--text-muted); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
+
+.sportSection { padding: 22px 17px 18px; border-bottom: 1px solid var(--border-mid); }
+.sidebarLabel { display: block; margin-bottom: 11px; color: var(--text-muted); font: 500 8px/1 var(--font-mono), monospace; letter-spacing: .14em; text-transform: uppercase; }
+.sportControl { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border-bright); }
+.sportControl button { height: 38px; border: 0; background: transparent; color: var(--text-muted); font: 600 10px/1 var(--font-mono), monospace; letter-spacing: .1em; cursor: pointer; }
+.sportControl button + button { border-left: 1px solid var(--border-bright); }
+.sportControl button[aria-pressed='true'] { background: var(--accent-mint); color: #0b0c0b; }
+
+.sideNav { flex: 1; padding: 23px 10px; }
+.sideNav > .sidebarLabel { margin-left: 8px; }
+.sideNav button { position: relative; width: 100%; min-height: 46px; display: grid; grid-template-columns: 20px 1fr auto; gap: 11px; align-items: center; padding: 0 10px; border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; text-align: left; font: 500 10px/1 var(--font-mono), monospace; letter-spacing: .04em; transition: color 150ms ease, background 150ms ease; }
+.sideNav button svg { width: 16px; height: 16px; stroke-width: 1.5; }
+.sideNav button small { font-size: 8px; }
+.sideNav button:hover { color: var(--text-primary); background: rgba(255,255,255,.025); }
+.sideNav button::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; background: transparent; }
+.sideNav .sideNavActive { background: rgba(216,255,67,.06); color: var(--accent-mint); }
+.sideNav .sideNavActive::before { background: var(--accent-mint); }
+
+.sidebarFoot { margin: 0 18px; padding: 18px 0 21px; border-top: 1px solid var(--border-mid); }
+.sidebarFoot span { color: var(--accent-amber); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+.sidebarFoot p { max-width: 170px; margin-top: 8px; color: var(--text-muted); font-size: 9px; line-height: 1.5; }
+
+.scanRail { flex-shrink: 0; min-height: 72px; display: flex; align-items: stretch; overflow-x: auto; background: var(--bg-void); border-bottom: 1px solid var(--border-mid); }
+.scanRailLabel { width: 84px; min-width: 84px; display: grid; place-items: center; color: var(--text-muted); border-right: 1px solid var(--border-mid); font: 500 8px/1 var(--font-mono), monospace; letter-spacing: .13em; text-transform: uppercase; writing-mode: vertical-rl; transform: rotate(180deg); }
+.scanCard { position: relative; min-width: 340px; display: grid; grid-template-columns: 1.2fr 1fr auto; gap: 18px; align-items: center; padding: 12px 18px 12px 21px; border-right: 1px solid var(--border-mid); }
+.scanCard::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--text-muted); }
+.scanGood::before { background: var(--accent-mint); }
+.scanWarning::before { background: var(--accent-amber); }
+.scanIdentity { display: flex; flex-direction: column; gap: 5px; }
+.scanIdentity span { color: var(--text-muted); font: 600 8px/1 var(--font-mono), monospace; letter-spacing: .12em; }
+.scanIdentity strong { color: var(--text-primary); font: 600 10px/1.2 var(--font-sans), sans-serif; }
+.scanMetrics { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; color: var(--text-muted); font-size: 8px; white-space: nowrap; }
+.scanMetrics b { color: var(--text-secondary); font-weight: 600; }
+.scanCard time { color: var(--text-dim); font-size: 8px; font-variant-numeric: tabular-nums; }
+.scanQuiet { color: var(--text-muted); }
+
+@keyframes terminalTicker { to { transform: translateX(-50%); } }
+
+@media (max-width: 960px) {
+  .topbar { grid-template-columns: 190px 1fr auto; }
+  .clock { display: none; }
+  .sidebar { width: 190px; min-width: 190px; }
+  .scanCard { min-width: 310px; }
+}
+
+@media (max-width: 720px) {
+  .topbar { min-height: 46px; grid-template-columns: 154px 1fr auto; }
+  .marketState { padding: 0 12px; gap: 8px; }
+  .marketState small { display: none; }
+  .marketState strong { font-size: 8px; }
+  .signalCount { min-width: 58px; padding: 0 10px; }
+  .signalCount small { display: none; }
+  .sidebar { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; width: 100%; min-width: 0; height: 66px; border-top: 1px solid var(--border-bright); border-right: 0; }
+  .terminalBrand, .sportSection, .sidebarFoot, .sideNav > .sidebarLabel { display: none; }
+  .sideNav { display: grid; grid-template-columns: repeat(6, 1fr); padding: 0; }
+  .sideNav button { min-height: 65px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 2px; text-align: center; border-right: 1px solid var(--border-dim); }
+  .sideNav button svg { width: 18px; height: 18px; }
+  .sideNav button span { font-size: 7px; line-height: 1.1; }
+  .sideNav button small { display: none; }
+  .sideNav button::before { left: 14px; right: 14px; top: 0; bottom: auto; width: auto; height: 2px; }
+  .scanRail { min-height: 64px; }
+  .scanRailLabel { display: none; }
+  .scanCard { min-width: 290px; padding: 10px 13px 10px 16px; grid-template-columns: 1.15fr 1fr; gap: 12px; }
+  .scanCard time { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tickerTrack { animation: none; }
+}

@@ -4,27 +4,27 @@
   --font-display:   'Archivo Black';
   --font-sans:      'DM Sans Variable';
   --font-mono:      'IBM Plex Mono';
-  --bg-void:       #05070f;
-  --bg-base:       #090c18;
-  --bg-surface:    #0d1220;
-  --bg-card:       #111828;
-  --bg-raised:     #162038;
-  --bg-hover:      #1c2a48;
-  --border-dim:    #192235;
-  --border-mid:    #223048;
-  --border-bright: #2e4068;
+  --bg-void:       #0b0c0b;
+  --bg-base:       #101210;
+  --bg-surface:    #141714;
+  --bg-card:       #181b18;
+  --bg-raised:     #1d211d;
+  --bg-hover:      #242924;
+  --border-dim:    #242824;
+  --border-mid:    #303630;
+  --border-bright: #454d45;
 
-  --accent-mint:   #00e5a0;
-  --accent-cyan:   #00c8e0;
-  --accent-blue:   #4488ff;
-  --accent-amber:  #f5a623;
-  --accent-red:    #f03d3d;
-  --accent-purple: #9b6dff;
+  --accent-mint:   #d9ff43;
+  --accent-cyan:   #73dded;
+  --accent-blue:   #78a8ff;
+  --accent-amber:  #ffb84d;
+  --accent-red:    #ff6542;
+  --accent-purple: #b79cff;
 
-  --text-primary:  #ccd8ee;
-  --text-secondary:#7890b8;
-  --text-muted:    #445070;
-  --text-dim:      #2a3850;
+  --text-primary:  #f1efe9;
+  --text-secondary:#a7afa7;
+  --text-muted:    #697269;
+  --text-dim:      #434a43;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -67,11 +67,11 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 14px;
+  padding: 8px 18px;
   border-bottom: 1px solid var(--border-dim);
   background: var(--bg-void);
   color: var(--text-dim);
-  font-size: 9px;
+  font-size: 8px;
   letter-spacing: .09em;
   text-transform: uppercase;
 }
@@ -190,17 +190,17 @@ select:focus-visible {
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
 }
 .card-surface {
   background: var(--bg-surface);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
 }
 .card-raised {
   background: var(--bg-raised);
   border: 1px solid var(--border-mid);
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 /* ─── Nav items ─── */
@@ -209,7 +209,7 @@ select:focus-visible {
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  border-radius: 3px;
+  border-radius: 0;
   cursor: pointer;
   color: var(--text-muted);
   font-size: 10px;
@@ -310,7 +310,7 @@ select:focus-visible {
 /* ─── Sport toggle ─── */
 .sport-toggle {
   display: flex; border: 1px solid var(--border-dim);
-  border-radius: 3px; overflow: hidden; background: var(--bg-surface);
+  border-radius: 0; overflow: hidden; background: var(--bg-surface);
 }
 .sport-btn {
   flex: 1; padding: 5px 10px; font-size: 10px; font-weight: 600;
@@ -353,7 +353,7 @@ select:focus-visible {
 .term-input {
   background: var(--bg-surface);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
   color: var(--text-primary);
   font-family: var(--font-mono), monospace;
   font-size: 12px;
@@ -368,7 +368,7 @@ select:focus-visible {
 .term-select {
   background: var(--bg-surface);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
   color: var(--text-primary);
   font-family: var(--font-mono), monospace;
   font-size: 11px;
@@ -384,7 +384,7 @@ select:focus-visible {
   background: rgba(0,229,160,0.12);
   color: var(--accent-mint);
   border: 1px solid rgba(0,229,160,0.3);
-  border-radius: 3px;
+  border-radius: 0;
   padding: 6px 14px;
   font-family: var(--font-mono), monospace;
   font-size: 10.5px;
@@ -403,7 +403,7 @@ select:focus-visible {
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border-dim);
-  border-radius: 3px;
+  border-radius: 0;
   padding: 5px 12px;
   font-family: var(--font-mono), monospace;
   font-size: 10.5px;
@@ -411,3 +411,8 @@ select:focus-visible {
   transition: all 0.12s ease;
 }
 .btn-ghost:hover { background: var(--bg-raised); color: var(--text-primary); }
+
+@media (max-width: 720px) {
+  .terminal-main { padding-bottom: 66px; }
+  .terminal-breadcrumb { padding-inline: 12px; }
+}
