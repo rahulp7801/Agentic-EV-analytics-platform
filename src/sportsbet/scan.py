@@ -263,6 +263,10 @@ async def run(sports: list[str], daily_credit_limit: int):
                     comparisons=comparisons,execution_ready=False))
         publish_snapshot('metrics:all',ledger.report(model_version=MODEL_VERSION))
         publish_snapshot('metrics:recommendations',ledger.report(True,model_version=MODEL_VERSION))
+        for sport in sports:
+            publish_snapshot(f'metrics:all:{sport}',ledger.report(model_version=MODEL_VERSION,sport=sport))
+            publish_snapshot(f'metrics:recommendations:{sport}',
+                ledger.report(True,model_version=MODEL_VERSION,sport=sport))
         return reports
     finally:
         await pool.close()

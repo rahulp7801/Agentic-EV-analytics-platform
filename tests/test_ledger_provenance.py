@@ -65,6 +65,19 @@ def test_legacy_utc_chronology_and_model_cohorts(tmp_path):
     assert ledger.report(model_version='missing')['sample_size']==0
 
 
+def test_metric_reports_filter_exact_league_without_cross_sport_leakage(tmp_path):
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    ledger.record('nba-scan',payload(game_id='nba-game',sport='nba',prop_type='points'))
+    ledger.record('nfl-scan',payload(game_id='nfl-game',sport='nfl',prop_type='pass_yds'))
+    nba=ledger.report(sport='nba')
+    nfl=ledger.report(sport='nfl')
+    assert nba['sport']=='nba' and nba['sample_size']==1 and nba['pending_count']==1
+    assert nfl['sport']=='nfl' and nfl['sample_size']==1 and nfl['pending_count']==1
+    assert ledger.report()['sport']=='all' and ledger.report()['sample_size']==2
+    with pytest.raises(ValueError,match='sport'):
+        ledger.report(sport='mlb')
+
+
 @pytest.mark.parametrize('changes',[
     {'quote_time':'2026-01-01T16:00:00+00:00'},
     {'model_generated_at':'2026-01-01T16:00:00+00:00'},

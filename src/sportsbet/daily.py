@@ -163,6 +163,10 @@ def create_daily_graph():
         try:
             publish_snapshot('metrics:all',ledger.report(model_version=MODEL_VERSION))
             publish_snapshot('metrics:recommendations',ledger.report(True,model_version=MODEL_VERSION))
+            for sport in state['sports']:
+                publish_snapshot(f'metrics:all:{sport}',ledger.report(model_version=MODEL_VERSION,sport=sport))
+                publish_snapshot(f'metrics:recommendations:{sport}',
+                    ledger.report(True,model_version=MODEL_VERSION,sport=sport))
         except Exception as exc:
             for result in results.values():
                 if result['status']=='complete':

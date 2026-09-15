@@ -3,22 +3,23 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { NextResponse } from 'next/server';
 import { ROOT, PYTHON } from '@/lib/python';
-import { metricCohort, metricLedgerArgs, metricSnapshotKey } from '@/lib/metricCohort';
+import { metricCohort, metricLedgerArgs, metricSnapshotKey, metricSport } from '@/lib/metricCohort';
 import { publicMetrics } from '@/lib/publicMetrics';
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const cohort = metricCohort(request.url);
-  if (!cohort) return NextResponse.json({error: 'Invalid metric cohort.'}, {status: 400});
+  const sport = metricSport(request.url);
+  if (!cohort || !sport) return NextResponse.json({error: 'Invalid metric request.'}, {status: 400});
   try {
     if (hosted) {
-      const data = await snapshot(metricSnapshotKey(cohort));
+      const data = await snapshot(metricSnapshotKey(cohort, sport));
       if (!data) return NextResponse.json({error:'No evaluation metrics have been published yet.'}, {status:503});
-      return NextResponse.json(publicMetrics(data, cohort), {headers:{'Cache-Control':'no-store'}});
+      return NextResponse.json(publicMetrics(data, cohort, sport), {headers:{'Cache-Control':'no-store'}});
     }
-    const { stdout } = await promisify(execFile)(PYTHON, metricLedgerArgs(cohort), {
+    const { stdout } = await promisify(execFile)(PYTHON, metricLedgerArgs(cohort, sport), {
       cwd: ROOT, timeout: 20000, env: {...process.env, PYTHONIOENCODING: 'utf-8'},
     });
-    return NextResponse.json(publicMetrics(JSON.parse(stdout), cohort), {headers: {'Cache-Control': 'no-store'}});
+    return NextResponse.json(publicMetrics(JSON.parse(stdout), cohort, sport), {headers: {'Cache-Control': 'no-store'}});
   } catch {
     return NextResponse.json({error: 'Evaluation metrics are temporarily unavailable.'}, {status: 503});
   }

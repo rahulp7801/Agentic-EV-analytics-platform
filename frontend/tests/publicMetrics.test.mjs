@@ -32,6 +32,12 @@ test('public metrics validates relationships and strips internal or mutable text
   assert.equal(JSON.stringify(result).includes('untrusted'),false);
 });
 
+test('public metrics binds league snapshots to the requested league', () => {
+  const value=report();value.sport='nfl';
+  assert.equal(publicMetrics(value,'all','nfl').sport,'nfl');
+  assert.throws(()=>publicMetrics(value,'all','nba'));
+});
+
 test('public metrics accepts the pre-cluster empty snapshot during rollout', () => {
   const value=report();
   Object.assign(value,{model_version:null,available_model_versions:[],sample_size:0,settled_count:0,
