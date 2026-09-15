@@ -1,7 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Syne:wght@600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
+  --font-display:   'Archivo Black';
+  --font-sans:      'DM Sans Variable';
+  --font-mono:      'IBM Plex Mono';
   --bg-void:       #05070f;
   --bg-base:       #090c18;
   --bg-surface:    #0d1220;
@@ -29,15 +31,51 @@
 
 html, body {
   height: 100%;
-  overflow: hidden;
   background: var(--bg-void);
   color: var(--text-primary);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 12.5px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+html { scroll-behavior: smooth; }
+body { min-height: 100%; }
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.terminal-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  overflow: hidden;
+  background: var(--bg-void);
+}
+
+.terminal-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.terminal-main { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-base); }
+.terminal-view { flex: 1; min-height: 0; overflow: hidden; }
+.terminal-breadcrumb {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border-dim);
+  background: var(--bg-void);
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.terminal-breadcrumb strong { color: var(--accent-mint); font-weight: 600; }
 
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -243,7 +281,7 @@ html, body {
 
 /* ─── Section header ─── */
 .section-header {
-  font-family: 'Syne', sans-serif;
+  font-family: var(--font-sans), sans-serif;
   font-weight: 700;
   font-size: 10px;
   letter-spacing: 0.18em;
@@ -285,7 +323,7 @@ html, body {
 
 /* ─── Stat number display ─── */
 .stat-num {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-weight: 600; letter-spacing: -0.01em;
 }
 
@@ -317,7 +355,7 @@ html, body {
   border: 1px solid var(--border-dim);
   border-radius: 3px;
   color: var(--text-primary);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 12px;
   padding: 6px 10px;
   outline: none;
@@ -332,7 +370,7 @@ html, body {
   border: 1px solid var(--border-dim);
   border-radius: 3px;
   color: var(--text-primary);
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 11px;
   padding: 5px 8px;
   outline: none;
@@ -348,7 +386,7 @@ html, body {
   border: 1px solid rgba(0,229,160,0.3);
   border-radius: 3px;
   padding: 6px 14px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -367,7 +405,7 @@ html, body {
   border: 1px solid var(--border-dim);
   border-radius: 3px;
   padding: 5px 12px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono), monospace;
   font-size: 10.5px;
   cursor: pointer;
   transition: all 0.12s ease;

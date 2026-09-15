@@ -4,6 +4,8 @@ NFL/NBA player-prop research with a deterministic LangGraph pipeline, PostgreSQL
 
 Production: https://agentic-ev-analytics-platform.vercel.app
 
+The root route is the public product introduction and reads its pipeline counts from the same sanitized scan-status API as the application. The research workspace lives at `/terminal`; it retains the existing evidence and execution-safety contracts. The interface uses one React animation runtime (`motion`) with user reduced-motion support and self-hosted fonts, so rendering does not depend on a third-party font request.
+
 ## Setup
 
 Use Python 3.12, uv 0.11.32, Node 24, and PostgreSQL 16. Copy `.env.example` to `.env`, then supply the exact database URLs from your provider and an Odds API key. URL-encode password characters and preserve the provider's SSL settings; the application does not rewrite your endpoint.
