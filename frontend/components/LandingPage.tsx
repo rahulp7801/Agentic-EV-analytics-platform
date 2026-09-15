@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Check, Database, Eye, Layers3, ShieldCheck, Sparkles } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { marketFreshness, type MarketFreshness } from '@/lib/marketFreshness';
+import BacktestLab from './BacktestLab';
 import styles from './LandingPage.module.css';
 
 type Pulse = {
@@ -164,6 +165,7 @@ export default function LandingPage() {
           .to(`.${styles.frameDark}`, { scale: 1.025, backgroundColor: '#2c2b38' }, 1.55);
 
         gsap.from(`.${styles.methodCard}`, { scrollTrigger: { trigger: `.${styles.methodGrid}`, start: 'top 76%' }, opacity: 0, y: 42, stagger: .1, duration: .8, ease: 'power3.out' });
+        gsap.from(`.${styles.backtestDemoFrame}`, { scrollTrigger: { trigger: `.${styles.backtestDemo}`, start: 'top 72%' }, opacity: 0, y: 58, scale: .97, duration: 1, ease: 'power3.out' });
       }, root);
     });
     return () => { cancelled = true; context?.revert(); };
@@ -173,7 +175,7 @@ export default function LandingPage() {
     <div className={styles.page} ref={root}>
       <header className={styles.nav}>
         <Link className={styles.brand} href="/"><span>Q</span><strong>Quant</strong></Link>
-            <nav aria-label="Landing navigation"><a href="#platform">Platform</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton}><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
+            <nav aria-label="Landing navigation"><a href="#platform">Platform</a><a href="#backtest-demo">Backtest</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton}><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
       </header>
 
       <main>
@@ -196,6 +198,11 @@ export default function LandingPage() {
             <p className={styles.storyWord}>Keep the proof.</p>
           </div>
           <div className={styles.productWrap}><ProductFrame pulse={pulse} /></div>
+        </section>
+
+        <section className={styles.backtestDemo} id="backtest-demo">
+          <div className={styles.backtestDemoIntro}><span>Interactive product demo</span><h2>Change the proof.<br />Watch the answer change.</h2><p>Select a replay cohort, choose the metrics that matter, and inspect whether any combination clears a real evidence threshold.</p></div>
+          <div className={styles.backtestDemoFrame}><BacktestLab sport="nfl" preview /></div>
         </section>
 
         <section className={styles.method} id="method">

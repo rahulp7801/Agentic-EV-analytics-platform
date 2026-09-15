@@ -10,6 +10,7 @@ import MarketWatch from '@/components/MarketWatch';
 import ScanStatus from '@/components/ScanStatus';
 import ParlayBuilder from '@/components/ParlayBuilder';
 import KellyCalc from '@/components/KellyCalc';
+import BacktestLab from '@/components/BacktestLab';
 import type { EVSignal, Sport } from '@/lib/types';
 
 export default function Terminal() {
@@ -43,6 +44,7 @@ export default function Terminal() {
             {view === 'props' && <PropsAnalysis sport={sport} />}
             {view === 'gamelogs' && <GameLogs sport={sport} />}
             {view === 'arbitrage' && <MarketWatch sport={sport} />}
+            {view === 'backtest' && <BacktestLab sport={sport} />}
             {view === 'parlay' && (
               <ParlayBuilder
                 externalLegs={parlayLegs}
