@@ -33,7 +33,7 @@ interface PropFunnel {
   kalshi_observation_skew_sides: number;
 }
 
-interface PropScreen { status: string; coverage: Partial<PropFunnel> }
+interface PropScreen { generated_at: string; status: string; coverage: Partial<PropFunnel> }
 
 function hasPropFunnel(value: Partial<PropFunnel>): value is PropFunnel {
   return ['kalshi_quotes', 'kalshi_exact_markets', 'kalshi_paired_sides', 'kalshi_missing_ask_sides',
@@ -94,6 +94,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
 
   const funnel = propScreen && hasPropFunnel(propScreen.coverage) ? propScreen.coverage : null;
   const freshness = marketFreshness(data?.captured_at, now);
+  const propScreenCurrent = propScreen?.status !== 'stale';
 
   return (
     <section className={styles.view} aria-labelledby="market-watch-title">
@@ -131,13 +132,21 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
             {freshness === 'current' ? 'Current capture' : 'Historical capture'} from {new Date(data.captured_at).toLocaleString()} · {data.scope} Positive gross gaps are screening leads, not profit. PrizePicks projection lines require a complete entry payout before arbitrage can be established.
           </div>
 
-          {funnel && (
-            <div className={styles.funnel} aria-label={`Cross-venue prop pairing ${propScreen?.status}`}>
-              <div><span>Kalshi quotes</span><strong>{funnel.kalshi_quotes}</strong></div>
-              <div><span>Exact markets</span><strong>{funnel.kalshi_exact_markets}</strong></div>
-              <div><span>Paired sides</span><strong>{funnel.kalshi_paired_sides}/{2 * funnel.kalshi_exact_markets}</strong></div>
-              <div><span>Excluded sides</span><strong>{funnel.kalshi_missing_ask_sides + funnel.kalshi_missing_sportsbook_sides + funnel.kalshi_observation_skew_sides}</strong></div>
-            </div>
+          {funnel && propScreen && (
+            <>
+              <div className={styles.notice}>
+                {propScreenCurrent ? 'Current' : 'Historical'} paid prop scan from {new Date(propScreen.generated_at).toLocaleString()}
+                {' · '}{propScreenCurrent
+                  ? 'Captured coverage is current evidence, not an executable opportunity count.'
+                  : 'Captured coverage is retained for audit and is not a current opportunity count.'}
+              </div>
+              <div className={styles.funnel} aria-label={`Cross-venue prop pairing ${propScreen.status}`}>
+                <div><span>Captured Kalshi quotes</span><strong>{funnel.kalshi_quotes}</strong></div>
+                <div><span>Captured exact markets</span><strong>{funnel.kalshi_exact_markets}</strong></div>
+                <div><span>Captured paired sides</span><strong>{funnel.kalshi_paired_sides}/{2 * funnel.kalshi_exact_markets}</strong></div>
+                <div><span>Captured exclusions</span><strong>{funnel.kalshi_missing_ask_sides + funnel.kalshi_missing_sportsbook_sides + funnel.kalshi_observation_skew_sides}</strong></div>
+              </div>
+            </>
           )}
           {propError && <div className={styles.notice}>Cross-venue prop scan: {propError}</div>}
 
