@@ -15,3 +15,10 @@ export async function snapshot<T = Record<string, unknown>>(key: string): Promis
   const payload = result.rows[0]?.payload;
   return payload === undefined ? null : payload as T;
 }
+
+export async function snapshots<T = Record<string, unknown>>(keys: string[]): Promise<Record<string, T | null>> {
+  const result = await databaseQuery<{snapshot_key: string; payload: unknown}>(
+    'SELECT snapshot_key,payload FROM dashboard_snapshots WHERE snapshot_key = ANY($1::text[])', [keys]);
+  const found = new Map(result.rows.map(item => [item.snapshot_key, item.payload as T]));
+  return Object.fromEntries(keys.map(key => [key, found.get(key) ?? null]));
+}
