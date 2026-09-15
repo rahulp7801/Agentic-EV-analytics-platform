@@ -124,7 +124,7 @@ test('production verification retries a transient deployment propagation mismatc
   const waits = [];
   await verifyProductionWithRetry(
     { base: 'https://example.test', fetchImpl },
-    { attempts: 2, delayMs: 25, wait: async delay => waits.push(delay) },
+    { attempts: 2, delayMs: 25, wait: async delay => waits.push(delay), log: () => {} },
   );
   assert.equal(stylesheetRequests, 2);
   assert.deepEqual(waits, [25]);
