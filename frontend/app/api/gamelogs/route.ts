@@ -1,4 +1,4 @@
-import { database } from '@/lib/database';
+import { databaseQuery } from '@/lib/database';
 import { publicGameLogs } from '@/lib/publicGameLogs';
 import type { Sport } from '@/lib/types';
 import { NextResponse } from 'next/server';
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   }
   const limit = Math.min(Number(limitText),200);
   try {
-    const {rows} = await database().query(
+    const {rows} = await databaseQuery<{payload: unknown}>(
       'SELECT payload FROM dashboard_gamelogs WHERE sport=$1 AND ($2=\'\' OR strpos(lower(player_name),lower($2))>0) '
       + 'ORDER BY game_date DESC,player_name,game_key LIMIT $3', [sport,player,limit]);
     return NextResponse.json({logs:publicGameLogs(rows.map(row=>row.payload),sport as Sport)},
