@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChartNoAxesCombined, ChartSpline, ClipboardList, Gauge, LayoutDashboard, Network } from 'lucide-react';
+import { ChartNoAxesCombined, ChartSpline, ClipboardList, FlaskConical, Gauge, LayoutDashboard, Network } from 'lucide-react';
 import type { Sport } from '@/lib/types';
 import styles from './TerminalChrome.module.css';
 
@@ -17,6 +17,7 @@ const NAV = [
   { id: 'props', label: 'Player props', icon: ChartSpline },
   { id: 'gamelogs', label: 'Game logs', icon: ClipboardList },
   { id: 'arbitrage', label: 'Market gaps', icon: ChartNoAxesCombined },
+  { id: 'backtest', label: 'Backtest lab', icon: FlaskConical },
   { id: 'parlay', label: 'Scenario lab', icon: Network },
   { id: 'kelly', label: 'Kelly sizing', icon: Gauge },
 ];

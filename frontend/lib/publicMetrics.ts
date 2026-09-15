@@ -1,4 +1,4 @@
-import type { MetricCohort } from './metricCohort';
+import type { MetricCohort, MetricSport } from './metricCohort';
 
 type JsonRecord = Record<string, unknown>;
 type ClusterMetrics = {
@@ -130,10 +130,11 @@ function clusterMetrics(data: JsonRecord): ClusterMetrics | null {
 }
 
 /** Validate and project the only evaluation shape allowed across the public API boundary. */
-export function publicMetrics(value: unknown, expected: MetricCohort) {
+export function publicMetrics(value: unknown, expected: MetricCohort, expectedSport: MetricSport = 'all') {
   const data = record(value);
   const cohort = expected === 'all' ? 'all_predictions' : 'recommendations';
-  if (data.cohort !== cohort) throw new Error('Invalid metrics');
+  const sport = data.sport ?? 'all';
+  if (data.cohort !== cohort || sport !== expectedSport) throw new Error('Invalid metrics');
   const sampleSize = count(data.sample_size);
   const settledCount = count(data.settled_count);
   const pendingCount = count(data.pending_count);
@@ -198,7 +199,7 @@ export function publicMetrics(value: unknown, expected: MetricCohort) {
     }
   }
   return {
-    cohort,
+    cohort, sport,
     model_version: modelVersion(data.model_version),
     available_model_versions: versions,
     sample_size: sampleSize, settled_count: settledCount, decided_count: decidedCount,

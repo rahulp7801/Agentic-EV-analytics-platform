@@ -380,9 +380,12 @@ class Ledger:
                 'outcome_evidence':json_object(proof)})
         return result
 
-    def report(self, recommendations_only: bool = False, model_version: str | None = None) -> dict:
+    def report(self, recommendations_only: bool = False, model_version: str | None = None,
+               sport: str | None = None) -> dict:
         from dataclasses import fields
         from sportsbet.arbitrage.ev import quote_terms
+        if sport is not None and sport not in STAT_COLUMNS:
+            raise ValueError('Evaluation sport is invalid')
         with self.connect() as db:
             records = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value,outcome_evidence FROM predictions').fetchall()
         signals = []
@@ -397,6 +400,8 @@ class Ledger:
             p = json_object(raw)
             if p is None:
                 excluded += 1
+                continue
+            if sport is not None and p.get('sport') != sport:
                 continue
             try:
                 version=normalized_model_version(p)
@@ -508,6 +513,7 @@ class Ledger:
                 'excluded_missing_metadata':excluded, 'duplicate_predictions':duplicate,
                 'excluded_closing_quotes':invalid_closing,
                 'cohort':'recommendations' if recommendations_only else 'all_predictions',
+                'sport':sport or 'all',
                 'model_version':model_version, 'available_model_versions':sorted(versions),
                 'unverified_settlements':unverified_settlements,
                 'selection_policy':'Earliest eligible prediction per game/player/market/side/line within the selected cohort.',
@@ -521,12 +527,14 @@ def main():
     parser.add_argument('--list', action='store_true', help='Export prediction IDs and observations for settlement')
     parser.add_argument('--recommendations-only',action='store_true')
     parser.add_argument('--model-version',help='Report one recorded model version; use unversioned for legacy rows')
+    parser.add_argument('--sport',choices=['nba','nfl'])
     args=parser.parse_args(); ledger=Ledger(args.path)
     if args.settlements:
         raw=Path(args.settlements).read_bytes()
         ledger.settle(json.loads(raw.decode('utf-8-sig')),
             source_ref='sha256:'+hashlib.sha256(raw).hexdigest())
-    print(json.dumps(ledger.predictions() if args.list else ledger.report(args.recommendations_only,args.model_version),indent=2))
+    print(json.dumps(ledger.predictions() if args.list else ledger.report(
+        args.recommendations_only,args.model_version,args.sport),indent=2))
 
 if __name__=='__main__':
     main()
