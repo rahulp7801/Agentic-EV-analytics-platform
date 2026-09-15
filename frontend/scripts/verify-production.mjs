@@ -19,6 +19,12 @@ export const publicPipelinePaths = [
   '/api/gamelogs?sport=nba',
 ];
 
+export const requiredCssMarkers = [
+  '--accent-mint:#d9ff43',
+  '.terminal-layout{',
+  '__hero h1{',
+];
+
 export function readinessStatuses(path, { paidEnabled, publicEnabled }) {
   if (paidPipelinePaths.includes(path)) return paidEnabled ? [200] : [200, 503];
   if (publicPipelinePaths.includes(path)) return paidEnabled || publicEnabled ? [200] : [200, 503];
@@ -56,6 +62,18 @@ export async function verifyProduction({
   const home = await check('/', [200]);
   if (home.headers.get('x-content-type-options') !== 'nosniff' || !home.headers.get('content-security-policy')) {
     throw new Error('Production security headers are missing');
+  }
+  const html = await home.text();
+  const stylesheetUrls = [...html.matchAll(/href=["']([^"']+\.css(?:\?[^"']*)?)["']/gi)]
+    .map(match => new URL(match[1], base).toString());
+  if (!stylesheetUrls.length) throw new Error('Production stylesheets are missing');
+  const css = (await Promise.all(stylesheetUrls.map(async url => {
+    const response = await fetchImpl(url, { signal: AbortSignal.timeout(20000), redirect: 'manual' });
+    if (response.status !== 200) throw new Error(`Production stylesheet returned HTTP ${response.status}`);
+    return response.text();
+  }))).join('\n');
+  for (const marker of requiredCssMarkers) {
+    if (!css.includes(marker)) throw new Error(`Production stylesheet is stale or incomplete: ${marker}`);
   }
   await check('/api/scan', [403], { method: 'POST' });
   await check('/.env', [404]);

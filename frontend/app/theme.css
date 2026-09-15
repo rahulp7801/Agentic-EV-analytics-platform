@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 :root {
   --font-display:   'Archivo Black';
   --font-sans:      'DM Sans Variable';
@@ -28,6 +26,10 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+button, input, select, textarea { font: inherit; }
+button { color: inherit; }
+a { color: inherit; }
+img, svg { display: block; }
 
 html, body {
   height: 100%;
