@@ -2,6 +2,7 @@ import type {EVSignal} from '@/lib/types';
 import {useEffect,useRef} from 'react';
 import styles from './ResearchViews.module.css';
 import PlayerPortrait from './PlayerPortrait';
+import PlayerHistory from './PlayerHistory';
 
 export const REASONS:Record<string,string>={
   availability_unavailable:'Current injury and roster evidence is unavailable or stale.',
@@ -51,5 +52,6 @@ export default function PredictionEvidence({signal,onClose}:{signal:EVSignal;onC
         <p className={styles.evidenceLimitation}>The probability is a historical baseline. Injury and teammate reports screen recommendations; no unvalidated injury, usage or rotation boost is added.</p>
       </div>
     </div>
+    <PlayerHistory key={signal.id} signal={signal} />
   </section>;
 }
