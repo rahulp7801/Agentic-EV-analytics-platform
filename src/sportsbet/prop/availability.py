@@ -80,14 +80,17 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
                     raise ValueError('Ambiguous injury reports')
                 result.append(dict(name=team['displayName'], abbreviation=team['abbreviation'],
                                    roster_names=names, roster_statuses={athlete['displayName']:
-                                       athlete.get('status',{}).get('name','Unknown') for athlete in athletes},reports=flags))
+                                       athlete.get('status',{}).get('name','Unknown') for athlete in athletes},reports=flags,
+                                   roster_source_url=base+'/teams/'+str(team['id'])+'/roster',
+                                   roster_source_sha256=next(source['source_sha256'] for source in sources
+                                       if source['url']==base+'/teams/'+str(team['id'])+'/roster')))
             write_archive(dict(sport=sport, game_id=event['id'], sources=sources),
                           directory=Path('.local/availability'))
             return dict(status='observed', captured_at=now.isoformat(),
                         source_url=base+'/injuries', source_sha256=next(
                             source['source_sha256'] for source in sources if source['url']==base+'/injuries'),
                         teams=result)
-        except (httpx.HTTPError, ValueError, KeyError, TypeError, OSError):
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError, AttributeError, OSError):
             return dict(status='unavailable', captured_at=now.isoformat())
 
 
@@ -105,15 +108,16 @@ def player_availability(context: dict | None, player: str, now: datetime) -> tup
         team, = matches
         subject = [row for row in team['reports'] if row['player'] == player]
         teammates = [row for row in team['reports'] if row['player'] != player]
-        roster_status=team.get('roster_statuses',{}).get(player,'Active')
+        roster_status=team.get('roster_statuses',{}).get(player,'Unknown')
         status = subject[0]['status'] if subject else ('Not listed on injury report'
             if roster_status=='Active' else 'Roster status: '+roster_status)
         evidence = dict(status='observed', captured_at=context['captured_at'],
                         source_url=context['source_url'], source_sha256=context['source_sha256'],
                         roster_confirmed=True, team=team['abbreviation'], subject_status=status,
+                        roster_source_url=team['roster_source_url'],roster_source_sha256=team['roster_source_sha256'],
                         teammates=teammates, probability_adjusted=False)
         reason = 'player_availability_risk' if (subject and status != 'Active') or roster_status!='Active' else (
             'teammate_availability_unmodeled' if any(row['status'] != 'Active' for row in teammates) else None)
         return evidence, reason
-    except (ValueError, KeyError, TypeError):
+    except (ValueError, KeyError, TypeError, AttributeError):
         return unavailable, 'availability_unavailable'

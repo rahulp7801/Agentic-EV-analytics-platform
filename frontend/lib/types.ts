@@ -5,6 +5,20 @@ export type PropType = 'points' | 'rebounds' | 'assists' | 'threes' | 'pra' | 's
 export type SignalStrength = 'high' | 'medium' | 'low' | 'unrated';
 export type Direction = 'over' | 'under';
 
+export interface AvailabilityEvidence {
+  status: 'observed' | 'unavailable';
+  roster_confirmed: boolean;
+  subject_status: string;
+  probability_adjusted: false;
+  captured_at?: string;
+  source_url?: string;
+  source_sha256?: string;
+  roster_source_url?: string;
+  roster_source_sha256?: string;
+  team?: string;
+  teammates: Array<{player:string; status:string; position:string; reported_at:string}>;
+}
+
 export interface EVSignal {
   id: string;
   player: string;
@@ -45,6 +59,8 @@ export interface EVSignal {
   is_home?: boolean;
   // Multi-game cache field — set by scan_game_ev.py
   game_id?: string;
+  availability?: AvailabilityEvidence;
+  forecast_cutoff?: string;
 }
 
 export interface GameLog {

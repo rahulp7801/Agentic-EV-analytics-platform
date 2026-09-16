@@ -129,7 +129,8 @@ async def test_availability_really_controls_daily_recommendations(tmp_path,injur
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
     now=datetime.now(timezone.utc)
     availability=dict(status='observed',captured_at=now.isoformat(),source_url='source',source_sha256='a'*64,
-        teams=[dict(abbreviation='KC',roster_names=['Player','Teammate'],reports=[] if injuries is None else
+        teams=[dict(abbreviation='KC',roster_names=['Player','Teammate'],
+        roster_statuses={'Player':'Active','Teammate':'Active'},roster_source_url='roster',roster_source_sha256='b'*64,reports=[] if injuries is None else
         [dict(player=injuries,status='Out',position='WR',reported_at=now.isoformat())])])
     result_model=PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24'),
         confidence_interval=(Decimal('.55'),Decimal('.65')))

@@ -10,7 +10,8 @@ from sportsbet.prop.availability import fetch_event_availability, player_availab
 def context():
     return dict(status='observed',captured_at=datetime.now(timezone.utc).isoformat(),
                 source_url='https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries',
-                source_sha256='a'*64,teams=[dict(abbreviation='KC',roster_names=['Player','Teammate'],reports=[])])
+                source_sha256='a'*64,teams=[dict(abbreviation='KC',roster_names=['Player','Teammate'],reports=[],
+                    roster_statuses={'Player':'Active','Teammate':'Active'},roster_source_url='roster',roster_source_sha256='b'*64)])
 
 
 def test_availability_never_infers_healthy_or_boosts_probability():
@@ -27,6 +28,8 @@ def test_availability_never_infers_healthy_or_boosts_probability():
     data['captured_at']=(now-timedelta(hours=2)).isoformat()
     assert player_availability(data,'Player',now)[1]=='availability_unavailable'
     assert player_availability(None,'Player',now)[1]=='availability_unavailable'
+    data=context();data['teams'][0]['roster_statuses']['Player']='Inactive'
+    assert player_availability(data,'Player',now)[1]=='player_availability_risk'
 
 
 @pytest.mark.parametrize('sport',['nfl','nba'])
@@ -45,7 +48,7 @@ async def test_exact_team_rosters_and_archived_response_hashes(sport,tmp_path,mo
         else:
             identity=request.url.path.split('/')[-2]
             body['team']=dict(id=identity)
-            athletes=[dict(displayName='Player' if identity=='1' else 'Opponent')]
+            athletes=[dict(displayName='Player' if identity=='1' else 'Opponent',status={'name':'Active'})]
             body['athletes']=[dict(items=athletes)] if sport=='nfl' else athletes
         return httpx.Response(200,json=body)
     original=httpx.AsyncClient

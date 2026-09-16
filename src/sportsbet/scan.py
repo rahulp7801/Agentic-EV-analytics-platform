@@ -29,6 +29,7 @@ from sportsbet.quant.vig import american_to_raw_prob
 MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl'}
 MAX_MODEL_CONCURRENCY = 8
+FORECAST_HORIZON_HOURS = 48
 
 def timestamp(value: str) -> datetime:
     result=datetime.fromisoformat(value.replace('Z','+00:00'))
@@ -193,7 +194,7 @@ async def run(sports: list[str], daily_credit_limit: int):
                 try:
                     response=await client.get(f'/sports/{SPORT_KEYS[sport]}/events',params={'apiKey':settings.odds_api_key})
                     if response.status_code!=200: raise RuntimeError(f'Event provider HTTP {response.status_code}')
-                    events=[e for e in response.json() if now < timestamp(e['commence_time']) <= now+timedelta(hours=24)]
+                    events=[e for e in response.json() if now < timestamp(e['commence_time']) <= now+timedelta(hours=FORECAST_HORIZON_HOURS)]
                     if len({e['id'] for e in events})!=len(events):
                         raise ValueError('Duplicate provider event identity')
                     report['eligible_events']=len(events)

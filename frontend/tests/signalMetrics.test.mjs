@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {signalMetrics,publicSignals,publicSignalSnapshots,parlayScenario} from '../lib/signalMetrics.ts';
+import {signalMetrics,publicSignals,publicSignalSnapshots,parlayScenario,forecastWindow} from '../lib/signalMetrics.ts';
 const now = Date.parse('2026-09-10T12:00:00Z');
 const quote = {true_prob: .6, american_odds: -110, push_probability: 0,
   direction: 'under', sportsbook: 'draftkings', model_version: 'empirical-jeffreys-v4',
   sample_size: 30, kelly_fraction: .04, snapped_at: new Date(now).toISOString(),
-  game_start_time: new Date(now + 3600000).toISOString()};
+  game_start_time: new Date(now + 3600000).toISOString(),availability:{status:'observed',
+    roster_confirmed:true,subject_status:'Not listed on injury report',probability_adjusted:false,
+    captured_at:new Date(now).toISOString(),team:'KC',teammates:[],
+    source_url:'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries',source_sha256:'a'.repeat(64),
+    roster_source_url:'https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/12/roster',roster_source_sha256:'b'.repeat(64)}};
 const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
   home_team:'Home',away_team:'Away',game_id:'game',sport:'nfl',prop_type:'pass_yds',line:249.5,
   mean_stat:260,confidence_interval:[.5,.7],trade_plan:[],injury_flags:{},
@@ -31,6 +35,31 @@ test('legacy, stale, synthetic, malformed and gated estimates cannot recommend s
 test('uncertainty must come from a valid reported interval', () => {
   assert.equal(signalMetrics({...quote, confidence_interval:[.9,.2]},now).confidence_interval,null);
   assert.deepEqual(signalMetrics({...quote, confidence_interval:[.4,.8]},now).confidence_interval,[.4,.8]);
+});
+
+test('availability screens recommendations without changing model probabilities',()=>{
+  for(const availability of [undefined,{...quote.availability,status:'unavailable'},
+    {...quote.availability,subject_status:'Out'},
+    {...quote.availability,captured_at:new Date(now-3600001).toISOString()},
+    {...quote.availability,teammates:[{player:'Teammate',status:'Questionable',position:'WR',reported_at:new Date(now).toISOString()}]}]) {
+    const result=publicSignals([{...publicQuote,availability}],now).signals[0];
+    assert.equal(result.gated,true);assert.equal(result.kelly_fraction,0);assert.equal(result.true_prob,.6);
+  }
+  const result=publicSignals([{...publicQuote,availability:{...quote.availability,source_url:'https://evil.example',private:'secret'}}],now).signals[0];
+  assert.equal(result.availability,undefined);assert.equal(result.gated,true);
+  const projected=publicSignals([{...publicQuote,availability:{...quote.availability,private:'internal'}}],now).signals[0];
+  assert.equal('private' in projected.availability,false);assert.equal(projected.gated,false);
+  for(const patch of [{probability_adjusted:true},{roster_source_url:'https://evil.example/roster'},
+    {source_url:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries'}]) {
+    const rejected=publicSignals([{...publicQuote,availability:{...quote.availability,...patch}}],now).signals[0];
+    assert.equal(rejected.availability,undefined);assert.equal(rejected.gated,true);
+  }
+});
+
+test('forecast windows change at kickoff',()=>{
+  assert.equal(forecastWindow(quote,now),'upcoming');
+  assert.equal(forecastWindow(quote,now+3600000),'archive');
+  assert.equal(forecastWindow({},now),'archive');
 });
 test('public signals require real identity and price fields and omit internal data', () => {
   const value={...publicQuote,internal_evidence:'private implementation detail'};

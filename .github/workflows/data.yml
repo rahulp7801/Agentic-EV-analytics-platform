@@ -101,7 +101,7 @@ jobs:
           fi
           exit "$status"
       - name: Stage public evidence without configured credentials
-        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'public_daily' || env.OPERATION == 'public_monitor' || env.OPERATION == 'refresh')
+        if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'public_daily' || env.OPERATION == 'public_monitor' || env.OPERATION == 'refresh' || env.OPERATION == 'scan')
         id: evidence
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

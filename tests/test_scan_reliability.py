@@ -37,6 +37,19 @@ def transport(monkeypatch,handle):
     monkeypatch.setattr(scan.httpx,'AsyncClient',lambda **kwargs:original(**kwargs,transport=httpx.MockTransport(handle)))
 
 
+async def test_future_forecasts_cover_48_hours_but_never_started_games(monkeypatch,worker):
+    stored,events,evaluated,pool=worker
+    now=datetime.now(timezone.utc)
+    events['nfl']=[dict(id=identity,home_team='Home',away_team='Away',commence_time=(now+timedelta(hours=hours)).isoformat())
+        for identity,hours in [('started',-1),('tomorrow',30),('too_far',49)]]
+    def handle(request):
+        if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nfl'])
+        return httpx.Response(200,json=events['nfl'][1])
+    transport(monkeypatch,handle)
+    await scan.run(['nfl'],4)
+    assert evaluated==['tomorrow'] and stored['scan:nfl']['eligible_events']==1
+
+
 @pytest.mark.asyncio
 async def test_budget_rotation_covers_both_leagues_and_unseen_events(monkeypatch,worker):
     stored,events,evaluated,pool=worker
