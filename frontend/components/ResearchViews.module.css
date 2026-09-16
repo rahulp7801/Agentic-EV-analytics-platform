@@ -256,6 +256,26 @@
 .forecastPlayer { padding: 0; border: 0; background: transparent; text-align: left; color: var(--text-primary); font: 600 13px var(--font-sans),sans-serif; cursor: pointer; }
 .forecastPlayer span { display: block; margin: 4px 0; color: var(--accent); font-size: 11px; font-weight: 400; }
 .forecastPlayer:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.playerPortrait { width: 56px; height: 56px; flex: 0 0 56px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 16px; background: #eeeaf9; color: #58448c; font: 600 18px var(--font-sans),sans-serif; }
+.playerPortrait img { width: 100%; height: 100%; object-fit: cover; }
+.playerHeading { display: flex; align-items: center; gap: 12px; }
+.playerHeading small { color: var(--text-secondary); font-size: 11px; }
+.savePlayer { flex-shrink: 0; margin-left: auto; border: 1px solid var(--border-dim); border-radius: 50%; width: 40px; height: 40px; display: grid; place-items: center; background: var(--bg-base); color: var(--text-secondary); cursor: pointer; }
+.savePlayer[aria-pressed="true"] { color: var(--accent); background: #eeeaf9; }
+.forecastToolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border-dim); }
+.forecastToolbar > span { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
+.viewSwitch { display: flex; padding: 3px; border: 1px solid var(--border-dim); border-radius: 12px; background: var(--bg-base); }
+.viewSwitch button,.uxButton { display: inline-flex; gap: 6px; align-items: center; padding: 9px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--text-secondary); font: 12px var(--font-sans),sans-serif; cursor: pointer; }
+.viewSwitch button[aria-pressed="true"] { background: var(--bg-surface); color: var(--accent); box-shadow: var(--shadow-sm); }
+.uxButton { border: 1px solid var(--border-dim); }
+.savePlayer:focus-visible,.uxButton:focus-visible,.viewSwitch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.forecastGrid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,320px),1fr)); gap: 16px; padding: 20px; }
+.forecastCard { min-width: 0; padding: 20px; border: 1px solid var(--border-dim); border-radius: 20px; background: var(--bg-surface); box-shadow: var(--shadow-sm); }
+.forecastCard h3 { margin: 20px 0 6px; color: var(--text-primary); font: 600 24px var(--font-sans),sans-serif; letter-spacing: -.04em; text-transform: capitalize; }
+.forecastCard h3 span { font-size: 16px; letter-spacing: -.02em; }
+.cardMatchup { margin: 0 0 20px; color: var(--text-secondary); font-size: 11px; }
+.cardFooter { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border-dim); color: var(--text-secondary); font-size: 10px; }
+@media(max-width:720px) { .forecastGrid { padding: 10px; gap: 12px; }.forecastToolbar { padding: 12px 10px; }.forecastToolbar > span { width: 100%; margin: 0; } }
 .predictionEvidence { flex-shrink: 0; margin: 12px 20px 20px; padding: 24px; border: 1px solid var(--border-dim); border-radius: 20px; background: var(--bg-surface); box-shadow: var(--shadow-sm); font: 13px/1.6 var(--font-sans),sans-serif; color: var(--text-secondary); }
 .predictionEvidence header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .predictionEvidence header small { color: var(--accent); }

@@ -4,6 +4,9 @@ import type { Sport, PropType, EVSignal } from '@/lib/types';
 import styles from './ResearchViews.module.css';
 import PredictionEvidence from './PredictionEvidence';
 import {forecastWindow,publicSignals} from '@/lib/signalMetrics';
+import PlayerPortrait from './PlayerPortrait';
+import {Bookmark,RefreshCw,LayoutGrid,List} from 'lucide-react';
+import {motion,useReducedMotion} from 'motion/react';
 
 // PropAnalysis is derived from real EV signals — no mock data
 interface PropsAnalysisProps { sport: Sport; }
@@ -67,6 +70,30 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   const [windowFilter,setWindowFilter]=useState('upcoming');
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const [now,setNow]=useState(0);
+  const [view,setView]=useState('cards');
+  const [shortlist,setShortlist]=useState<string[]>([]);
+  const [scope,setScope]=useState('all');
+  const [sort,setSort]=useState('edge');
+  const [refresh,setRefresh]=useState(0);
+  const [storageNotice,setStorageNotice]=useState('');
+  const reduceMotion=useReducedMotion();
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>{
+      try {
+        const saved=JSON.parse(localStorage.getItem('forecast-players') ?? '[]');
+        if(Array.isArray(saved)) setShortlist(saved.filter((value):value is string=>typeof value==='string' && value.length<=110).slice(0,500));
+      } catch {setStorageNotice('Saved players are unavailable in this browser.');}
+    },0);
+    return ()=>window.clearTimeout(timer);
+  },[]);
+  function savePlayer(p:EVSignal) {
+    const key=`${p.sport}:${p.player}`;
+    const updated=shortlist.includes(key) ? shortlist.filter(item=>item!==key) : [...shortlist,key].slice(-500);
+    setShortlist(updated);
+    try {localStorage.setItem('forecast-players',JSON.stringify(updated));setStorageNotice('');}
+    catch {setStorageNotice('Saved for this session. Browser storage is unavailable.');}
+  }
+  function resetFilters() {setPlayerFilter('');setPropFilter('all');setMinEV(0);setWindowFilter('upcoming');setScope('all');}
 
   useEffect(()=>{
     const timer=window.setInterval(()=>setNow(Date.now()),30_000);
@@ -97,18 +124,20 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     }, 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [sport]);
+  }, [sport,refresh]);
 
   const currentProps=publicSignals(allProps,now).signals;
   const selected=currentProps.find(p=>p.id===selectedId && p.sport===sport);
   const props = currentProps.filter(p => {
     if (p.sport !== sport) return false;
+    if(scope==='saved' && !shortlist.includes(`${p.sport}:${p.player}`)) return false;
+    if(scope==='eligible' && p.gated) return false;
     if(windowFilter!=='all' && forecastWindow(p,now)!==windowFilter) return false;
     if (playerFilter && !p.player.toLowerCase().includes(playerFilter.toLowerCase())) return false;
     if (propFilter !== 'all' && p.prop_type !== propFilter) return false;
     if (minEV>0 && p.ev_pct < minEV / 100) return false;
     return true;
-  });
+  }).sort((a,b)=>sort==='player' ? a.player.localeCompare(b.player) : sort==='sample' ? (b.sample_size ?? 0)-(a.sample_size ?? 0) : b.ev_pct-a.ev_pct);
 
   if (loading) return (
     <div className={styles.loadingState}>
@@ -124,6 +153,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
       {/* Header */}
       <div className={styles.propsHeader}>
         <div className="section-header">Player forecasts</div>
+        <button className={styles.uxButton} type="button" onClick={()=>setRefresh(n=>n+1)} aria-label="Refresh forecasts"><RefreshCw size={16} />Refresh</button>
         <div style={{ flex: 1 }} />
 
         <input
@@ -157,18 +187,40 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
         </div>
       </div>
 
+      <div className={styles.forecastToolbar}>
+        <div className={styles.viewSwitch} aria-label="Forecast view">
+          <button type="button" aria-pressed={view==='cards'} onClick={()=>setView('cards')}><LayoutGrid size={16} />Cards</button>
+          <button type="button" aria-pressed={view==='table'} onClick={()=>setView('table')}><List size={16} />Table</button>
+        </div>
+        <select className="term-select" aria-label="Forecast shortlist" value={scope} onChange={e=>setScope(e.target.value)}>
+          <option value="all">All estimates</option><option value="saved">Saved players</option><option value="eligible">Research eligible</option>
+        </select>
+        <select className="term-select" aria-label="Sort forecasts" value={sort} onChange={e=>setSort(e.target.value)}>
+          <option value="edge">Highest edge</option><option value="sample">Largest sample</option><option value="player">Player A–Z</option>
+        </select>
+        <button className={styles.uxButton} type="button" onClick={resetFilters}>Reset filters</button>
+        <span role="status">{props.length} forecasts · {new Set(props.map(p=>p.player)).size} players</span>
+      </div>
+      {storageNotice && <p role="status" className={styles.forecastIntro}>{storageNotice}</p>}
+
       {error && <div className={styles.notice} role="alert">{error}</div>}
-      <p className={styles.forecastIntro}>Historical model forecasts with observed prices. Open a player to see the reasoning, uncertainty and current injury evidence. Blocked estimates are retained for transparency.</p>
+      <p className={styles.forecastIntro}>Explore model forecasts with observed prices. Open a player for the evidence, or save them to follow their props. Saved players stay in this browser. A positive edge alone does not make a pick eligible.</p>
       {selected && <PredictionEvidence signal={selected} onClose={()=>{setSelectedId(null);document.getElementById(`forecast-${selected.id}`)?.focus();}} />}
 
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto' }} tabIndex={0} aria-label="Recorded player prop estimates">
         {props.length === 0 ? (
           <div className={styles.propsEmpty}>
-            <strong>{allProps.length ? 'No forecasts match these filters.' : `No recorded ${sport.toUpperCase()} forecasts are published yet.`}</strong>
+            <strong>{scope==='saved' ? 'Your saved-player view is empty.' : allProps.length ? 'No forecasts match these filters.' : `No recorded ${sport.toUpperCase()} forecasts are published yet.`}</strong>
             <span>{allProps.length ? 'Try all recorded forecasts, another player, or a lower minimum edge.' : 'The scheduled scan covers the next 48 hours, subject to source availability and the API budget. Forecasts require real pregame prices and sufficient player history.'}</span>
           </div>
-        ) : <table className="data-table">
+        ) : view==='cards' ? <div className={styles.forecastGrid}>{props.map(p=><motion.article key={p.id} className={styles.forecastCard} initial={reduceMotion ? false : {opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.2}}>
+          <div className={styles.playerHeading}><PlayerPortrait signal={p} /><div><button id={`forecast-${p.id}`} type="button" className={styles.forecastPlayer} onClick={()=>setSelectedId(p.id)}>{p.player}<span>Explore forecast →</span></button><small>{p.availability?.team ?? p.sport.toUpperCase()} · {new Date(p.game_start_time ?? '').toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</small></div><SaveButton prop={p} saved={shortlist.includes(`${p.sport}:${p.player}`)} onSave={()=>savePlayer(p)} /></div>
+          <h3>{p.direction} {p.line} <span>{p.prop_type.replaceAll('_',' ')}</span></h3>
+          <p className={styles.cardMatchup}>{p.home_team} vs {p.away_team}</p>
+          <ProbabilityComparison model={p.true_prob} implied={p.implied_prob} />
+          <div className={styles.cardFooter}><span className={`badge ${p.gated ? 'badge-dim' : 'badge-mint'}`}>{p.gated ? 'Blocked estimate' : 'Research eligible'}</span><span>{p.sample_size} games · {p.sportsbook}</span></div>
+        </motion.article>)}</div> : <table className="data-table">
           <thead>
             <tr>
               <th>Player</th>
@@ -182,7 +234,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
             </tr>
           </thead>
           <tbody>
-            {props.map(p => <PropRow key={p.id} prop={p} onExplain={()=>setSelectedId(p.id)} />)}
+            {props.map(p => <PropRow key={p.id} prop={p} onExplain={()=>setSelectedId(p.id)} saved={shortlist.includes(`${p.sport}:${p.player}`)} onSave={()=>savePlayer(p)} />)}
           </tbody>
         </table>}
       </div>
@@ -190,11 +242,16 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   );
 }
 
-function PropRow({ prop,onExplain }: { prop: EVSignal;onExplain:()=>void }) {
+function SaveButton({prop,saved,onSave}:{prop:EVSignal;saved:boolean;onSave:()=>void}) {
+  return <button type="button" className={styles.savePlayer} aria-label={`${saved?'Unsave':'Save'} ${prop.player}`} aria-pressed={saved} onClick={onSave}><Bookmark size={18} fill={saved?'currentColor':'none'} /></button>;
+}
+
+function PropRow({ prop,onExplain,saved,onSave }: { prop: EVSignal;onExplain:()=>void;saved:boolean;onSave:()=>void }) {
   const evPct = prop.ev_pct * 100;
   return (
     <tr>
       <td>
+        <div className={styles.playerHeading}><PlayerPortrait signal={prop} /><SaveButton prop={prop} saved={saved} onSave={onSave} /></div>
         <button id={`forecast-${prop.id}`} type="button" className={styles.forecastPlayer} onClick={onExplain}>{prop.player}<span>Why this forecast →</span></button>
         <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{prop.team || prop.home_team} vs {prop.opponent || prop.away_team}</div>
         <span className={`badge ${prop.gated ? 'badge-dim' : 'badge-mint'}`}>{prop.gated ? 'Blocked estimate' : 'Research eligible'}</span>

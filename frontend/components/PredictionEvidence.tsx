@@ -1,6 +1,7 @@
 import type {EVSignal} from '@/lib/types';
 import {useEffect,useRef} from 'react';
 import styles from './ResearchViews.module.css';
+import PlayerPortrait from './PlayerPortrait';
 
 const REASONS:Record<string,string>={
   availability_unavailable:'Current injury and roster evidence is unavailable or stale.',
@@ -24,6 +25,7 @@ export default function PredictionEvidence({signal,onClose}:{signal:EVSignal;onC
   useEffect(()=>{panel.current?.focus();},[signal.id]);
   return <section ref={panel} tabIndex={-1} className={styles.predictionEvidence} aria-label={`Why ${signal.player} was forecast`}>
     <header>
+      <PlayerPortrait signal={signal} />
       <div><small>Forecast evidence</small><h2>{signal.player}</h2><p>{signal.direction} {signal.line} {signal.prop_type.replaceAll('_',' ')} · {signal.home_team} vs {signal.away_team}</p></div>
       <button type="button" className={styles.evidenceClose} onClick={onClose}>Close explanation</button>
     </header>
