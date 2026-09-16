@@ -17,8 +17,26 @@ export type ForecastBenchmark = {
   log_loss_game_cluster_interval: [number, number];
 };
 
+export type ForecastEvidenceRecord = {
+  id: string;
+  event_id: string;
+  player_name: string;
+  prop_type: ForecastBenchmark['prop_type'];
+  actual_value: number;
+  game_start_time: string;
+  game_date: string;
+  team: string;
+  opponent: string;
+  source_url: string;
+  source_sha256: string;
+  research_threshold: number;
+  model_probability: number;
+  sample_size: number;
+  outcome: boolean;
+};
+
 export type ForecastBenchmarkBundle = {
-  schema_version: 1;
+  schema_version: 2;
   id: string;
   sport: 'nfl';
   title: string;
@@ -33,6 +51,7 @@ export type ForecastBenchmarkBundle = {
   evaluation_scope: string;
   price_scope: string;
   benchmarks: ForecastBenchmark[];
+  records: ForecastEvidenceRecord[];
 };
 
 function object(value: unknown): Record<string, unknown> {
@@ -65,9 +84,26 @@ function interval(value: unknown, minimum: number, maximum: number): [number, nu
   return [lower, upper];
 }
 
+function timestamp(value: unknown) {
+  const result = text(value, /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/, 64);
+  if (!Number.isFinite(Date.parse(result))) throw new Error('Invalid benchmark');
+  return result;
+}
+
+function sourceUrl(value: unknown, eventId: string) {
+  const result = text(value, /^https:\/\/site\.api\.espn\.com\//, 300);
+  const parsed = new URL(result);
+  if (parsed.origin !== 'https://site.api.espn.com'
+      || parsed.pathname !== '/apis/site/v2/sports/football/nfl/summary'
+      || parsed.searchParams.size !== 1 || parsed.searchParams.get('event') !== eventId) {
+    throw new Error('Invalid benchmark');
+  }
+  return result;
+}
+
 export function publicForecastBenchmark(value: unknown): ForecastBenchmarkBundle {
   const data = object(value);
-  if (data.schema_version !== 1 || data.sport !== 'nfl' || !Array.isArray(data.benchmarks)
+  if (data.schema_version !== 2 || data.sport !== 'nfl' || !Array.isArray(data.benchmarks)
       || data.benchmarks.length < 1 || data.benchmarks.length > 8) throw new Error('Invalid benchmark');
   const benchmarks = data.benchmarks.map(raw => {
     const item = object(raw);
@@ -102,17 +138,56 @@ export function publicForecastBenchmark(value: unknown): ForecastBenchmarkBundle
       log_loss_game_cluster_interval:logLossInterval};
   });
   if (new Set(benchmarks.map(item => item.prop_type)).size !== benchmarks.length) throw new Error('Invalid benchmark');
-  return {schema_version:1, id:text(data.id, /^[a-z0-9-]{1,64}$/), sport:'nfl',
+  const startDate=text(data.start_date, /^\d{4}-\d{2}-\d{2}$/);
+  const endDate=text(data.end_date, /^\d{4}-\d{2}-\d{2}$/);
+  const gameCount=count(data.game_count);
+  if (startDate>endDate) throw new Error('Invalid benchmark');
+  if (!Array.isArray(data.records) || data.records.length < 1 || data.records.length > 1000
+      || data.records.length !== benchmarks.reduce((total,item)=>total+item.evaluated_count,0)) {
+    throw new Error('Invalid benchmark');
+  }
+  const thresholdByProp=new Map(benchmarks.map(item=>[item.prop_type,item.research_threshold]));
+  const records=data.records.map(raw=>{
+    const item=object(raw);
+    const eventId=text(item.event_id,/^\d{6,12}$/);
+    const prop=text(item.prop_type,/^(pass_yds|receptions)$/) as ForecastEvidenceRecord['prop_type'];
+    const threshold=metric(item.research_threshold,0,10000);
+    const actual=metric(item.actual_value,0,10000);
+    if (thresholdByProp.get(prop)!==threshold || typeof item.outcome!=='boolean'
+        || item.outcome!==(actual>threshold)) throw new Error('Invalid benchmark');
+    const gameDate=text(item.game_date,/^\d{4}-\d{2}-\d{2}$/);
+    if (gameDate < startDate || gameDate > endDate) throw new Error('Invalid benchmark');
+    return {id:text(item.id,/^\d{6,12}-(pass_yds|receptions)-\d{1,16}$/,128),event_id:eventId,
+      player_name:text(item.player_name,/^[A-Za-z.' -]{1,100}$/),prop_type:prop,
+      actual_value:actual,game_start_time:timestamp(item.game_start_time),game_date:gameDate,
+      team:text(item.team,/^[A-Z0-9]{2,4}$/),opponent:text(item.opponent,/^[A-Z0-9]{2,4}$/),
+      source_url:sourceUrl(item.source_url,eventId),
+      source_sha256:text(item.source_sha256,/^[a-f0-9]{64}$/),research_threshold:threshold,
+      model_probability:metric(item.model_probability,0,1),sample_size:count(item.sample_size),
+      outcome:item.outcome};
+  });
+  if (new Set(records.map(item=>item.id)).size!==records.length) throw new Error('Invalid benchmark');
+  for (const benchmark of benchmarks) {
+    if (records.filter(item=>item.prop_type===benchmark.prop_type).length!==benchmark.evaluated_count) {
+      throw new Error('Invalid benchmark');
+    }
+  }
+  if (new Set(records.map(item=>item.event_id)).size!==gameCount) throw new Error('Invalid benchmark');
+  return {schema_version:2, id:text(data.id, /^[a-z0-9-]{1,64}$/), sport:'nfl',
     title:text(data.title, /^[A-Za-z0-9 ]{1,80}$/),
-    start_date:text(data.start_date, /^\d{4}-\d{2}-\d{2}$/),
-    end_date:text(data.end_date, /^\d{4}-\d{2}-\d{2}$/),
+    start_date:startDate, end_date:endDate,
     retrieved_at:text(data.retrieved_at, /^\d{4}-\d{2}-\d{2}T/, 64),
     model_version:text(data.model_version, /^[A-Za-z0-9._-]{1,64}$/),
-    game_count:count(data.game_count), outcome_record_count:count(data.outcome_record_count),
+    game_count:gameCount, outcome_record_count:count(data.outcome_record_count),
     dataset_sha256:text(data.dataset_sha256, /^[a-f0-9]{64}$/),
     source_code_sha256:text(data.source_code_sha256, /^[a-f0-9]{64}$/),
     evaluation_scope:text(data.evaluation_scope, /^.{1,500}$/, 500),
-    price_scope:text(data.price_scope, /^.{1,500}$/, 500), benchmarks};
+    price_scope:text(data.price_scope, /^.{1,500}$/, 500), benchmarks,records};
+}
+
+export function forecastResult(record: ForecastEvidenceRecord) {
+  const side=record.model_probability>=0.5 ? 'over' : 'under';
+  return {side,correct:(side==='over')===record.outcome};
 }
 
 export function forecastChecks(benchmark: ForecastBenchmark) {
