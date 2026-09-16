@@ -15,7 +15,7 @@ from sportsbet.market_watch import run as watch, DEFAULT_GAME_LIMIT
 from sportsbet.ledger import Ledger
 from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.refresh import refresh_history
-from sportsbet.scan import run as scan, timestamp
+from sportsbet.scan import run as scan, timestamp, prop_credit_holdback, MARKETS
 from sportsbet.schedules import collect as collect_schedule
 from sportsbet.settlement import pending_schedule_offsets, settle_final_props
 
@@ -102,11 +102,13 @@ def create_daily_graph():
     async def markets(state):
         results={}
         public=state['mode'].startswith('public_')
+        held=prop_credit_holdback(state['sports'],state['daily_credit_limit'])
+        market_holdback=held+max(len(MARKETS[s]) for s in state['sports']) if held else 0
         for sport in state['sports']:
             try:
                 public_provider='public' if state['mode']=='public_daily' else 'kalshi'
                 summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,
-                    **({'provider':public_provider} if public else {}))
+                    **({'provider':public_provider} if public else {'credit_holdback':market_holdback}))
                 complete = bool(summary['sources']) and all(
                     source['status']=='observed' and not source.get('partial_coverage',True)
                     for source in summary['sources'].values()
@@ -178,7 +180,8 @@ def create_daily_graph():
         groups=('markets','schedules') if public else ('histories','markets','props','schedules','settlements')
         if state['mode']=='public_daily':groups+=('histories','settlements')
         accepted=('complete','observed') if public else ('complete',)
-        healthy=all(r['status'] in accepted for group in groups for r in state[group].values())
+        healthy=all(r['status'] in accepted or (group=='props' and r['status']=='scheduled')
+            for group in groups for r in state[group].values())
         result=dict(mode=state['mode'],finished_at=datetime.now(timezone.utc).isoformat(),
             status=('observed' if public else 'complete') if healthy else 'degraded',execution_ready=False,
             histories=state['histories'],markets=state['markets'],schedules=state['schedules'],

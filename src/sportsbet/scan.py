@@ -37,6 +37,28 @@ def timestamp(value: str) -> datetime:
         raise ValueError('Provider timestamp has no timezone')
     return result
 
+def prop_credit_holdback(sports: list[str], limit: int) -> int:
+    """Protect two full pregame checks when the configured budget supports them."""
+    width=max(len(MARKETS[sport]) for sport in sports)
+    return 2*width if limit>=3*width else 0
+
+def next_quote_check(event: dict, attempted_at: str | None, now: datetime) -> datetime:
+    """Cadence controls collection only, never extends quote eligibility."""
+    start=timestamp(event['commence_time'])
+    try:
+        last=timestamp(attempted_at)
+        if last>now: return now
+    except (ValueError,TypeError,AttributeError):
+        return now
+    remaining=start-now
+    boundaries=[start-boundary for boundary in (timedelta(hours=6),timedelta(hours=1))]
+    if any(last<boundary<=now for boundary in boundaries):
+        return now
+    interval=timedelta(hours=12) if remaining>timedelta(hours=6) else (
+        timedelta(hours=2) if remaining>timedelta(hours=1) else timedelta(minutes=15))
+    transitions=[boundary for boundary in boundaries if boundary>now]
+    return min([last+interval]+transitions)
+
 def quotes_from_event(event: dict, sport: str) -> list[PlayerPropSnapshotCreate]:
     return parse_event_quotes(event, sport, set(MARKETS[sport]))
 
@@ -188,12 +210,14 @@ async def run(sports: list[str], daily_credit_limit: int):
     reports={}
     queues={}
     screens={sport:[] for sport in sports}
+    held=prop_credit_holdback(sports,daily_credit_limit)
     try:
         async with httpx.AsyncClient(base_url='https://api.the-odds-api.com/v4',timeout=20,follow_redirects=False) as client:
             for sport in sports:
                 previous=load_snapshot('scan:'+sport) or {}
                 report=dict(scan_id=scan_id,sport=sport,started_at=now.isoformat(),finished_at=None,status='running',
                     eligible_events=None,attempted_events=0,completed_events=0,budget_skipped_events=0,
+                    cadence_deferred_events=0,next_refresh_at=None,
                     failures=[],coverage={},attempts=previous.get('attempts',{}),
                     model_complete_events=0,model_partial_events=0,model_unavailable_events=0,
                     execution_ready=False)
@@ -207,7 +231,8 @@ async def run(sports: list[str], daily_credit_limit: int):
                         raise ValueError('Duplicate provider event identity')
                     report['eligible_events']=len(events)
                     report['attempts']={e['id']:report['attempts'][e['id']] for e in events if e['id'] in report['attempts']}
-                    queues[sport]=sorted(events,key=lambda e:(report['attempts'].get(e['id'],''),timestamp(e['commence_time']),e['id']))
+                    queues[sport]=sorted(events,key=lambda e:(timestamp(e['commence_time'])>now+timedelta(hours=1),
+                        report['attempts'].get(e['id'],''),timestamp(e['commence_time']),e['id']))
                 except Exception as exc:
                     report['failures'].append(dict(stage='event_discovery',error_type=type(exc).__name__))
                     queues[sport]=[]
@@ -218,7 +243,14 @@ async def run(sports: list[str], daily_credit_limit: int):
                      for sport in order if i<len(queues[sport])]
             for sport,event in pending:
                 report=reports[sport]
-                if not ledger.reserve_api_credits(len(MARKETS[sport]),daily_credit_limit):
+                check=next_quote_check(event,report['attempts'].get(event['id']),datetime.now(timezone.utc))
+                if check>datetime.now(timezone.utc):
+                    report['cadence_deferred_events']+=1
+                    if not report['next_refresh_at'] or check<timestamp(report['next_refresh_at']):
+                        report['next_refresh_at']=check.isoformat()
+                    continue
+                close=timestamp(event['commence_time'])-datetime.now(timezone.utc)<=timedelta(hours=1)
+                if not ledger.reserve_api_credits(len(MARKETS[sport]),daily_credit_limit,holdback=0 if close else held):
                     report['budget_skipped_events']+=1
                     continue
                 report['attempted_events']+=1
@@ -257,7 +289,8 @@ async def run(sports: list[str], daily_credit_limit: int):
                 report['model_partial_events']=model_statuses['partial']
                 report['model_unavailable_events']=model_statuses['unavailable']
                 model_incomplete=report['model_partial_events'] or report['model_unavailable_events']
-                report['status']='degraded' if report['failures'] or report['budget_skipped_events'] or model_incomplete else 'complete'
+                report['status']='degraded' if report['failures'] or report['budget_skipped_events'] or model_incomplete else (
+                    'scheduled' if report['cadence_deferred_events'] else 'complete')
                 report['finished_at']=datetime.now(timezone.utc).isoformat()
                 publish_snapshot('scan:'+sport,report)
                 comparisons=[row for screen in screens[sport] for row in screen['comparisons']]
@@ -309,7 +342,7 @@ def main():
     try:
         reports=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.daily_credit_limit))
         print(json.dumps({s:{k:v for k,v in r.items() if k not in ('attempts','coverage')} for s,r in reports.items()}))
-        if not reports or any(r['status']!='complete' for r in reports.values()):
+        if not reports or any(r['status'] not in ('complete','scheduled') for r in reports.values()):
             raise SystemExit(2)
     except Exception as exc:
         raise SystemExit(f'Market update failed ({type(exc).__name__})') from None

@@ -60,13 +60,17 @@ async def test_budget_rotation_covers_both_leagues_and_unseen_events(monkeypatch
         identity=request.url.path.split('/')[-2]
         return httpx.Response(200,json=next(e for e in events[sport] if e['id']==identity))
     transport(monkeypatch,handle)
+    for league in events.values():
+        for event in league:
+            event['commence_time']=(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat()
     # Raise the daily ceiling by exactly one event each run; prior credits remain spent.
     for limit in (4,7,11,14):
         await scan.run(['nfl','nba'],limit)
     assert evaluated==['nfl0','nba0','nfl1','nba1']
     assert stored['scan:nba']['completed_events']==1
-    assert stored['scan:nba']['budget_skipped_events']==1
-    assert stored['scan:nba']['status']=='degraded'
+    assert stored['scan:nba']['budget_skipped_events']==0
+    assert stored['scan:nba']['cadence_deferred_events']==1
+    assert stored['scan:nba']['status']=='scheduled'
     assert stored['signals:nfl:nfl0']['cross_venue']['reason']=='missing_handoff'
     # The fourth scan attempted no NFL quote, so it replaces the prior screen with an honest empty snapshot.
     assert stored['prop-screens:nfl']['coverage']=={
@@ -191,3 +195,40 @@ def test_cli_status_matches_actual_scan_coverage(monkeypatch,worker,capsys,mode)
         elif mode=='empty':
             assert report['status']=='complete' and report['eligible_events']==0
     pool.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_repeated_monitor_defers_network_requests_without_relabeling_old_quotes(monkeypatch,worker):
+    stored,events,evaluated,pool=worker
+    requests=[]
+    def handle(request):
+        requests.append(request.url.path)
+        if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nba'])
+        return httpx.Response(200,json=next(e for e in events['nba'] if e['id'] in request.url.path))
+    transport(monkeypatch,handle)
+    await scan.run(['nba'],25)
+    original=deepcopy(stored['signals:nba:nba0'])
+    report=(await scan.run(['nba'],25))['nba']
+    assert evaluated==['nba0','nba1']
+    assert len(requests)==4  # Two discovery requests and just two paid event requests.
+    assert report['status']=='scheduled' and report['cadence_deferred_events']==2
+    assert report['next_refresh_at'] and report['completed_events']==0
+    assert stored['signals:nba:nba0']==original  # No timestamp or eligibility rewrite.
+
+
+@pytest.mark.asyncio
+async def test_scan_preserves_last_credits_for_last_hour_checks(monkeypatch,worker):
+    stored,events,evaluated,pool=worker
+    assert scan.Ledger().reserve_api_credits(17,25)
+    def handle(request):
+        if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nfl'])
+        return httpx.Response(200,json=next(e for e in events['nfl'] if e['id'] in request.url.path))
+    transport(monkeypatch,handle)
+    distant=(await scan.run(['nfl'],25))['nfl']
+    assert distant['budget_skipped_events']==2 and not evaluated
+    for event in events['nfl']:
+        event['commence_time']=(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat()
+    close=(await scan.run(['nfl'],25))['nfl']
+    assert close['completed_events']==2 and close['budget_skipped_events']==0
+    assert evaluated==['nfl0','nfl1']
+    assert not scan.Ledger().reserve_api_credits(1,25)
