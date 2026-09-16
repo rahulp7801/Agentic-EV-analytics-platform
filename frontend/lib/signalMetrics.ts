@@ -123,7 +123,7 @@ function publicGame(value:unknown) {
 }
 
 /** Validate and project the complete stored signal snapshot boundary. */
-export function publicSignalSnapshots(value:unknown, now=Date.now()) {
+export function publicSignalSnapshots(value:unknown, now=Date.now(), sport?:Sport) {
   if (!Array.isArray(value) || value.length>100) throw new Error('Invalid signal snapshots');
   const rawSignals:unknown[]=[];
   const games=new Map<string,ReturnType<typeof publicGame>>();
@@ -146,7 +146,11 @@ export function publicSignalSnapshots(value:unknown, now=Date.now()) {
       games.set(key,game);
     }
   }
-  return {generated_at:generatedAt,games:[...games.values()],...publicSignals(rawSignals,now)};
+  const projected=publicSignals(rawSignals,now);
+  return {generated_at:generatedAt,
+    games:[...games.values()].filter(game=>!sport || game.sport===sport),
+    ...projected,
+    signals:projected.signals.filter(signal=>!sport || signal.sport===sport)};
 }
 
 export function parlayScenario(probabilities: number[], grossPayout: number) {

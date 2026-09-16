@@ -62,6 +62,18 @@ test('public signal snapshots project bounded metadata and strip stored internal
   assert.deepEqual(result.games,[{game_id:'game',home_team:'Home',away_team:'Away',date:'20260910',sport:'nfl'}]);
   assert.equal('coverage' in result,false);assert.equal('secret' in result.games[0],false);
 });
+test('public signal snapshots enforce the requested league boundary',()=>{
+  const nbaQuote={...publicQuote,id:'nba-prediction',sport:'nba',prop_type:'points',
+    home_team:'Celtics',away_team:'Knicks'};
+  const snapshot={generated_at:new Date(now).toISOString(),signals:[publicQuote,nbaQuote],games:[
+    {game_id:'game',home_team:'Home',away_team:'Away',date:'20260910',sport:'nfl'},
+    {game_id:'nba-game',home_team:'Celtics',away_team:'Knicks',date:'20260910',sport:'nba'},
+  ]};
+  const result=publicSignalSnapshots([snapshot],now,'nba');
+  assert.deepEqual(result.signals.map(signal=>signal.sport),['nba']);
+  assert.deepEqual(result.games.map(game=>game.sport),['nba']);
+  assert.equal(result.invalid_signals,0);
+});
 test('public signal snapshots reject malformed envelopes and bound attacker-controlled text',()=>{
   const snapshot={generated_at:new Date(now).toISOString(),signals:[publicQuote],games:[]};
   for(const changed of [{...snapshot,generated_at:'today'},

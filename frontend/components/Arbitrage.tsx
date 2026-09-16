@@ -247,7 +247,7 @@ export default function Arbitrage({ sport }: { sport: Sport }) {
   const [refreshing, setRefreshing] = useState(false);
   const fetchEVSignals = useCallback(async () => {
     try {
-      const res = await fetch('/api/signals', { cache: 'no-store' });
+      const res = await fetch(`/api/signals?sport=${sport}`, { cache: 'no-store' });
       if (!res.ok) { setEvSignals([]); return; }
       const json = await res.json();
       // Always update signals (including empty array) — never fall back to stale state
