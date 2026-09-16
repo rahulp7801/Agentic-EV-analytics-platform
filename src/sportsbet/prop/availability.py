@@ -81,6 +81,10 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
                 if len(flags) > 64 or len({flag['player'] for flag in flags}) != len(flags):
                     raise ValueError('Ambiguous injury reports')
                 result.append(dict(name=team['displayName'], abbreviation=team['abbreviation'],
+                                   portraits={athlete['displayName']:dict(player_id=str(athlete.get('id','')),
+                                       player_image_url=athlete.get('headshot',{}).get('href','')) for athlete in athletes
+                                       if str(athlete.get('id','')).isdigit() and athlete.get('headshot',{}).get('href')==
+                                       f"https://a.espncdn.com/i/headshots/{sport}/players/full/{athlete['id']}.png"},
                                    roster_names=names, roster_statuses={athlete['displayName']:
                                        athlete.get('status',{}).get('name','Unknown') for athlete in athletes},reports=flags,
                                    injury_coverage='observed' if groups else 'unavailable',
@@ -122,6 +126,7 @@ def player_availability(context: dict | None, player: str, now: datetime) -> tup
                         roster_confirmed=True, team=team['abbreviation'], subject_status=status,
                         roster_source_url=team['roster_source_url'],roster_source_sha256=team['roster_source_sha256'],
                         teammates=teammates, probability_adjusted=False)
+        evidence.update(team.get('portraits',{}).get(player,{}))
         reason = 'player_availability_risk' if (subject and status != 'Active') or roster_status!='Active' else (
             'teammate_availability_unmodeled' if any(row['status'] != 'Active' for row in teammates) else None)
         return evidence, reason

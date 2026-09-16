@@ -96,6 +96,9 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
   return {status:'observed',roster_confirmed:true,subject_status:a.subject_status,
     captured_at:a.captured_at,source_url:url,source_sha256:a.source_sha256,team:a.team,
     roster_source_url:a.roster_source_url,roster_source_sha256:a.roster_source_sha256,
+    ...(bounded(a.player_id,20) && /^[0-9]+$/.test(a.player_id)
+      && a.player_image_url===`https://a.espncdn.com/i/headshots/${sport}/players/full/${a.player_id}.png`
+      ? {player_id:a.player_id,player_image_url:a.player_image_url} : {}),
     teammates,probability_adjusted:false};
 }
 

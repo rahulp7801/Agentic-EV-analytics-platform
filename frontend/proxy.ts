@@ -8,7 +8,7 @@ export function proxy(request: NextRequest) {
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ''};
     style-src 'self' 'nonce-${nonce}';
     style-src-attr 'unsafe-inline';
-    img-src 'self' blob: data:;
+    img-src 'self' blob: data: https://a.espncdn.com;
     font-src 'self';
     connect-src 'self';
     worker-src 'self' blob:;
