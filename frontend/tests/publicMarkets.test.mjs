@@ -22,6 +22,21 @@ test('public markets strips evidence, profit and fee calculation internals',()=>
   assert.equal('legs' in result.comparisons[0].depth_fee_scenarios.cases[0],false);
   assert.match(result.scope,/not verified arbitrage/);});
 
+test('budget-limited sportsbooks preserve independent Kalshi evidence without claiming quotes',()=>{
+  const value=snapshot();
+  value.sources.sportsbook={status:'budget_exhausted',count:0,partial_coverage:true};
+  const result=publicMarkets(value,'nfl');
+  assert.equal(result.sources.sportsbook.status,'budget_exhausted');
+  assert.equal(result.sources.sportsbook.count,0);
+  assert.equal(result.sources.kalshi.count,1);
+  assert.equal(result.comparisons.length,1);
+  value.sources.sportsbook.count=1;
+  assert.throws(()=>publicMarkets(value,'nfl'));
+  value.sources.sportsbook.count=0;
+  value.sources.sportsbook.partial_coverage=false;
+  assert.throws(()=>publicMarkets(value,'nfl'));
+});
+
 test('public markets rejects identity, accounting, status and coverage corruption',()=>{for(const mutate of [
   value=>{value.sport='nba';},value=>{value.execution_ready=true;},value=>{value.comparisons[0].gross_cost='0.8';},
   value=>{value.sources.kalshi.coverage.event_failed_games=1;},value=>{value.sources.prizepicks.reason='private URL';},
