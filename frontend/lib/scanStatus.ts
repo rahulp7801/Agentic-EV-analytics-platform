@@ -1,5 +1,5 @@
 export function scanStatus(data: Record<string, unknown> | null, now = Date.now()) {
-  if (!data) return {state:'not_run',label:'No scan recorded',updated_at:null,eligible:null,completed:null,deferred:null,quotes:null,selections:null,model_requests:null,model_estimates:null,unresolved_selections:null,missing_estimates:null};
+  if (!data) return {state:'not_run',label:'No scan recorded',updated_at:null,next_refresh_at:null,eligible:null,completed:null,deferred:null,quotes:null,selections:null,model_requests:null,model_estimates:null,unresolved_selections:null,missing_estimates:null};
   const stamp=String(data.finished_at || data.started_at || '');
   const age=now-Date.parse(stamp);
   const count=(value:unknown)=>typeof value==='number' && Number.isInteger(value) && value>=0 ? value : null;
@@ -23,6 +23,7 @@ export function scanStatus(data: Record<string, unknown> | null, now = Date.now(
     else if (!modelCountsValid) {state='unknown';label='Scan coverage invalid';}
     else if (data.status==='complete' && (unresolved_selections || missing_estimates)) {state='unknown';label='Scan coverage invalid';}
     else if (deferred && deferred>0) {state='partial';label=completed===0 ? 'Scan paused: API budget' : 'Coverage limited: API budget';}
+    else if (data.status==='scheduled' && count(data.cadence_deferred_events)) {state='scheduled';label='Waiting for next quote check';}
     else if (data.status==='degraded') {
       state='degraded';
       label=unresolved_selections ? 'Player history coverage incomplete'
@@ -32,5 +33,8 @@ export function scanStatus(data: Record<string, unknown> | null, now = Date.now(
     else if (data.status==='complete' && completed && quotes===0) {state='no_quotes';label='No usable prop quotes';}
     else if (data.status==='complete' && completed===eligible && completed!==null) {state='complete';label='Scan complete';}
   }
-  return {state,label,updated_at:Number.isFinite(Date.parse(stamp)) ? stamp : null,eligible,completed,deferred,quotes,selections,model_requests,model_estimates,unresolved_selections,missing_estimates};
+  const next=typeof data.next_refresh_at==='string' ? data.next_refresh_at : '';
+  const nextTime=Date.parse(next);
+  const next_refresh_at=state==='scheduled' && /(?:Z|[+-]\d{2}:\d{2})$/.test(next) && nextTime>now && nextTime<=now+48*3600000 ? next : null;
+  return {state,label,updated_at:Number.isFinite(Date.parse(stamp)) ? stamp : null,next_refresh_at,eligible,completed,deferred,quotes,selections,model_requests,model_estimates,unresolved_selections,missing_estimates};
 }

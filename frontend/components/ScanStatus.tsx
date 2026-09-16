@@ -7,6 +7,7 @@ type Status = {
   state: string;
   label: string;
   updated_at: string | null;
+  next_refresh_at: string | null;
   eligible: number | null;
   completed: number | null;
   deferred: number | null;
@@ -77,7 +78,7 @@ export default function ScanStatus() {
               <span><b>{status.missing_estimates}</b> unavailable</span>
             )}
           </div>
-          {status.updated_at && <time dateTime={status.updated_at}>{new Date(status.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>}
+          {status.next_refresh_at ? <time dateTime={status.next_refresh_at}>Next {new Date(status.next_refresh_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time> : status.updated_at && <time dateTime={status.updated_at} title="Last scan check">{new Date(status.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>}
         </article>
       ))}
     </div>

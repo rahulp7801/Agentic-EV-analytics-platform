@@ -45,3 +45,19 @@ test('interrupted scans do not stay green or running indefinitely',()=>{
   assert.equal(scanStatus(running,now).state,'running');
   assert.equal(scanStatus(running,now+21*60000).state,'interrupted');
 });
+
+test('cadence waits are distinct from fresh quotes and provider failures',()=>{
+  const waiting={...completed,status:'scheduled',completed_events:0,coverage:{},cadence_deferred_events:2};
+  assert.equal(scanStatus(waiting,now).state,'scheduled');
+  assert.equal(scanStatus(waiting,now).label,'Waiting for next quote check');
+  assert.equal(scanStatus({...waiting,budget_skipped_events:1},now).state,'partial');
+  assert.equal(scanStatus({...waiting,failures:[{}]},now).state,'degraded');
+  assert.equal(scanStatus(waiting,now+46*60000).state,'stale');
+});
+test('next check exposes only bounded future timezone-aware scheduled timestamps',()=>{
+  const waiting={...completed,status:'scheduled',completed_events:0,coverage:{},cadence_deferred_events:2,next_refresh_at:'2026-09-11T13:00:00Z'};
+  assert.equal(scanStatus(waiting,now).next_refresh_at,waiting.next_refresh_at);
+  for(const value of ['invalid','2026-09-11T13:00:00','2026-09-10T13:00:00Z','2026-09-14T13:00:00Z']) assert.equal(scanStatus({...waiting,next_refresh_at:value},now).next_refresh_at,null);
+  assert.equal(scanStatus({...waiting,status:'degraded'},now).next_refresh_at,null);
+  assert.equal(scanStatus(null,now).next_refresh_at,null);
+});
