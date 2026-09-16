@@ -2,11 +2,18 @@ import type {EVSignal} from './types';
 import {publicGameLogs} from './publicGameLogs.ts';
 
 /** Descriptive outcomes at this line, never a betting replay or a new forecast. */
+export function historyCutoff(signal:EVSignal) {
+  const cutoff=signal.forecast_cutoff;
+  if(!cutoff || !/^\d{4}-\d{2}-\d{2}$/.test(cutoff) || Number(cutoff.slice(0,4))<1 || !Number.isFinite(Date.parse(cutoff))
+    || new Date(`${cutoff}T00:00:00Z`).toISOString().slice(0,10)!==cutoff) throw new Error('Forecast cutoff unavailable');
+  if(!/([zZ]|[+-]\d\d:\d\d)$/.test(signal.snapped_at) || !Number.isFinite(Date.parse(signal.snapped_at))) throw new Error('Price capture time unavailable');
+  const captureDay=new Date(signal.snapped_at).toISOString().slice(0,10);
+  return captureDay<cutoff ? captureDay : cutoff;
+}
+
 export function forecastHistory(value:unknown,signal:EVSignal,count=20) {
   if(!Number.isSafeInteger(count) || count<1 || count>200) throw new Error('Invalid history window');
-  const cutoff=signal.forecast_cutoff;
-  if(!cutoff || !/^\d{4}-\d{2}-\d{2}$/.test(cutoff) || !Number.isFinite(Date.parse(cutoff))
-    || new Date(`${cutoff}T00:00:00Z`).toISOString().slice(0,10)!==cutoff) throw new Error('Forecast cutoff unavailable');
+  const cutoff=historyCutoff(signal);
   const logs=publicGameLogs(value,signal.sport)
     .filter(row=>String(row.player).toLowerCase()===signal.player.toLowerCase() && String(row.date)<cutoff)
     .sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,count);

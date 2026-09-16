@@ -22,7 +22,7 @@ function text(value: unknown, maximum: number) {
 function date(value: unknown) {
   const result=text(value,10);
   const parsed=new Date(`${result}T00:00:00Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || !Number.isFinite(parsed.valueOf())
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || Number(result.slice(0,4))<1 || !Number.isFinite(parsed.valueOf())
       || parsed.toISOString().slice(0,10)!==result) {
     throw new Error('Invalid game log');
   }
