@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight, Check, FlaskConical, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { BACKTEST_METRICS, formatBacktestMetric, mispricedProps, strategySuggestions,
   type BacktestMetric, type BacktestReport } from '@/lib/backtestLab';
+import {forecastChecks, type ForecastBenchmarkBundle} from '@/lib/publicBenchmarks';
 import type { EVSignal, Sport } from '@/lib/types';
 import styles from './BacktestLab.module.css';
 
@@ -23,6 +24,7 @@ export default function BacktestLab({ sport, preview = false }: Props) {
   const [selected, setSelected] = useState<BacktestMetric[]>(INITIAL_METRICS);
   const [minimumSample, setMinimumSample] = useState(50);
   const [reports, setReports] = useState<Record<Cohort, BacktestReport | null>>({all:null,recommendations:null});
+  const [benchmark, setBenchmark] = useState<ForecastBenchmarkBundle | null>(null);
   const [signals, setSignals] = useState<EVSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,15 +32,19 @@ export default function BacktestLab({ sport, preview = false }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    setBenchmark(null);
     try {
-      const [allResponse, recommendationsResponse, signalsResponse] = await Promise.all([
+      const [allResponse, recommendationsResponse, signalsResponse, benchmarkResponse] = await Promise.all([
         fetch(`/api/metrics?cohort=all&sport=${sport}`, {cache:'no-store'}),
         fetch(`/api/metrics?cohort=recommendations&sport=${sport}`, {cache:'no-store'}),
         fetch(`/api/signals?sport=${sport}`, {cache:'no-store'}),
+        fetch(`/api/benchmarks?sport=${sport}`),
       ]);
-      const [all, recommendations, signalEnvelope] = await Promise.all([
-        allResponse.json(), recommendationsResponse.json(), signalsResponse.json(),
+      const [all, recommendations, signalEnvelope, benchmarkEnvelope] = await Promise.all([
+        allResponse.json(), recommendationsResponse.json(), signalsResponse.json(), benchmarkResponse.json(),
       ]);
+      setBenchmark(benchmarkResponse.ok && Array.isArray(benchmarkEnvelope.benchmarks)
+        ? benchmarkEnvelope.benchmarks[0] ?? null : null);
       if (!allResponse.ok || !recommendationsResponse.ok) throw new Error('League replay snapshot is not published yet.');
       setReports({all, recommendations});
       setSignals(signalsResponse.ok && Array.isArray(signalEnvelope.signals) ? signalEnvelope.signals : []);
@@ -145,6 +151,29 @@ export default function BacktestLab({ sport, preview = false }: Props) {
           )) : <div className={styles.emptySuggestion}><strong>No validated combination yet.</strong><p>Suggestions require at least {minimumSample} decided selections and multiple uncertainty-aware checks. Point estimates alone do not qualify.</p></div>}
         </aside>
       </div>
+
+      {benchmark && <div className={styles.benchmarkPanel}>
+        <div className={styles.benchmarkHeading}>
+          <div><span><ShieldCheck /> Verified retrospective benchmark</span><h3>{benchmark.title}</h3>
+            <p>{benchmark.evaluation_scope}</p></div>
+          <div><strong>{benchmark.game_count} games</strong><span>{benchmark.outcome_record_count} outcome rows</span></div>
+        </div>
+        <div className={styles.benchmarkGrid}>{benchmark.benchmarks.map(item => {
+          const checks=forecastChecks(item);
+          const passed=Object.values(checks).filter(Boolean).length;
+          return <article key={item.prop_type}>
+            <div className={styles.benchmarkCardTop}><div><span>{item.label} · over {item.research_threshold}</span>
+              <strong>{item.evaluated_count} verified forecasts</strong></div>
+              <em data-pass={passed >= 2}>{passed >= 2 ? `${passed} forecast checks passed` : 'Did not clear checks'}</em></div>
+            <div className={styles.benchmarkMetrics}>
+              <div><span>Brier</span><strong>{item.brier_score.toFixed(3)}</strong><small>{item.brier_score_game_cluster_interval.map(value=>value.toFixed(3)).join('–')}</small></div>
+              <div><span>Log loss</span><strong>{item.log_loss.toFixed(3)}</strong><small>{item.log_loss_game_cluster_interval.map(value=>value.toFixed(3)).join('–')}</small></div>
+              <div><span>Calibration</span><strong>{(item.calibration_error*100).toFixed(1)}%</strong><small>{checks.calibration ? '≤5% check passed' : '>5% check not passed'}</small></div>
+            </div>
+          </article>;
+        })}</div>
+        <div className={styles.benchmarkFoot}><span>{benchmark.price_scope}</span><code>dataset {benchmark.dataset_sha256.slice(0,12)}…</code></div>
+      </div>}
 
       <div className={styles.candidates}>
         <div className={styles.candidateHeading}>

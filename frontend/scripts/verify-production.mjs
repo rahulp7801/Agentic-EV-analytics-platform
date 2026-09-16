@@ -17,12 +17,15 @@ export const publicPipelinePaths = [
   '/api/games?sport=nba',
   '/api/gamelogs?sport=nfl',
   '/api/gamelogs?sport=nba',
+  '/api/benchmarks?sport=nfl',
+  '/api/benchmarks?sport=nba',
 ];
 
 export const requiredCssMarkers = [
   '--accent:#5e5ce6',
   '.terminal-layout{',
   '__hero h1{',
+  '__benchmarkPanel{',
 ];
 
 export function readinessStatuses(path, { paidEnabled, publicEnabled }) {

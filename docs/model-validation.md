@@ -112,3 +112,27 @@ rows were evaluated after adding their ingestion and settlement support. They ar
 regression evidence rather than untouched holdouts. ROI and CLV are null. Future model changes
 need forward timestamped priced quotes and later untouched settlements before any
 profitability claim.
+
+### 2026 NFL Week 1 retrospective holdout
+
+On September 15, 2026, the current v4 graph was replayed over the completed Week 1
+slate as if each game had not started. Every query used the game date as an exclusive
+cutoff and at most 40 prior games; the archived Week 1 ESPN box scores were introduced
+only for grading. The 200.5 passing-yard and 4.5 reception thresholds were already
+documented before this run. This is a retrospective time split, not a prediction file
+timestamped before kickoff, and the historical database can contain later provider
+corrections.
+
+| Fixed-threshold cohort | Candidates | Evaluated | Brier | 95% game-cluster Brier | Log loss | 95% game-cluster log loss | Calibration error |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Passing yards over 200.5 | 34 | 24 | 0.252302 | 0.171835–0.332768 | 0.700006 | 0.525533–0.874480 | 0.179138 |
+| Receptions over 4.5 | 238 | 146 | 0.162507 | 0.119084–0.205931 | 0.490493 | 0.374478–0.606507 | 0.092394 |
+
+The receptions cohort clears the predeclared 50% Brier and `ln(2)` log-loss
+benchmarks even at the upper game-cluster interval bound. It does not clear the 5%
+calibration-error check. The passing cohort clears none of those checks. Neither
+cohort includes a historical sportsbook line or price, so ROI, CLV, stake, and profit
+remain unavailable. The outcome archive contains 15 games and 627 player-stat rows;
+its SHA-256 is `1b027a0540b5bb1be3c664a5e31a33ebd16ad5fbccfcab7e0b545b743ee086df`.
+The evaluated Python source hash is
+`dfd37ceb9a6a18a00b476c116477a2b3f0717f4b70669294fed6de87a1092d6d`.
