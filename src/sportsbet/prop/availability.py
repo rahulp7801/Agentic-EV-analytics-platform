@@ -47,6 +47,8 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
             teams = [entry['team'] for entry in directory['sports'][0]['leagues'][0]['teams']]
             selected = []
             for name in (event['home_team'], event['away_team']):
+                if sport=='nba' and name=='Los Angeles Clippers':
+                    name='LA Clippers'  # Explicit provider alias, not fuzzy identity matching.
                 matches = [team for team in teams if team['displayName'] == name]
                 if len(matches) != 1 or not str(matches[0]['id']).isdigit():
                     raise ValueError('Ambiguous availability team identity')
@@ -58,8 +60,8 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
                     raise ValueError('Roster team identity mismatch')
                 groups = [group for group in injuries['injuries'] if str(group['id']) == str(team['id'])
                           and group['displayName'] == team['displayName']]
-                if len(groups) != 1:
-                    raise ValueError('Missing or ambiguous injury team coverage')
+                if len(groups) > 1:
+                    raise ValueError('Ambiguous injury team coverage')
                 athletes = roster['athletes']
                 if sport == 'nfl':
                     athletes = [athlete for group in athletes for athlete in group['items']]
@@ -67,7 +69,7 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
                 if not names or len(names) != len(set(names)):
                     raise ValueError('Incomplete or ambiguous roster')
                 flags = []
-                for injury in groups[0]['injuries']:
+                for injury in groups[0]['injuries'] if groups else []:
                     athlete = injury['athlete']
                     if str(athlete['team']['id']) != str(team['id']):
                         raise ValueError('Injury team identity mismatch')
@@ -81,12 +83,14 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
                 result.append(dict(name=team['displayName'], abbreviation=team['abbreviation'],
                                    roster_names=names, roster_statuses={athlete['displayName']:
                                        athlete.get('status',{}).get('name','Unknown') for athlete in athletes},reports=flags,
+                                   injury_coverage='observed' if groups else 'unavailable',
                                    roster_source_url=base+'/teams/'+str(team['id'])+'/roster',
                                    roster_source_sha256=next(source['source_sha256'] for source in sources
                                        if source['url']==base+'/teams/'+str(team['id'])+'/roster')))
             write_archive(dict(sport=sport, game_id=event['id'], sources=sources),
                           directory=Path('.local/availability'))
-            return dict(status='observed', captured_at=now.isoformat(),
+            return dict(status='observed' if all(team['injury_coverage']=='observed' for team in result)
+                        else 'partial', captured_at=now.isoformat(),
                         source_url=base+'/injuries', source_sha256=next(
                             source['source_sha256'] for source in sources if source['url']==base+'/injuries'),
                         teams=result)
@@ -98,7 +102,7 @@ def player_availability(context: dict | None, player: str, now: datetime) -> tup
     """Never equate an unlisted injury with a confirmed active game-day lineup."""
     unavailable = dict(status='unavailable', roster_confirmed=False, subject_status='Unknown',
                        teammates=[], probability_adjusted=False)
-    if not context or context.get('status') != 'observed':
+    if not context or context.get('status') not in ('observed','partial'):
         return unavailable, 'availability_unavailable'
     try:
         fresh_timestamp(context['captured_at'], now)
@@ -106,6 +110,8 @@ def player_availability(context: dict | None, player: str, now: datetime) -> tup
         if len(matches) != 1:
             return unavailable, 'roster_unconfirmed'
         team, = matches
+        if team.get('injury_coverage','observed') != 'observed':
+            return unavailable, 'availability_unavailable'
         subject = [row for row in team['reports'] if row['player'] == player]
         teammates = [row for row in team['reports'] if row['player'] != player]
         roster_status=team.get('roster_statuses',{}).get(player,'Unknown')

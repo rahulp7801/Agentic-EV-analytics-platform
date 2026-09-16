@@ -30,10 +30,14 @@ def test_availability_never_infers_healthy_or_boosts_probability():
     assert player_availability(None,'Player',now)[1]=='availability_unavailable'
     data=context();data['teams'][0]['roster_statuses']['Player']='Inactive'
     assert player_availability(data,'Player',now)[1]=='player_availability_risk'
+    data=context();data['status']='partial'
+    data['teams'].append(dict(abbreviation='OTHER',roster_names=['Opponent'],injury_coverage='unavailable'))
+    assert player_availability(data,'Player',now)[1] is None
+    assert player_availability(data,'Opponent',now)[1]=='availability_unavailable'
 
 
-@pytest.mark.parametrize('sport',['nfl','nba'])
-async def test_exact_team_rosters_and_archived_response_hashes(sport,tmp_path,monkeypatch):
+@pytest.mark.parametrize('sport,missing_team',[('nfl',False),('nba',False),('nba',True)])
+async def test_exact_team_rosters_and_archived_response_hashes(sport,missing_team,tmp_path,monkeypatch):
     monkeypatch.chdir(tmp_path)
     now=datetime.now(timezone.utc).isoformat()
     teams=[dict(id=str(i),displayName=name,abbreviation=name) for i,name in enumerate(['Home','Away'],1)]
@@ -44,7 +48,7 @@ async def test_exact_team_rosters_and_archived_response_hashes(sport,tmp_path,mo
         if request.url.path.endswith('/teams'):
             body['sports']=[dict(leagues=[dict(teams=[dict(team=t) for t in teams])])]
         elif request.url.path.endswith('/injuries'):
-            body['injuries']=[dict(id=t['id'],displayName=t['displayName'],injuries=[]) for t in teams]
+            body['injuries']=[dict(id=t['id'],displayName=t['displayName'],injuries=[]) for t in (teams[:1] if missing_team else teams)]
         else:
             identity=request.url.path.split('/')[-2]
             body['team']=dict(id=identity)
@@ -54,8 +58,9 @@ async def test_exact_team_rosters_and_archived_response_hashes(sport,tmp_path,mo
     original=httpx.AsyncClient
     with patch('sportsbet.prop.availability.httpx.AsyncClient',lambda **kwargs:original(**kwargs,transport=httpx.MockTransport(handle))):
         result=await fetch_event_availability(dict(id='event',home_team='Home',away_team='Away'),sport)
-        assert result['status']=='observed' and len(result['source_sha256'])==64
+        assert result['status']==('partial' if missing_team else 'observed') and len(result['source_sha256'])==64
         assert player_availability(result,'Player',datetime.now(timezone.utc))[0]['team']=='Home'
+        assert player_availability(result,'Opponent',datetime.now(timezone.utc))[0]['status']==('unavailable' if missing_team else 'observed')
         assert len(list((tmp_path/'.local/availability').glob('*.json')))==1
         result=await fetch_event_availability(dict(id='event',home_team='Wrong',away_team='Away'),sport)
         assert result['status']=='unavailable'
