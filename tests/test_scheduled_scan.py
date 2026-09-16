@@ -142,6 +142,7 @@ async def test_availability_really_controls_daily_recommendations(tmp_path,injur
     if expected:
         reserve.assert_not_called()
         assert all(s['gate_reason']==expected and s['gated'] and s['kelly_fraction']==0 for s in result['signals'])
+        assert all('Approved research stake at capture: 0.0%' in s['trade_plan'][1] for s in result['signals'])
     else:
         assert reserve.call_count==2 and all(not s['gated'] for s in result['signals'])
 

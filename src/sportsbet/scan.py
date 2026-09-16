@@ -137,6 +137,14 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 f'Observed price {quote.price:+d}; break-even {float(implied):.1%}. '
                 'This estimate did not pass the model edge and uncertainty gates.',
                 'No validated injury or teammate probability adjustment is applied.']
+            if signal:
+                mean=f'{float(prop.mean_stat):.1f}' if prop.mean_stat is not None else 'unavailable'
+                uncertainty=(f'{float(model_interval[0]):.1%} to {float(model_interval[1]):.1%}'
+                    if model_interval else 'unavailable')
+                # A thesis must not suggest staking a pick that eligibility blocks.
+                trade_plan[1]=(f'Historical sample: {prop.sample_size} games, mean {mean}; '
+                    f'95% probability interval {uncertainty}. Approved research stake at capture: '
+                    f'{float(signal.kelly_fraction) if accepted else 0:.1%} of bankroll.')
             if availability_evidence['status']=='observed':
                 trade_plan[-1]=(f"Availability: {availability_evidence['subject_status']}; "
                     f"{len(availability_evidence['teammates'])} teammates listed on the captured injury report. "
