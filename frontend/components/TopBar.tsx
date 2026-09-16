@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { Sport } from '@/lib/types';
 import styles from './TerminalChrome.module.css';
 
 type TickerSignal = {
@@ -13,7 +14,10 @@ type TickerSignal = {
   gated?: boolean;
 };
 
-export default function TopBar() {
+export default function TopBar({ sport, onSportChange }: {
+  sport: Sport;
+  onSportChange: (sport: Sport) => void;
+}) {
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
   const [signals, setSignals] = useState<TickerSignal[]>([]);
@@ -69,9 +73,15 @@ export default function TopBar() {
     <header className={styles.topbar}>
       <div className={styles.marketState}>
         <span className={`${styles.statusDot} ${available && signals.length ? styles.statusLive : ''}`} />
-        <div>
+        <div className={styles.marketCopy}>
           <small>Market pulse</small>
           <strong>{available ? 'Evidence connected' : 'Awaiting estimates'}</strong>
+        </div>
+        <div className={styles.mobileSportControl} aria-label="League">
+          {(['nfl', 'nba'] as Sport[]).map(option => (
+            <button key={option} type="button" aria-pressed={sport === option}
+              onClick={() => onSportChange(option)}>{option.toUpperCase()}</button>
+          ))}
         </div>
       </div>
       <div className={styles.tickerViewport} aria-label="Current eligible market estimates">

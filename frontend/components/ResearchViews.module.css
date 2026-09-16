@@ -15,6 +15,9 @@
   width: min(760px, 100%);
   border: 1px solid var(--border-bright);
   background: rgba(11, 12, 11, .94);
+  --text-primary: #fff;
+  --text-secondary: #d7d9de;
+  --text-muted: #b4b7be;
 }
 
 .emptyEyebrow {

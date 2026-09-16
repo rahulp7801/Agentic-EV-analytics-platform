@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight, Check, FlaskConical, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { BACKTEST_METRICS, formatBacktestMetric, mispricedProps, strategySuggestions,
@@ -13,6 +13,13 @@ type Cohort = 'all' | 'recommendations';
 type Props = { sport: Sport; preview?: boolean };
 
 const INITIAL_METRICS: BacktestMetric[] = ['roi', 'brier_score', 'clv_mean'];
+
+async function responseJson<T>(path: string, signal: AbortSignal): Promise<T> {
+  const response = await fetch(path, {cache: 'no-store', signal});
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || `${path} unavailable`);
+  return body as T;
+}
 
 function cohortTitle(cohort: Cohort) {
   return cohort === 'all' ? 'All eligible predictions' : 'Accepted recommendations';
@@ -28,36 +35,42 @@ export default function BacktestLab({ sport, preview = false }: Props) {
   const [signals, setSignals] = useState<EVSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const request = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
     setLoading(true);
     setError('');
-    setBenchmark(null);
-    try {
-      const [allResponse, recommendationsResponse, signalsResponse, benchmarkResponse] = await Promise.all([
-        fetch(`/api/metrics?cohort=all&sport=${sport}`, {cache:'no-store'}),
-        fetch(`/api/metrics?cohort=recommendations&sport=${sport}`, {cache:'no-store'}),
-        fetch(`/api/signals?sport=${sport}`, {cache:'no-store'}),
-        fetch(`/api/benchmarks?sport=${sport}`),
-      ]);
-      const [all, recommendations, signalEnvelope, benchmarkEnvelope] = await Promise.all([
-        allResponse.json(), recommendationsResponse.json(), signalsResponse.json(), benchmarkResponse.json(),
-      ]);
-      setBenchmark(benchmarkResponse.ok && Array.isArray(benchmarkEnvelope.benchmarks)
-        ? benchmarkEnvelope.benchmarks[0] ?? null : null);
-      if (!allResponse.ok || !recommendationsResponse.ok) throw new Error('League replay snapshot is not published yet.');
-      setReports({all, recommendations});
-      setSignals(signalsResponse.ok && Array.isArray(signalEnvelope.signals) ? signalEnvelope.signals : []);
-    } catch (loadError) {
-      setReports({all:null,recommendations:null});
-      setSignals([]);
-      setError(loadError instanceof Error ? loadError.message : 'Backtest evidence is unavailable.');
-    } finally {
-      setLoading(false);
-    }
+    const [all, recommendations, signalEnvelope, benchmarkEnvelope] = await Promise.allSettled([
+      responseJson<BacktestReport>(`/api/metrics?cohort=all&sport=${sport}`, controller.signal),
+      responseJson<BacktestReport>(`/api/metrics?cohort=recommendations&sport=${sport}`, controller.signal),
+      responseJson<{signals: EVSignal[]}>(`/api/signals?sport=${sport}`, controller.signal),
+      responseJson<{benchmarks: ForecastBenchmarkBundle[]}>(`/api/benchmarks?sport=${sport}`, controller.signal),
+    ]);
+    if (controller.signal.aborted || request.current !== controller) return;
+
+    setReports({
+      all: all.status === 'fulfilled' ? all.value : null,
+      recommendations: recommendations.status === 'fulfilled' ? recommendations.value : null,
+    });
+    setSignals(signalEnvelope.status === 'fulfilled' && Array.isArray(signalEnvelope.value.signals)
+      ? signalEnvelope.value.signals : []);
+    setBenchmark(benchmarkEnvelope.status === 'fulfilled' && Array.isArray(benchmarkEnvelope.value.benchmarks)
+      ? benchmarkEnvelope.value.benchmarks[0] ?? null : null);
+    const unavailable = [all, recommendations].filter(result => result.status === 'rejected').length;
+    setError(unavailable ? `${unavailable === 2 ? 'League replay snapshots are' : 'One replay snapshot is'} not published yet. Available evidence remains visible.` : '');
+    setLoading(false);
   }, [sport]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      request.current?.abort();
+    };
+  }, [load]);
 
   const report = reports[cohort];
   const suggestions = useMemo(() => strategySuggestions(
