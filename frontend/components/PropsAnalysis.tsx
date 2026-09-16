@@ -144,7 +144,12 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
 
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto' }} tabIndex={0} aria-label="Recorded player prop estimates">
-        <table className="data-table">
+        {props.length === 0 ? (
+          <div className={styles.propsEmpty}>
+            <strong>{allProps.length ? 'No props match these filters.' : `No recorded ${sport.toUpperCase()} props are published yet.`}</strong>
+            <span>{allProps.length ? 'Adjust the player, prop type, or minimum edge.' : 'This view will populate only after a source-backed estimate passes the publication boundary.'}</span>
+          </div>
+        ) : <table className="data-table">
           <thead>
             <tr>
               <th>Player</th>
@@ -159,15 +164,8 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
           </thead>
           <tbody>
             {props.map(p => <PropRow key={p.id} prop={p} />)}
-            {props.length === 0 && (
-              <tr>
-                <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '48px 16px' }}>
-                  No recorded props match the current filters.
-                </td>
-              </tr>
-            )}
           </tbody>
-        </table>
+        </table>}
       </div>
     </div>
   );

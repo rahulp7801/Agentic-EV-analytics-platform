@@ -27,8 +27,8 @@ export async function GET() {
 
   if (!fs.existsSync(filePath)) {
     return NextResponse.json(
-      { error: 'No signal cache found. Run scan_game_ev.py first.', signals: [], generated_at: null },
-      { status: 404 }
+      { error: 'No signal snapshot has been published yet.', signals: [], generated_at: null },
+      { status: 503 }
     );
   }
 
@@ -39,6 +39,6 @@ export async function GET() {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch {
-    return NextResponse.json({ error: 'Failed to parse signal cache.', signals: [] }, { status: 500 });
+    return NextResponse.json({ error: 'Results are temporarily unavailable.', signals: [] }, { status: 503 });
   }
 }

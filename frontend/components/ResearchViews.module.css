@@ -130,6 +130,9 @@
 
 .propsHeader { flex-shrink: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 9px; padding: 11px 14px; border-bottom: 1px solid var(--border-mid); background: var(--bg-void); }
 .propsHeader > :first-child { margin-right: auto; }
+.propsEmpty { min-height: 260px; padding: 40px 18px; display: grid; place-content: center; gap: 7px; text-align: center; }
+.propsEmpty strong { color: var(--text-primary); font-size: 13px; }
+.propsEmpty span { max-width: 440px; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 
 .toolView { height: 100%; overflow: auto; padding: clamp(16px, 2.4vw, 30px); background: var(--bg-base); }
 .toolHeader { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 440px); gap: 24px; align-items: end; padding-bottom: 22px; border-bottom: 1px solid var(--border-bright); }
