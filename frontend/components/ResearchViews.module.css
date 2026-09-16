@@ -252,5 +252,39 @@
 .funnel { gap: 1px; overflow: hidden; border-color: var(--border-dim); border-radius: 16px; background: var(--border-dim); }.funnel div { border: 0; background: var(--bg-surface); }.funnel strong { font-family: var(--font-sans), sans-serif; }
 .comparisonList { gap: 12px; }.comparison { overflow: hidden; border-radius: 18px; background: var(--bg-surface); box-shadow: var(--shadow-sm); }.comparisonHeader, .comparisonCost, .legList li { border-color: var(--border-dim); }.comparisonCost strong { color: var(--accent); }
 .panel { overflow: hidden; border-color: var(--border-dim); border-radius: 18px; background: var(--bg-surface); box-shadow: var(--shadow-sm); }
+.forecastIntro { margin: 0; padding: 12px 20px; color: var(--text-secondary); font: 12px/1.6 var(--font-sans),sans-serif; }
+.forecastPlayer { padding: 0; border: 0; background: transparent; text-align: left; color: var(--text-primary); font: 600 13px var(--font-sans),sans-serif; cursor: pointer; }
+.forecastPlayer span { display: block; margin: 4px 0; color: var(--accent); font-size: 11px; font-weight: 400; }
+.forecastPlayer:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.predictionEvidence { flex-shrink: 0; margin: 12px 20px 20px; padding: 24px; border: 1px solid var(--border-dim); border-radius: 20px; background: var(--bg-surface); box-shadow: var(--shadow-sm); font: 13px/1.6 var(--font-sans),sans-serif; color: var(--text-secondary); }
+.predictionEvidence header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.predictionEvidence header small { color: var(--accent); }
+.predictionEvidence:focus { outline: none; }
+.evidenceClose { padding: 8px 12px; border: 1px solid var(--border-dim); border-radius: 9px; background: var(--bg-base); color: var(--text-secondary); font: 12px var(--font-sans),sans-serif; cursor: pointer; }
+.evidenceClose:hover { color: var(--accent); border-color: var(--accent); }
+.evidenceClose:focus-visible,.teammateReports:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.predictionEvidence h2 { margin: 3px 0; font-size: 28px; line-height: 1.2; letter-spacing: -.04em; color: var(--text-primary); }
+.predictionEvidence h3 { margin: 0 0 10px; font-size: 16px; color: var(--text-primary); }
+.predictionEvidence p { margin: 8px 0 14px; }
+.predictionEvidence ul { padding-left: 18px; }
+.predictionEvidence li { margin-bottom: 10px; }
+.predictionEvidence a { color: var(--accent); text-decoration: underline; }
+.evidenceMetrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 16px 0 24px; }
+.evidenceMetrics div { padding: 15px; border: 1px solid var(--border-dim); border-radius: 12px; }
+.evidenceMetrics span,.evidenceMetrics small { display: block; font-size: 11px; }
+.evidenceMetrics strong { display: block; margin: 5px 0; color: var(--text-primary); font-size: 24px; letter-spacing: -.03em; }
+.evidenceColumns { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.predictionEvidence dl div { display: flex; gap: 12px; margin: 5px 0; }
+.predictionEvidence dd { margin: 0; }
+.teammateReports { max-height: 240px; overflow-y: auto; list-style: none; padding-left: 0 !important; }
+.teammateReports li { display: grid; grid-template-columns: 1fr auto; padding: 8px 0; border-bottom: 1px solid var(--border-dim); }
+.teammateReports small { grid-column: 1/-1; }
+.evidenceLimitation { padding: 12px; border: 1px solid var(--border-dim); border-radius: 10px; }
+@media(max-width:720px) {
+  .predictionEvidence { margin: 10px; padding: 18px; }
+  .predictionEvidence header { flex-wrap: wrap; }
+  .evidenceMetrics,.evidenceColumns { grid-template-columns: 1fr; gap: 12px; }
+  .teammateReports li { grid-template-columns: 1fr; }
+}
 .panelHeader, .controlBar { border-color: var(--border-dim); }.analysisReadout { border-color: var(--border-dim); border-radius: 13px; background: var(--bg-surface); }.analysisReadout strong { color: var(--accent); }
 .emptyState, .loadingState { background: var(--bg-base); }.emptyPanel { overflow: hidden; border-color: var(--border-dim); border-radius: 22px; background: var(--bg-surface); box-shadow: var(--shadow-md); }.emptyCopy h2 { color: var(--text-primary); font-family: var(--font-sans), sans-serif; font-weight: 600; letter-spacing: -.045em; text-transform: none; }.emptyChecks, .emptyChecks div, .emptyEyebrow { border-color: var(--border-dim); }.emptyEyebrow { color: var(--accent-amber); }

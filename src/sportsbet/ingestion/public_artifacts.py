@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import quote, quote_plus, unquote, urlsplit
 
 
-DIRECTORIES = ('market-watch', 'prizepicks', 'nba-refresh')
+DIRECTORIES = ('market-watch', 'prizepicks', 'nba-refresh', 'availability')
 CREDENTIALS = ('DATABASE_URL', 'DATABASE_URL_ASYNC', 'ANALYTICS_DATABASE_URL', 'ODDS_API_KEY')
 
 

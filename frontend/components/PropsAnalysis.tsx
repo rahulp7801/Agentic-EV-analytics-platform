@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react';
 import type { Sport, PropType, EVSignal } from '@/lib/types';
 import styles from './ResearchViews.module.css';
+import PredictionEvidence from './PredictionEvidence';
+import {forecastWindow,publicSignals} from '@/lib/signalMetrics';
 
 // PropAnalysis is derived from real EV signals — no mock data
 interface PropsAnalysisProps { sport: Sport; }
 
-const PROP_TYPES: PropType[] = ['points', 'rebounds', 'assists', 'threes', 'pra', 'pass_yds', 'pass_tds', 'rush_yds', 'rec_yds'];
+const PROP_TYPES: PropType[] = ['points', 'rebounds', 'assists', 'threes', 'pra', 'steals', 'blocks', 'pass_yds', 'pass_tds', 'rush_yds', 'rec_yds', 'receptions'];
 
 function ProbabilityComparison({ model, implied }: { model: number; implied: number }) {
   const edge = model - implied;
@@ -62,6 +64,15 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   const [allProps, setAllProps] = useState<EVSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [windowFilter,setWindowFilter]=useState('upcoming');
+  const [selectedId,setSelectedId]=useState<string|null>(null);
+  const [now,setNow]=useState(0);
+
+  useEffect(()=>{
+    const timer=window.setInterval(()=>setNow(Date.now()),30_000);
+    const initial=window.setTimeout(()=>setNow(Date.now()),0);
+    return ()=>{window.clearInterval(timer);window.clearTimeout(initial);};
+  },[]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -88,11 +99,14 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [sport]);
 
-  const props = allProps.filter(p => {
+  const currentProps=publicSignals(allProps,now).signals;
+  const selected=currentProps.find(p=>p.id===selectedId && p.sport===sport);
+  const props = currentProps.filter(p => {
     if (p.sport !== sport) return false;
+    if(windowFilter!=='all' && forecastWindow(p,now)!==windowFilter) return false;
     if (playerFilter && !p.player.toLowerCase().includes(playerFilter.toLowerCase())) return false;
     if (propFilter !== 'all' && p.prop_type !== propFilter) return false;
-    if (p.ev_pct < minEV / 100) return false;
+    if (minEV>0 && p.ev_pct < minEV / 100) return false;
     return true;
   });
 
@@ -109,7 +123,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
       <div className={styles.propsHeader}>
-        <div className="section-header">Prop Analysis</div>
+        <div className="section-header">Player forecasts</div>
         <div style={{ flex: 1 }} />
 
         <input
@@ -121,6 +135,9 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
           value={playerFilter}
           onChange={e => setPlayerFilter(e.target.value)}
         />
+        <select aria-label="Forecast window" className="term-select" value={windowFilter} onChange={e=>setWindowFilter(e.target.value)}>
+          <option value="upcoming">Upcoming games</option><option value="archive">Past games</option><option value="all">All recorded forecasts</option>
+        </select>
         <select id="prop-type-filter" aria-label="Prop type" className="term-select" value={propFilter} onChange={e => setPropFilter(e.target.value)}>
           <option value="all">All Props</option>
           {PROP_TYPES.map(p => <option key={p} value={p}>{p.replace('_', ' ').toUpperCase()}</option>)}
@@ -141,13 +158,15 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
       </div>
 
       {error && <div className={styles.notice} role="alert">{error}</div>}
+      <p className={styles.forecastIntro}>Historical model forecasts with observed prices. Open a player to see the reasoning, uncertainty and current injury evidence. Blocked estimates are retained for transparency.</p>
+      {selected && <PredictionEvidence signal={selected} onClose={()=>{setSelectedId(null);document.getElementById(`forecast-${selected.id}`)?.focus();}} />}
 
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto' }} tabIndex={0} aria-label="Recorded player prop estimates">
         {props.length === 0 ? (
           <div className={styles.propsEmpty}>
-            <strong>{allProps.length ? 'No props match these filters.' : `No recorded ${sport.toUpperCase()} props are published yet.`}</strong>
-            <span>{allProps.length ? 'Adjust the player, prop type, or minimum edge.' : 'This view will populate only after a source-backed estimate passes the publication boundary.'}</span>
+            <strong>{allProps.length ? 'No forecasts match these filters.' : `No recorded ${sport.toUpperCase()} forecasts are published yet.`}</strong>
+            <span>{allProps.length ? 'Try all recorded forecasts, another player, or a lower minimum edge.' : 'The scheduled scan covers the next 48 hours, subject to source availability and the API budget. Forecasts require real pregame prices and sufficient player history.'}</span>
           </div>
         ) : <table className="data-table">
           <thead>
@@ -163,7 +182,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
             </tr>
           </thead>
           <tbody>
-            {props.map(p => <PropRow key={p.id} prop={p} />)}
+            {props.map(p => <PropRow key={p.id} prop={p} onExplain={()=>setSelectedId(p.id)} />)}
           </tbody>
         </table>}
       </div>
@@ -171,13 +190,14 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   );
 }
 
-function PropRow({ prop }: { prop: EVSignal }) {
+function PropRow({ prop,onExplain }: { prop: EVSignal;onExplain:()=>void }) {
   const evPct = prop.ev_pct * 100;
   return (
     <tr>
       <td>
-        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 12 }}>{prop.player}</div>
-        <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{prop.team} vs {prop.opponent}</div>
+        <button id={`forecast-${prop.id}`} type="button" className={styles.forecastPlayer} onClick={onExplain}>{prop.player}<span>Why this forecast →</span></button>
+        <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{prop.team || prop.home_team} vs {prop.opponent || prop.away_team}</div>
+        <span className={`badge ${prop.gated ? 'badge-dim' : 'badge-mint'}`}>{prop.gated ? 'Blocked estimate' : 'Research eligible'}</span>
       </td>
       <td>
         <span className={`badge ${prop.sport === 'nba' ? 'badge-blue' : 'badge-purple'}`} style={{ marginBottom: 3, display: 'block', width: 'fit-content' }}>
@@ -200,7 +220,7 @@ function PropRow({ prop }: { prop: EVSignal }) {
         <span style={{
           color: evPct >= 10 ? 'var(--accent-mint)' : evPct >= 5 ? 'var(--accent-amber)' : 'var(--text-secondary)',
           fontWeight: 700, fontSize: 13,
-        }}>+{evPct.toFixed(1)}pp</span>
+        }}>{evPct>0?'+':''}{evPct.toFixed(1)}pp</span>
       </td>
       <td>
         <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>

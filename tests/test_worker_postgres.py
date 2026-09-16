@@ -298,7 +298,12 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
         assert archived['source_sha256'] == expected_quote.source_sha256
         assert archived['source_record_sha256'] == expected_quote.source_record_sha256
         # Both estimates remain auditable while their distinct gates suppress a recommendation.
-        assert result['signals'] == []
+        assert len(result['signals']) == 1
+        forecast = result['signals'][0]
+        assert forecast['gated'] and forecast['kelly_fraction'] == 0
+        assert forecast['true_prob'] == predictions[0]['model_probability']
+        assert forecast['sample_size'] == count and len(forecast['trade_plan']) == 3
+        assert forecast['availability']['status'] == 'unavailable'
         assert predictions[0]['model_sample_size'] == count
         lower, upper = predictions[0]['model_confidence_interval']
         assert lower < upper

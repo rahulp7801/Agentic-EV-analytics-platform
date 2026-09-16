@@ -47,6 +47,8 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     record_many.assert_called_once()
     assert len(record_many.call_args.args[1])==2
     assert len(result['signals'])==2
+    assert all(s['trade_plan'] and len(s['trade_plan'])==3 and s['gated']
+        and s['gate_reason']=='availability_unavailable' and s['kelly_fraction']==0 for s in result['signals'])
     assert {s['direction'] for s in result['signals']}=={'over','under'}
     assert len(ledger.predictions())==2
     assert all(p['model_version']=='empirical-jeffreys-v4' and p['model_generated_at']==p['captured_at']
@@ -117,3 +119,40 @@ def test_api_budget_survives_restart(tmp_path):
     assert Ledger(path).reserve_api_credits(3,5)
     assert not Ledger(path).reserve_api_credits(3,5)
     assert Ledger(path).reserve_api_credits(2,5)
+
+
+@pytest.mark.parametrize('injuries,expected',[(None,None),('Player','player_availability_risk'),
+    ('Teammate','teammate_availability_unmodeled')])
+async def test_availability_really_controls_daily_recommendations(tmp_path,injuries,expected):
+    conn=AsyncMock();conn.fetch.return_value=[{'player_id':1}]
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    now=datetime.now(timezone.utc)
+    availability=dict(status='observed',captured_at=now.isoformat(),source_url='source',source_sha256='a'*64,
+        teams=[dict(abbreviation='KC',roster_names=['Player','Teammate'],
+        roster_statuses={'Player':'Active','Teammate':'Active'},roster_source_url='roster',roster_source_sha256='b'*64,reports=[] if injuries is None else
+        [dict(player=injuries,status='Out',position='WR',reported_at=now.isoformat())])])
+    result_model=PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24'),
+        confidence_interval=(Decimal('.55'),Decimal('.65')))
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    with patch('sportsbet.prop.agents.run_prop_query',AsyncMock(return_value=result_model)),patch.object(ledger,'reserve',return_value=(True,'accepted')) as reserve:
+        result=await evaluate_event(pool,event('nfl'),'nfl',ledger,'scan',availability)
+    assert len(result['signals'])==2
+    assert all(s['true_prob'] in [.6,.4] for s in result['signals'])
+    if expected:
+        reserve.assert_not_called()
+        assert all(s['gate_reason']==expected and s['gated'] and s['kelly_fraction']==0 for s in result['signals'])
+    else:
+        assert reserve.call_count==2 and all(not s['gated'] for s in result['signals'])
+
+
+async def test_non_recommended_forecast_is_not_silently_discarded(tmp_path):
+    conn=AsyncMock();conn.fetch.return_value=[{'player_id':1}]
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    prop=PropResult(true_probability=Decimal('.5'),sample_size=40,mean_stat=Decimal('24'),
+        confidence_interval=(Decimal('.3'),Decimal('.7')))
+    with patch('sportsbet.prop.agents.run_prop_query',AsyncMock(return_value=prop)):
+        result=await evaluate_event(pool,event('nfl'),'nfl',Ledger(tmp_path/'audit.sqlite'),'scan')
+    assert len(result['signals'])==2
+    assert all(s['gated'] and s['trade_plan'] and s['kelly_fraction']==0 for s in result['signals'])

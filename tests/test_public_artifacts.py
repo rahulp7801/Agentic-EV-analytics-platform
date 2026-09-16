@@ -9,9 +9,10 @@ import pytest
 from sportsbet.ingestion.public_artifacts import stage
 
 
-def test_public_artifacts_preserve_evidence_and_exclude_private_directories(tmp_path):
+@pytest.mark.parametrize('directory',['market-watch','availability'])
+def test_public_artifacts_preserve_evidence_and_exclude_private_directories(tmp_path,directory):
     root = tmp_path / 'source'
-    public = root / 'market-watch'
+    public = root / directory
     public.mkdir(parents=True)
     data = b'{"source":"kalshi","price":"0.54"}'
     (public / 'capture.json').write_bytes(data)
@@ -20,7 +21,7 @@ def test_public_artifacts_preserve_evidence_and_exclude_private_directories(tmp_
     (private / 'credentials.json').write_text('{"password":"private"}')
     output = tmp_path / 'staged'
     assert stage(root, output, ['private']) == 1
-    assert (output / 'market-watch/capture.json').read_bytes() == data
+    assert (output / directory / 'capture.json').read_bytes() == data
     assert not (output / 'secrets').exists()
     with pytest.raises(FileExistsError):
         stage(root, output, [])

@@ -1,4 +1,4 @@
-import type {EVSignal,PropType,Sport} from './types';
+import type {AvailabilityEvidence,EVSignal,PropType,Sport} from './types';
 
 const CURRENT_MODEL_VERSION = 'empirical-jeffreys-v4';
 
@@ -20,9 +20,17 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
   const legacy = s.model_version !== CURRENT_MODEL_VERSION;
   const stale = !Number.isFinite(quoteTime) || now - quoteTime > 300000 || quoteTime > now + 60000;
   const started = !Number.isFinite(start) || start <= now;
+  const availability = s.availability as AvailabilityEvidence | undefined;
+  const availabilityTime = Date.parse(availability?.captured_at ?? '');
+  const availabilityReason = availability?.status !== 'observed' || !availability.roster_confirmed
+    || !Array.isArray(availability.teammates) || !Number.isFinite(availabilityTime) || now-availabilityTime>3600000 || availabilityTime>now+60000
+    ? 'availability_unavailable'
+    : !['Active','Not listed on injury report'].includes(availability.subject_status) ? 'player_availability_risk'
+    : availability.teammates.some(row=>row.status!=='Active') ? 'teammate_availability_unmodeled' : null;
   const reason = !valid ? 'invalid_metrics' : legacy ? 'legacy_model' : synthetic ? 'synthetic_price'
     : stale ? 'stale_quote' : started ? 'missing_or_started_game' : (!Number.isFinite(sample) || sample < 20) ? 'insufficient_sample'
     : (!Number.isFinite(kelly) || kelly < 0 || kelly > 0.25) ? 'invalid_stake'
+    : availabilityReason ? availabilityReason
     : s.gated ? String(s.gate_reason ?? 'risk_gate') : null;
   const b = odds < 0 ? 100 / -odds : odds / 100;
   const ci = s.confidence_interval;
@@ -53,6 +61,49 @@ function timestamp(value:unknown):value is string {
     && Number.isFinite(Date.parse(value));
 }
 
+function rosterSource(value:unknown,sport:Sport):value is string {
+  if(!bounded(value,150)) return false;
+  try {
+    const url=new URL(value);
+    const path=sport==='nfl' ? /^\/apis\/site\/v2\/sports\/football\/nfl\/teams\/[0-9]+\/roster$/
+      : /^\/apis\/site\/v2\/sports\/basketball\/nba\/teams\/[0-9]+\/roster$/;
+    return url.origin==='https://site.api.espn.com' && !url.username && !url.password
+      && !url.search && !url.hash && path.test(url.pathname);
+  } catch {return false;}
+}
+
+function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|undefined {
+  if (!value || typeof value!=='object' || Array.isArray(value)) return undefined;
+  const a=value as Record<string,unknown>;
+  if(a.status==='unavailable') return {status:'unavailable',roster_confirmed:false,
+    subject_status:'Unknown',teammates:[],probability_adjusted:false};
+  const url=sport==='nfl' ? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries'
+    : 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries';
+  if(a.status!=='observed' || a.roster_confirmed!==true || a.probability_adjusted!==false
+    || !timestamp(a.captured_at) || a.source_url!==url || !bounded(a.source_sha256,64)
+    || !/^[a-f0-9]{64}$/.test(a.source_sha256) || !bounded(a.roster_source_sha256,64)
+    || !/^[a-f0-9]{64}$/.test(a.roster_source_sha256) || !rosterSource(a.roster_source_url,sport)
+    || !bounded(a.subject_status,100)
+    || !bounded(a.team,5) || !Array.isArray(a.teammates) || a.teammates.length>64) return undefined;
+  const teammates:AvailabilityEvidence['teammates']=[];
+  for(const value of a.teammates) {
+    if(!value || typeof value!=='object' || Array.isArray(value)) return undefined;
+    const row=value as Record<string,unknown>;
+    if(!bounded(row.player,100) || !bounded(row.status,100) || !bounded(row.position,10)
+      || !timestamp(row.reported_at) || Date.parse(row.reported_at)>Date.parse(a.captured_at)+60000) return undefined;
+    teammates.push({player:row.player,status:row.status,position:row.position,reported_at:row.reported_at});
+  }
+  return {status:'observed',roster_confirmed:true,subject_status:a.subject_status,
+    captured_at:a.captured_at,source_url:url,source_sha256:a.source_sha256,team:a.team,
+    roster_source_url:a.roster_source_url,roster_source_sha256:a.roster_source_sha256,
+    teammates,probability_adjusted:false};
+}
+
+export function forecastWindow(signal:Pick<EVSignal,'game_start_time'>,now=Date.now()) {
+  const start=Date.parse(signal.game_start_time ?? '');
+  return Number.isFinite(start) && start>now ? 'upcoming' : 'archive';
+}
+
 /** Return the only signal shape allowed across the public API boundary. */
 export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -81,7 +132,8 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
       || Object.entries(flags).length>20 || Object.entries(flags).some(
         ([key,item])=>!bounded(key,64) || !bounded(item,300,true))
       || !bounded(s.market_type,100)) return null;
-  const metrics=signalMetrics(s,now);
+  const availability=publicAvailability(s.availability,sport);
+  const metrics=signalMetrics({...s,availability},now);
   if (!finite(metrics.implied_prob) || !finite(metrics.ev_pct)
       || (metrics.expected_return !== null && !finite(metrics.expected_return))) return null;
   const gateReason=typeof metrics.gate_reason === 'string' ? metrics.gate_reason : undefined;
@@ -95,7 +147,10 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
     sportsbook:s.sportsbook,trade_plan:[...tradePlan],injury_flags:{...flags} as Record<string,string>,
     market_type:s.market_type,snapped_at:s.snapped_at,strength:'unrated',
     gated:metrics.gated as boolean,...(gateReason ? {gate_reason:gateReason} : {}),
-    sample_size:s.sample_size,mean_stat:mean as number|null,game_id:s.game_id};
+    sample_size:s.sample_size,mean_stat:mean as number|null,game_id:s.game_id,
+    ...(availability ? {availability} : {}),
+    ...(bounded(s.forecast_cutoff,10) && /^\d{4}-\d{2}-\d{2}$/.test(s.forecast_cutoff)
+      && Number.isFinite(Date.parse(s.forecast_cutoff)) ? {forecast_cutoff:s.forecast_cutoff} : {})};
 }
 
 export function publicSignals(value:unknown, now=Date.now()) {
