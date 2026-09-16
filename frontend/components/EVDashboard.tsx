@@ -321,7 +321,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
 
   const fetchSignals = useCallback(async () => {
     try {
-      const res = await fetch('/api/signals', { cache: 'no-store' });
+      const res = await fetch(`/api/signals?sport=${sport}`, { cache: 'no-store' });
       const json = await res.json();
       setData(json);
 
@@ -330,7 +330,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sport]);
 
   useEffect(() => {
     fetchSignals();

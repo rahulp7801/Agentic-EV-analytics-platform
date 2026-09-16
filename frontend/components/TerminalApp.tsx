@@ -72,6 +72,7 @@ export default function TerminalApp() {
             {view === 'backtest' && <BacktestLab sport={sport} />}
             {view === 'parlay' && (
               <ParlayBuilder
+                sport={sport}
                 externalLegs={parlayLegs}
                 onRemoveExternal={id => setParlayLegs(previous => previous.filter(signal => signal.id !== id))}
               />

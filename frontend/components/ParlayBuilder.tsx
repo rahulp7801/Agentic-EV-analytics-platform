@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { EVSignal } from '@/lib/types';
+import type { EVSignal, Sport } from '@/lib/types';
 import { parlayScenario, signalMetrics } from '@/lib/signalMetrics';
 import styles from './ResearchViews.module.css';
 
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 
-export default function ParlayBuilder({ externalLegs = [], onRemoveExternal }: {
+export default function ParlayBuilder({ sport, externalLegs = [], onRemoveExternal }: {
+  sport: Sport;
   externalLegs?: EVSignal[];
   onRemoveExternal?: (id: string) => void;
 }) {
@@ -19,15 +20,16 @@ export default function ParlayBuilder({ externalLegs = [], onRemoveExternal }: {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/signals', { cache: 'no-store', signal: controller.signal })
+    fetch(`/api/signals?sport=${sport}`, { cache: 'no-store', signal: controller.signal })
       .then(response => { if (!response.ok) throw new Error(); return response.json(); })
-      .then(data => { if (!controller.signal.aborted) setSignals(data.signals ?? []); })
+      .then(data => { if (!controller.signal.aborted) { setError(''); setSignals(data.signals ?? []); } })
       .catch(() => { if (!controller.signal.aborted) setError('Signals unavailable.'); });
     const timer = setInterval(() => setNow(Date.now()), 15_000);
     return () => { controller.abort(); clearInterval(timer); };
-  }, []);
+  }, [sport]);
 
   const candidates = [...new Map([...signals, ...externalLegs].map(signal => [signal.id, signal])).values()]
+    .filter(signal => signal.sport === sport)
     .filter(signal => !signalMetrics({ ...signal }, now).gated && !(signal.push_probability ?? 0));
   const legs = candidates.filter(signal => selected.includes(signal.id) || externalLegs.some(item => item.id === signal.id));
   const scenario = parlayScenario(legs.map(signal => signal.true_prob), Number(payout));

@@ -40,7 +40,7 @@ export default function TopBar({ sport, onSportChange }: {
     const controller = new AbortController();
     async function load() {
       try {
-        const response = await fetch('/api/signals', { cache: 'no-store', signal: controller.signal });
+        const response = await fetch(`/api/signals?sport=${sport}`, { cache: 'no-store', signal: controller.signal });
         if (!response.ok) throw new Error('Unavailable');
         const data = await response.json();
         setSignals((data.signals || []).filter((signal: TickerSignal) => !signal.gated));
@@ -58,7 +58,7 @@ export default function TopBar({ sport, onSportChange }: {
       controller.abort();
       clearInterval(timer);
     };
-  }, []);
+  }, [sport]);
 
   const ticker = (hidden: boolean) => signals.map((signal, index) => (
     <span className={styles.tickerItem} key={`${hidden ? 'copy' : 'source'}-${index}`} aria-hidden={hidden || undefined}>
