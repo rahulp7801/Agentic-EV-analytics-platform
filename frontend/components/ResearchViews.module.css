@@ -270,6 +270,7 @@
 .viewSwitch button,.uxButton { display: inline-flex; gap: 6px; align-items: center; padding: 9px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--text-secondary); font: 12px var(--font-sans),sans-serif; cursor: pointer; }
 .viewSwitch button[aria-pressed="true"] { background: var(--bg-surface); color: var(--accent); box-shadow: var(--shadow-sm); }
 .uxButton { border: 1px solid var(--border-dim); }
+.uxButton[aria-pressed="true"] { background:var(--bg-surface); color:var(--accent); border-color:var(--accent); }
 .savePlayer:focus-visible,.uxButton:focus-visible,.viewSwitch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .forecastGrid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,320px),1fr)); gap: 16px; padding: 20px; }
 .forecastCard { min-width: 0; padding: 20px; border: 1px solid var(--border-dim); border-radius: 20px; background: var(--bg-surface); box-shadow: var(--shadow-sm); }
@@ -322,3 +323,20 @@
 }
 .panelHeader, .controlBar { border-color: var(--border-dim); }.analysisReadout { border-color: var(--border-dim); border-radius: 13px; background: var(--bg-surface); }.analysisReadout strong { color: var(--accent); }
 .emptyState, .loadingState { background: var(--bg-base); }.emptyPanel { overflow: hidden; border-color: var(--border-dim); border-radius: 22px; background: var(--bg-surface); box-shadow: var(--shadow-md); }.emptyCopy h2 { color: var(--text-primary); font-family: var(--font-sans), sans-serif; font-weight: 600; letter-spacing: -.045em; text-transform: none; }.emptyChecks, .emptyChecks div, .emptyEyebrow { border-color: var(--border-dim); }.emptyEyebrow { color: var(--accent-amber); }
+
+.forecastHeading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:24px 20px 16px; }
+.forecastHeading h2 { margin:0; font:600 28px var(--font-sans),sans-serif; letter-spacing:-.04em; color:var(--text-primary); }
+.forecastHeading p { margin:6px 0 0; color:var(--text-secondary); font:13px var(--font-sans),sans-serif; }
+.forecastControls { display:flex; align-items:flex-start; flex-wrap:wrap; gap:10px; padding:0 20px 16px; }
+.forecastControls > input { flex:1; min-width:160px; }
+.forecastFilters { border:1px solid var(--border-dim); border-radius:10px; background:var(--bg-surface); }
+.forecastFilters summary { cursor:pointer; padding:10px 14px; color:var(--text-primary); font:13px var(--font-sans),sans-serif; }
+.forecastFilters[open] { flex-basis:100%; order:4; }
+.filterFields { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; padding:16px; border-top:1px solid var(--border-dim); }
+.filterFields label { display:flex; flex-direction:column; gap:8px; font:12px var(--font-sans),sans-serif; color:var(--text-secondary); }
+.filterFields select { width:100%; }
+.filterFields input { accent-color:var(--accent); }
+.filterFields button { align-self:end; }
+.forecastSummary { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:0 20px 12px; color:var(--text-secondary); font:12px var(--font-sans),sans-serif; }
+.forecastFilters summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:10px; }
+@media(max-width:720px) { .forecastHeading { padding:20px 10px 16px; }.forecastHeading h2 { font-size:24px; }.forecastControls { padding:0 10px 12px; }.forecastControls > input { flex-basis:100%; }.forecastSummary { padding:0 10px 12px; } }

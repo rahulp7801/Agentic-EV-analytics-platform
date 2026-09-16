@@ -85,10 +85,10 @@ async def kalshi_prop_fee_contexts(reader: KalshiReader, supported: dict,
     return contexts,failures
 
 
-async def sportsbooks(sport: str, daily_credit_limit: int) -> dict:
+async def sportsbooks(sport: str, daily_credit_limit: int, credit_holdback: int = 0) -> dict:
     if not settings.odds_api_key:
         raise ValueError('Provider not configured')
-    if not Ledger().reserve_api_credits(1, daily_credit_limit):
+    if not Ledger().reserve_api_credits(1, daily_credit_limit,holdback=credit_holdback):
         return dict(status='budget_exhausted', events=[])
     async with httpx.AsyncClient(timeout=20, follow_redirects=False) as client:
         response = await client.get(f'https://api.the-odds-api.com/v4/sports/{SPORT_KEYS[sport]}/odds',
@@ -691,11 +691,11 @@ def price_row(kind, identity, title, legs, reasons):
         fee_adjusted_profit=None, realized_profit=None, execution_ready=False)
 
 
-async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: bool, provider: str='all'):
-    if sport not in ('nba','nfl') or provider not in ('all','public','sportsbook','kalshi','prizepicks') or type(game_limit) is not int or not 1<=game_limit<=MAX_GAME_LIMIT or daily_credit_limit<1:
+async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: bool, provider: str='all', *, credit_holdback: int = 0):
+    if sport not in ('nba','nfl') or provider not in ('all','public','sportsbook','kalshi','prizepicks') or type(game_limit) is not int or not 1<=game_limit<=MAX_GAME_LIMIT or daily_credit_limit<1 or type(credit_holdback) is not int or credit_holdback<0:
         raise ValueError('Invalid market collection request')
     now = datetime.now(timezone.utc)
-    collectors={'sportsbook':lambda:sportsbooks(sport,daily_credit_limit),
+    collectors={'sportsbook':lambda:sportsbooks(sport,daily_credit_limit,credit_holdback),
         'kalshi':lambda:kalshi_games(sport,now,game_limit),'prizepicks':lambda:capture_projections(sport)}
     selected=list(collectors) if provider=='all' else ['kalshi','prizepicks'] if provider=='public' else [provider]
     sources = {name:dict(status='not_requested',partial_coverage=True) for name in collectors if name not in selected}

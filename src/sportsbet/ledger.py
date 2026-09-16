@@ -246,8 +246,8 @@ class Ledger:
                        (identity,group,day,amount))
         return True, 'accepted'
 
-    def reserve_api_credits(self, cost: int, limit: int = 25) -> bool:
-        if type(cost) is not int or type(limit) is not int or cost < 1 or limit < 1:
+    def reserve_api_credits(self, cost: int, limit: int = 25, holdback: int = 0) -> bool:
+        if type(cost) is not int or type(limit) is not int or type(holdback) is not int or cost < 1 or limit < 1 or holdback < 0:
             return False
         today = datetime.now(timezone.utc).date()
         day = today.isoformat()
@@ -255,11 +255,11 @@ class Ledger:
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT credits FROM api_usage WHERE risk_day=?', (day,)).fetchone()
-            if (row[0] if row else 0) + cost > limit:
+            if (row[0] if row else 0) + cost + holdback > limit:
                 return False
             rolling = db.execute('SELECT COALESCE(SUM(credits),0) FROM api_usage WHERE risk_day>=? AND risk_day<=?',
                 (window_start,day)).fetchone()[0]
-            if rolling + cost > settings.odds_rolling_credit_limit:
+            if rolling + cost + holdback > settings.odds_rolling_credit_limit:
                 return False
             db.execute('INSERT INTO api_usage VALUES (?,?) ON CONFLICT(risk_day) DO UPDATE SET credits=api_usage.credits+excluded.credits', (day,cost))
         return True

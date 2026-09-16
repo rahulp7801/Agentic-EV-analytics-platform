@@ -32,7 +32,7 @@ async def test_actual_daily_graph_isolates_refresh_failure_and_orders_paid_stage
     def refresh(sport,day,backfill=False):
         calls.append(('refresh',sport))
         if sport=='nfl': raise RuntimeError('provider URL with secret')
-    async def watch(sport,limit,count,publish):
+    async def watch(sport,limit,count,publish,**kwargs):
         calls.append(('watch',sport))
         return {'sources':{'book':{'status':'observed'}},'captured_at':datetime.now(timezone.utc).isoformat()},None
     async def scan(sports,limit):
@@ -67,7 +67,7 @@ async def test_monitor_cannot_use_old_failed_incomplete_or_future_refreshes(monk
     result=await daily.run(['nfl'],'monitor',25)
     assert result['props']['nfl']['status']=='blocked'
     scan.assert_not_called()
-    watch.assert_awaited_once_with('nfl',25,daily.DEFAULT_GAME_LIMIT,True)
+    watch.assert_awaited_once_with('nfl',25,daily.DEFAULT_GAME_LIMIT,True,credit_holdback=12)
 
 
 @pytest.mark.asyncio
@@ -77,7 +77,7 @@ async def test_monitor_uses_recent_history_and_refreshes_markets_before_props(mo
     watch=AsyncMock(return_value=({'sources':{'kalshi':{'status':'observed','partial_coverage':False}},
         'captured_at':datetime.now(timezone.utc).isoformat()},None))
     async def scan_ready(sports,limit):
-        watch.assert_awaited_once_with('nba',25,daily.DEFAULT_GAME_LIMIT,True)
+        watch.assert_awaited_once_with('nba',25,daily.DEFAULT_GAME_LIMIT,True,credit_holdback=9)
         return {'nba':{'status':'complete'}}
     scan=AsyncMock(side_effect=scan_ready)
     monkeypatch.setattr(daily,'scan',scan);monkeypatch.setattr(daily,'watch',watch)
