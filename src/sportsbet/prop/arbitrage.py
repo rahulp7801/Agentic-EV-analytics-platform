@@ -20,7 +20,7 @@ Design rules (locked from CLAUDE.md and Phase decisions):
 """
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 import structlog
@@ -258,8 +258,8 @@ def make_prop_arbitrage_agent(
         if raw_line is not None:
             try:
                 target_line = Decimal(str(raw_line))
-            except Exception:
-                pass
+            except (InvalidOperation, TypeError, ValueError):
+                target_line = None
 
         target_player: str = state.get("player_name", "")  # type: ignore[attr-defined]
         matched_snapshot = None

@@ -407,8 +407,11 @@ async def kalshi_games(sport: str, now: datetime, limit: int) -> dict:
                     changes=await reader.event_fee_changes(details['main_game_event_ticker'])
                     fee_context=dict(status='observed',series=series_data,series_changes=series_changes,
                         event_changes=changes,received_at=datetime.now(timezone.utc).isoformat())
-                except Exception:
-                    pass
+                except Exception as exc:
+                    fee_context=dict(status='unavailable',reason='event_fee_lookup_failed',
+                        error_type=type(exc).__name__)
+                    failures.append(dict(stage='event_fee',event_ticker=identity,
+                        error_type=type(exc).__name__))
             snapshots=[]
             omitted_markets+=max(0,len(active)-3)
             for market in active[:3]:

@@ -132,6 +132,14 @@ class OddsAPIPoller:
             self._client_cm = None
             self._client = None
 
+    def _active_client(self) -> httpx.AsyncClient:
+        """Return the open client or fail safely when lifecycle usage is invalid."""
+        if self._client is None:
+            raise RuntimeError(
+                "OddsAPIPoller requests require an active async context manager"
+            )
+        return self._client
+
     async def fetch_nfl_odds(
         self,
         regions: str = "us",
@@ -154,9 +162,9 @@ class OddsAPIPoller:
                 f"daily_credit_cap={self._daily_credit_cap}"
             )
 
-        assert self._client is not None, "fetch_nfl_odds called outside async context manager"
+        client = self._active_client()
 
-        response = await self._client.get(
+        response = await client.get(
             f"/v4/sports/{NFL_SPORT_KEY}/odds",
             params={
                 "apiKey": self._api_key,
@@ -201,9 +209,9 @@ class OddsAPIPoller:
                 f"daily_credit_cap={self._daily_credit_cap}"
             )
 
-        assert self._client is not None, "fetch_nba_odds called outside async context manager"
+        client = self._active_client()
 
-        response = await self._client.get(
+        response = await client.get(
             f"/v4/sports/{NBA_SPORT_KEY}/odds",
             params={
                 "apiKey": self._api_key,
@@ -248,15 +256,13 @@ class OddsAPIPoller:
         Returns:
             List of raw per-event prop response dicts (one dict per event).
         """
-        assert self._client is not None, (
-            "fetch_player_props called outside async context manager"
-        )
+        client = self._active_client()
 
         sport_key = NFL_SPORT_KEY if sport == "nfl" else NBA_SPORT_KEY
         prop_markets = NFL_PROP_MARKETS if sport == "nfl" else NBA_PROP_MARKETS
 
         # Step 1: fetch event list
-        events_response = await self._client.get(
+        events_response = await client.get(
             f"/v4/sports/{sport_key}/events",
             params={"apiKey": self._api_key},
         )
@@ -285,7 +291,7 @@ class OddsAPIPoller:
                 )
 
             event_id = event["id"]
-            props_response = await self._client.get(
+            props_response = await client.get(
                 f"/v4/sports/{sport_key}/events/{event_id}/odds",
                 params={
                     "apiKey": self._api_key,
