@@ -52,7 +52,7 @@ async def test_exact_team_rosters_and_archived_response_hashes(sport,missing_tea
         else:
             identity=request.url.path.split('/')[-2]
             body['team']=dict(id=identity)
-            athletes=[dict(displayName='Player' if identity=='1' else 'Opponent',status={'name':'Active'})]
+            athletes=[dict(id='123',headshot={'href':f'https://a.espncdn.com/i/headshots/{sport}/players/full/123.png'},displayName='Player' if identity=='1' else 'Opponent',status={'name':'Active'})]
             body['athletes']=[dict(items=athletes)] if sport=='nfl' else athletes
         return httpx.Response(200,json=body)
     original=httpx.AsyncClient
@@ -60,6 +60,7 @@ async def test_exact_team_rosters_and_archived_response_hashes(sport,missing_tea
         result=await fetch_event_availability(dict(id='event',home_team='Home',away_team='Away'),sport)
         assert result['status']==('partial' if missing_team else 'observed') and len(result['source_sha256'])==64
         assert player_availability(result,'Player',datetime.now(timezone.utc))[0]['team']=='Home'
+        assert player_availability(result,'Player',datetime.now(timezone.utc))[0]['player_image_url']==f'https://a.espncdn.com/i/headshots/{sport}/players/full/123.png'
         assert player_availability(result,'Opponent',datetime.now(timezone.utc))[0]['status']==('unavailable' if missing_team else 'observed')
         assert len(list((tmp_path/'.local/availability').glob('*.json')))==1
         result=await fetch_event_availability(dict(id='event',home_team='Wrong',away_team='Away'),sport)

@@ -14,6 +14,16 @@ const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
   home_team:'Home',away_team:'Away',game_id:'game',sport:'nfl',prop_type:'pass_yds',line:249.5,
   mean_stat:260,confidence_interval:[.5,.7],trade_plan:[],injury_flags:{},
   market_type:'player_pass_yds',strength:'unrated'};
+test('portraits require an exact ESPN URL tied to the roster athlete and league',()=>{
+  const a={...quote.availability,player_id:'123',player_image_url:'https://a.espncdn.com/i/headshots/nfl/players/full/123.png'};
+  const project=availability=>publicSignals([{...publicQuote,availability}],now).signals[0];
+  assert.equal(project(a).availability.player_image_url,a.player_image_url);
+  for(const player_image_url of ['https://evil.example/123.png',a.player_image_url+'?redirect=1',a.player_image_url.replace('/nfl/','/nba/'),a.player_image_url.replace('123.png','456.png')]) {
+    const result=project({...a,player_image_url});
+    assert.equal(result.availability.player_image_url,undefined);
+    assert.equal(result.true_prob,.6);
+  }
+});
 test('uses payout for expected return, separates edge and preserves Under', () => {
   const s = signalMetrics(quote, now);
   assert.equal(s.direction, 'under'); assert.equal(s.gated, false);
