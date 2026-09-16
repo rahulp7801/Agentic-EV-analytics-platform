@@ -108,19 +108,24 @@ def _actual(db, prediction: dict, sport: str, day: str, game: dict):
         if not player_id.isdigit() or int(player_id)<=0 or str(int(player_id))!=player_id:
             raise ValueError('Invalid player identity')
         fields=STAT_FIELDS['nba']
-        rows=db.execute(f'''SELECT {','.join(fields)},source_provider,source_sha256,
+        # Identifiers come only from the immutable STAT_FIELDS schema constant;
+        # player and date remain bound values.
+        query=f'''SELECT {','.join(fields)},source_provider,source_sha256,
             source_record_sha256,source_observed_at
-            FROM nba_player_gamelogs WHERE player_id=? AND game_date=?''',
-            (int(player_id),day)).fetchall()
+            FROM nba_player_gamelogs WHERE player_id=? AND game_date=?'''
+        rows=db.execute(query,(int(player_id),day)).fetchall()
     else:
         if not player_id.strip() or len(player_id)>20:
             raise ValueError('Invalid player identity')
         fields=STAT_FIELDS['nfl']
-        rows=db.execute(f'''SELECT {','.join('ps.'+field for field in fields)},ps.source_provider,
+        # Identifiers come only from the immutable STAT_FIELDS schema constant;
+        # player and date remain bound values.
+        query=f'''SELECT {','.join('ps.'+field for field in fields)},ps.source_provider,
             ps.source_sha256,ps.source_record_sha256,ps.source_observed_at
             FROM player_stats ps JOIN games g
             ON g.season=ps.season AND g.week=ps.week AND ps.team IN (g.home_team,g.away_team)
-            WHERE ps.player_id=? AND g.game_date=?''',(player_id,day)).fetchall()
+            WHERE ps.player_id=? AND g.game_date=?'''
+        rows=db.execute(query,(player_id,day)).fetchall()
     if len(rows)!=1:
         return None
     record=dict(zip(fields,rows[0][:len(fields)],strict=True))
