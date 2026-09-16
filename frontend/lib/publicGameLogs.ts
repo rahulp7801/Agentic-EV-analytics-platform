@@ -22,7 +22,7 @@ function text(value: unknown, maximum: number) {
 function date(value: unknown) {
   const result=text(value,10);
   const parsed=new Date(`${result}T00:00:00Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || !Number.isFinite(parsed.valueOf())
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || Number(result.slice(0,4))<1 || !Number.isFinite(parsed.valueOf())
       || parsed.toISOString().slice(0,10)!==result) {
     throw new Error('Invalid game log');
   }
@@ -51,4 +51,18 @@ function gameLog(value: unknown, sport: Sport) {
 export function publicGameLogs(value: unknown, sport: Sport) {
   if (!Array.isArray(value) || value.length>200) throw new Error('Invalid game logs');
   return value.map(item=>gameLog(item,sport));
+}
+
+/** Bound historical queries before constructing parameterized SQL. */
+export function gameLogRequest(params:URLSearchParams) {
+  const sport=params.get('sport') ?? 'nba';
+  const player=(params.get('player') ?? '').trim();
+  const limit=params.get('limit') ?? '40';
+  const exact=params.get('exact') ?? '0';
+  const before=params.get('before');
+  if(!['nba','nfl'].includes(sport) || player.length>100 || /[\u0000-\u001f]/.test(player)
+    || !/^[0-9]{1,6}$/.test(limit) || Number(limit)<1 || !['0','1'].includes(exact)
+    || (exact==='1' && !player)) throw new Error('Invalid game-log request');
+  return {sport:sport as Sport,player,limit:Math.min(Number(limit),200),exact:exact==='1',
+    before:before===null ? null : date(before)};
 }

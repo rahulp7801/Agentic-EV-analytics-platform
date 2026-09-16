@@ -277,6 +277,17 @@
 .forecastCard h3 span { font-size: 16px; letter-spacing: -.02em; }
 .cardMatchup { margin: 0 0 20px; color: var(--text-secondary); font-size: 11px; }
 .cardGate { margin: 12px 0 0; color: var(--text-secondary); font: 12px/1.5 var(--font-sans),sans-serif; }
+.playerHistory { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-dim); }
+.historyHeader { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.historyHeader p { margin-bottom: 0; }
+.historyOutcomes { display: flex; gap: 6px; }
+.historyOutcomes span { flex: 1; height: 8px; border-radius: 3px; background: var(--border-bright); }
+.historyOutcomes [data-outcome="Matched direction"] { background: var(--accent-mint); }
+.historyOutcomes [data-outcome="Opposite direction"] { background: var(--accent-red); }
+.historyDisclaimer { font-size: 12px; }
+.historyTable { max-height: 320px; overflow: auto; border: 1px solid var(--border-dim); border-radius: 12px; }
+.historyTable:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.historyTable caption { padding: 12px; text-align: left; font: 12px var(--font-sans),sans-serif; color: var(--text-secondary); }
 .cardFooter { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border-dim); color: var(--text-secondary); font-size: 10px; }
 @media(max-width:720px) { .forecastGrid { padding: 10px; gap: 12px; }.forecastToolbar { padding: 12px 10px; }.forecastToolbar > span { width: 100%; margin: 0; } }
 .predictionEvidence { flex-shrink: 0; margin: 12px 20px 20px; padding: 24px; border: 1px solid var(--border-dim); border-radius: 20px; background: var(--bg-surface); box-shadow: var(--shadow-sm); font: 13px/1.6 var(--font-sans),sans-serif; color: var(--text-secondary); }
