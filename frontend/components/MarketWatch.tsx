@@ -62,6 +62,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
         const response = await fetch(`/api/markets?sport=${sport}`, { signal: controller.signal, cache: 'no-store' });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || 'Market observations unavailable.');
+        if(controller.signal.aborted) return;
         setData(body);
         setError('');
         setNow(Date.now());
@@ -78,6 +79,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
         const response = await fetch(`/api/prop-screens?sport=${sport}`, { signal: controller.signal, cache: 'no-store' });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || 'Cross-venue prop scan unavailable.');
+        if(controller.signal.aborted) return;
         setPropScreen(body);
         setPropError('');
       } catch (loadError) {
@@ -119,13 +121,15 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
                 <div className={styles.sourceCardHeader}><span>{name}</span><span>{SOURCE_LABELS[source.status] ?? 'Unavailable'}</span></div>
                 <p>{source.count} source records{source.partial_coverage ? ' · partial coverage' : ''}
                   {sourceFailureText(source.reason) && ` · ${sourceFailureText(source.reason)}`}
+                </p>
+                {source.coverage && <details className={styles.marketDetails}><summary>Coverage details</summary><p>
                   {source.coverage && ` · ${marketCoverageText(source.coverage)}`}
                   {source.coverage && !source.coverage.discovery_complete && ' · discovery incomplete'}
                   {source.coverage && source.coverage.omitted_markets > 0 && ` · ${source.coverage.omitted_markets} markets omitted`}
                   {source.coverage?.prop_series_expected !== undefined && ` · ${source.coverage.prop_linked_markets} player props linked across ${source.coverage.prop_linked_events} events`}
                   {source.coverage?.prop_structured_quote_markets !== undefined && ` · ${propQuoteCoverageText(source.coverage as PropQuoteCoverage)}`}
                   {source.coverage?.prop_player_resolved_quote_markets !== undefined && ` · ${source.coverage.prop_player_resolved_quote_markets} player identities resolved`}
-                </p>
+                </p></details>}
               </article>
             ))}
           </div>
@@ -178,6 +182,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
                       ))}
                     </ul>
                     <div className={styles.comparisonBody}>
+                      {(row.exchange_fee_scenarios || row.depth_fee_scenarios) && <details className={styles.marketDetails}><summary>Fee scenarios and limits</summary>
                       {row.exchange_fee_scenarios && (
                         <p>Modeled with exchange fees: ${Number(row.exchange_fee_scenarios.combined_cost.direct).toFixed(4)} direct · ${Number(row.exchange_fee_scenarios.combined_cost.non_direct).toFixed(4)} non-direct. {row.exchange_fee_scenarios.scope}</p>
                       )}
@@ -186,6 +191,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
                           ? row.depth_fee_scenarios.cases.map(scenario => `${scenario.contracts_per_kalshi_leg} contracts: $${Number(scenario.combined_cost.direct).toFixed(4)} direct / $${Number(scenario.combined_cost.non_direct).toFixed(4)} non-direct`).join(' · ')
                           : 'Insufficient displayed depth for the requested sizes.'} {row.depth_fee_scenarios.scope}</p>
                       )}
+                      </details>}
                       <p>{row.reasons.join(' ')}</p>
                     </div>
                   </article>
