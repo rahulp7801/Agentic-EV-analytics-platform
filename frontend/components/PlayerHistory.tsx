@@ -33,7 +33,7 @@ export default function PlayerHistory({signal}:{signal:EVSignal}) {
     try {history=forecastHistory(logs,signal,count);} catch {invalid='Recorded history could not be validated for this forecast.';}
   }
   return <section className={styles.playerHistory} aria-label="Player history before forecast">
-    <div className={styles.historyHeader}><div><h3>History behind the line</h3><p>Recorded games before {cutoff ?? 'an unavailable cutoff'}, compared with {signal.direction} {signal.line} {signal.prop_type.replaceAll('_',' ')}. The window ends before the price-capture day and target-game cutoff.</p></div>
+    <div className={styles.historyHeader}><div><h3>History behind the line</h3><p>Recorded games before {cutoff ?? 'an unavailable cutoff'}, compared with {signal.direction} {signal.line} {signal.prop_type.replaceAll('_',' ')}. A conservative one-day gap before price capture excludes overnight games.</p></div>
       <div className={styles.viewSwitch} aria-label="History window">{[10,20].map(n=><button type="button" key={n} aria-pressed={count===n} onClick={()=>setCount(n)}>Last {n}</button>)}</div>
     </div>
     {loading ? <p role="status">Loading recorded history…</p> : error || invalid ? <p role="status">{error || invalid}</p>

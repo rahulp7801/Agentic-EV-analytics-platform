@@ -7,7 +7,8 @@ export function historyCutoff(signal:EVSignal) {
   if(!cutoff || !/^\d{4}-\d{2}-\d{2}$/.test(cutoff) || Number(cutoff.slice(0,4))<1 || !Number.isFinite(Date.parse(cutoff))
     || new Date(`${cutoff}T00:00:00Z`).toISOString().slice(0,10)!==cutoff) throw new Error('Forecast cutoff unavailable');
   if(!/([zZ]|[+-]\d\d:\d\d)$/.test(signal.snapped_at) || !Number.isFinite(Date.parse(signal.snapped_at))) throw new Error('Price capture time unavailable');
-  const captureDay=new Date(signal.snapped_at).toISOString().slice(0,10);
+  // Date-only logs cannot establish completion across overnight league games.
+  const captureDay=new Date(Date.parse(signal.snapped_at)-86_400_000).toISOString().slice(0,10);
   return captureDay<cutoff ? captureDay : cutoff;
 }
 
