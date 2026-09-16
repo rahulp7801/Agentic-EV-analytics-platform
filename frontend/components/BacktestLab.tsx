@@ -5,12 +5,14 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight, Check, FlaskConical, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { BACKTEST_METRICS, formatBacktestMetric, mispricedProps, strategySuggestions,
   type BacktestMetric, type BacktestReport } from '@/lib/backtestLab';
-import {forecastChecks, type ForecastBenchmarkBundle} from '@/lib/publicBenchmarks';
+import {forecastChecks, forecastResult, type ForecastBenchmarkBundle} from '@/lib/publicBenchmarks';
 import type { EVSignal, Sport } from '@/lib/types';
 import styles from './BacktestLab.module.css';
 
 type Cohort = 'all' | 'recommendations';
 type Props = { sport: Sport; preview?: boolean };
+type EvidenceProp = 'all' | 'pass_yds' | 'receptions';
+type EvidenceGrade = 'all' | 'correct' | 'missed';
 
 const INITIAL_METRICS: BacktestMetric[] = ['roi', 'brier_score', 'clv_mean'];
 
@@ -33,6 +35,9 @@ export default function BacktestLab({ sport, preview = false }: Props) {
   const [reports, setReports] = useState<Record<Cohort, BacktestReport | null>>({all:null,recommendations:null});
   const [benchmark, setBenchmark] = useState<ForecastBenchmarkBundle | null>(null);
   const [signals, setSignals] = useState<EVSignal[]>([]);
+  const [evidenceProp, setEvidenceProp] = useState<EvidenceProp>('all');
+  const [evidenceGrade, setEvidenceGrade] = useState<EvidenceGrade>('all');
+  const [evidenceLimit, setEvidenceLimit] = useState(20);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const request = useRef<AbortController | null>(null);
@@ -77,6 +82,16 @@ export default function BacktestLab({ sport, preview = false }: Props) {
     Object.values(reports).filter((value): value is BacktestReport => value !== null), selected, minimumSample),
   [reports, selected, minimumSample]);
   const candidates = useMemo(() => mispricedProps(signals, sport), [signals, sport]);
+  const evidence = useMemo(() => (benchmark?.records ?? [])
+    .filter(record => evidenceProp === 'all' || record.prop_type === evidenceProp)
+    .filter(record => evidenceGrade === 'all'
+      || forecastResult(record).correct === (evidenceGrade === 'correct'))
+    .sort((left,right) => right.game_start_time.localeCompare(left.game_start_time)
+      || left.player_name.localeCompare(right.player_name)),
+  [benchmark, evidenceGrade, evidenceProp]);
+  const evidenceCorrect = useMemo(() => (benchmark?.records ?? [])
+    .filter(record => forecastResult(record).correct).length, [benchmark]);
+  const displayedEvidence = evidence.slice(0, preview ? 6 : evidenceLimit);
 
   function toggleMetric(metric: BacktestMetric) {
     setSelected(current => current.includes(metric)
@@ -174,6 +189,8 @@ export default function BacktestLab({ sport, preview = false }: Props) {
         <div className={styles.benchmarkGrid}>{benchmark.benchmarks.map(item => {
           const checks=forecastChecks(item);
           const passed=Object.values(checks).filter(Boolean).length;
+          const itemRecords=benchmark.records.filter(record=>record.prop_type===item.prop_type);
+          const itemCorrect=itemRecords.filter(record=>forecastResult(record).correct).length;
           return <article key={item.prop_type}>
             <div className={styles.benchmarkCardTop}><div><span>{item.label} · over {item.research_threshold}</span>
               <strong>{item.evaluated_count} verified forecasts</strong></div>
@@ -182,9 +199,51 @@ export default function BacktestLab({ sport, preview = false }: Props) {
               <div><span>Brier</span><strong>{item.brier_score.toFixed(3)}</strong><small>{item.brier_score_game_cluster_interval.map(value=>value.toFixed(3)).join('–')}</small></div>
               <div><span>Log loss</span><strong>{item.log_loss.toFixed(3)}</strong><small>{item.log_loss_game_cluster_interval.map(value=>value.toFixed(3)).join('–')}</small></div>
               <div><span>Calibration</span><strong>{(item.calibration_error*100).toFixed(1)}%</strong><small>{checks.calibration ? '≤5% check passed' : '>5% check not passed'}</small></div>
+              <div><span>50% direction</span><strong>{((itemCorrect/itemRecords.length)*100).toFixed(1)}%</strong><small>{itemCorrect}/{itemRecords.length} calls correct</small></div>
             </div>
           </article>;
         })}</div>
+        <div className={styles.evidenceHeading}>
+          <div><span>Prediction-level evidence</span><h4>Every forecast, graded.</h4>
+            <p>The model call uses a transparent 50% probability cutoff. Final stats grade the fixed research threshold; this is directional forecast accuracy, not betting profit.</p></div>
+          <div><strong>{evidenceCorrect} / {benchmark.records.length}</strong><span>50% model calls correct</span>
+            <small>{((evidenceCorrect / benchmark.records.length) * 100).toFixed(1)}% directional accuracy</small></div>
+        </div>
+        <div className={styles.evidenceFilters}>
+          <div aria-label="Evidence prop filter">
+            {([['all','All props'],['pass_yds','Passing yards'],['receptions','Receptions']] as const).map(([value,label]) =>
+              <button type="button" key={value} aria-pressed={evidenceProp===value} onClick={()=>{setEvidenceProp(value);setEvidenceLimit(20);}}>{label}</button>)}
+          </div>
+          <div aria-label="Evidence grade filter">
+            {([['all','All results'],['correct','Correct'],['missed','Missed']] as const).map(([value,label]) =>
+              <button type="button" key={value} aria-pressed={evidenceGrade===value} onClick={()=>{setEvidenceGrade(value);setEvidenceLimit(20);}}>{label}</button>)}
+          </div>
+          <span>{evidence.length} records</span>
+        </div>
+        <div className={styles.evidenceScroll} role="region" aria-label="Verified forecast results" tabIndex={0}>
+          <table className={styles.evidenceTable}>
+            <thead><tr><th>Date</th><th>Player / matchup</th><th>Research test</th><th>Cutoff forecast</th><th>Final stat</th><th>Grade</th><th>Evidence</th></tr></thead>
+            <tbody>{displayedEvidence.map(record=>{
+              const result=forecastResult(record);
+              const label=benchmark.benchmarks.find(item=>item.prop_type===record.prop_type)?.label ?? record.prop_type;
+              return <tr key={record.id}>
+                <td><time dateTime={record.game_start_time}>{new Date(`${record.game_date}T12:00:00Z`).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</time></td>
+                <td><strong>{record.player_name}</strong><small>{record.team} vs {record.opponent}</small></td>
+                <td><strong>Over {record.research_threshold}</strong><small>{label}</small></td>
+                <td><strong>{result.side==='over' ? 'Over' : 'Under'}</strong><small>P(over) {(record.model_probability*100).toFixed(1)}% · n={record.sample_size}</small></td>
+                <td><strong>{record.actual_value}</strong><small>{record.outcome ? 'Over' : 'Under'} threshold</small></td>
+                <td><em data-correct={result.correct}>{result.correct ? 'Correct' : 'Missed'}</em></td>
+                <td><a href={record.source_url} target="_blank" rel="noreferrer">ESPN event <ArrowUpRight /></a><code title={record.source_sha256}>{record.source_sha256.slice(0,8)}…</code></td>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
+        {!displayedEvidence.length && <div className={styles.emptyEvidence}>No verified forecasts match these filters.</div>}
+        <div className={styles.evidenceActions}>
+          {!preview && evidenceLimit<evidence.length && <button type="button" onClick={()=>setEvidenceLimit(limit=>limit+20)}>Show 20 more</button>}
+          {preview && <a href="/terminal#nfl/backtest">Open all {benchmark.records.length} verified results <ArrowUpRight /></a>}
+          <span>Source hashes bind each result to its archived ESPN response.</span>
+        </div>
         <div className={styles.benchmarkFoot}><span>{benchmark.price_scope}</span><code>dataset {benchmark.dataset_sha256.slice(0,12)}…</code></div>
       </div>}
 
