@@ -61,6 +61,17 @@ function timestamp(value:unknown):value is string {
     && Number.isFinite(Date.parse(value));
 }
 
+function rosterSource(value:unknown,sport:Sport):value is string {
+  if(!bounded(value,150)) return false;
+  try {
+    const url=new URL(value);
+    const path=sport==='nfl' ? /^\/apis\/site\/v2\/sports\/football\/nfl\/teams\/[0-9]+\/roster$/
+      : /^\/apis\/site\/v2\/sports\/basketball\/nba\/teams\/[0-9]+\/roster$/;
+    return url.origin==='https://site.api.espn.com' && !url.username && !url.password
+      && !url.search && !url.hash && path.test(url.pathname);
+  } catch {return false;}
+}
+
 function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|undefined {
   if (!value || typeof value!=='object' || Array.isArray(value)) return undefined;
   const a=value as Record<string,unknown>;
@@ -71,8 +82,7 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
   if(a.status!=='observed' || a.roster_confirmed!==true || a.probability_adjusted!==false
     || !timestamp(a.captured_at) || a.source_url!==url || !bounded(a.source_sha256,64)
     || !/^[a-f0-9]{64}$/.test(a.source_sha256) || !bounded(a.roster_source_sha256,64)
-    || !/^[a-f0-9]{64}$/.test(a.roster_source_sha256) || !bounded(a.roster_source_url,150)
-    || !new RegExp('^'+url.replace('/injuries','').replaceAll('.','\\.')+'/teams/[0-9]+/roster$').test(a.roster_source_url)
+    || !/^[a-f0-9]{64}$/.test(a.roster_source_sha256) || !rosterSource(a.roster_source_url,sport)
     || !bounded(a.subject_status,100)
     || !bounded(a.team,5) || !Array.isArray(a.teammates) || a.teammates.length>64) return undefined;
   const teammates:AvailabilityEvidence['teammates']=[];

@@ -50,6 +50,9 @@ test('availability screens recommendations without changing model probabilities'
   const projected=publicSignals([{...publicQuote,availability:{...quote.availability,private:'internal'}}],now).signals[0];
   assert.equal('private' in projected.availability,false);assert.equal(projected.gated,false);
   for(const patch of [{probability_adjusted:true},{roster_source_url:'https://evil.example/roster'},
+    {roster_source_url:'https://site.api.espn.com.evil.example/apis/site/v2/sports/football/nfl/teams/12/roster'},
+    {roster_source_url:'https://user:password@site.api.espn.com/apis/site/v2/sports/football/nfl/teams/12/roster'},
+    {roster_source_url:quote.availability.roster_source_url+'?redirect=evil'},
     {source_url:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries'}]) {
     const rejected=publicSignals([{...publicQuote,availability:{...quote.availability,...patch}}],now).signals[0];
     assert.equal(rejected.availability,undefined);assert.equal(rejected.gated,true);
