@@ -3,7 +3,7 @@ import {useEffect,useRef} from 'react';
 import styles from './ResearchViews.module.css';
 import PlayerPortrait from './PlayerPortrait';
 
-const REASONS:Record<string,string>={
+export const REASONS:Record<string,string>={
   availability_unavailable:'Current injury and roster evidence is unavailable or stale.',
   roster_unconfirmed:'The player could not be confirmed on either current roster.',
   player_availability_risk:'The player has a reported availability risk.',

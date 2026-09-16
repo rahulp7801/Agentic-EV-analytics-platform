@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import type { Sport, PropType, EVSignal } from '@/lib/types';
 import styles from './ResearchViews.module.css';
-import PredictionEvidence from './PredictionEvidence';
+import PredictionEvidence,{REASONS} from './PredictionEvidence';
 import {forecastWindow,publicSignals} from '@/lib/signalMetrics';
 import PlayerPortrait from './PlayerPortrait';
 import {Bookmark,RefreshCw,LayoutGrid,List} from 'lucide-react';
@@ -12,6 +12,7 @@ import {motion,useReducedMotion} from 'motion/react';
 interface PropsAnalysisProps { sport: Sport; }
 
 const PROP_TYPES: PropType[] = ['points', 'rebounds', 'assists', 'threes', 'pra', 'steals', 'blocks', 'pass_yds', 'pass_tds', 'rush_yds', 'rec_yds', 'receptions'];
+const PROP_LABELS:Record<PropType,string>={points:'Points',rebounds:'Rebounds',assists:'Assists',threes:'Three-pointers',pra:'Points + rebounds + assists',steals:'Steals',blocks:'Blocks',pass_yds:'Passing yards',pass_tds:'Passing touchdowns',rush_yds:'Rushing yards',rec_yds:'Receiving yards',receptions:'Receptions'};
 
 function ProbabilityComparison({ model, implied }: { model: number; implied: number }) {
   const edge = model - implied;
@@ -170,7 +171,7 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
         </select>
         <select id="prop-type-filter" aria-label="Prop type" className="term-select" value={propFilter} onChange={e => setPropFilter(e.target.value)}>
           <option value="all">All Props</option>
-          {PROP_TYPES.map(p => <option key={p} value={p}>{p.replace('_', ' ').toUpperCase()}</option>)}
+          {PROP_TYPES.map(p => <option key={p} value={p}>{PROP_LABELS[p]}</option>)}
         </select>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <label htmlFor="prop-min-edge" style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap' }}>Min edge (pp)</label>
@@ -212,14 +213,15 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
         {props.length === 0 ? (
           <div className={styles.propsEmpty}>
             <strong>{scope==='saved' ? 'Your saved-player view is empty.' : allProps.length ? 'No forecasts match these filters.' : `No recorded ${sport.toUpperCase()} forecasts are published yet.`}</strong>
-            <span>{allProps.length ? 'Try all recorded forecasts, another player, or a lower minimum edge.' : 'The scheduled scan covers the next 48 hours, subject to source availability and the API budget. Forecasts require real pregame prices and sufficient player history.'}</span>
+            <span>{scope==='saved' ? 'Save a player with the bookmark button in All estimates, then return here. Other filters still apply to your saved players.' : allProps.length ? 'Try all recorded forecasts, another player, or a lower minimum edge.' : 'The scheduled scan covers the next 48 hours, subject to source availability and the API budget. Forecasts require real pregame prices and sufficient player history.'}</span>
           </div>
         ) : view==='cards' ? <div className={styles.forecastGrid}>{props.map(p=><motion.article key={p.id} className={styles.forecastCard} initial={reduceMotion ? false : {opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.2}}>
           <div className={styles.playerHeading}><PlayerPortrait signal={p} /><div><button id={`forecast-${p.id}`} type="button" className={styles.forecastPlayer} onClick={()=>setSelectedId(p.id)}>{p.player}<span>Explore forecast →</span></button><small>{p.availability?.team ?? p.sport.toUpperCase()} · {new Date(p.game_start_time ?? '').toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</small></div><SaveButton prop={p} saved={shortlist.includes(`${p.sport}:${p.player}`)} onSave={()=>savePlayer(p)} /></div>
-          <h3>{p.direction} {p.line} <span>{p.prop_type.replaceAll('_',' ')}</span></h3>
+          <h3>{p.direction} {p.line} <span>{PROP_LABELS[p.prop_type]}</span></h3>
           <p className={styles.cardMatchup}>{p.home_team} vs {p.away_team}</p>
           <ProbabilityComparison model={p.true_prob} implied={p.implied_prob} />
           <div className={styles.cardFooter}><span className={`badge ${p.gated ? 'badge-dim' : 'badge-mint'}`}>{p.gated ? 'Blocked estimate' : 'Research eligible'}</span><span>{p.sample_size} games · {p.sportsbook}</span></div>
+          {p.gated && <p className={styles.cardGate}>{REASONS[p.gate_reason ?? ''] ?? 'A model or portfolio risk gate blocked this pick.'}</p>}
         </motion.article>)}</div> : <table className="data-table">
           <thead>
             <tr>
