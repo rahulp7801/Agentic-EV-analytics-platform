@@ -24,7 +24,8 @@ def worker(monkeypatch,tmp_path):
         commence_time=(datetime.now(timezone.utc)+timedelta(hours=2+i)).isoformat()) for i in range(2)]
         for sport in ('nfl','nba')}
     evaluated=[]
-    async def evaluate(pool,event,sport,ledger,scan_id):
+    monkeypatch.setattr(scan,'fetch_event_availability',AsyncMock(return_value={'status':'unavailable'}))
+    async def evaluate(pool,event,sport,ledger,scan_id,availability=None):
         evaluated.append(event['id'])
         return {'signals':[], 'games':[], 'coverage':{'quotes':0,'selections':0,'counts':{}}}
     monkeypatch.setattr(scan,'evaluate_event',evaluate)

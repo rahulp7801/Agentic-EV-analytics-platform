@@ -17,6 +17,8 @@ from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_
 from sportsbet.ledger import Ledger
 from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.prop.agents import make_prop_quant_agent
+from sportsbet.prop.availability import fetch_event_availability, player_availability
+from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
@@ -44,7 +46,8 @@ def quote_coverage(quotes: list[PlayerPropSnapshotCreate]) -> dict:
         and bool(quote.source_record_sha256) for quote in quotes),
         selections=len(selections),unique_players=len({selection[0] for selection in selections}))
 
-async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id: str) -> dict:
+async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id: str,
+                         availability: dict | None = None) -> dict:
     start=timestamp(event['commence_time'])
     game_date=start.astimezone(ZoneInfo('America/New_York')).date()
     season=game_date.year if game_date.month >= (10 if sport=='nba' else 9) else game_date.year-1
@@ -105,9 +108,11 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         accepted=False
         reason=state.get('gate_reason') or 'no_positive_edge'
         now=datetime.now(timezone.utc)
+        availability_evidence, availability_reason=player_availability(availability,player,now)
         if signal:
             if now >= start: reason='game_started'
             elif not -60 <= (now-quote.snapped_at).total_seconds() <= 300: reason='stale_quote'
+            elif availability_reason: reason=availability_reason
             else: accepted,reason=ledger.reserve(signal,float(line))
         payload=dict(game_id=event['id'],player=player,player_id=player_id,sport=sport,
             game_date=game_date.isoformat(),home_team=event['home_team'],away_team=event['away_team'],
@@ -121,18 +126,33 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             quote_source_record_sha256=quote.source_record_sha256,accepted=accepted,gate_reason=reason,
             stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version=MODEL_VERSION)
         counts[reason] += 1
-        public_signal=None
-        if signal:
+        # Publish every measured forecast, including non-recommended estimates.
+        # Availability screens eligibility; v4 remains an unchanged historical baseline.
+        if prop:
+            implied,payout=quote_terms(quote.price,american_to_raw_prob(quote.price))
+            trade_plan=list(signal.trade_plan) if signal else [
+                f'Historical baseline: {prop.sample_size} prior games before {game_date.isoformat()}; '
+                f'{side.lower()} probability {float(probability):.1%}.',
+                f'Observed price {quote.price:+d}; break-even {float(implied):.1%}. '
+                'This estimate did not pass the model edge and uncertainty gates.',
+                'No validated injury or teammate probability adjustment is applied.']
+            if availability_evidence['status']=='observed':
+                trade_plan[-1]=(f"Availability: {availability_evidence['subject_status']}; "
+                    f"{len(availability_evidence['teammates'])} teammates listed on the captured injury report. "
+                    'Reports screen eligibility; no injury probability boost is applied.')
             public_signal=dict(player=player,sport=sport,
                 game_id=event['id'],prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
                 team='',opponent='',home_team=event['home_team'],away_team=event['away_team'],
-                true_prob=float(probability),implied_prob=float(signal.implied_probability),ev_pct=float(signal.ev_percentage),
-                expected_return=float(signal.expected_return),push_probability=float(prop.push_probability),
-                kelly_fraction=float(signal.kelly_fraction) if accepted else 0,gated=not accepted,gate_reason=reason,
+                true_prob=float(probability),implied_prob=float(implied),ev_pct=float(probability-implied),
+                expected_return=float(compute_expected_return(probability,payout,prop.push_probability)),push_probability=float(prop.push_probability),
+                kelly_fraction=float(signal.kelly_fraction) if accepted and signal else 0,gated=not accepted,gate_reason=reason,
                 sportsbook=quote.sportsbook,american_odds=quote.price,snapped_at=quote.snapped_at.isoformat(),
                 game_start_time=start.isoformat(),sample_size=prop.sample_size,mean_stat=float(prop.mean_stat) if prop.mean_stat is not None else None,
-                confidence_interval=[float(x) for x in signal.confidence_interval] if signal.confidence_interval else None,
-                model_version=MODEL_VERSION,strength='unrated',trade_plan=[],injury_flags={},market_type=market)
+                confidence_interval=[float(x) for x in model_interval] if model_interval else None,
+                model_version=MODEL_VERSION,strength='unrated',trade_plan=trade_plan,injury_flags={},market_type=market,
+                availability=availability_evidence,forecast_cutoff=game_date.isoformat())
+            payload.update(availability=availability_evidence,trade_plan=trade_plan,
+                           forecast_cutoff=game_date.isoformat())
         audited.append((payload,public_signal))
     prediction_ids=ledger.record_many(scan_id,[payload for payload,_ in audited])
     for prediction_id,(_,public_signal) in zip(prediction_ids,audited,strict=True):
@@ -213,7 +233,8 @@ async def run(sports: list[str], daily_credit_limit: int):
                     screens[sport].append(dict(status=screened['status'],
                         coverage=screened['coverage'],
                         comparisons=sportsbook_screen['comparisons']+screened['comparisons']))
-                    result=await asyncio.wait_for(evaluate_event(pool,quoted,sport,ledger,scan_id),timeout=120)
+                    availability=await fetch_event_availability(quoted,sport)
+                    result=await asyncio.wait_for(evaluate_event(pool,quoted,sport,ledger,scan_id,availability),timeout=120)
                     result['cross_venue']=screened
                     result['sportsbook_arb']=sportsbook_screen
                     publish_snapshot(f'signals:{sport}:{event["id"]}',result)
