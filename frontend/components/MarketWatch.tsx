@@ -12,6 +12,8 @@ import {
 } from '@/lib/marketCoverage';
 import styles from './ResearchViews.module.css';
 
+const SOURCE_LABELS:Record<string,string>={observed:'Observed',degraded:'Limited coverage',unavailable:'Unavailable',not_requested:'Not requested',budget_exhausted:'API budget reached'};
+
 interface Observation {
   captured_at: string;
   scope: string;
@@ -114,7 +116,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
           <div className={styles.sourceGrid}>
             {Object.entries(data.sources).map(([name, source]) => (
               <article className={styles.sourceCard} key={name}>
-                <div className={styles.sourceCardHeader}><span>{name}</span><span>{source.status}</span></div>
+                <div className={styles.sourceCardHeader}><span>{name}</span><span>{SOURCE_LABELS[source.status] ?? 'Unavailable'}</span></div>
                 <p>{source.count} source records{source.partial_coverage ? ' · partial coverage' : ''}
                   {sourceFailureText(source.reason) && ` · ${sourceFailureText(source.reason)}`}
                   {source.coverage && ` · ${marketCoverageText(source.coverage)}`}

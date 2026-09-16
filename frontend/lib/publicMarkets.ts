@@ -54,7 +54,8 @@ function coverage(value: unknown) {
 }
 function source(value: unknown) {
   const item=row(value), status=text(item.status,32);
-  if (!['observed','degraded','unavailable','not_requested'].includes(status) || typeof item.partial_coverage !== 'boolean') throw new Error('Invalid markets');
+  if (!['observed','degraded','unavailable','not_requested','budget_exhausted'].includes(status) || typeof item.partial_coverage !== 'boolean') throw new Error('Invalid markets');
+  if (status==='budget_exhausted' && (item.count!==0 || item.partial_coverage!==true)) throw new Error('Invalid markets');
   const reason=item.reason===undefined ? undefined : text(item.reason,64);
   if (reason && !SOURCE_REASONS.has(reason)) throw new Error('Invalid markets');
   return {status,count:count(item.count),partial_coverage:item.partial_coverage,
