@@ -22,13 +22,13 @@ export function scanStatus(data: Record<string, unknown> | null, now = Date.now(
     else if (Array.isArray(data.failures) && data.failures.length) {state='degraded';label='Scan had failures';}
     else if (!modelCountsValid) {state='unknown';label='Scan coverage invalid';}
     else if (data.status==='complete' && (unresolved_selections || missing_estimates)) {state='unknown';label='Scan coverage invalid';}
+    else if (deferred && deferred>0) {state='partial';label=completed===0 ? 'Scan paused: API budget' : 'Coverage limited: API budget';}
     else if (data.status==='degraded') {
       state='degraded';
       label=unresolved_selections ? 'Player history coverage incomplete'
         : missing_estimates ? 'Model estimates incomplete' : 'Model coverage incomplete';
     }
-    else if (deferred && deferred>0) {state='partial';label='Budget limited coverage';}
-    else if (data.status==='complete' && eligible===0) {state='no_games';label='No games in next 24 hours';}
+    else if (data.status==='complete' && eligible===0) {state='no_games';label='No upcoming games in scan window';}
     else if (data.status==='complete' && completed && quotes===0) {state='no_quotes';label='No usable prop quotes';}
     else if (data.status==='complete' && completed===eligible && completed!==null) {state='complete';label='Scan complete';}
   }

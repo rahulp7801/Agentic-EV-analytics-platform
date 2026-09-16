@@ -28,6 +28,14 @@ test('scan health exposes quote and model coverage separately',()=>{
   assert.equal(status.missing_estimates,1);
   assert.equal(status.label,'Player history coverage incomplete');
 });
+test('budget-skipped scans explain the provider limit without implying model failure',()=>{
+  const limited={...completed,status:'degraded',completed_events:0,budget_skipped_events:2,coverage:{}};
+  assert.equal(scanStatus(limited,now).label,'Scan paused: API budget');
+  assert.equal(scanStatus(limited,now).state,'partial');
+  assert.equal(scanStatus({...limited,completed_events:1},now).label,'Coverage limited: API budget');
+  assert.equal(scanStatus({...limited,failures:[{}]},now).label,'Scan had failures');
+  assert.equal(scanStatus({...completed,eligible_events:0,completed_events:0,coverage:{}},now).label,'No upcoming games in scan window');
+});
 test('scan health rejects impossible or falsely complete model funnels',()=>{
   assert.equal(scanStatus({...completed,coverage:{game:{selections:2,model_requests:3,model_estimates:3}}},now).state,'unknown');
   assert.equal(scanStatus({...completed,coverage:{game:{selections:3,model_requests:3,model_estimates:2}}},now).state,'unknown');
