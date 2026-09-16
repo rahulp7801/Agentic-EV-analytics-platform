@@ -8,10 +8,29 @@ import {
   readinessStatuses,
   verifyProduction,
   verifyProductionWithRetry,
+  verifySecurityHeaders,
 } from '../scripts/verify-production.mjs';
 
 const deploymentHtml = '<html><head><link rel="stylesheet" href="/app.css"></head></html>';
 const deploymentCss = requiredCssMarkers.join(' ');
+const securityHeaderValues = {
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'cross-origin-opener-policy': 'same-origin',
+  'cross-origin-resource-policy': 'same-origin',
+  'x-dns-prefetch-control': 'off',
+  'strict-transport-security': 'max-age=63072000; includeSubDomains',
+  'permissions-policy': 'camera=(), microphone=()',
+  'content-security-policy': "default-src 'self'; script-src 'self' 'nonce-YWJjZA==' 'strict-dynamic'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+};
+const securityHeaders = { get: name => securityHeaderValues[name.toLowerCase()] ?? null };
+
+test('production security policy requires nonce scripts and isolation headers', () => {
+  assert.doesNotThrow(() => verifySecurityHeaders(securityHeaders));
+  assert.throws(() => verifySecurityHeaders({ get: name => name === 'content-security-policy'
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline'" : securityHeaders.get(name) }), /CSP/);
+});
 
 test('public pipeline makes public endpoints mandatory without requiring paid endpoints', () => {
   const flags = { paidEnabled: false, publicEnabled: true };
@@ -33,7 +52,7 @@ test('production verification rejects unavailable public data when its pipeline 
     const status = path === '/api/markets?sport=nfl' ? 503 : path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200;
     return {
       status,
-      headers: { get: (name) => name === 'x-content-type-options' ? 'nosniff' : name === 'content-security-policy' ? "default-src 'self'" : null },
+      headers: securityHeaders,
       text: async () => deploymentHtml,
     };
   };
@@ -60,7 +79,7 @@ test('production verification binds public endpoints to the current collection r
         : undefined;
     return {
       status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
-      headers: { get: (name) => name === 'x-content-type-options' ? 'nosniff' : name === 'content-security-policy' ? "default-src 'self'" : null },
+      headers: securityHeaders,
       text: async () => deploymentHtml,
       json: async () => ({ captured_at }),
     };
@@ -93,7 +112,7 @@ test('production verification rejects a stale or incomplete stylesheet bundle', 
     if (path === '/app.css') return { status: 200, text: async () => ':root{--accent-mint:#00e5a0}' };
     return {
       status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
-      headers: { get: (name) => name === 'x-content-type-options' ? 'nosniff' : name === 'content-security-policy' ? "default-src 'self'" : null },
+      headers: securityHeaders,
       text: async () => deploymentHtml,
       json: async () => ({}),
     };
@@ -115,7 +134,7 @@ test('production verification retries a transient deployment propagation mismatc
     }
     return {
       status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
-      headers: { get: (name) => name === 'x-content-type-options' ? 'nosniff' : name === 'content-security-policy' ? "default-src 'self'" : null },
+      headers: securityHeaders,
       text: async () => deploymentHtml,
       json: async () => ({}),
     };

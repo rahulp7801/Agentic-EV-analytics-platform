@@ -61,15 +61,31 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
   const [minEV, setMinEV] = useState(0);
   const [allProps, setAllProps] = useState<EVSignal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/signals', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(data => {
-        setAllProps(Array.isArray(data.signals) ? data.signals : []);
-      })
-      .catch(() => setAllProps([]))
-      .finally(() => setLoading(false));
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError('');
+      fetch(`/api/signals?sport=${sport}`, { cache: 'no-store', signal: controller.signal })
+        .then(async response => {
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error || 'Recorded prop estimates unavailable.');
+          return body;
+        })
+        .then(data => {
+          if (!controller.signal.aborted) setAllProps(Array.isArray(data.signals) ? data.signals : []);
+        })
+        .catch(loadError => {
+          if (!controller.signal.aborted) {
+            setAllProps([]);
+            setError(loadError instanceof Error ? loadError.message : 'Recorded prop estimates unavailable.');
+          }
+        })
+        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    }, 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [sport]);
 
   const props = allProps.filter(p => {
@@ -97,19 +113,23 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
         <div style={{ flex: 1 }} />
 
         <input
+          id="prop-player-filter"
+          aria-label="Search player"
           className="term-input"
           style={{ width: 180 }}
           placeholder="Search player..."
           value={playerFilter}
           onChange={e => setPlayerFilter(e.target.value)}
         />
-        <select className="term-select" value={propFilter} onChange={e => setPropFilter(e.target.value)}>
+        <select id="prop-type-filter" aria-label="Prop type" className="term-select" value={propFilter} onChange={e => setPropFilter(e.target.value)}>
           <option value="all">All Props</option>
           {PROP_TYPES.map(p => <option key={p} value={p}>{p.replace('_', ' ').toUpperCase()}</option>)}
         </select>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap' }}>Min edge (pp)</span>
+          <label htmlFor="prop-min-edge" style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap' }}>Min edge (pp)</label>
           <input
+            id="prop-min-edge"
+            aria-valuetext={`${minEV} percentage points`}
             type="range" min={0} max={20} step={1} value={minEV}
             onChange={e => setMinEV(Number(e.target.value))}
             style={{ width: 80, accentColor: 'var(--accent-mint)' }}
@@ -120,8 +140,10 @@ export default function PropsAnalysis({ sport }: PropsAnalysisProps) {
         </div>
       </div>
 
+      {error && <div className={styles.notice} role="alert">{error}</div>}
+
       {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, overflow: 'auto' }} tabIndex={0} aria-label="Recorded player prop estimates">
         <table className="data-table">
           <thead>
             <tr>

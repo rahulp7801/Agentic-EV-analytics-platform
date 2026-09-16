@@ -175,7 +175,7 @@ export default function LandingPage() {
     <div className={styles.page} ref={root}>
       <header className={styles.nav}>
         <Link className={styles.brand} href="/"><span>Q</span><strong>Quant</strong></Link>
-            <nav aria-label="Landing navigation"><a href="#platform">Platform</a><a href="#backtest-demo">Backtest</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton}><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
+            <nav aria-label="Landing navigation"><a href="#platform">Platform</a><a href="#backtest-demo">Backtest</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton} aria-label="Open dashboard"><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
       </header>
 
       <main>

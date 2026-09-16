@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, CheckCircle2, CircleAlert, Clock3, Database, RefreshCw } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { marketFreshness } from '@/lib/marketFreshness';
@@ -74,8 +74,8 @@ function sourceCopy(source?: Source) {
   return 'Collection unavailable';
 }
 
-async function json<T>(path: string): Promise<T> {
-  const response = await fetch(path, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
+async function json<T>(path: string, signal: AbortSignal): Promise<T> {
+  const response = await fetch(path, { cache: 'no-store', signal });
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || `${path} unavailable`);
   return body as T;
@@ -86,14 +86,21 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
   const [data, setData] = useState<DashboardData>({ errors: [], checkedAt: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const request = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 8_000);
     const results = await Promise.allSettled([
-      json<MarketData>(`/api/markets?sport=${sport}`),
-      json<Record<Sport, Scan>>('/api/scans'),
-      json<{ games: Array<unknown> }>(`/api/games?sport=${sport}`),
-      json<Metrics>('/api/metrics'),
+      json<MarketData>(`/api/markets?sport=${sport}`, controller.signal),
+      json<Record<Sport, Scan>>('/api/scans', controller.signal),
+      json<{ games: Array<unknown> }>(`/api/games?sport=${sport}`, controller.signal),
+      json<Metrics>(`/api/metrics?sport=${sport}`, controller.signal),
     ]);
+    window.clearTimeout(timeout);
+    if (controller.signal.aborted || request.current !== controller) return;
     const errors: string[] = [];
     results.forEach((result, index) => {
       if (result.status === 'rejected') errors.push(['Markets', 'Model scan', 'Schedule', 'Evaluation'][index]);
@@ -110,16 +117,19 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
   }, [sport]);
 
   useEffect(() => {
-    let active = true;
-    const initial = window.setTimeout(() => { if (active) void load(); }, 0);
-    const timer = window.setInterval(() => { if (active) void load(); }, 30_000);
-    return () => { active = false; window.clearTimeout(initial); window.clearInterval(timer); };
+    const initial = window.setTimeout(() => void load(), 0);
+    const timer = window.setInterval(() => void load(), 30_000);
+    return () => {
+      request.current?.abort();
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, [load]);
 
   const refresh = async () => {
     setRefreshing(true);
     await load();
-    setRefreshing(false);
+    if (request.current && !request.current.signal.aborted) setRefreshing(false);
   };
 
   const kalshi = data.markets?.sources.kalshi;

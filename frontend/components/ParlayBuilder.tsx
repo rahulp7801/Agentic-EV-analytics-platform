@@ -18,12 +18,13 @@ export default function ParlayBuilder({ externalLegs = [], onRemoveExternal }: {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    fetch('/api/signals')
+    const controller = new AbortController();
+    fetch('/api/signals', { cache: 'no-store', signal: controller.signal })
       .then(response => { if (!response.ok) throw new Error(); return response.json(); })
-      .then(data => setSignals(data.signals ?? []))
-      .catch(() => setError('Signals unavailable.'));
+      .then(data => { if (!controller.signal.aborted) setSignals(data.signals ?? []); })
+      .catch(() => { if (!controller.signal.aborted) setError('Signals unavailable.'); });
     const timer = setInterval(() => setNow(Date.now()), 15_000);
-    return () => clearInterval(timer);
+    return () => { controller.abort(); clearInterval(timer); };
   }, []);
 
   const candidates = [...new Map([...signals, ...externalLegs].map(signal => [signal.id, signal])).values()]

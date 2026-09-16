@@ -113,6 +113,23 @@ async def test_odds_poller_writes_snapshot() -> None:
         assert poller._credits_remaining == 499
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method,args", [
+    ("fetch_nfl_odds", ()),
+    ("fetch_nba_odds", ()),
+    ("fetch_player_props", ("nfl",)),
+])
+async def test_odds_poller_rejects_requests_outside_context(
+    method: str,
+    args: tuple[str, ...],
+) -> None:
+    """Public fetch methods must fail even when Python assertions are disabled."""
+    poller = OddsAPIPoller(api_key="test-key", daily_credit_cap=500)
+
+    with pytest.raises(RuntimeError, match="active async context manager"):
+        await getattr(poller, method)(*args)
+
+
 # ---------------------------------------------------------------------------
 # CTXT-02: Staleness guard
 # ---------------------------------------------------------------------------

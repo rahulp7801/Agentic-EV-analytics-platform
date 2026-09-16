@@ -51,7 +51,7 @@ export default function ScanStatus() {
   }, []);
 
   return (
-    <div className={styles.scanRail} aria-live="polite">
+    <div className={styles.scanRail} aria-live="polite" aria-label="Daily model pipeline status" tabIndex={0}>
       <span className={styles.scanRailLabel}>Pipeline</span>
       {error ? (
         <div className={`${styles.scanCard} ${styles.scanWarning}`}><strong>{error}</strong></div>

@@ -26,30 +26,23 @@ function StatCell({ value, line }: { value?: number; line?: number }) {
 
 export default function GameLogs({ sport }: GameLogsProps) {
   const [playerFilter, setPlayerFilter] = useState('');
-  const [activeProp, setActiveProp] = useState<string>('points');
+  const [activeProp, setActiveProp] = useState<string>(sport === 'nba' ? 'points' : 'pass_yds');
   const [activeLine, setActiveLine] = useState('');
-  const [selectedSport, setSelectedSport] = useState<Sport>(sport);
   const [allLogs, setAllLogs] = useState<GameLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => { setSelectedSport(sport); }, [sport]);
-  useEffect(() => {
-    setActiveProp(selectedSport === 'nba' ? 'points' : 'pass_yds');
-    setActiveLine('');
-  }, [selectedSport]);
 
   const fetchLogs = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
     setAllLogs([]);
     setError('');
     try {
-      const params = new URLSearchParams({ sport: selectedSport, limit: '40' });
+      const params = new URLSearchParams({ sport, limit: '40' });
       if (playerFilter) params.set('player', playerFilter);
       const response = await fetch(`/api/gamelogs?${params}`, { cache: 'no-store', signal });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Game logs unavailable');
-      const logs: GameLog[] = data.logs.map((row: Record<string, unknown>, index: number) => gameLog(row, selectedSport, String(index)));
+      const logs: GameLog[] = data.logs.map((row: Record<string, unknown>, index: number) => gameLog(row, sport, String(index)));
       if (!signal.aborted) setAllLogs(logs);
     } catch (loadError) {
       if (!signal.aborted) {
@@ -59,7 +52,7 @@ export default function GameLogs({ sport }: GameLogsProps) {
     } finally {
       if (!signal.aborted) setLoading(false);
     }
-  }, [selectedSport, playerFilter]);
+  }, [sport, playerFilter]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -67,7 +60,7 @@ export default function GameLogs({ sport }: GameLogsProps) {
     return () => { controller.abort(); clearTimeout(timer); };
   }, [fetchLogs]);
 
-  const cols = selectedSport === 'nba' ? NBA_COLS : NFL_COLS;
+  const cols = sport === 'nba' ? NBA_COLS : NFL_COLS;
   const numericLine = activeLine.trim() === '' ? NaN : Number(activeLine);
   const lineValue = Number.isFinite(numericLine) && numericLine >= 0 ? numericLine : undefined;
   const frequency = overFrequency(allLogs, activeProp, lineValue);
@@ -83,13 +76,6 @@ export default function GameLogs({ sport }: GameLogsProps) {
       </header>
 
       <div className={styles.controlBar}>
-        <div className={styles.controlGroup}>
-          <span>League</span>
-          <div className="sport-toggle" style={{ width: 130 }}>
-            <button className={`sport-btn ${selectedSport === 'nba' ? 'active-nba' : ''}`} onClick={() => setSelectedSport('nba')}>NBA</button>
-            <button className={`sport-btn ${selectedSport === 'nfl' ? 'active-nfl' : ''}`} onClick={() => setSelectedSport('nfl')}>NFL</button>
-          </div>
-        </div>
         <div className={styles.controlGroup} style={{ minWidth: 190 }}>
           <label htmlFor="log-player">Player filter</label>
           <input id="log-player" className="term-input" placeholder="Search recorded players" value={playerFilter} onChange={event => setPlayerFilter(event.target.value)} />
@@ -117,7 +103,7 @@ export default function GameLogs({ sport }: GameLogsProps) {
       {error && <div className={styles.notice} role="alert">{error}</div>}
       {frequency && <p className={styles.contextNote}><b>Descriptive only</b> · {frequency.pushes} ties and {frequency.missing} missing stats excluded from the shown-row rate.</p>}
 
-      <div className={styles.tableViewport}>
+      <div className={styles.tableViewport} tabIndex={0} aria-label="Recorded player game logs">
         <table className={`data-table ${styles.toolTable}`}>
           <thead>
             <tr>

@@ -34,6 +34,35 @@ export function readinessStatuses(path, { paidEnabled, publicEnabled }) {
   throw new Error(`Unclassified readiness endpoint: ${path}`);
 }
 
+export function verifySecurityHeaders(headers) {
+  const expected = {
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'referrer-policy': 'strict-origin-when-cross-origin',
+    'cross-origin-opener-policy': 'same-origin',
+    'cross-origin-resource-policy': 'same-origin',
+    'x-dns-prefetch-control': 'off',
+  };
+  for (const [name, value] of Object.entries(expected)) {
+    if (headers.get(name) !== value) throw new Error(`Production security header is missing or invalid: ${name}`);
+  }
+  if (!headers.get('strict-transport-security')?.includes('max-age=63072000')) {
+    throw new Error('Production HSTS policy is missing or invalid');
+  }
+  if (!headers.get('permissions-policy')?.includes('camera=()')) {
+    throw new Error('Production permissions policy is missing or invalid');
+  }
+  const policy = headers.get('content-security-policy') || '';
+  for (const directive of ["default-src 'self'", "script-src 'self'", "'strict-dynamic'", "object-src 'none'",
+    "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'", "connect-src 'self'"]) {
+    if (!policy.includes(directive)) throw new Error(`Production CSP is missing: ${directive}`);
+  }
+  if (!/'nonce-[A-Za-z0-9+/=]+'/.test(policy) || /script-src[^;]*'unsafe-inline'/.test(policy)
+      || /script-src[^;]*'unsafe-eval'/.test(policy)) {
+    throw new Error('Production script CSP does not enforce a nonce');
+  }
+}
+
 function expectedPublicCapture(path, report) {
   if (!report) return undefined;
   const url = new URL(path, 'https://readiness.invalid');
@@ -68,9 +97,7 @@ export async function verifyProduction({
     cache: 'no-store',
     headers: { 'cache-control': 'no-cache' },
   });
-  if (home.headers.get('x-content-type-options') !== 'nosniff' || !home.headers.get('content-security-policy')) {
-    throw new Error('Production security headers are missing');
-  }
+  verifySecurityHeaders(home.headers);
   const html = await home.text();
   const stylesheetUrls = [...html.matchAll(/href=["']([^"']+\.css(?:\?[^"']*)?)["']/gi)]
     .map(match => new URL(match[1], base).toString());

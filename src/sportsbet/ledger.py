@@ -468,9 +468,10 @@ class Ledger:
                 for offset in range(0,len(identities),250):
                     batch=identities[offset:offset+250]
                     placeholders=','.join('?' for _ in batch)
-                    rows=db.execute(
-                        f'SELECT identity,captured_at,probability FROM quotes '
-                        f'WHERE identity IN ({placeholders}) ORDER BY captured_at DESC',batch).fetchall()
+                    # The only interpolated text is one literal '?' per bounded batch item;
+                    # quote identities remain bound values.
+                    query=f'SELECT identity,captured_at,probability FROM quotes WHERE identity IN ({placeholders}) ORDER BY captured_at DESC'
+                    rows=db.execute(query,batch).fetchall()
                     for identity,captured,probability in rows:
                         closing_quotes.setdefault(identity,[]).append((captured,probability))
         for entered,_,start,p,outcome,selection in parsed:

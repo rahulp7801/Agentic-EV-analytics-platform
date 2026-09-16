@@ -97,7 +97,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
   const propScreenCurrent = propScreen?.status !== 'stale';
 
   return (
-    <section className={styles.view} aria-labelledby="market-watch-title">
+    <section className={styles.view} aria-labelledby="market-watch-title" tabIndex={0}>
       <header className={styles.viewHeader}>
         <div>
           <small>Cross-venue observation · {sport.toUpperCase()}</small>
