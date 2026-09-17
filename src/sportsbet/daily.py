@@ -108,7 +108,7 @@ def create_daily_graph():
             try:
                 public_provider='public' if state['mode']=='public_daily' else 'kalshi'
                 summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,
-                    **({'provider':public_provider} if public else {'credit_holdback':market_holdback}))
+                    **({'provider':public_provider} if public else {'credit_holdback':market_holdback,'sportsbook_cadence_hours':6}))
                 complete = bool(summary['sources']) and all(
                     source['status']=='observed' and not source.get('partial_coverage',True)
                     for source in summary['sources'].values()
