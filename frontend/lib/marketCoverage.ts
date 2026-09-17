@@ -19,6 +19,7 @@ export interface PropQuoteCoverage {
 }
 
 export function sourceFailureText(reason:unknown):string|null {
+  if (reason==='collection_cadence') return 'waiting for scheduled sportsbook capture';
   if (reason==='access_denied') return 'provider access denied';
   if (reason==='rate_limited') return 'provider rate limited';
   if (reason==='upstream_unavailable') return 'provider temporarily unavailable';

@@ -67,7 +67,7 @@ async def test_monitor_cannot_use_old_failed_incomplete_or_future_refreshes(monk
     result=await daily.run(['nfl'],'monitor',25)
     assert result['props']['nfl']['status']=='blocked'
     scan.assert_not_called()
-    watch.assert_awaited_once_with('nfl',25,daily.DEFAULT_GAME_LIMIT,True,credit_holdback=12)
+    watch.assert_awaited_once_with('nfl',25,daily.DEFAULT_GAME_LIMIT,True,credit_holdback=12,sportsbook_cadence_hours=6)
 
 
 @pytest.mark.asyncio
@@ -77,7 +77,7 @@ async def test_monitor_uses_recent_history_and_refreshes_markets_before_props(mo
     watch=AsyncMock(return_value=({'sources':{'kalshi':{'status':'observed','partial_coverage':False}},
         'captured_at':datetime.now(timezone.utc).isoformat()},None))
     async def scan_ready(sports,limit):
-        watch.assert_awaited_once_with('nba',25,daily.DEFAULT_GAME_LIMIT,True,credit_holdback=9)
+        watch.assert_awaited_once_with('nba',25,daily.DEFAULT_GAME_LIMIT,True,credit_holdback=9,sportsbook_cadence_hours=6)
         return {'nba':{'status':'complete'}}
     scan=AsyncMock(side_effect=scan_ready)
     monkeypatch.setattr(daily,'scan',scan);monkeypatch.setattr(daily,'watch',watch)
@@ -185,6 +185,7 @@ async def test_full_monitor_real_collector_shares_budget_and_preserves_other_ven
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(settings,'odds_api_key','fixture')
     monkeypatch.setattr(market_watch,'Ledger',lambda:ledger)
+    monkeypatch.setattr(market_watch,'load_snapshot',lambda key:deepcopy(stored.get(key)))
     monkeypatch.setattr(daily,'load_snapshot',lambda key:dict(status='complete',finished_at=datetime.now(timezone.utc).isoformat()))
     for module in (daily,market_watch):
         monkeypatch.setattr(module,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))

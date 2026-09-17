@@ -37,6 +37,21 @@ test('budget-limited sportsbooks preserve independent Kalshi evidence without cl
   assert.throws(()=>publicMarkets(value,'nfl'));
 });
 
+test('cadence-deferred sportsbooks expose an explicit wait and never claim new observations',()=>{
+  const value=snapshot();
+  value.sources.sportsbook={status:'not_requested',count:0,partial_coverage:true,reason:'collection_cadence'};
+  const result=publicMarkets(value,'nfl');
+  assert.equal(result.sources.sportsbook.reason,'collection_cadence');
+  assert.equal(result.sources.kalshi.count,1);
+  assert.equal(result.comparisons.length,1);
+  for(const change of [{status:'observed'},{count:1},{partial_coverage:false}]) {
+    const forged=snapshot();forged.sources.sportsbook={...value.sources.sportsbook,...change};
+    assert.throws(()=>publicMarkets(forged,'nfl'));
+  }
+  value.sources.kalshi={...value.sources.sportsbook};
+  assert.throws(()=>publicMarkets(value,'nfl'));
+});
+
 test('public markets rejects identity, accounting, status and coverage corruption',()=>{for(const mutate of [
   value=>{value.sport='nba';},value=>{value.execution_ready=true;},value=>{value.comparisons[0].gross_cost='0.8';},
   value=>{value.sources.kalshi.coverage.event_failed_games=1;},value=>{value.sources.prizepicks.reason='private URL';},
