@@ -4,7 +4,7 @@ type Row = Record<string, unknown>;
 const SCOPE = 'Observed prices only. Gross gaps exclude fees and full settlement states; they are not verified arbitrage or backtest returns.';
 const FEE_SCOPE = 'One contract per Kalshi leg with modeled taker fees. Excludes sportsbook/FCM, funding and exceptional settlement charges. Not a fill or profit bound.';
 const DEPTH_SCOPE = 'Hypothetical orders consuming displayed price levels. Actual fills, quote changes, limits and exceptional charges are not modeled. Not a fill or profit bound.';
-const SOURCE_REASONS = new Set(['access_denied','rate_limited','upstream_unavailable','request_rejected']);
+const SOURCE_REASONS = new Set(['access_denied','rate_limited','upstream_unavailable','request_rejected','collection_cadence']);
 const COVERAGE_COUNTS = ['discovered_games','attempted_games','observed_games','quoted_games','failed_games',
   'event_failed_games','market_failed_games','sample_complete_games','omitted_markets','prop_open_events',
   'prop_fee_failures','prop_open_markets','prop_linked_events','prop_linked_markets','prop_series_expected',
@@ -52,12 +52,13 @@ function coverage(value: unknown) {
         +(result.prop_one_sided_quote_markets as number)+(result.prop_unquoted_markets as number)) throw new Error('Invalid markets');
   return result;
 }
-function source(value: unknown) {
+function source(value: unknown, name: string) {
   const item=row(value), status=text(item.status,32);
   if (!['observed','degraded','unavailable','not_requested','budget_exhausted'].includes(status) || typeof item.partial_coverage !== 'boolean') throw new Error('Invalid markets');
   if (status==='budget_exhausted' && (item.count!==0 || item.partial_coverage!==true)) throw new Error('Invalid markets');
   const reason=item.reason===undefined ? undefined : text(item.reason,64);
   if (reason && !SOURCE_REASONS.has(reason)) throw new Error('Invalid markets');
+  if (reason==='collection_cadence' && (name!=='sportsbook' || status!=='not_requested' || item.count!==0 || item.partial_coverage!==true)) throw new Error('Invalid markets');
   return {status,count:count(item.count),partial_coverage:item.partial_coverage,
     ...(reason ? {reason} : {}),...(item.coverage===undefined ? {} : {coverage:coverage(item.coverage)})};
 }
@@ -100,7 +101,7 @@ export function publicMarkets(value: unknown, expected: Sport) {
   if (data.schema_version!==2 || data.sport!==expected || data.execution_ready!==false
       || data.realized_profit!==null || !Array.isArray(data.comparisons) || data.comparisons.length>200) throw new Error('Invalid markets');
   const sources=row(data.sources), resultSources:Record<string,ReturnType<typeof source>>={};
-  for (const name of ['sportsbook','kalshi','prizepicks']) resultSources[name]=source(sources[name]);
+  for (const name of ['sportsbook','kalshi','prizepicks']) resultSources[name]=source(sources[name],name);
   return {sport:expected,captured_at:timestamp(data.captured_at),scope:SCOPE,sources:resultSources,
     comparisons:data.comparisons.map(comparison)};
 }

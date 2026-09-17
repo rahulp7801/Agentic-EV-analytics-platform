@@ -118,7 +118,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
           <div className={styles.sourceGrid}>
             {Object.entries(data.sources).map(([name, source]) => (
               <article className={styles.sourceCard} key={name}>
-                <div className={styles.sourceCardHeader}><span>{name}</span><span>{SOURCE_LABELS[source.status] ?? 'Unavailable'}</span></div>
+                <div className={styles.sourceCardHeader}><span>{name}</span><span>{source.reason==='collection_cadence' ? 'Waiting for capture' : SOURCE_LABELS[source.status] ?? 'Unavailable'}</span></div>
                 <p>{source.count} source records{source.partial_coverage ? ' · partial coverage' : ''}
                   {sourceFailureText(source.reason) && ` · ${sourceFailureText(source.reason)}`}
                 </p>

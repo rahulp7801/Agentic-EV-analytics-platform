@@ -4,6 +4,7 @@ import {marketCoverageText,propQuoteCoverageText,sourceFailureText} from '../lib
 
 test('provider failures expose only approved operational reasons',()=>{
   assert.equal(sourceFailureText('access_denied'),'provider access denied');
+  assert.equal(sourceFailureText('collection_cadence'),'waiting for scheduled sportsbook capture');
   assert.equal(sourceFailureText('rate_limited'),'provider rate limited');
   assert.equal(sourceFailureText('upstream_unavailable'),'provider temporarily unavailable');
   assert.equal(sourceFailureText('request_rejected'),'provider rejected the request');
