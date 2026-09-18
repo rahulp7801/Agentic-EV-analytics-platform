@@ -68,7 +68,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
   const [allProps, setAllProps] = useState<EVSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [windowFilter,setWindowFilter]=useState('latest');
+  const [windowFilter,setWindowFilter]=useState(initialPlayer ? 'all' : 'latest');
   const [visibleCount,setVisibleCount]=useState(24);
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const [now,setNow]=useState(0);
@@ -159,14 +159,14 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
       <div className={styles.forecastHeading}>
         <div><h2>Your player research</h2><p>Real forecasts. Familiar faces. The evidence behind every estimate.</p></div>
         <button className={styles.uxButton} type="button" onClick={()=>setRefresh(n=>n+1)} disabled={loading} aria-label="Refresh forecasts"><RefreshCw size={16} />{loading?'Refreshing...':'Refresh'}</button>
       </div>
       <div className={styles.forecastControls}>
         <input aria-label="Search player" className="term-input" placeholder="Find a player..." value={playerFilter} onChange={e=>{setPlayerFilter(e.target.value);setVisibleCount(24);}} />
-        <select aria-label="Forecast window" className="term-select" value={windowFilter} onChange={e=>{setWindowFilter(e.target.value);setVisibleCount(24);}}><option value="latest">Latest available slate</option><option value="upcoming">Upcoming games</option><option value="archive">Past games</option><option value="all">All recorded forecasts</option></select>
+        <select aria-label="Forecast window" className="term-select" value={windowFilter} onChange={e=>{setWindowFilter(e.target.value);setVisibleCount(24);}}><option value="latest">Available forecasts</option><option value="upcoming">Upcoming games</option><option value="archive">Past games</option><option value="all">All recorded forecasts</option></select>
         <button className={styles.uxButton} type="button" aria-pressed={scope==='saved'} onClick={()=>setScope(scope==='saved'?'all':'saved')}><Bookmark size={16} />Saved players</button>
         <details className={styles.forecastFilters}>
           <summary>Filters{effectivePropFilter!=='all' || minEV>0 || scope==='eligible' ? ' - Active' : ''}</summary>
@@ -184,13 +184,13 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
       {storageNotice && <p role="status" className={styles.forecastIntro}>{storageNotice}</p>}
 
       {error && <div className={styles.notice} role="alert">{error}</div>}
-      {effectiveWindow==='archive' && currentProps.length>0 && <div className={styles.archiveNotice}><strong>Latest recorded slate</strong><span>These games have started. Explore the original forecasts and player history; expired prices cannot qualify as current picks.</span></div>}
+      {effectiveWindow==='archive' && currentProps.length>0 && <div className={styles.archiveNotice}><strong>Past games · Prices expired</strong><span>Original forecasts and player history remain available for research.</span></div>}
       {players.length>0 && <nav className={styles.playerShelf} aria-label="Players with recorded forecasts">{players.map(p=><button type="button" key={p.player} aria-pressed={playerFilter===p.player} onClick={()=>{setPlayerFilter(playerFilter===p.player?'':p.player);setVisibleCount(24);}}><PlayerPortrait signal={p} /><strong>{p.player}</strong><small>{p.player_profile?.team ?? p.availability?.team ?? sport.toUpperCase()}{p.player_profile?.jersey ? ` · #${p.player_profile.jersey}` : ''}{p.player_profile?.position ? ` · ${p.player_profile.position}` : ''}</small></button>)}</nav>}
       <p className={styles.forecastIntro}>Prices are recorded observations, not live quotes. Quotes expire after five minutes. Saved players stay in this browser.</p>
       {selected && <PredictionEvidence signal={selected} onClose={()=>{setSelectedId(null);document.getElementById(`forecast-${selected.id}`)?.focus();}} />}
 
       {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto' }} tabIndex={0} aria-label="Recorded player prop estimates">
+      <div style={{ overflowX: 'auto' }} tabIndex={0} aria-label="Recorded player prop estimates">
         {props.length === 0 ? (
           <div className={styles.propsEmpty}>
             <strong>{scope==='saved' ? 'Your saved-player view is empty.' : allProps.length ? 'No forecasts match these filters.' : `No recorded ${sport.toUpperCase()} forecasts are published yet.`}</strong>
