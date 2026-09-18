@@ -87,7 +87,7 @@ rate counters are regional, so per-IP allowances are not a global quota.
 Validated public API responses share a ten-second edge cache while browser
 responses remain uncached. The browser rechecks quote expiry; incomplete
 qualified inspection exposes no picks.
-Per-instance database work is capped at four active queries without a waiting
+Per-instance database work is capped at six active queries without a waiting
 queue, with connection, statement and query timeouts. This instance cap is not
 a global traffic limit.
 

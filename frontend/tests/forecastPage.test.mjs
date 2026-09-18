@@ -99,6 +99,27 @@ test('verified research survives a later timeout or temporary failure without cl
   }
 });
 
+test('explicit continuation loads the remaining verified revision without repeating the first page',async()=>{
+  const values=Array.from({length:240},(_,i)=>({...base,id:String(i)})),offsets=[];
+  const fetchImpl=async(url)=>{
+    const options=forecastRequest(new URL(url,'https://example.test'));offsets.push(options.offset);
+    return {ok:true,json:async()=>forecastPage(input(values.slice(options.offset,options.offset+options.limit),240),options,now)};
+  };
+  const first=await fetchForecasts('nfl',undefined,'library',fetchImpl,100);
+  assert.equal(first.signals.length,100);assert.equal(first.cursor.offset,100);assert.equal(first.complete,false);
+  const remaining=await fetchForecasts('nfl',undefined,'library',fetchImpl,1000,first.cursor);
+  assert.equal(remaining.signals.length,140);assert.equal(remaining.cursor,null);assert.equal(remaining.complete,true);
+  assert.equal(new Set([...first.signals,...remaining.signals].map(s=>s.id)).size,240);
+  assert.deepEqual(offsets,[0,100,200]);
+  await assert.rejects(fetchForecasts('nfl',undefined,'library',async()=>({ok:false,status:409}),1000,first.cursor),/unavailable/);
+  await assert.rejects(fetchForecasts('nfl',undefined,'library',async()=>({ok:true,json:async()=>({...metadata,signals:[base]})}),1000,first.cursor),/coverage/);
+  for(const cursor of [{...first.cursor,offset:0},{...first.cursor,offset:1000},
+    {...first.cursor,revision:'invalid'},{...first.cursor,total_count:99}]) {
+    await assert.rejects(fetchForecasts('nfl',undefined,'library',fetchImpl,1000,cursor),/cursor/);
+  }
+  await assert.rejects(fetchForecasts('nfl',undefined,'qualified',fetchImpl,1000,first.cursor),/cursor/);
+});
+
 test('initial failures, cancellation and inconsistent coverage cannot become a usable partial response',async()=>{
   await assert.rejects(fetchForecasts('nfl',undefined,'library',async()=>({ok:false,status:503})),/unavailable/);
   let calls=0;

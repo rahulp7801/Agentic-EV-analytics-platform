@@ -8,8 +8,8 @@ export async function queryWithClient<T extends QueryResultRow>(
   text: string,
   values: unknown[] = [],
 ): Promise<QueryResult<T>> {
-  // Per-isolate backpressure; the edge firewall and reader role bound global abuse.
-  if(activeQueries>=4) {
+  // Per-isolate backpressure; the reader role also caps global database connections.
+  if(activeQueries>=6) {
     await client.end().catch(()=>undefined);
     throw new Error('Service busy');
   }
