@@ -67,6 +67,17 @@ Its downgrade deliberately retains this security restriction. Disposable
 PostgreSQL regressions reproduce the provider grants, verify access denial and
 preserved data, and verify the restricted reader/worker remain usable.
 
+The default-ACL review also found browser grants automatically applied to new
+objects. `0025_deny_browser_defaults` and provisioning revoke future table/view
+and sequence defaults for the connected application creator in `public` and
+`analytics`. Downgrade preserves the denial. Tests recreate provider defaults,
+create new objects after migration/provisioning and verify denied grants/query
+access without relying on table RLS. Provider-admin defaults are outside this
+application creator's scope. New application functions require explicit PUBLIC
+execution review; schema-level function revocation cannot override PostgreSQL's
+implicit global PUBLIC execution default. Existing application RPCs remain
+absent; the provider's event-trigger helper is not a callable application RPC.
+
 The dashboard reader has no superuser, role/database creation, replication,
 RLS bypass or schema creation privileges; its default transaction is read-only,
 statement timeout is five seconds and connection limit is 12. Hosted frontend
