@@ -74,6 +74,24 @@ test('forecast windows change at kickoff',()=>{
   assert.equal(forecastWindow(quote,now+3600000),'archive');
   assert.equal(forecastWindow({},now),'archive');
 });
+
+test('roster injury sources require the exact committed roster URL and hash',()=>{
+  const availability={...quote.availability, source_url:quote.availability.roster_source_url,
+    source_sha256:quote.availability.roster_source_sha256,
+    teammates:[{player:'Teammate',status:'Questionable',position:'RB',reported_at:new Date(now).toISOString()}]};
+  const project=a=>publicSignals([{...publicQuote,availability:a}],now).signals[0];
+  const result=project(availability);
+  assert.equal(result.availability.source_url,availability.roster_source_url);
+  assert.equal(result.gate_reason,'teammate_availability_unmodeled');
+  assert.equal(result.true_prob,.6);assert.equal(result.kelly_fraction,0);
+  for(const patch of [{source_sha256:'c'.repeat(64)},
+    {source_url:availability.source_url.replace('/12/','/13/')},
+    {source_url:availability.source_url+'?redirect=evil'},
+    {source_url:availability.source_url.replace('/football/nfl/','/basketball/nba/')}]) {
+    const rejected=project({...availability,...patch});
+    assert.equal(rejected.availability,undefined);assert.equal(rejected.gated,true);
+  }
+});
 test('public signals require real identity and price fields and omit internal data', () => {
   const value={...publicQuote,internal_evidence:'private implementation detail'};
   const result=publicSignals([value,{...value,sportsbook:undefined},{...value,american_odds:-105.5},
