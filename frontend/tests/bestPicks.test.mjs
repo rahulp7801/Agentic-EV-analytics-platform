@@ -16,7 +16,8 @@ test('lower raw edge can outrank a less supported high point estimate',()=>{
   assert.deepEqual(bestPicks([base,stronger],now).map(p=>p.id),['B','A']);
 });
 test('the shortlist cannot manufacture picks from stale, uncertain, injured, capped or blocked evidence',()=>{
-  for(const patch of [{confidence_interval:null},{confidence_interval:[.49,.8]},{gated:true},
+  for(const patch of [{confidence_interval:null},{confidence_interval:[.49,.8]},
+    {confidence_interval:[.7,.8]},{push_probability:.1,confidence_interval:[.52,.95]},{gated:true},
     {true_prob:.8},{true_prob:.650000001},{snapped_at:new Date(now-300001).toISOString()},{sample_size:19},
     {availability:{...base.availability,teammates:[{player:'T',status:'Out',position:'WR',reported_at:new Date(now).toISOString()}]}}]) {
     assert.deepEqual(bestPicks([{...base,...patch}],now),[]);

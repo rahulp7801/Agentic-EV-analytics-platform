@@ -4,7 +4,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sportsbet.ledger import Ledger
-from sportsbet.graph.models import PropResult
+from sportsbet.graph.models import PropResult,EVSignal
 from sportsbet.scan import evaluate_event, quotes_from_event
 from sportsbet.scan import recommendation_quality
 
@@ -33,7 +33,11 @@ async def test_strongest_uncertainty_margin_gets_correlated_risk_slot_first(tmp_
     assert len(accepted)==1 and accepted[0]['line']==21.5 and accepted[0]['true_prob']==.6
     assert next(s for s in output['signals'] if s['line']==20.5)['gate_reason']=='correlated_exposure'
     assert len(ledger.predictions())==2  # Retain both immutable measured forecasts.
+    assert all(p['recommendation_policy_version']=='lower-bound-margin-v1' for p in ledger.predictions())
     assert recommendation_quality(None)==(Decimal('-Infinity'),0)
+    inconsistent=EVSignal(ev_percentage=Decimal('.1'),true_probability=Decimal('.6'),implied_probability=Decimal('.5'),
+        kelly_fraction=Decimal('.01'),confidence_interval=(Decimal('.7'),Decimal('.8')),trade_plan=[],market_type='player_pass_yds')
+    assert recommendation_quality(inconsistent)==(Decimal('-Infinity'),0)
 
 def event(sport='nba'):
     now=datetime.now(timezone.utc)

@@ -2,7 +2,9 @@ import {publicSignals} from './signalMetrics.ts';
 import type {EVSignal} from './types';
 
 export function conservativeMargin(signal:EVSignal):number|null {
-  return signal.confidence_interval ? signal.confidence_interval[0]-signal.implied_prob : null;
+  const interval=signal.confidence_interval;
+  return interval && interval[0]<=signal.true_prob && signal.true_prob<=interval[1]
+    && interval[1]<=1-(signal.push_probability ?? 0)+1e-12 ? interval[0]-signal.implied_prob : null;
 }
 
 export function compareQuality(a:EVSignal,b:EVSignal) {
