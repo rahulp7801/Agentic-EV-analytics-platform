@@ -95,7 +95,7 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    const timeout = window.setTimeout(() => controller.abort(), 8_000);
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     const results = await Promise.allSettled([
       json<MarketData>(`/api/markets?sport=${sport}`, controller.signal),
       json<Record<Sport, Scan>>('/api/scans', controller.signal),
