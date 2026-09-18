@@ -159,8 +159,8 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
             <span className={`${styles.liveDot} ${current ? styles.live : ''}`} />
             {current ? 'Current market observation' : 'Last published observation'}
           </div>
-          <h1>{sport.toUpperCase()} intelligence,<br /><span>with the evidence attached.</span></h1>
-          <p>Your players, the recorded forecasts, and the evidence to explore them. Start with a player, then check the price and the risks.</p>
+          <h1>{sport.toUpperCase()} research desk</h1>
+          <p>Explore real forecasts, player history, and the price behind each estimate.</p>
         </div>
         <div className={styles.heroActions}>
           <button type="button" className={styles.refresh} onClick={refresh} disabled={refreshing}>

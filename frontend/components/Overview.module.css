@@ -65,3 +65,9 @@
 @media (max-width: 720px) { .overview { padding: 24px 16px 100px; }.hero { grid-template-columns: 1fr; gap: 24px; }.hero h1 { font-size: 42px; }.heroActions { grid-template-columns: 1fr 1fr; }.primary { grid-column: auto; }.heroActions > span { text-align: left; }.metricGrid { grid-template-columns: 1fr 1fr; gap: 9px; }.metricCard { min-height: 144px; padding: 17px; }.metricCard strong { margin-top: 24px; }.comparisonRows article { grid-template-columns: 1fr auto; gap: 10px; }.comparisonRows article > div:nth-child(2), .comparisonRows article > div:nth-child(3) { display: none; } }
 @media (max-width: 430px) { .metricGrid { grid-template-columns: 1fr; }.heroActions { grid-template-columns: 1fr; }.primary { grid-column: 1; } }
 @media (prefers-reduced-motion: reduce) { .spinning, .loading span { animation: none; } }
+.overview { padding: clamp(24px,3vw,38px); }
+.hero { gap: 24px; padding-bottom: 26px; }
+.hero h1 { font-size: clamp(30px,3.5vw,46px); line-height: 1.08; }
+.hero p { margin-top: 14px; font-size: 14px; }
+.kicker { margin-bottom: 14px; }
+@media(max-width:720px) { .overview { padding: 22px 16px 100px; }.hero { gap: 18px; }.hero h1 { font-size: 32px; }.metricGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }.metricCard { min-height: 126px; padding: 15px; }.metricCard strong { margin-top: 18px; font-size: 32px; }.heroActions { grid-template-columns: 1fr 1fr; }.primary { grid-column: auto; } }
