@@ -2,6 +2,7 @@
 import Performance from "@/components/Performance";
 import { useState, useEffect, useCallback } from 'react';
 import type { EVSignal, Sport } from '@/lib/types';
+import {fetchForecasts} from '@/lib/fetchForecasts';
 import styles from './ResearchViews.module.css';
 
 interface EVDashboardProps {
@@ -321,8 +322,7 @@ export default function EVDashboard({ sport, onAddToParlay, parlayIds = new Set(
 
   const fetchSignals = useCallback(async () => {
     try {
-      const res = await fetch(`/api/signals?sport=${sport}`, { cache: 'no-store' });
-      const json = await res.json();
+      const json = await fetchForecasts(sport);
       setData(json);
 
     } catch {

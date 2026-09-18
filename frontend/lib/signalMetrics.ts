@@ -213,7 +213,7 @@ function publicGame(value:unknown) {
   if (!Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0,10)!==calendar)
     throw new Error('Invalid signal game');
   return {game_id:game.game_id,home_team:game.home_team,away_team:game.away_team,
-    date:game.date,sport:game.sport};
+    date:game.date,sport:game.sport as Sport};
 }
 
 /** Validate and project the complete stored signal snapshot boundary. */

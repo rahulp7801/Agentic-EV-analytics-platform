@@ -7,6 +7,7 @@ import { BACKTEST_METRICS, formatBacktestMetric, mispricedProps, strategySuggest
   type BacktestMetric, type BacktestReport } from '@/lib/backtestLab';
 import {forecastChecks, forecastResult, type ForecastBenchmarkBundle} from '@/lib/publicBenchmarks';
 import type { EVSignal, Sport } from '@/lib/types';
+import {fetchForecasts} from '@/lib/fetchForecasts';
 import styles from './BacktestLab.module.css';
 
 type Cohort = 'all' | 'recommendations';
@@ -51,7 +52,7 @@ export default function BacktestLab({ sport, preview = false }: Props) {
     const [all, recommendations, signalEnvelope, benchmarkEnvelope] = await Promise.allSettled([
       responseJson<BacktestReport>(`/api/metrics?cohort=all&sport=${sport}`, controller.signal),
       responseJson<BacktestReport>(`/api/metrics?cohort=recommendations&sport=${sport}`, controller.signal),
-      responseJson<{signals: EVSignal[]}>(`/api/signals?sport=${sport}`, controller.signal),
+      fetchForecasts(sport,controller.signal,'qualified'),
       responseJson<{benchmarks: ForecastBenchmarkBundle[]}>(`/api/benchmarks?sport=${sport}`, controller.signal),
     ]);
     if (controller.signal.aborted || request.current !== controller) return;

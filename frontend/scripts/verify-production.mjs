@@ -3,6 +3,8 @@ import { pathToFileURL } from 'node:url';
 
 export const paidPipelinePaths = [
   '/api/signals',
+  '/api/signals?sport=nfl&view=qualified',
+  '/api/signals?sport=nba&view=qualified',
   '/api/metrics',
   '/api/metrics?cohort=recommendations',
   '/api/scans',

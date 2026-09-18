@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Sport } from '@/lib/types';
 import { expectedProfit } from '@/lib/signalMetrics';
+import {fetchForecasts} from '@/lib/fetchForecasts';
 
 function fmt_odds(n: number) { return n > 0 ? '+' + n : String(n); }
 function fmt_pct(n: number) { return (n * 100).toFixed(1) + '%'; }
@@ -247,11 +248,9 @@ export default function Arbitrage({ sport }: { sport: Sport }) {
   const [refreshing, setRefreshing] = useState(false);
   const fetchEVSignals = useCallback(async () => {
     try {
-      const res = await fetch(`/api/signals?sport=${sport}`, { cache: 'no-store' });
-      if (!res.ok) { setEvSignals([]); return; }
-      const json = await res.json();
+      const json = await fetchForecasts(sport,undefined,'qualified');
       // Always update signals (including empty array) — never fall back to stale state
-      const filtered = ((json.signals ?? []) as Record<string, unknown>[]).filter(
+      const filtered = (json.signals.map(signal=>({...signal})) as Record<string, unknown>[]).filter(
         s => !s.gated && s.sport === sport
       );
       setEvSignals(filtered);

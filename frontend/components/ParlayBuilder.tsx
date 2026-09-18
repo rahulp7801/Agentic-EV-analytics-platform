@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { EVSignal, Sport } from '@/lib/types';
 import { parlayScenario, signalMetrics } from '@/lib/signalMetrics';
+import {fetchForecasts} from '@/lib/fetchForecasts';
 import styles from './ResearchViews.module.css';
 
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
@@ -20,8 +21,7 @@ export default function ParlayBuilder({ sport, externalLegs = [], onRemoveExtern
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/signals?sport=${sport}`, { cache: 'no-store', signal: controller.signal })
-      .then(response => { if (!response.ok) throw new Error(); return response.json(); })
+    fetchForecasts(sport,controller.signal,'qualified')
       .then(data => { if (!controller.signal.aborted) { setError(''); setSignals(data.signals ?? []); } })
       .catch(() => { if (!controller.signal.aborted) setError('Signals unavailable.'); });
     const timer = setInterval(() => setNow(Date.now()), 15_000);
