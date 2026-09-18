@@ -43,6 +43,7 @@ export default function PredictionEvidence({signal,onClose}:{signal:EVSignal;onC
         <dl><div><dt>Game starts</dt><dd>{time(signal.game_start_time)}</dd></div><div><dt>Price observed</dt><dd>{time(signal.snapped_at)}</dd></div></dl>
       </div>
       <div><h3>Injuries & teammates</h3>
+        {signal.player_profile && <p>Player profile: <strong>{signal.player_profile.name} · {signal.player_profile.team}{signal.player_profile.jersey ? ` · #${signal.player_profile.jersey}` : ''}{signal.player_profile.position ? ` · ${signal.player_profile.position}` : ''}</strong>. <a href={signal.player_profile.source_url} target="_blank" rel="noreferrer">Profile roster source</a> · Captured {time(signal.player_profile.captured_at)}. This presentation metadata does not update the original forecast’s availability evidence.</p>}
         <p><strong>{availability?.status==='observed' ? availability.subject_status : 'Current availability unavailable'}</strong></p>
         <p>{availability?.roster_confirmed ? `Matched to the captured ${availability.team} roster. ` : 'Roster identity is not confirmed. '}An unlisted injury does not confirm game-day participation. Final starters, minutes and snap counts are not verified here.</p>
         {availability?.status==='observed' && <>

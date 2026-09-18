@@ -1,4 +1,4 @@
-import type {AvailabilityEvidence,EVSignal,PropType,Sport} from './types';
+import type {AvailabilityEvidence,EVSignal,PlayerProfile,PropType,Sport} from './types';
 
 const CURRENT_MODEL_VERSION = 'empirical-jeffreys-v4';
 
@@ -112,9 +112,33 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     teammates,probability_adjusted:false};
 }
 
+/** Current identity metadata never supplies historical availability or eligibility. */
+export function publicPlayerProfile(value:unknown,sport:Sport,player:string,now=Date.now()):PlayerProfile|undefined {
+  if(!value || typeof value!=='object' || Array.isArray(value)) return undefined;
+  const p=value as Record<string,unknown>;
+  if(p.player!==player || !bounded(p.name,100) || !bounded(p.team,5)
+    || !bounded(p.player_id,20) || !/^[1-9][0-9]*$/.test(p.player_id)
+    || p.image_url!==`https://a.espncdn.com/i/headshots/${sport}/players/full/${p.player_id}.png`
+    || !timestamp(p.captured_at) || Date.parse(p.captured_at)>now+60000
+    || now-Date.parse(p.captured_at)>14*86400000 || !rosterSource(p.source_url,sport)
+    || !bounded(p.source_sha256,64) || !/^[a-f0-9]{64}$/.test(p.source_sha256)) return undefined;
+  const alias=p.name!==player;
+  if(alias && (sport!=='nfl' || p.identity_source_url!=='https://github.com/nflverse/nflverse-data/releases/download/players/players.csv'
+    || !bounded(p.identity_source_sha256,64) || !/^[a-f0-9]{64}$/.test(p.identity_source_sha256))) return undefined;
+  return {player,name:p.name,team:p.team,player_id:p.player_id,image_url:p.image_url,captured_at:p.captured_at,
+    source_url:p.source_url,source_sha256:p.source_sha256,
+    ...(bounded(p.jersey,2) && /^[0-9]{1,2}$/.test(p.jersey) ? {jersey:p.jersey} : {}),
+    ...(bounded(p.position,10) && /^[A-Z0-9/-]+$/.test(p.position) ? {position:p.position} : {}),
+    ...(alias ? {identity_source_url:p.identity_source_url as string,identity_source_sha256:p.identity_source_sha256 as string} : {})};
+}
+
 export function forecastWindow(signal:Pick<EVSignal,'game_start_time'>,now=Date.now()) {
   const start=Date.parse(signal.game_start_time ?? '');
   return Number.isFinite(start) && start>now ? 'upcoming' : 'archive';
+}
+
+export function latestForecastWindow(signals:EVSignal[],now=Date.now()) {
+  return signals.some(signal=>forecastWindow(signal,now)==='upcoming') ? 'upcoming' : 'archive';
 }
 
 /** Return the only signal shape allowed across the public API boundary. */
@@ -146,6 +170,7 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
         ([key,item])=>!bounded(key,64) || !bounded(item,300,true))
       || !bounded(s.market_type,100)) return null;
   const availability=publicAvailability(s.availability,sport);
+  const playerProfile=publicPlayerProfile(s.player_profile,sport,s.player,now);
   const metrics=signalMetrics({...s,availability},now);
   if (!finite(metrics.implied_prob) || !finite(metrics.ev_pct)
       || (metrics.expected_return !== null && !finite(metrics.expected_return))) return null;
@@ -162,6 +187,7 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
     gated:metrics.gated as boolean,...(gateReason ? {gate_reason:gateReason} : {}),
     sample_size:s.sample_size,mean_stat:mean as number|null,game_id:s.game_id,
     ...(availability ? {availability} : {}),
+    ...(playerProfile ? {player_profile:playerProfile} : {}),
     ...(bounded(s.forecast_cutoff,10) && /^\d{4}-\d{2}-\d{2}$/.test(s.forecast_cutoff)
       && Number.isFinite(Date.parse(s.forecast_cutoff)) ? {forecast_cutoff:s.forecast_cutoff} : {})};
 }

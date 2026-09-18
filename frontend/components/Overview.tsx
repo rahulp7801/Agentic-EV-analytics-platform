@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, CheckCircle2, CircleAlert, Clock3, Database, RefreshCw } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { marketFreshness } from '@/lib/marketFreshness';
-import type { Sport } from '@/lib/types';
+import type { EVSignal, Sport } from '@/lib/types';
+import {publicSignals,forecastWindow} from '@/lib/signalMetrics';
+import PlayerPortrait from './PlayerPortrait';
 import styles from './Overview.module.css';
 
 type Source = {
@@ -46,6 +48,7 @@ type Metrics = {
 };
 
 type DashboardData = {
+  forecasts?: EVSignal[];
   markets?: MarketData;
   scan?: Scan;
   games?: Array<unknown>;
@@ -81,7 +84,7 @@ async function json<T>(path: string, signal: AbortSignal): Promise<T> {
   return body as T;
 }
 
-export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpenMarkets: () => void }) {
+export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport: Sport; onOpenMarkets: () => void;onOpenPlayers:(player?:string)=>void }) {
   const reduceMotion = useReducedMotion();
   const [data, setData] = useState<DashboardData>({ errors: [], checkedAt: 0 });
   const [loading, setLoading] = useState(true);
@@ -98,22 +101,25 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
       json<Record<Sport, Scan>>('/api/scans', controller.signal),
       json<{ games: Array<unknown> }>(`/api/games?sport=${sport}`, controller.signal),
       json<Metrics>(`/api/metrics?sport=${sport}`, controller.signal),
+      json<{signals:EVSignal[]}>(`/api/signals?sport=${sport}`,controller.signal).then(body=>publicSignals(body.signals)),
     ]);
     window.clearTimeout(timeout);
-    if (controller.signal.aborted || request.current !== controller) return;
+    if (request.current !== controller) return;
     const errors: string[] = [];
     results.forEach((result, index) => {
-      if (result.status === 'rejected') errors.push(['Markets', 'Model scan', 'Schedule', 'Evaluation'][index]);
+      if (result.status === 'rejected') errors.push(['Markets', 'Model scan', 'Schedule', 'Evaluation','Player forecasts'][index]);
     });
     setData({
       markets: results[0].status === 'fulfilled' ? results[0].value : undefined,
       scan: results[1].status === 'fulfilled' ? results[1].value[sport] : undefined,
       games: results[2].status === 'fulfilled' ? results[2].value.games : undefined,
       metrics: results[3].status === 'fulfilled' ? results[3].value : undefined,
+      forecasts: results[4].status==='fulfilled' ? results[4].value.signals : undefined,
       errors,
       checkedAt: Date.now(),
     });
     setLoading(false);
+    setRefreshing(false);
   }, [sport]);
 
   useEffect(() => {
@@ -136,12 +142,14 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
   const linkedProps = Number(kalshi?.coverage?.prop_linked_markets ?? 0);
   const twoSided = Number(kalshi?.coverage?.prop_two_sided_quote_markets ?? 0);
   const current = marketFreshness(data.markets?.captured_at, data.checkedAt) === 'current';
+  const players=[...new Map((data.forecasts ?? []).map(signal=>[signal.player,signal])).values()];
+  const upcoming=(data.forecasts ?? []).filter(signal=>forecastWindow(signal,data.checkedAt)==='upcoming').length;
   const cards = useMemo(() => [
     { label: 'Games observed', value: data.games?.length ?? null, note: `${sport.toUpperCase()} schedule window`, tone: 'blue' },
     { label: 'Kalshi player props', value: kalshi ? linkedProps : null, note: kalshi ? `${twoSided} with two-sided quotes` : 'No market capture', tone: 'violet' },
-    { label: 'Model estimates', value: data.scan?.model_estimates ?? null, note: data.scan?.label ?? 'No model scan', tone: data.scan?.state === 'complete' ? 'green' : 'amber' },
+    { label: 'Recorded forecasts', value: data.forecasts?.length ?? null, note: `${players.length} players · ${upcoming} upcoming forecasts`, tone: 'green' },
     { label: 'Evaluation sample', value: data.metrics?.sample_size ?? null, note: data.metrics ? `${data.metrics.pending_count} pending · ${data.metrics.settled_count} settled · ${data.metrics.excluded_missing_metadata} excluded` : 'No metrics snapshot', tone: 'slate' },
-  ], [data, kalshi, linkedProps, sport, twoSided]);
+  ], [data, kalshi, linkedProps, sport, twoSided,players.length,upcoming]);
 
   return (
     <motion.section className={styles.overview} initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }}>
@@ -152,15 +160,15 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
             {current ? 'Current market observation' : 'Last published observation'}
           </div>
           <h1>{sport.toUpperCase()} intelligence,<br /><span>with the evidence attached.</span></h1>
-          <p>Current coverage, model state, and evaluation are shown separately so an unavailable source never masquerades as a zero.</p>
+          <p>Your players, the recorded forecasts, and the evidence to explore them. Start with a player, then check the price and the risks.</p>
         </div>
         <div className={styles.heroActions}>
           <button type="button" className={styles.refresh} onClick={refresh} disabled={refreshing}>
             <RefreshCw size={16} className={refreshing ? styles.spinning : undefined} />
             Refresh
           </button>
-          <button type="button" className={styles.primary} onClick={onOpenMarkets}>
-            Explore markets <ArrowUpRight size={17} />
+          <button type="button" className={styles.primary} onClick={()=>onOpenPlayers()}>
+            Explore players <ArrowUpRight size={17} />
           </button>
           <span>{data.markets ? `Captured ${elapsed(data.markets.captured_at, data.checkedAt)}` : 'Awaiting market capture'}</span>
         </div>
@@ -181,6 +189,11 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
                 </article>
               ))}
             </div>
+
+            <section className={styles.playersPanel} aria-label="Recorded player forecasts">
+              <div className={styles.comparisonHeading}><div><span>Your research starts here</span><h2>{upcoming ? 'Players on the next slate' : 'Players on the recorded slate'}</h2></div><button type="button" onClick={()=>onOpenPlayers()}>All players <ArrowUpRight size={15} /></button></div>
+              {players.length ? <><div className={styles.playersGrid}>{players.slice(0,8).map(signal=><button type="button" key={signal.player} onClick={()=>onOpenPlayers(signal.player)}><PlayerPortrait signal={signal} /><strong>{signal.player}</strong><small>{signal.player_profile?.team ?? signal.availability?.team ?? sport.toUpperCase()}{signal.player_profile?.jersey ? ` · #${signal.player_profile.jersey}` : ''}{signal.player_profile?.position ? ` · ${signal.player_profile.position}` : ''}</small><span>{data.forecasts?.filter(s=>s.player===signal.player).length} forecasts <ArrowUpRight size={12} /></span></button>)}</div><p>{upcoming ? 'Upcoming records still require fresh quotes and all model risk checks.' : 'Recorded forecasts remain available after kickoff. Historical prices are expired; these are research records, not current picks.'} Player profiles show separately captured roster metadata.</p></> : <div className={styles.emptyComparisons}>{loading ? 'Loading your players…' : data.errors.includes('Player forecasts') ? 'Player records could not be loaded. Refresh to try again.' : `No ${sport.toUpperCase()} player forecasts are published. Switch leagues to explore available records.`}</div>}
+            </section>
 
             <div className={styles.contentGrid}>
               <section className={styles.panel}>
@@ -205,7 +218,7 @@ export default function Overview({ sport, onOpenMarkets }: { sport: Sport; onOpe
 
               <section className={`${styles.panel} ${styles.truthPanel}`}>
                 <div className={styles.panelHeader}>
-                  <div><span>Evidence state</span><h2>Why some metrics are blank</h2></div>
+                  <div><span>Evidence state</span><h2>What the numbers mean</h2></div>
                   <CircleAlert size={20} />
                 </div>
                 <div className={styles.truthList}>

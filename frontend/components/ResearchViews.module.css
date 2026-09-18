@@ -325,6 +325,15 @@
 .emptyState, .loadingState { background: var(--bg-base); }.emptyPanel { overflow: hidden; border-color: var(--border-dim); border-radius: 22px; background: var(--bg-surface); box-shadow: var(--shadow-md); }.emptyCopy h2 { color: var(--text-primary); font-family: var(--font-sans), sans-serif; font-weight: 600; letter-spacing: -.045em; text-transform: none; }.emptyChecks, .emptyChecks div, .emptyEyebrow { border-color: var(--border-dim); }.emptyEyebrow { color: var(--accent-amber); }
 
 .forecastHeading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:24px 20px 16px; }
+.archiveNotice { margin: 0 20px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 14px 18px; border-radius: 14px; background: var(--bg-surface); border: 1px solid var(--border-dim); font: 12px/1.6 var(--font-sans),sans-serif; color: var(--text-secondary); }
+.archiveNotice strong { color: var(--text-primary); }
+.playerShelf { display: flex; overflow-x: auto; flex-shrink: 0; gap: 10px; padding: 4px 20px 16px; }
+.playerShelf button { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 0 0 138px; padding: 16px 10px; border-radius: 18px; border: 1px solid var(--border-dim); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; font: 13px var(--font-sans),sans-serif; }
+.playerShelf button[aria-pressed="true"] { border-color: var(--accent); background: var(--bg-base); }
+.playerShelf button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.playerShelf small { color: var(--text-secondary); font-size: 11px; }
+.moreForecasts { display: flex; justify-content: center; padding: 12px 20px 28px; }
+@media(max-width:720px) { .archiveNotice { margin-left: 10px; margin-right: 10px; }.playerShelf { padding-left: 10px; padding-right: 10px; } }
 .forecastHeading h2 { margin:0; font:600 28px var(--font-sans),sans-serif; letter-spacing:-.04em; color:var(--text-primary); }
 .forecastHeading p { margin:6px 0 0; color:var(--text-secondary); font:13px var(--font-sans),sans-serif; }
 .forecastControls { display:flex; align-items:flex-start; flex-wrap:wrap; gap:10px; padding:0 20px 16px; }

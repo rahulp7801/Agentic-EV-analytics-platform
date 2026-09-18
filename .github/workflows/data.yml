@@ -100,6 +100,11 @@ jobs:
             exit 0
           fi
           exit "$status"
+      - name: Update source-backed player profiles
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
+        run: uv run --locked python -m sportsbet.player_profiles --sport "$SPORT"
       - name: Stage public evidence without configured credentials
         if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'public_daily' || env.OPERATION == 'public_monitor' || env.OPERATION == 'refresh' || env.OPERATION == 'scan')
         id: evidence
