@@ -77,6 +77,16 @@ def create_daily_graph():
                 evidence[sport]=combined
             else:
                 evidence[sport]=current
+            future=await collect_schedule(sport,now,offsets=(2,3,4,5,6))
+            partial=current['status']!='complete' or future['status']!='complete'
+            slate={**current,'captured_at':future['captured_at'],
+                'games':current.get('games',[])+future.get('games',[]),
+                'failures':current.get('failures',[])+future.get('failures',[]),
+                'sources':current.get('sources',[])+future.get('sources',[]),
+                'partial':partial,'status':'complete' if not partial else 'unavailable' if (
+                    current['status']=='unavailable' and future['status']=='unavailable') else 'partial'}
+            publish_snapshot('slate:'+sport,slate)
+            results[sport]['slate_status']=slate['status']
         return {'schedules':results,'schedule_evidence':evidence}
 
     async def histories(state):

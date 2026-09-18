@@ -116,7 +116,8 @@ async def test_daily_uses_catchup_evidence_but_publishes_current_schedule_only(m
         'failures':[],'sources':['current']}
     older={'status':'complete','captured_at':datetime.now(timezone.utc).isoformat(),
         'games':[{'label':'2026-09-05'}],'failures':[],'sources':['older']}
-    collector=AsyncMock(side_effect=[current,older])
+    future={'status':'complete','captured_at':current['captured_at'],'games':[{'label':'2026-09-20'}]}
+    collector=AsyncMock(side_effect=[current,older,future])
     monkeypatch.setattr(daily,'collect_schedule',collector)
     monkeypatch.setattr(daily,'pending_schedule_offsets',lambda ledger,sport,now:(-30,-8))
     monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
@@ -128,11 +129,13 @@ async def test_daily_uses_catchup_evidence_but_publishes_current_schedule_only(m
     monkeypatch.setattr(daily,'scan',AsyncMock(return_value={'nfl':{'status':'complete'}}))
     report=await daily.run(['nfl'],'daily',25)
     assert report['status']=='complete'
-    assert collector.await_count==2
-    current_call,older_call=collector.await_args_list
+    assert collector.await_count==3
+    current_call,older_call,future_call=collector.await_args_list
     assert current_call.args[0]=='nfl' and current_call.args[1] is older_call.args[1]
     assert current_call.kwargs=={}
     assert older_call.kwargs=={'offsets':(-30,-8,-7,-6,-5,-4,-3,-2)}
+    assert future_call.kwargs=={'offsets':(2,3,4,5,6)}
+    assert [game['label'] for game in stored['slate:nfl']['games']]==['Yesterday','Today','Tomorrow','2026-09-20']
     assert [game['label'] for game in stored['schedule:nfl']['games']]==['Yesterday','Today','Tomorrow']
     assert [game['label'] for game in settled[0]['games']]==['2026-09-05','Yesterday','Today','Tomorrow']
 
@@ -144,7 +147,7 @@ async def test_catchup_failure_degrades_settlement_without_hiding_current_schedu
         'games':[{'label':'Today'}],'failures':[],'sources':['current']}
     older={'status':'unavailable','captured_at':datetime.now(timezone.utc).isoformat(),
         'games':[],'failures':[{'date':'old'}],'sources':[]}
-    monkeypatch.setattr(daily,'collect_schedule',AsyncMock(side_effect=[current,older]))
+    monkeypatch.setattr(daily,'collect_schedule',AsyncMock(side_effect=[current,older,current]))
     monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
     monkeypatch.setattr(daily,'refresh_history',lambda *args:{'status':'complete'})
     monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:
@@ -156,6 +159,23 @@ async def test_catchup_failure_degrades_settlement_without_hiding_current_schedu
     assert report['status']=='degraded' and report['schedules']['nba']['status']=='complete'
     assert stored['schedule:nba']==current and settled[0]['status']=='partial'
     scan.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_future_schedule_failure_keeps_current_fixtures_and_marks_partial_slate(monkeypatch):
+    stored={}
+    current={'status':'complete','captured_at':datetime.now(timezone.utc).isoformat(),
+        'games':[{'label':'Today'}],'sources':['current'],'failures':[]}
+    future={'status':'unavailable','captured_at':current['captured_at'],'games':[],
+        'sources':[],'failures':[{'date':'20260920','error_type':'HTTPStatusError'}]}
+    monkeypatch.setattr(daily,'collect_schedule',AsyncMock(side_effect=[current,future]))
+    monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    monkeypatch.setattr(daily,'watch',AsyncMock(return_value=({'sources':{'kalshi':{
+        'status':'observed','partial_coverage':False}},'captured_at':current['captured_at']},None)))
+    result=await daily.run(['nfl'],'public_monitor',25)
+    assert stored['schedule:nfl']==current
+    assert stored['slate:nfl']['games']==current['games'] and stored['slate:nfl']['partial'] is True
+    assert result['schedules']['nfl']['slate_status']=='partial'
 
 
 @pytest.mark.asyncio
