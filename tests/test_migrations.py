@@ -25,6 +25,45 @@ def get_alembic_cfg(url: str) -> alembic.config.Config:
 
 
 @pytest.mark.serial
+@pytest.mark.skipif(not os.environ.get('SPORTSBET_TEST_DATABASE_URL'), reason='Disposable database required')
+def test_browser_role_migration_closes_owner_view_and_preserves_data():
+    url = os.environ['SPORTSBET_TEST_DATABASE_URL']
+    cfg = get_alembic_cfg(url)
+    alembic.command.upgrade(cfg, '0023_worker_snapshot_append')
+    engine = sa.create_engine(url)
+    created = []
+    try:
+        with engine.begin() as conn:
+            for role in ('anon', 'authenticated'):
+                if not conn.execute(sa.text('SELECT 1 FROM pg_roles WHERE rolname=:role'), {'role': role}).first():
+                    conn.execute(sa.text(f'CREATE ROLE {role} NOLOGIN'))
+                    created.append(role)
+                conn.execute(sa.text(f'GRANT ALL ON public.dashboard_snapshots, public.dashboard_gamelogs TO {role}'))
+            conn.execute(sa.text("INSERT INTO dashboard_snapshots(snapshot_key,payload) VALUES ('acl-proof','{}')"))
+        alembic.command.upgrade(cfg, 'head')
+        with engine.connect() as conn:
+            assert conn.execute(sa.text("SELECT count(*) FROM dashboard_snapshots WHERE snapshot_key='acl-proof'")).scalar_one() == 1
+            for role in ('anon', 'authenticated'):
+                for table in ('public.dashboard_snapshots', 'public.dashboard_gamelogs'):
+                    assert not conn.execute(sa.text("SELECT has_table_privilege(:role,:table,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')"),
+                                            {'role': role, 'table': table}).scalar_one()
+        for role in ('anon', 'authenticated'):
+            with pytest.raises(sa.exc.ProgrammingError):
+                with engine.begin() as conn:
+                    conn.execute(sa.text(f'SET LOCAL ROLE {role}'))
+                    conn.execute(sa.text('SELECT * FROM public.dashboard_gamelogs LIMIT 1'))
+        alembic.command.downgrade(cfg, '0023_worker_snapshot_append')
+        with engine.connect() as conn:
+            assert not conn.execute(sa.text("SELECT has_table_privilege('anon','public.dashboard_gamelogs','SELECT')")).scalar_one()
+    finally:
+        alembic.command.downgrade(cfg, 'base')
+        with engine.begin() as conn:
+            for role in created:
+                conn.execute(sa.text(f'DROP ROLE {role}'))
+        engine.dispose()
+
+
+@pytest.mark.serial
 @pytest.mark.skipif(
     not os.environ.get("SPORTSBET_TEST_DATABASE_URL"),
     reason="SPORTSBET_TEST_DATABASE_URL not set",

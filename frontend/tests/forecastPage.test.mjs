@@ -6,7 +6,7 @@ const now=Date.now(),stamp=new Date(now).toISOString();
 const base={id:'A',player:'A',team:'KC',opponent:'BUF',sport:'nfl',home_team:'Kansas City Chiefs',away_team:'Washington Commanders',game_id:'game',
   prop_type:'pass_yds',line:249.5,direction:'over',true_prob:.6,american_odds:100,push_probability:0,
   sportsbook:'draftkings',model_version:'empirical-jeffreys-v4',sample_size:40,mean_stat:260,
-  confidence_interval:[.55,.65],kelly_fraction:.01,gated:false,trade_plan:[],injury_flags:{},market_type:'player_pass_yds',
+  confidence_interval:[.55,.65],kelly_fraction:.01,gated:false,forecast_cutoff:new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(now+3600000),trade_plan:[],injury_flags:{},market_type:'player_pass_yds',
   snapped_at:stamp,game_start_time:new Date(now+3600000).toISOString(),
   availability:{status:'observed',roster_confirmed:true,subject_status:'Not listed on injury report',probability_adjusted:false,
     captured_at:stamp,team:'KC',teammates:[],
@@ -81,4 +81,42 @@ test('missing evidence stays absent and invalid rows advance the cursor safely',
   assert.equal(result.pagination.next_offset,2);
   const empty=forecastPage({...input([]),metadata:null},request(),now);
   assert.equal(empty.generated_at,null);assert.equal(empty.pagination.complete,true);
+});
+
+test('verified research survives a later timeout or temporary failure without claiming completeness',async()=>{
+  for(const failure of [409,429,503,'timeout']) {
+    let calls=0;
+    const result=await fetchForecasts('nfl',undefined,'library',async(url)=>{
+      if(calls++>0) {
+        if(failure==='timeout') throw new DOMException('Timed out','TimeoutError');
+        return {ok:false,status:failure};
+      }
+      const options=forecastRequest(new URL(url,'https://example.test'));
+      return {ok:true,json:async()=>forecastPage(input(Array(100).fill(base),240),options,now)};
+    });
+    assert.equal(result.signals.length,100);assert.equal(result.total_count,240);
+    assert.equal(result.complete,false);assert.equal(calls,2);
+  }
+});
+
+test('initial failures, cancellation and inconsistent coverage cannot become a usable partial response',async()=>{
+  await assert.rejects(fetchForecasts('nfl',undefined,'library',async()=>({ok:false,status:503})),/unavailable/);
+  let calls=0;
+  await assert.rejects(fetchForecasts('nfl',undefined,'library',async(url)=>{
+    if(calls++>0) throw new DOMException('Cancelled','AbortError');
+    const options=forecastRequest(new URL(url,'https://example.test'));
+    return {ok:true,json:async()=>forecastPage(input(Array(100).fill(base),240),options,now)};
+  }),{name:'AbortError'});
+  for(const failure of ['total','cursor']) {
+    calls=0;
+    await assert.rejects(fetchForecasts('nfl',undefined,'library',async(url)=>{
+      const options=forecastRequest(new URL(url,'https://example.test'));
+      const body=forecastPage(input(Array(100).fill(base),240),options,now);
+      if(calls++>0) {if(failure==='total') body.total_count=241;else body.pagination.next_offset=0;}
+      return {ok:true,json:async()=>body};
+    }),/coverage|cursor/);
+  }
+  const options=forecastRequest(new URL('https://example.test/api/signals?sport=nfl&view=qualified'));
+  const result=await fetchForecasts('nfl',undefined,'qualified',async()=>({ok:true,json:async()=>forecastPage(input([base],5002),options,now)}));
+  assert.deepEqual(result.signals,[]);assert.equal(result.complete,false);
 });

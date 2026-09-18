@@ -1,0 +1,67 @@
+{
+  "firewallEnabled": true,
+  "rules": [
+    {
+      "id": "dashboard-dynamic-rate-limit",
+      "name": "Limit public dashboard dynamic requests",
+      "description": "240 dynamic requests per minute per source IP; assets excluded.",
+      "active": true,
+      "conditionGroup": [
+        {
+          "conditions": [
+            {
+              "type": "path",
+              "op": "pre",
+              "neg": true,
+              "value": "/_next/static/"
+            },
+            {
+              "type": "path",
+              "op": "neq",
+              "value": "/favicon.ico"
+            },
+            {
+              "type": "path",
+              "op": "neq",
+              "value": "/file.svg"
+            },
+            {
+              "type": "path",
+              "op": "neq",
+              "value": "/globe.svg"
+            },
+            {
+              "type": "path",
+              "op": "neq",
+              "value": "/next.svg"
+            },
+            {
+              "type": "path",
+              "op": "neq",
+              "value": "/vercel.svg"
+            },
+            {
+              "type": "path",
+              "op": "neq",
+              "value": "/window.svg"
+            }
+          ]
+        }
+      ],
+      "action": {
+        "mitigate": {
+          "action": "rate_limit",
+          "rateLimit": {
+            "algo": "fixed_window",
+            "window": 60,
+            "limit": 240,
+            "keys": [
+              "ip"
+            ],
+            "action": "rate_limit"
+          }
+        }
+      }
+    }
+  ]
+}

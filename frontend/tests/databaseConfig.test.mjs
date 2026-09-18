@@ -15,3 +15,12 @@ test('custom CA preserves credentials and enforces certificate and hostname veri
   assert.throws(()=>databaseConfig(undefined),/unavailable/);
   assert.equal(new URL(databaseConfig(value).connectionString).searchParams.get('sslmode'),'verify-full');
 });
+
+test('hosted connections cannot silently use plaintext or skip certificate verification',()=>{
+  const value='postgresql://reader:synthetic@pooler.example/postgres';
+  for(const suffix of ['', '?sslmode=disable','?sslmode=require','?sslmode=no-verify']) {
+    assert.throws(()=>databaseConfig(value+suffix,undefined,true),/verification/);
+  }
+  assert.ok(databaseConfig(value+'?sslmode=verify-full','Public CA',true).ssl.rejectUnauthorized);
+  assert.ok(databaseConfig('postgresql://localhost/sportsbet').connectionString);
+});

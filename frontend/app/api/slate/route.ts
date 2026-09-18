@@ -18,5 +18,5 @@ export async function GET(request:Request) {
   result ??=await liveSchedule(sport,now,6);
   if(result.status!==200) return Response.json(result.body,{status:503,headers:{'Cache-Control':'no-store'}});
   return Response.json({...result.body,games:slateReadiness(result.body.games,scan,now),coverage_available,
-    settlements:settlementProgress(reports,sport,now),window_days:7},{headers:{'Cache-Control':'no-store'}});
+    settlements:settlementProgress(reports,sport,now),window_days:7},{headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
 }

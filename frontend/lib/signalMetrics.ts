@@ -27,16 +27,23 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
     ? 'availability_unavailable'
     : !['Active','Not listed on injury report'].includes(availability.subject_status) ? 'player_availability_risk'
     : availability.teammates.some(row=>row.status!=='Active') ? 'teammate_availability_unmodeled' : null;
-  const reason = !valid ? 'invalid_metrics' : legacy ? 'legacy_model' : synthetic ? 'synthetic_price'
-    : stale ? 'stale_quote' : started ? 'missing_or_started_game' : (!Number.isFinite(sample) || sample < 20) ? 'insufficient_sample'
-    : (!Number.isFinite(kelly) || kelly < 0 || kelly > 0.25) ? 'invalid_stake'
-    : availabilityReason ? availabilityReason
-    : s.gated ? String(s.gate_reason ?? 'risk_gate') : null;
   const b = odds < 0 ? 100 / -odds : odds / 100;
   const ci = s.confidence_interval;
   const interval = !legacy && Array.isArray(ci) && ci.length === 2 && ci.every(x => typeof x === 'number' && Number.isFinite(x))
     && ci[0] >= 0 && ci[0] <= ci[1] && ci[1] <= 1 ? ci : null;
   const breakEven = (1 - push) / (1 + b);
+  const expectedReturn=p*b-(1-p-push);
+  const cutoff=Number.isFinite(start) ? new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(start) : null;
+  const reason = !valid ? 'invalid_metrics' : legacy ? 'legacy_model' : synthetic ? 'synthetic_price'
+    : stale ? 'stale_quote' : started ? 'missing_or_started_game' : (!Number.isFinite(sample) || sample < 20) ? 'insufficient_sample'
+    : (!Number.isFinite(kelly) || kelly < 0 || kelly > 0.25) ? 'invalid_stake'
+    : availabilityReason ? availabilityReason
+    : s.gated!==false ? String(s.gate_reason ?? 'risk_gate')
+    : s.forecast_cutoff!==cutoff ? 'missing_prediction_cutoff'
+    : !interval || interval[0]>p || interval[1]<p || interval[1]>1-push+1e-12 ? 'uncertainty_unavailable'
+    : p-breakEven>.15+1e-12 ? 'edge_review_limit'
+    : expectedReturn<=0 ? 'no_positive_edge'
+    : interval[0]<=breakEven ? 'edge_not_confident' : null;
   return {...s, implied_prob: valid && !synthetic ? breakEven : s.implied_prob,
     ev_pct: valid && !synthetic ? p - breakEven : s.ev_pct, expected_return: valid && !legacy && !synthetic ? p * b - (1 - p - push) : null,
     confidence_interval: interval, strength: 'unrated', gated: reason !== null, gate_reason: reason,

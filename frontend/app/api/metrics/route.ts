@@ -14,12 +14,12 @@ export async function GET(request: Request) {
     if (hosted) {
       const data = await snapshot(metricSnapshotKey(cohort, sport));
       if (!data) return NextResponse.json({error:'No evaluation metrics have been published yet.'}, {status:503});
-      return NextResponse.json(publicMetrics(data, cohort, sport), {headers:{'Cache-Control':'no-store'}});
+      return NextResponse.json(publicMetrics(data, cohort, sport), {headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
     }
     const { stdout } = await promisify(execFile)(PYTHON, metricLedgerArgs(cohort, sport), {
       cwd: ROOT, timeout: 20000, env: {...process.env, PYTHONIOENCODING: 'utf-8'},
     });
-    return NextResponse.json(publicMetrics(JSON.parse(stdout), cohort, sport), {headers: {'Cache-Control': 'no-store'}});
+    return NextResponse.json(publicMetrics(JSON.parse(stdout), cohort, sport), {headers: {'Cache-Control': 'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
     return NextResponse.json({error: 'Evaluation metrics are temporarily unavailable.'}, {status: 503});
   }
