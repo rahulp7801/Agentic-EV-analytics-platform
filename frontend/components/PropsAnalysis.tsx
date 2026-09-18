@@ -7,6 +7,7 @@ import {forecastWindow,latestForecastWindow,publicSignals} from '@/lib/signalMet
 import PlayerPortrait from './PlayerPortrait';
 import {Bookmark,RefreshCw,LayoutGrid,List} from 'lucide-react';
 import {motion,useReducedMotion} from 'motion/react';
+import {compareQuality} from '@/lib/bestPicks';
 
 // PropAnalysis is derived from real EV signals — no mock data
 interface PropsAnalysisProps { sport: Sport; initialPlayer?:string; }
@@ -75,7 +76,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
   const [view,setView]=useState('cards');
   const [shortlist,setShortlist]=useState<string[]>([]);
   const [scope,setScope]=useState('all');
-  const [sort,setSort]=useState('edge');
+  const [sort,setSort]=useState('quality');
   const [refresh,setRefresh]=useState(0);
   const [storageNotice,setStorageNotice]=useState('');
   const reduceMotion=useReducedMotion();
@@ -147,7 +148,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
     if (effectivePropFilter !== 'all' && p.prop_type !== effectivePropFilter) return false;
     if (minEV>0 && p.ev_pct < minEV / 100) return false;
     return true;
-  }).sort((a,b)=>sort==='player' ? a.player.localeCompare(b.player) : sort==='sample' ? (b.sample_size ?? 0)-(a.sample_size ?? 0) : b.ev_pct-a.ev_pct);
+  }).sort((a,b)=>sort==='quality' ? Number(a.gated)-Number(b.gated) || compareQuality(a,b) : sort==='player' ? a.player.localeCompare(b.player) : sort==='sample' ? (b.sample_size ?? 0)-(a.sample_size ?? 0) : b.ev_pct-a.ev_pct);
 
   if (loading && !allProps.length) return (
     <div className={styles.loadingState}>
@@ -173,7 +174,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
           <div className={styles.filterFields}>
             <label>Prop<select aria-label="Prop type" className="term-select" value={effectivePropFilter} onChange={e=>setPropFilter(e.target.value)}><option value="all">All props</option>{leagueProps.map(p=><option key={p} value={p}>{PROP_LABELS[p]}</option>)}</select></label>
             <label>Eligibility<select aria-label="Forecast shortlist" className="term-select" value={scope} onChange={e=>setScope(e.target.value)}><option value="all">All estimates</option><option value="saved">Saved players</option><option value="eligible">Research eligible</option></select></label>
-            <label>Sort<select aria-label="Sort forecasts" className="term-select" value={sort} onChange={e=>setSort(e.target.value)}><option value="edge">Highest edge</option><option value="sample">Largest sample</option><option value="player">Player A-Z</option></select></label>
+            <label>Sort<select aria-label="Sort forecasts" className="term-select" value={sort} onChange={e=>setSort(e.target.value)}><option value="quality">Strongest supported margin</option><option value="edge">Point-estimate edge</option><option value="sample">Largest sample</option><option value="player">Player A-Z</option></select></label>
             <label htmlFor="prop-min-edge">Minimum edge: {minEV}pp<input id="prop-min-edge" aria-valuetext={`${minEV} percentage points`} type="range" min={0} max={20} step={1} value={minEV} onChange={e=>setMinEV(Number(e.target.value))} /></label>
             <button className={styles.uxButton} type="button" onClick={resetFilters}>Reset filters</button>
           </div>

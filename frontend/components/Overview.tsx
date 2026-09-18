@@ -7,6 +7,7 @@ import { marketFreshness } from '@/lib/marketFreshness';
 import type { EVSignal, Sport } from '@/lib/types';
 import {publicSignals,forecastWindow} from '@/lib/signalMetrics';
 import PlayerPortrait from './PlayerPortrait';
+import {bestPicks,conservativeMargin} from '@/lib/bestPicks';
 import styles from './Overview.module.css';
 
 type Source = {
@@ -144,6 +145,7 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
   const current = marketFreshness(data.markets?.captured_at, data.checkedAt) === 'current';
   const players=[...new Map((data.forecasts ?? []).map(signal=>[signal.player,signal])).values()];
   const upcoming=(data.forecasts ?? []).filter(signal=>forecastWindow(signal,data.checkedAt)==='upcoming').length;
+  const picks=bestPicks(data.forecasts ?? []);
   const cards = useMemo(() => [
     { label: 'Games observed', value: data.games?.length ?? null, note: `${sport.toUpperCase()} schedule window`, tone: 'blue' },
     { label: 'Kalshi player props', value: kalshi ? linkedProps : null, note: kalshi ? `${twoSided} with two-sided quotes` : 'No market capture', tone: 'violet' },
@@ -189,6 +191,12 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
                 </article>
               ))}
             </div>
+
+            <section className={styles.shortlist} aria-label="Qualified picks">
+              <div><h2>Strongest qualified picks <span>{picks.length}</span></h2><p>{picks.length ? 'Ranked by the margin that remains at the reported 95% lower probability bound.' : 'No picks clear every current check. Explore the recorded forecasts below.'}</p></div>
+              <details><summary>How picks qualify</summary><p>Fresh prices, at least 20 prior games, verified roster and injury screening, a positive lower-bound margin above the price’s break-even probability, and approved risk limits. At most three distinct player/game choices; the list can stay empty. Ranking measures model evidence, not guaranteed profit or proven future performance.</p></details>
+              {picks.length>0 && <div className={styles.pickRows}>{picks.map(pick=><button key={pick.id} type="button" onClick={()=>onOpenPlayers(pick.player)}><PlayerPortrait signal={pick} /><div><strong>{pick.player}</strong><small>{pick.direction} {pick.line} {pick.prop_type.replaceAll('_',' ')} · {pick.sportsbook}</small></div><span>+{(conservativeMargin(pick)!*100).toFixed(1)}pp<small>Lower-bound margin</small></span></button>)}</div>}
+            </section>
 
             <section className={styles.playersPanel} aria-label="Recorded player forecasts">
               <div className={styles.comparisonHeading}><div><span>Your research starts here</span><h2>Players in your forecast library</h2></div><button type="button" onClick={()=>onOpenPlayers()}>All players <ArrowUpRight size={15} /></button></div>

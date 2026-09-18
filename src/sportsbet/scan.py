@@ -30,6 +30,19 @@ MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl'}
 MAX_MODEL_CONCURRENCY = 8
 FORECAST_HORIZON_HOURS = 48
+RECOMMENDATION_POLICY_VERSION = 'lower-bound-margin-v1'
+
+
+def recommendation_quality(signal):
+    """Rank supported uncertainty margins before allocating correlated risk."""
+    if not signal or not signal.confidence_interval:
+        return Decimal('-Infinity'), 0
+    lower,upper=signal.confidence_interval
+    if (not all(value.is_finite() for value in (lower,upper,signal.true_probability,signal.push_probability,
+            signal.implied_probability)) or not 0<=lower<=signal.true_probability<=upper<=1-signal.push_probability):
+        return Decimal('-Infinity'),0
+    margin=signal.confidence_interval[0]-signal.implied_probability
+    return (margin, signal.sample_size or 0) if margin.is_finite() else (Decimal('-Infinity'),0)
 
 def timestamp(value: str) -> datetime:
     result=datetime.fromisoformat(value.replace('Z','+00:00'))
@@ -117,6 +130,9 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     modeled=await asyncio.gather(*(model(selection) for selection in prepared))
     if any(state.get('error') for _,state in modeled):
         raise RuntimeError('Model evaluation failed')
+    # Alphabetical/line order must not consume a player's risk slot ahead of a
+    # stronger qualified estimate. Keep all forecasts; retain every existing gate.
+    modeled.sort(key=lambda candidate:recommendation_quality(candidate[1].get('ev_signal')),reverse=True)
     for selection,state in modeled:
         player,market,line,side,quote,player_id=selection
         prop=state.get('nba_prop_result' if sport=='nba' else 'prop_result')
@@ -136,6 +152,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         if signal:
             if now >= start: reason='game_started'
             elif not -60 <= (now-quote.snapped_at).total_seconds() <= 300: reason='stale_quote'
+            elif recommendation_quality(signal)[0]<=0: reason='edge_not_confident'
             elif availability_reason: reason=availability_reason
             else: accepted,reason=ledger.reserve(signal,float(line))
         payload=dict(game_id=event['id'],player=player,player_id=player_id,sport=sport,
@@ -148,7 +165,8 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             quote_time=quote.snapped_at.isoformat(),model_generated_at=now.isoformat(),
             quote_source_provider=quote.source_provider,quote_source_sha256=quote.source_sha256,
             quote_source_record_sha256=quote.source_record_sha256,accepted=accepted,gate_reason=reason,
-            stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version=MODEL_VERSION)
+            stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version=MODEL_VERSION,
+            recommendation_policy_version=RECOMMENDATION_POLICY_VERSION)
         counts[reason] += 1
         # Publish every measured forecast, including non-recommended estimates.
         # Availability screens eligibility; v4 remains an unchanged historical baseline.
