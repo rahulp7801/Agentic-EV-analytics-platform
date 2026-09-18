@@ -25,6 +25,7 @@ export interface AvailabilityEvidence {
 }
 
 export interface EVSignal {
+  player_profile?: PlayerProfile;
   id: string;
   player: string;
   team: string;
@@ -66,6 +67,21 @@ export interface EVSignal {
   game_id?: string;
   availability?: AvailabilityEvidence;
   forecast_cutoff?: string;
+}
+
+export interface PlayerProfile {
+  player: string;
+  name: string;
+  team: string;
+  player_id: string;
+  image_url: string;
+  captured_at: string;
+  source_url: string;
+  source_sha256: string;
+  jersey?: string;
+  position?: string;
+  identity_source_url?: string;
+  identity_source_sha256?: string;
 }
 
 export interface GameLog {

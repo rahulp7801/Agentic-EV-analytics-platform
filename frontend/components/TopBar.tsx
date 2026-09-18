@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Sport } from '@/lib/types';
+import {publicSignals} from '@/lib/signalMetrics';
 import styles from './TerminalChrome.module.css';
 
 type TickerSignal = {
@@ -22,6 +23,8 @@ export default function TopBar({ sport, onSportChange }: {
   const [date, setDate] = useState('');
   const [signals, setSignals] = useState<TickerSignal[]>([]);
   const [available, setAvailable] = useState(false);
+  const [recorded,setRecorded]=useState(0);
+  const [players,setPlayers]=useState(0);
 
   useEffect(() => {
     const update = () => {
@@ -43,11 +46,17 @@ export default function TopBar({ sport, onSportChange }: {
         const response = await fetch(`/api/signals?sport=${sport}`, { cache: 'no-store', signal: controller.signal });
         if (!response.ok) throw new Error('Unavailable');
         const data = await response.json();
-        setSignals((data.signals || []).filter((signal: TickerSignal) => !signal.gated));
+        if(controller.signal.aborted) return;
+        const forecasts=publicSignals(data.signals).signals;
+        setSignals(forecasts.filter(signal=>!signal.gated));
+        setRecorded(forecasts.length);
+        setPlayers(new Set(forecasts.map(signal=>signal.player)).size);
         setAvailable(true);
       } catch {
         if (!controller.signal.aborted) {
           setSignals([]);
+          setRecorded(0);
+          setPlayers(0);
           setAvailable(false);
         }
       }
@@ -88,12 +97,12 @@ export default function TopBar({ sport, onSportChange }: {
         {signals.length ? (
           <div className={styles.tickerTrack}>{ticker(false)}{ticker(true)}</div>
         ) : (
-          <span className={styles.tickerEmpty}>No fresh eligible estimates in the published snapshot</span>
+          <span className={styles.tickerEmpty}>{available && recorded ? `${recorded} recorded forecasts · ${players} players · No current eligible picks` : available ? `No published ${sport.toUpperCase()} forecasts` : 'Forecast refresh unavailable'}</span>
         )}
       </div>
       <div className={styles.signalCount}>
-        <small>Signals</small>
-        <strong>{available ? signals.length : '—'}</strong>
+        <small>Recorded</small>
+        <strong aria-label={available ? `${recorded} recorded forecasts, ${signals.length} currently eligible` : 'Forecast count unavailable'}>{available ? recorded : '—'}</strong>
       </div>
       <time className={styles.clock} dateTime={time ? new Date().toISOString() : undefined}>
         <span>{date}</span><strong>{time}</strong>

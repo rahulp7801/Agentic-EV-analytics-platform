@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {signalMetrics,publicSignals,publicSignalSnapshots,parlayScenario,forecastWindow} from '../lib/signalMetrics.ts';
+import {signalMetrics,publicSignals,publicSignalSnapshots,parlayScenario,forecastWindow,latestForecastWindow,publicPlayerProfile} from '../lib/signalMetrics.ts';
 const now = Date.parse('2026-09-10T12:00:00Z');
 const quote = {true_prob: .6, american_odds: -110, push_probability: 0,
   direction: 'under', sportsbook: 'draftkings', model_version: 'empirical-jeffreys-v4',
@@ -14,6 +14,30 @@ const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
   home_team:'Home',away_team:'Away',game_id:'game',sport:'nfl',prop_type:'pass_yds',line:249.5,
   mean_stat:260,confidence_interval:[.5,.7],trade_plan:[],injury_flags:{},
   market_type:'player_pass_yds',strength:'unrated'};
+test('latest available view retains archived forecasts without loosening eligibility',()=>{
+  assert.equal(latestForecastWindow([publicQuote],now),'upcoming');
+  const later=now+7200000;
+  assert.equal(latestForecastWindow([publicQuote],later),'archive');
+  const result=publicSignals([publicQuote],later).signals[0];
+  assert.equal(result.gated,true);
+  assert.equal(result.kelly_fraction,0);
+  assert.equal(result.true_prob,publicQuote.true_prob);
+});
+test('current player presentation requires source and ID commitments and cannot override historical risk',()=>{
+  const profile={player:'Player',name:'Player',team:'KC',player_id:'123',jersey:'0',position:'QB',
+    image_url:'https://a.espncdn.com/i/headshots/nfl/players/full/123.png',captured_at:new Date(now).toISOString(),
+    source_url:quote.availability.roster_source_url,source_sha256:'c'.repeat(64),private:'secret',gated:false};
+  assert.equal(publicPlayerProfile(profile,'nfl','Player',now).jersey,'0');
+  for(const patch of [{player:'Other'},{name:'Alias'},{source_url:profile.source_url+'?secret=x'},
+    {image_url:profile.image_url.replace('123.png','456.png')},{captured_at:new Date(now+120000).toISOString()},
+    {captured_at:new Date(now-15*86400000).toISOString()}]) assert.equal(publicPlayerProfile({...profile,...patch},'nfl','Player',now),undefined);
+  const signal=publicSignals([{...publicQuote,player_profile:profile,gated:true,gate_reason:'risk_gate'}],now).signals[0];
+  assert.equal(signal.gated,true);assert.equal(signal.kelly_fraction,0);
+  assert.equal(signal.player_profile.private,undefined);assert.equal(signal.player_profile.gated,undefined);
+  assert.equal(signal.true_prob,publicQuote.true_prob);
+  assert.equal(signal.availability.captured_at,publicQuote.availability.captured_at);
+  assert.equal(publicPlayerProfile({...profile,jersey:'<1>',position:'<script>'},'nfl','Player',now).jersey,undefined);
+});
 test('portraits require an exact ESPN URL tied to the roster athlete and league',()=>{
   const a={...quote.availability,player_id:'123',player_image_url:'https://a.espncdn.com/i/headshots/nfl/players/full/123.png'};
   const project=availability=>publicSignals([{...publicQuote,availability}],now).signals[0];
