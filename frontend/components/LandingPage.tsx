@@ -151,9 +151,8 @@ export default function LandingPage() {
       const ScrollTrigger = triggerModule.ScrollTrigger;
       gsap.registerPlugin(ScrollTrigger);
       context = gsap.context(() => {
-        gsap.timeline({ scrollTrigger: { trigger: `.${styles.hero}`, start: 'top top', end: 'bottom top', scrub: 0.7 } })
-          .to(`.${styles.heroCopy}`, { yPercent: -18, opacity: .18, scale: .94, ease: 'none' }, 0)
-          .to(`.${styles.heroOrb}`, { yPercent: 30, scale: 1.22, opacity: .15, ease: 'none' }, 0);
+        // Motion owns the hero copy entrance; scrubbing it can cache opacity zero.
+        gsap.to(`.${styles.heroOrb}`, { scrollTrigger: { trigger: `.${styles.hero}`, start: 'top top', end: 'bottom top', scrub: 0.7 }, yPercent: 30, scale: 1.22, opacity: .15, ease: 'none' });
 
         const story = gsap.timeline({ scrollTrigger: { trigger: `.${styles.story}`, start: 'top top', end: '+=240%', scrub: 0.65, pin: true, anticipatePin: 1 } });
         story.fromTo(`.${styles.productFrame}`, { scale: .78, rotateX: 7, y: 80 }, { scale: 1, rotateX: 0, y: 0, ease: 'power2.out' })

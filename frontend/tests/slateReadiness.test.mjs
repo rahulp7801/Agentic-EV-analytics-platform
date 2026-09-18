@@ -1,7 +1,8 @@
 import test from 'node:test';
+import benchmark from '../data/nfl-week1-2026.json' with {type:'json'};
 import assert from 'node:assert/strict';
 import {slateReadiness,settlementProgress} from '../lib/slateReadiness.ts';
-import {WEEK_ONE_DEMO,demoResult,DEFAULT_DEMO_INDEX} from '../lib/weekOneDemo.ts';
+import {WEEK_ONE_DEMO,demoResult,demoHistory,DEFAULT_DEMO_INDEX} from '../lib/weekOneDemo.ts';
 import {liveSchedule} from '../lib/liveSchedule.ts';
 import {scheduleSnapshot} from '../lib/scheduleStatus.ts';
 const now=Date.parse('2026-09-18T16:00:00Z');
@@ -61,4 +62,23 @@ test('worker-captured future fixtures preserve source identity and cannot silent
   assert.equal(result.status,200);assert.equal(result.body.games[0].provider_event_id,'source');
   assert.equal(scheduleSnapshot(captured,'nfl',now).status,503);
   assert.equal(scheduleSnapshot({...captured,captured_at:new Date(now-5*3600000).toISOString()},'nfl',now,6).status,503);
+});
+
+test('demo explanations reconstruct each retained forecast from actual pregame history',()=>{
+  const expected={'Brock Purdy':[17,24,3],'Matthew Stafford':[24,33,5],'Aaron Rodgers':[21,33,4]};
+  for(const record of WEEK_ONE_DEMO) {
+    const history=demoHistory(record),[hits,count,recent]=expected[record.player];
+    const retained=benchmark.records.find(row=>row.player_name===record.player && row.prop_type==='pass_yds');
+    assert.equal(retained.sample_size,record.sample);assert.equal(retained.model_probability,record.probability);
+    assert.equal(retained.actual_value,record.actual);assert.equal(retained.research_threshold,record.threshold);
+    assert.equal(history.above,hits);assert.equal(history.games.length,count);
+    assert.equal(history.games.length,record.sample);assert.equal(history.recentAbove,recent);
+    assert.ok(Math.abs(history.probability-record.probability)<.000001);
+    assert.equal(new Set(history.games.map(game=>game.date)).size,count);
+    for(const game of history.games) {assert.ok(game.date<record.date);assert.ok(game.date>='2024-01-01');assert.ok(Number.isFinite(game.yards));}
+    assert.equal(history.games.some(game=>game.date===record.date),false);
+  }
+  const purdy=demoHistory(WEEK_ONE_DEMO[DEFAULT_DEMO_INDEX]);
+  assert.deepEqual(purdy.recent.map(game=>game.yards),[127,303,295,295,168]);
+  assert.ok(purdy.recentAbove/5<purdy.above/purdy.games.length);
 });

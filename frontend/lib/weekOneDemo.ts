@@ -1,3 +1,5 @@
+import history from '../data/week-one-demo-history.json' with {type:'json'};
+
 /** Fixed public retrospective holdout records; never live offers or accepted picks. */
 export const WEEK_ONE_DEMO=[
   {player:'Matthew Stafford',team:'LAR',opponent:'SF',athlete:'12483',event:'401872657',date:'2026-09-10',
@@ -15,4 +17,16 @@ export function demoResult(record:typeof WEEK_ONE_DEMO[number]) {
   return {outcome:record.actual>record.threshold ? 'Above threshold' : 'Below threshold',
     correct:(record.probability>.5)===(record.actual>record.threshold),
     recommendation:'Research only',historical_price:null,profit:null,execution_ready:false};
+}
+
+/** Same season floor, exclusive date cutoff and 40-game cap as the retained replay. */
+export function demoHistory(record:typeof WEEK_ONE_DEMO[number]) {
+  const games=history.records[record.player].filter(game=>game.date<record.date).slice(0,40);
+  const above=games.filter(game=>game.yards>record.threshold).length;
+  const sorted=games.map(game=>game.yards).sort((a,b)=>a-b);
+  const recent=games.slice(0,5);
+  return {games,above,below:games.length-above,
+    median:(sorted[Math.floor((sorted.length-1)/2)]+sorted[Math.floor(sorted.length/2)])/2,
+    recent,recentAbove:recent.filter(game=>game.yards>record.threshold).length,
+    probability:(above+.5)/(games.length+1)};
 }
