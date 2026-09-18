@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {slateReadiness,settlementProgress} from '../lib/slateReadiness.ts';
-import {WEEK_ONE_DEMO,demoResult} from '../lib/weekOneDemo.ts';
+import {WEEK_ONE_DEMO,demoResult,DEFAULT_DEMO_INDEX} from '../lib/weekOneDemo.ts';
 import {liveSchedule} from '../lib/liveSchedule.ts';
 import {scheduleSnapshot} from '../lib/scheduleStatus.ts';
 const now=Date.parse('2026-09-18T16:00:00Z');
@@ -37,6 +37,8 @@ test('settlement progress cannot fabricate verified totals from impossible count
 });
 test('static retrospective demo retains both correct and missed baselines and never produces a pick or profit',()=>{
   const results=WEEK_ONE_DEMO.map(demoResult);assert.equal(results.filter(r=>r.correct).length,2);
+  assert.equal(WEEK_ONE_DEMO[DEFAULT_DEMO_INDEX].player,'Brock Purdy');
+  assert.equal(demoResult(WEEK_ONE_DEMO[DEFAULT_DEMO_INDEX]).correct,true);
   assert.equal(results.filter(r=>!r.correct).length,1);
   for(const result of results) {assert.equal(result.historical_price,null);assert.equal(result.profit,null);assert.equal(result.execution_ready,false);assert.equal(result.recommendation,'Research only');}
 });

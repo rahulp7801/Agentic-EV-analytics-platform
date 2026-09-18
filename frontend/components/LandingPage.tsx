@@ -165,7 +165,7 @@ export default function LandingPage() {
           .to(`.${styles.frameDark}`, { scale: 1.025, backgroundColor: '#2c2b38' }, 1.55);
 
         gsap.from(`.${styles.methodCard}`, { scrollTrigger: { trigger: `.${styles.methodGrid}`, start: 'top 76%' }, opacity: 0, y: 42, stagger: .1, duration: .8, ease: 'power3.out' });
-        gsap.from(`.${styles.backtestDemoFrame}`, { scrollTrigger: { trigger: `.${styles.backtestDemo}`, start: 'top 72%' }, opacity: 0, y: 58, scale: .97, duration: 1, ease: 'power3.out' });
+        gsap.from(`.${styles.backtestDemoFrame}`, { scrollTrigger: { trigger: `.${styles.backtestDemo}`, start: 'top 72%' }, opacity: 0, duration: .7, ease: 'power3.out' });
       }, root);
     });
     return () => { cancelled = true; context?.revert(); };
@@ -175,7 +175,7 @@ export default function LandingPage() {
     <div className={styles.page} ref={root}>
       <header className={styles.nav}>
         <Link className={styles.brand} href="/"><span>Q</span><strong>Quant</strong></Link>
-            <nav aria-label="Landing navigation"><a href="#platform">Platform</a><a href="#backtest-demo">Backtest</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton} aria-label="Open dashboard"><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
+            <nav aria-label="Landing navigation"><a href="#platform">Platform</a><a href="#demo">Demo</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton} aria-label="Open dashboard"><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
       </header>
 
       <main>
@@ -185,7 +185,7 @@ export default function LandingPage() {
             <div className={styles.eyebrow}><Sparkles size={14} /> Evidence-first sports intelligence</div>
             <h1>An edge you<br />can <span>inspect.</span></h1>
             <p>One clear view of sportsbook prices, prediction markets, player projections, and model evidence—built to show what is live, what is stale, and what is still unknown.</p>
-            <div className={styles.heroActions}><Link href="/terminal">Explore live markets <ArrowRight size={17} /></Link><a href="#platform">See how it works</a></div>
+            <div className={styles.heroActions}><a href="#demo" aria-label="Try the Week 1 demo"><span aria-hidden="true">▶</span> Try the demo <ArrowRight size={17} /></a><Link href="/terminal">Open dashboard <ArrowUpRight size={17} /></Link></div>
           </motion.div>
           <motion.div className={styles.heroPulse} initial={reduceMotion ? false : { opacity: 0, y: 35 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .28, duration: .8 }}><MarketPulse pulse={pulse} /></motion.div>
           <div className={styles.heroFine}><span>NBA + NFL</span><span>Sportsbooks · Kalshi · PrizePicks</span><span>Read-only analysis</span></div>
@@ -201,7 +201,7 @@ export default function LandingPage() {
         </section>
 
         <section className={styles.backtestDemo} id="backtest-demo">
-          <div className={styles.backtestDemoIntro}><span>Explore a previous week</span><h2>Follow the forecast.<br />Keep the proof.</h2><p>Walk through an actual Week 1 research replay, inspect its quality checks, and see the final result. This fixed demo works even when live markets are waiting for data.</p></div>
+          <div className={styles.backtestDemoIntro}><span>Try a real past-game replay</span><h2>A clear forecast.<br />A result you can check.</h2><p>See the player, direction, model evidence and verified final stat together. Compare Week 1 replays, including a miss, without leaving the card.</p></div>
           <div className={styles.backtestDemoFrame}><HistoricalFlowDemo /></div>
         </section>
 
