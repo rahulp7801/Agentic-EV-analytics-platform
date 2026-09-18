@@ -48,6 +48,8 @@ async def test_future_forecasts_cover_48_hours_but_never_started_games(monkeypat
     transport(monkeypatch,handle)
     await scan.run(['nfl'],4)
     assert evaluated==['tomorrow'] and stored['scan:nfl']['eligible_events']==1
+    assert stored['scan:nfl']['events'][0]['game_id']=='tomorrow'
+    assert stored['scan:nfl']['events'][0]['state']=='evaluated'
 
 
 @pytest.mark.asyncio
@@ -116,6 +118,7 @@ async def test_mismatched_quote_response_is_rejected_and_next_event_continues(mo
     report=(await scan.run(['nba'],25))['nba']
     assert evaluated==['nba1'] and report['completed_events']==1
     assert report['failures'][0]['event_id']=='nba0'
+    assert {e['game_id']:e['state'] for e in report['events']}=={'nba0':'failed','nba1':'evaluated'}
     assert 'nba0' in report['attempts']
 
 

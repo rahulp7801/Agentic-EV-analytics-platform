@@ -13,6 +13,8 @@ export const paidPipelinePaths = [
 ];
 
 export const publicPipelinePaths = [
+  '/api/slate?sport=nfl',
+  '/api/slate?sport=nba',
   '/api/markets?sport=nfl',
   '/api/markets?sport=nba',
   '/api/games?sport=nfl',

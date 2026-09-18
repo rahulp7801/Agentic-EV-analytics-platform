@@ -8,6 +8,7 @@ import type { EVSignal, Sport } from '@/lib/types';
 import {forecastWindow} from '@/lib/signalMetrics';
 import {fetchForecasts} from '@/lib/fetchForecasts';
 import PlayerPortrait from './PlayerPortrait';
+import SlateReadiness from './SlateReadiness';
 import {bestPicks,conservativeMargin} from '@/lib/bestPicks';
 import styles from './Overview.module.css';
 
@@ -213,6 +214,8 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
               <div className={styles.comparisonHeading}><div><span>Your research starts here</span><h2>Players in your forecast library</h2></div><button type="button" onClick={()=>onOpenPlayers()}>All players <ArrowUpRight size={15} /></button></div>
               {players.length ? <><div className={styles.playersGrid}>{players.slice(0,8).map(signal=><button type="button" key={signal.player} onClick={()=>onOpenPlayers(signal.player)}><PlayerPortrait signal={signal} /><strong>{signal.player}</strong><small>{signal.player_profile?.team ?? signal.availability?.team ?? sport.toUpperCase()}{signal.player_profile?.jersey ? ` · #${signal.player_profile.jersey}` : ''}{signal.player_profile?.position ? ` · ${signal.player_profile.position}` : ''}</small><span>{data.forecasts?.filter(s=>s.player===signal.player).length} forecasts <ArrowUpRight size={12} /></span></button>)}</div><p>{upcoming ? 'Upcoming records still require fresh quotes and all model risk checks.' : 'Recorded forecasts remain available after kickoff. Historical prices are expired; these are research records, not current picks.'} Player profiles show separately captured roster metadata.</p></> : <div className={styles.emptyComparisons}>{loading ? 'Loading your players…' : data.errors.includes('Player forecasts') ? 'Player records could not be loaded. Refresh to try again.' : `No ${sport.toUpperCase()} player forecasts are published. Switch leagues to explore available records.`}</div>}
             </section>
+
+            <SlateReadiness key={sport} sport={sport} />
 
             <div className={styles.contentGrid}>
               <section className={styles.panel}>

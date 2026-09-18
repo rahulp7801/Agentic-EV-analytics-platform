@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Check, Database, Eye, Layers3, ShieldCheck, Sparkles } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { marketFreshness, type MarketFreshness } from '@/lib/marketFreshness';
-import BacktestLab from './BacktestLab';
+import HistoricalFlowDemo from './HistoricalFlowDemo';
 import styles from './LandingPage.module.css';
 
 type Pulse = {
@@ -201,8 +201,8 @@ export default function LandingPage() {
         </section>
 
         <section className={styles.backtestDemo} id="backtest-demo">
-          <div className={styles.backtestDemoIntro}><span>Interactive product demo</span><h2>Change the proof.<br />Watch the answer change.</h2><p>Select a replay cohort, choose the metrics that matter, and inspect whether any combination clears a real evidence threshold.</p></div>
-          <div className={styles.backtestDemoFrame}><BacktestLab sport="nfl" preview /></div>
+          <div className={styles.backtestDemoIntro}><span>Explore a previous week</span><h2>Follow the forecast.<br />Keep the proof.</h2><p>Walk through an actual Week 1 research replay, inspect its quality checks, and see the final result. This fixed demo works even when live markets are waiting for data.</p></div>
+          <div className={styles.backtestDemoFrame}><HistoricalFlowDemo /></div>
         </section>
 
         <section className={styles.method} id="method">
