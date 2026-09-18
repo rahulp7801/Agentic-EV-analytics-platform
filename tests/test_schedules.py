@@ -43,12 +43,28 @@ async def test_schedule_supports_bounded_seven_day_settlement_catchup(monkeypatc
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('offsets',[(),(-1,-1),(True,),(-31,),(2,)])
+@pytest.mark.parametrize('offsets',[(),(-1,-1),(True,),(-31,),(7,)])
 async def test_schedule_rejects_unbounded_or_ambiguous_lookback(offsets):
     with pytest.raises(ValueError,match='offsets'):
         await schedules.collect('nfl',datetime.now(timezone.utc),offsets=offsets)
     with pytest.raises(ValueError,match='timezone'):
         await schedules.collect('nfl',datetime.now().replace(tzinfo=None))
+
+
+@pytest.mark.asyncio
+async def test_schedule_collects_bounded_future_days_without_weekwide_duplicates(monkeypatch):
+    client=httpx.AsyncClient
+    requested=[]
+    def respond(request):
+        requested.append(request.url.params['dates'])
+        data=board();data['events'][0]['date']='2026-09-13T23:00:00Z'
+        data['events'][0]['status']['type']['completed']=False
+        return httpx.Response(200,json=data)
+    monkeypatch.setattr(schedules.httpx,'AsyncClient',lambda **kwargs:client(transport=httpx.MockTransport(respond),**kwargs))
+    result=await schedules.collect('nfl',datetime(2026,9,11,18,tzinfo=timezone.utc),offsets=(2,3,4,5,6))
+    assert requested==['20260913','20260914','20260915','20260916','20260917']
+    assert result['status']=='complete' and len(result['games'])==1
+    assert result['games'][0]['label']=='2026-09-13' and result['games'][0]['completed'] is False
 
 
 @pytest.mark.asyncio

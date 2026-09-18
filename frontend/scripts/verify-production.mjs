@@ -29,7 +29,7 @@ export const requiredCssMarkers = [
   '--accent:#5e5ce6',
   '.terminal-layout{',
   '__hero h1{',
-  '__benchmarkPanel{',
+  '__demo{',
 ];
 
 export function readinessStatuses(path, { paidEnabled, publicEnabled }) {

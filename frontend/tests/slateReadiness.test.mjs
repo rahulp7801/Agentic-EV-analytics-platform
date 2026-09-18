@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {slateReadiness,settlementProgress} from '../lib/slateReadiness.ts';
 import {WEEK_ONE_DEMO,demoResult} from '../lib/weekOneDemo.ts';
 import {liveSchedule} from '../lib/liveSchedule.ts';
+import {scheduleSnapshot} from '../lib/scheduleStatus.ts';
 const now=Date.parse('2026-09-18T16:00:00Z');
 const game={home_name:'Washington Commanders',away_name:'Dallas Cowboys',home_abbr:'WSH',away_abbr:'DAL',
   game_time:'2026-09-20T17:00:00Z',date:'20260920',provider_event_id:'source'};
@@ -49,4 +50,13 @@ test('future scoreboard dates and week-wide NFL responses produce seven-day cove
   });
   const result=await liveSchedule('nfl',now,6);assert.equal(result.status,200);
   assert.equal(result.body.games.length,1);assert.equal(result.body.games[0].date,'20260920');assert.equal(requested.length,8);
+});
+
+test('worker-captured future fixtures preserve source identity and cannot silently use stale or short windows',()=>{
+  const captured={sport:'nfl',status:'complete',partial:false,as_of_date:'2026-09-18',
+    captured_at:new Date(now).toISOString(),games:[{...game,date:'20260920',label:'2026-09-20',completed:false}]};
+  const result=scheduleSnapshot(captured,'nfl',now,6);
+  assert.equal(result.status,200);assert.equal(result.body.games[0].provider_event_id,'source');
+  assert.equal(scheduleSnapshot(captured,'nfl',now).status,503);
+  assert.equal(scheduleSnapshot({...captured,captured_at:new Date(now-5*3600000).toISOString()},'nfl',now,6).status,503);
 });
