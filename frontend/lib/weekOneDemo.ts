@@ -10,6 +10,7 @@ export const WEEK_ONE_DEMO=[
     threshold:200.5,probability:.632353,sample:33,actual:221,
     source_sha256:'d9809ccb7867c49f53a53ddd00b9249eba6cc9e21cb4af1ec8fcd1cc29b95a4d'},
 ] as const;
+export const DEFAULT_DEMO_INDEX=1;
 export function demoResult(record:typeof WEEK_ONE_DEMO[number]) {
   return {outcome:record.actual>record.threshold ? 'Above threshold' : 'Below threshold',
     correct:(record.probability>.5)===(record.actual>record.threshold),
