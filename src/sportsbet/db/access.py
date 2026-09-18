@@ -22,6 +22,19 @@ APPEND_TABLES = ('odds_snapshots', 'player_prop_snapshots')
 ANALYTICS_TABLES = ('predictions', 'exposure', 'quotes', 'api_usage')
 
 
+def deny_browser_roles(conn):
+    """Supabase defaults can grant named browser roles independently of PUBLIC/RLS."""
+    targets = [sql.Identifier('public', table) for table in
+               (*READ_TABLES, 'alembic_version', 'ev_signals', 'dashboard_gamelogs')]
+    targets.extend(sql.Identifier('analytics', table) for table in ANALYTICS_TABLES)
+    grantees = [sql.SQL('PUBLIC')]
+    for role in ('anon', 'authenticated'):
+        if conn.execute('SELECT 1 FROM pg_roles WHERE rolname=%s', (role,)).fetchone():
+            grantees.append(sql.Identifier(role))
+    conn.execute(sql.SQL('REVOKE ALL ON {} FROM {}').format(
+        sql.SQL(', ').join(targets), sql.SQL(', ').join(grantees)))
+
+
 def _lock_policy_tables(conn):
     """Acquire policy-table locks before role/catalog writes can form a deadlock."""
     targets = [sql.Identifier('public', 'alembic_version')]
@@ -32,6 +45,7 @@ def _lock_policy_tables(conn):
 
 def apply_access(conn):
     """Explicit grants and role-specific RLS policies; no rights for anonymous users."""
+    deny_browser_roles(conn)
     conn.execute(sql.SQL('GRANT SELECT ON public.alembic_version TO {}').format(sql.Identifier(WORKER)))
     conn.execute('DROP POLICY IF EXISTS sportsbet_worker_schema_readiness ON public.alembic_version')
     conn.execute(sql.SQL('CREATE POLICY sportsbet_worker_schema_readiness ON public.alembic_version '

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {signalMetrics,publicSignals,publicSignalSnapshots,parlayScenario,forecastWindow,latestForecastWindow,publicPlayerProfile} from '../lib/signalMetrics.ts';
 const now = Date.parse('2026-09-10T12:00:00Z');
-const quote = {true_prob: .6, american_odds: -110, push_probability: 0,
+const quote = {gated:false,forecast_cutoff:'2026-09-10',confidence_interval:[.55,.7],true_prob: .6, american_odds: -110, push_probability: 0,
   direction: 'under', sportsbook: 'draftkings', model_version: 'empirical-jeffreys-v4',
   sample_size: 30, kelly_fraction: .04, snapped_at: new Date(now).toISOString(),
   game_start_time: new Date(now + 3600000).toISOString(),availability:{status:'observed',
@@ -12,7 +12,7 @@ const quote = {true_prob: .6, american_odds: -110, push_probability: 0,
     roster_source_url:'https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/12/roster',roster_source_sha256:'b'.repeat(64)}};
 const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
   home_team:'Home',away_team:'Away',game_id:'game',sport:'nfl',prop_type:'pass_yds',line:249.5,
-  mean_stat:260,confidence_interval:[.5,.7],trade_plan:[],injury_flags:{},
+  mean_stat:260,confidence_interval:[.55,.7],trade_plan:[],injury_flags:{},
   market_type:'player_pass_yds',strength:'unrated'};
 test('full legitimate NFL/NBA team names survive both public forecast boundaries',()=>{
   for(const [sport,home,away] of [['nfl','Washington Commanders','Tampa Bay Buccaneers'],
@@ -65,7 +65,7 @@ test('uses payout for expected return, separates edge and preserves Under', () =
   assert.equal(s.direction, 'under'); assert.equal(s.gated, false);
   assert.ok(Math.abs(s.expected_return - .145454545) < 1e-8);
   assert.ok(Math.abs(s.ev_pct - .076190476) < 1e-8);
-  assert.equal(s.confidence_interval, null); assert.equal(s.strength, 'unrated');
+  assert.deepEqual(s.confidence_interval,[.55,.7]); assert.equal(s.strength, 'unrated');
 });
 test('push refunds count toward expected return', () => {
   assert.ok(Math.abs(signalMetrics({...quote, true_prob:.5, push_probability:.1},now).expected_return - .0545454545) < 1e-8);

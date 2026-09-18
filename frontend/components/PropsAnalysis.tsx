@@ -128,7 +128,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
       }
     };
     const initial=window.setTimeout(load,0);
-    const poll=window.setInterval(load,30_000);
+    const poll=window.setInterval(load,60_000);
     document.addEventListener('visibilitychange',load);
     return () => {window.clearTimeout(initial);window.clearInterval(poll);document.removeEventListener('visibilitychange',load);controller.abort();};
   }, [sport,refresh]);
@@ -195,8 +195,8 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
       <div style={{ overflowX: 'auto' }} tabIndex={0} aria-label="Recorded player prop estimates">
         {props.length === 0 ? (
           <div className={styles.propsEmpty}>
-            <strong>{scope==='saved' ? 'Your saved-player view is empty.' : allProps.length ? 'No forecasts match these filters.' : `No recorded ${sport.toUpperCase()} forecasts are published yet.`}</strong>
-            <span>{scope==='saved' ? 'Use the bookmark next to a player to save them. Other filters still apply to your saved players.' : allProps.length ? 'Try all recorded forecasts, another player, or a lower minimum edge.' : 'The scheduled scan covers the next 48 hours, subject to source availability and the API budget. Forecasts require real pregame prices and sufficient player history.'}</span>
+            <strong>{!allProps.length && error ? 'Forecasts could not be loaded.' : scope==='saved' ? 'Your saved-player view is empty.' : allProps.length ? 'No forecasts match these filters.' : `No recorded ${sport.toUpperCase()} forecasts are published yet.`}</strong>
+            <span>{!allProps.length && error ? 'Try Refresh. A failed request does not mean there are no forecasts.' : scope==='saved' ? 'Use the bookmark next to a player to save them. Other filters still apply to your saved players.' : allProps.length ? 'Try all recorded forecasts, another player, or a lower minimum edge.' : 'The scheduled scan covers the next 48 hours, subject to source availability and the API budget. Forecasts require real pregame prices and sufficient player history.'}</span>
             {allProps.length>0 && <button className={styles.uxButton} type="button" onClick={()=>{resetFilters();setWindowFilter('all');}}>Show all forecasts</button>}
           </div>
         ) : view==='cards' ? <><div className={styles.forecastGrid}>{props.slice(0,visibleCount).map(p=><motion.article key={p.id} className={styles.forecastCard} initial={reduceMotion ? false : {opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.2}}>

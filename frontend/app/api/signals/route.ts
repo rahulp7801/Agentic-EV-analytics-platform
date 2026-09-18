@@ -37,7 +37,7 @@ export async function GET(request:Request) {
     if(options.revision && options.revision!==data.revision) {
       return NextResponse.json({error:'Forecasts changed during browsing. Refresh to reload.'},{status:409});
     }
-    return NextResponse.json(forecastPage(data,options),{headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json(forecastPage(data,options),{headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
     return NextResponse.json({error:'Results are temporarily unavailable.',signals:[]},{status:503});
   }

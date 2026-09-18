@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       + 'AND ($4::date IS NULL OR game_date<$4::date) '
       + 'ORDER BY game_date DESC,player_name,game_key LIMIT $3', [sport,player,limit,before,exact]);
     return NextResponse.json({logs:publicGameLogs(rows.map(row=>row.payload),sport)},
-      {headers:{'Cache-Control':'no-store'}});
+      {headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
     return NextResponse.json({error:'Game logs are temporarily unavailable.',logs:[]}, {status:503});
   }

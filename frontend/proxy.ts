@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {publicRequest} from './lib/publicRequest';
 
 export function proxy(request: NextRequest) {
+  const status=publicRequest(request);
+  if(status) return NextResponse.json({error:'Request rejected.'},{status,headers:{'Cache-Control':'no-store'}});
+  if(request.nextUrl.pathname.startsWith('/api/')) return NextResponse.next();
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const development = process.env.NODE_ENV === 'development';
   const policy = `
@@ -33,10 +37,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [{
-    source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
-    missing: [
-      { type: 'header', key: 'next-router-prefetch' },
-      { type: 'header', key: 'purpose', value: 'prefetch' },
-    ],
+    source: '/((?!_next/static|_next/image|favicon.ico).*)',
   }],
 };

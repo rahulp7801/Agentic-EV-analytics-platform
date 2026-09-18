@@ -61,10 +61,22 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
     passwords = {READER: uuid.uuid4().hex, WORKER: uuid.uuid4().hex}
     key = 'test-access-' + uuid.uuid4().hex
     with psycopg.connect(dsn) as admin:
+        browser_roles_created = []
+        for browser_role in ('anon', 'authenticated'):
+            if not admin.execute('SELECT 1 FROM pg_roles WHERE rolname=%s', (browser_role,)).fetchone():
+                admin.execute(sql.SQL('CREATE ROLE {} NOLOGIN').format(sql.Identifier(browser_role)))
+                browser_roles_created.append(browser_role)
+            # Reproduce Supabase defaults, including its owner-executed view.
+            admin.execute(sql.SQL('GRANT ALL ON public.dashboard_snapshots, public.dashboard_gamelogs TO {}')
+                          .format(sql.Identifier(browser_role)))
         provision_roles(admin, passwords)
         admin.execute("INSERT INTO dashboard_snapshots(snapshot_key,payload) VALUES (%s,'{}')", (key,))
     try:
         with psycopg.connect(dsn, user=READER, password=passwords[READER], autocommit=True) as reader:
+            for browser_role in ('anon', 'authenticated'):
+                for table in ('public.dashboard_snapshots', 'public.dashboard_gamelogs'):
+                    assert not reader.execute("SELECT has_table_privilege(%s,%s,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')",
+                                              (browser_role, table)).fetchone()[0]
             assert reader.execute('SELECT count(*) FROM dashboard_snapshots WHERE snapshot_key=%s', (key,)).fetchone()[0] == 1
             assert reader.execute('SHOW default_transaction_read_only').fetchone()[0] == 'on'
             reader.execute('SELECT payload FROM dashboard_gamelogs LIMIT 1')
@@ -119,4 +131,6 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
                 admin.execute(sql.SQL('DROP POLICY {} ON {}').format(sql.Identifier(policy), sql.Identifier(schema,table)))
             for role in (READER, WORKER):
                 admin.execute(sql.SQL('DROP OWNED BY {}').format(sql.Identifier(role)))
+                admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
+            for role in browser_roles_created:
                 admin.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))

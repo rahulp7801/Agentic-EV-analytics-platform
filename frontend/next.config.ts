@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Player portraits use direct allowlisted URLs; no public optimizer is needed.
+  images: {unoptimized: true},
   async headers() {
     return [{source: '/:path*', headers: [
       {key: 'X-Content-Type-Options', value: 'nosniff'},

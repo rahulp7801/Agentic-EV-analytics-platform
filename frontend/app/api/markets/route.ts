@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   try {
     const data = await snapshot('markets:'+sport);
     if (!data) return NextResponse.json({error:'No market observations have been published yet.'}, {status:503});
-    return NextResponse.json(publicMarkets(data,sport), {headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json(publicMarkets(data,sport), {headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
     return NextResponse.json({error:'Market observations are temporarily unavailable.'}, {status:503});
   }

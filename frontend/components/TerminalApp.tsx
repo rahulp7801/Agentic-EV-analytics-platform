@@ -7,7 +7,6 @@ import Overview from '@/components/Overview';
 import PropsAnalysis from '@/components/PropsAnalysis';
 import GameLogs from '@/components/GameLogs';
 import MarketWatch from '@/components/MarketWatch';
-import ScanStatus from '@/components/ScanStatus';
 import ParlayBuilder from '@/components/ParlayBuilder';
 import KellyCalc from '@/components/KellyCalc';
 import BacktestLab from '@/components/BacktestLab';
@@ -58,13 +57,10 @@ export default function TerminalApp() {
         />
         <main className="terminal-main">
           <div className="terminal-breadcrumb" aria-label="Current workspace">
-            <span>Research desk</span>
-            <span aria-hidden="true">/</span>
             <span>{sport.toUpperCase()}</span>
             <span aria-hidden="true">/</span>
-            <strong>{view.replace('_', ' ')}</strong>
+            <strong>{{dashboard:'Picks',props:'Players',arbitrage:'Markets',backtest:'Backtesting',gamelogs:'Game logs',parlay:'Scenario lab',kelly:'Stake calculator'}[view]}</strong>
           </div>
-          <ScanStatus />
           <div className="terminal-view">
             {view === 'dashboard' && (
               <Overview key={sport} sport={sport} onOpenMarkets={() => changeView('arbitrage')} onOpenPlayers={name=>{changeView('props');setPlayer(name ?? '');}} />
