@@ -6,6 +6,34 @@ import pytest
 from sportsbet.ledger import Ledger
 from sportsbet.graph.models import PropResult
 from sportsbet.scan import evaluate_event, quotes_from_event
+from sportsbet.scan import recommendation_quality
+
+
+async def test_strongest_uncertainty_margin_gets_correlated_risk_slot_first(tmp_path):
+    raw=event('nfl')
+    raw['bookmakers'][0]['markets'][0]['outcomes']=[
+        dict(name='Over',description='Player',point=20.5,price=100),
+        dict(name='Over',description='Player',point=21.5,price=100)]
+    conn=AsyncMock();conn.fetch.return_value=[{'player_id':'00-0037248'}]
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    now=datetime.now(timezone.utc)
+    availability=dict(status='observed',captured_at=now.isoformat(),source_url='source',source_sha256='a'*64,
+        teams=[dict(abbreviation='KC',roster_names=['Player'],roster_statuses={'Player':'Active'},
+        roster_source_url='roster',roster_source_sha256='b'*64,reports=[])])
+    async def result(_,params):
+        strong=params.line==Decimal('21.5')
+        return PropResult(true_probability=Decimal('.6' if strong else '.65'),sample_size=40,
+            mean_stat=Decimal('24'),confidence_interval=(Decimal('.56'),Decimal('.64')) if strong
+            else (Decimal('.52'),Decimal('.78')))
+    ledger=Ledger(tmp_path/'quality.sqlite')
+    with patch('sportsbet.prop.agents.run_prop_query',AsyncMock(side_effect=result)):
+        output=await evaluate_event(pool,raw,'nfl',ledger,'quality',availability)
+    accepted=[s for s in output['signals'] if not s['gated']]
+    assert len(accepted)==1 and accepted[0]['line']==21.5 and accepted[0]['true_prob']==.6
+    assert next(s for s in output['signals'] if s['line']==20.5)['gate_reason']=='correlated_exposure'
+    assert len(ledger.predictions())==2  # Retain both immutable measured forecasts.
+    assert recommendation_quality(None)==(Decimal('-Infinity'),0)
 
 def event(sport='nba'):
     now=datetime.now(timezone.utc)

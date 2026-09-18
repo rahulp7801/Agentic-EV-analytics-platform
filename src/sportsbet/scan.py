@@ -31,6 +31,14 @@ SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl'}
 MAX_MODEL_CONCURRENCY = 8
 FORECAST_HORIZON_HOURS = 48
 
+
+def recommendation_quality(signal):
+    """Rank supported uncertainty margins before allocating correlated risk."""
+    if not signal or not signal.confidence_interval:
+        return Decimal('-Infinity'), 0
+    margin=signal.confidence_interval[0]-signal.implied_probability
+    return (margin, signal.sample_size or 0) if margin.is_finite() else (Decimal('-Infinity'),0)
+
 def timestamp(value: str) -> datetime:
     result=datetime.fromisoformat(value.replace('Z','+00:00'))
     if result.tzinfo is None:
@@ -117,6 +125,9 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     modeled=await asyncio.gather(*(model(selection) for selection in prepared))
     if any(state.get('error') for _,state in modeled):
         raise RuntimeError('Model evaluation failed')
+    # Alphabetical/line order must not consume a player's risk slot ahead of a
+    # stronger qualified estimate. Keep all forecasts; retain every existing gate.
+    modeled.sort(key=lambda candidate:recommendation_quality(candidate[1].get('ev_signal')),reverse=True)
     for selection,state in modeled:
         player,market,line,side,quote,player_id=selection
         prop=state.get('nba_prop_result' if sport=='nba' else 'prop_result')
