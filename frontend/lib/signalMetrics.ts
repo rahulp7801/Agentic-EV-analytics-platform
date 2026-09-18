@@ -151,7 +151,7 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
   const flags=s.injury_flags;
   const mean=s.mean_stat;
   if (!bounded(s.id,128) || !bounded(s.player,100) || !bounded(s.team,20,true)
-      || !bounded(s.opponent,20,true) || !bounded(s.home_team,20) || !bounded(s.away_team,20)
+      || !bounded(s.opponent,20,true) || !bounded(s.home_team,100) || !bounded(s.away_team,100)
       || !bounded(s.game_id,128) || !sport || !prop
       || !finite(s.line) || Number(s.line)<0 || Number(s.line)>10000
       || (s.direction !== 'over' && s.direction !== 'under')
@@ -205,7 +205,7 @@ export function publicSignals(value:unknown, now=Date.now()) {
 function publicGame(value:unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid signal game');
   const game=value as Record<string,unknown>;
-  if (!bounded(game.game_id,128) || !bounded(game.home_team,20) || !bounded(game.away_team,20)
+  if (!bounded(game.game_id,128) || !bounded(game.home_team,100) || !bounded(game.away_team,100)
       || (game.sport!=='nfl' && game.sport!=='nba') || !bounded(game.date,8)
       || !/^\d{8}$/.test(game.date)) throw new Error('Invalid signal game');
   const calendar=`${game.date.slice(0,4)}-${game.date.slice(4,6)}-${game.date.slice(6,8)}`;
@@ -213,7 +213,7 @@ function publicGame(value:unknown) {
   if (!Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0,10)!==calendar)
     throw new Error('Invalid signal game');
   return {game_id:game.game_id,home_team:game.home_team,away_team:game.away_team,
-    date:game.date,sport:game.sport};
+    date:game.date,sport:game.sport as Sport};
 }
 
 /** Validate and project the complete stored signal snapshot boundary. */

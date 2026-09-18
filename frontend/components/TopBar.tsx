@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Sport } from '@/lib/types';
-import {publicSignals} from '@/lib/signalMetrics';
+import {fetchForecasts} from '@/lib/fetchForecasts';
 import styles from './TerminalChrome.module.css';
 
 type TickerSignal = {
@@ -25,6 +25,7 @@ export default function TopBar({ sport, onSportChange }: {
   const [available, setAvailable] = useState(false);
   const [recorded,setRecorded]=useState(0);
   const [players,setPlayers]=useState(0);
+  const [complete,setComplete]=useState(true);
 
   useEffect(() => {
     const update = () => {
@@ -43,12 +44,11 @@ export default function TopBar({ sport, onSportChange }: {
     const controller = new AbortController();
     async function load() {
       try {
-        const response = await fetch(`/api/signals?sport=${sport}`, { cache: 'no-store', signal: controller.signal });
-        if (!response.ok) throw new Error('Unavailable');
-        const data = await response.json();
+        const [data,qualified]=await Promise.all([fetchForecasts(sport,controller.signal),fetchForecasts(sport,controller.signal,'qualified')]);
         if(controller.signal.aborted) return;
-        const forecasts=publicSignals(data.signals).signals;
-        setSignals(forecasts.filter(signal=>!signal.gated));
+        const forecasts=data.signals;
+        setSignals(qualified.complete ? qualified.signals : []);
+        setComplete(data.complete && qualified.complete);
         setRecorded(forecasts.length);
         setPlayers(new Set(forecasts.map(signal=>signal.player)).size);
         setAvailable(true);
@@ -97,11 +97,11 @@ export default function TopBar({ sport, onSportChange }: {
         {signals.length ? (
           <div className={styles.tickerTrack}>{ticker(false)}{ticker(true)}</div>
         ) : (
-          <span className={styles.tickerEmpty}>{available && recorded ? `${recorded} recorded forecasts · ${players} players · No current eligible picks` : available ? `No published ${sport.toUpperCase()} forecasts` : 'Forecast refresh unavailable'}</span>
+          <span className={styles.tickerEmpty}>{available && !complete ? `${recorded} loaded forecasts · Limited research coverage` : available && recorded ? `${recorded} recorded forecasts · ${players} players · No current eligible picks` : available ? `No published ${sport.toUpperCase()} forecasts` : 'Forecast refresh unavailable'}</span>
         )}
       </div>
       <div className={styles.signalCount}>
-        <small>Recorded</small>
+        <small>{complete ? 'Recorded' : 'Loaded'}</small>
         <strong aria-label={available ? `${recorded} recorded forecasts, ${signals.length} currently eligible` : 'Forecast count unavailable'}>{available ? recorded : '—'}</strong>
       </div>
       <time className={styles.clock} dateTime={time ? new Date().toISOString() : undefined}>

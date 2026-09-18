@@ -1,68 +1,44 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { databaseQuery, hosted } from '@/lib/database';
-import { publicSignalSnapshots, publicPlayerProfile } from '@/lib/signalMetrics';
-import type { Sport } from '@/lib/types';
+import {createHash} from 'crypto';
+import {databaseQuery,hosted} from '@/lib/database';
+import {forecastPage,forecastRequest,FORECAST_PAGE_QUERY,type ForecastPageInput} from '@/lib/forecastPage';
 
-// Force dynamic — never cache this route handler (cache file changes after each scan).
-export const dynamic = 'force-dynamic';
+export const dynamic='force-dynamic';
 
-const CACHE_PATH = path.join(process.cwd(), '..', 'frontend', 'public', 'signals_cache.json');
-// Also try the public dir directly (for production build)
-const PUBLIC_PATH = path.join(process.cwd(), 'public', 'signals_cache.json');
-
-export async function GET(request: Request) {
-  const requestedSport = new URL(request.url).searchParams.get('sport');
-  if (requestedSport !== null && requestedSport !== 'nfl' && requestedSport !== 'nba') {
-    return NextResponse.json({ error: 'Unsupported sport.' }, { status: 400 });
-  }
-  const sport = requestedSport as Sport | null;
-
-  if (hosted) {
-    try {
-      const pattern = sport ? `signals:${sport}:%` : 'signals:%';
-      const profileKeys=sport ? ['player-profiles:'+sport] : ['player-profiles:nfl','player-profiles:nba'];
-      const {rows} = await databaseQuery<{snapshot_key:string;payload: unknown}>(
-        'SELECT snapshot_key,payload FROM dashboard_snapshots WHERE snapshot_key LIKE $1 OR snapshot_key = ANY($2::text[]) ORDER BY updated_at DESC LIMIT 102',
-        [pattern,profileKeys],
-      );
-      const data = rows.filter(row=>row.snapshot_key.startsWith('signals:')).slice(0,100).map(r => r.payload);
-      const now=Date.now();
-      const result=publicSignalSnapshots(data,now,sport ?? undefined);
-      // Profile collection is independent; its failure must not hide real forecasts.
-      try {
-        const profiles=Object.fromEntries(rows.filter(row=>profileKeys.includes(row.snapshot_key)).map(row=>[row.snapshot_key,row.payload])) as Record<string,{profiles?:unknown[]}>;
-        result.signals=result.signals.map(signal=>{
-          const values=profiles['player-profiles:'+signal.sport]?.profiles;
-          if(!Array.isArray(values) || values.length>500) return signal;
-          const matches=values.map(value=>publicPlayerProfile(value,signal.sport,signal.player,now)).filter(Boolean);
-          return matches.length===1 ? {...signal,player_profile:matches[0]} : signal;
-        });
-      } catch { /* Retain the captured forecast's own roster portrait. */ }
-      return NextResponse.json(result,
-        {headers: {'Cache-Control':'no-store'}});
-    } catch {
-      return NextResponse.json({error:'Results are temporarily unavailable.',signals:[]}, {status:503});
-    }
-  }
-
-  const filePath = fs.existsSync(PUBLIC_PATH) ? PUBLIC_PATH : CACHE_PATH;
-
-  if (!fs.existsSync(filePath)) {
-    return NextResponse.json(
-      { error: 'No signal snapshot has been published yet.', signals: [], generated_at: null },
-      { status: 503 }
-    );
-  }
-
+export async function GET(request:Request) {
+  let options:ReturnType<typeof forecastRequest>;
+  try {options=forecastRequest(new URL(request.url));}
+  catch {return NextResponse.json({error:'Unsupported forecast request.'},{status:400});}
   try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    const data = JSON.parse(raw);
-    return NextResponse.json(publicSignalSnapshots([data], Date.now(), sport ?? undefined), {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    let data:ForecastPageInput;
+    if(hosted) {
+      const profileKeys=options.sport ? ['player-profiles:'+options.sport] : ['player-profiles:nfl','player-profiles:nba'];
+      const result=await databaseQuery<{data:ForecastPageInput}>(FORECAST_PAGE_QUERY,
+        [options.sport ? `signals:${options.sport}:%` : 'signals:%',profileKeys,options.view==='qualified',
+          options.view==='qualified' ? 5001 : options.limit,options.offset]);
+      data=result.rows[0].data;
+    } else {
+      const paths=[path.join(process.cwd(),'public','signals_cache.json'),
+        path.join(process.cwd(),'..','frontend','public','signals_cache.json')];
+      const filePath=paths.find(value=>fs.existsSync(value));
+      if(!filePath) throw new Error('No published snapshot');
+      const raw=fs.readFileSync(filePath,'utf8');
+      const snapshot=JSON.parse(raw);
+      if(!Array.isArray(snapshot.signals) || snapshot.signals.length>500) throw new Error('Invalid snapshot');
+      const signals=snapshot.signals.filter((value:{sport?:unknown;gated?:unknown})=>
+        (!options.sport || value?.sport===options.sport) && (options.view!=='qualified' || value?.gated===false));
+      data={rows:signals.slice(options.offset,options.offset+options.limit).map((signal:unknown)=>
+        ({payload:{...snapshot,signals:[signal]}})),profiles:{},total_count:signals.length,
+        revision:createHash('sha256').update(raw).digest('hex'),metadata:{...snapshot,signals:[],games:[]},invalid_envelopes:0,window_complete:true};
+      if(options.view==='qualified') data.rows=signals.map((signal:unknown)=>({payload:{...snapshot,signals:[signal]}}));
+    }
+    if(options.revision && options.revision!==data.revision) {
+      return NextResponse.json({error:'Forecasts changed during browsing. Refresh to reload.'},{status:409});
+    }
+    return NextResponse.json(forecastPage(data,options),{headers:{'Cache-Control':'no-store'}});
   } catch {
-    return NextResponse.json({ error: 'Results are temporarily unavailable.', signals: [] }, { status: 503 });
+    return NextResponse.json({error:'Results are temporarily unavailable.',signals:[]},{status:503});
   }
 }

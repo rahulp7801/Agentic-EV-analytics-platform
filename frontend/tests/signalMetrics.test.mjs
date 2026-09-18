@@ -14,6 +14,18 @@ const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
   home_team:'Home',away_team:'Away',game_id:'game',sport:'nfl',prop_type:'pass_yds',line:249.5,
   mean_stat:260,confidence_interval:[.5,.7],trade_plan:[],injury_flags:{},
   market_type:'player_pass_yds',strength:'unrated'};
+test('full legitimate NFL/NBA team names survive both public forecast boundaries',()=>{
+  for(const [sport,home,away] of [['nfl','Washington Commanders','Tampa Bay Buccaneers'],
+    ['nba','Minnesota Timberwolves','Oklahoma City Thunder'],['nba','Golden State Warriors','Portland Trail Blazers']]) {
+    const forecast={...publicQuote,sport,home_team:home,away_team:away};
+    const game={sport,game_id:'game',home_team:home,away_team:away,date:'20260910'};
+    const result=publicSignalSnapshots([{generated_at:new Date(now).toISOString(),signals:[forecast],games:[game]}],now,sport);
+    assert.equal(result.signals.length,1);assert.equal(result.invalid_signals,0);
+    assert.equal(result.games[0].home_team,home);
+    assert.equal(publicSignals([{...forecast,home_team:'x'.repeat(101)}],now).signals.length,0);
+    assert.throws(()=>publicSignalSnapshots([{generated_at:new Date(now).toISOString(),signals:[],games:[{...game,away_team:'bad\nname'}]}],now));
+  }
+});
 test('latest available view retains archived forecasts without loosening eligibility',()=>{
   assert.equal(latestForecastWindow([publicQuote],now),'upcoming');
   const later=now+7200000;

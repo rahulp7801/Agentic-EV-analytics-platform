@@ -5,7 +5,8 @@ import { ArrowUpRight, CheckCircle2, CircleAlert, Clock3, Database, RefreshCw } 
 import { motion, useReducedMotion } from 'motion/react';
 import { marketFreshness } from '@/lib/marketFreshness';
 import type { EVSignal, Sport } from '@/lib/types';
-import {publicSignals,forecastWindow} from '@/lib/signalMetrics';
+import {forecastWindow} from '@/lib/signalMetrics';
+import {fetchForecasts} from '@/lib/fetchForecasts';
 import PlayerPortrait from './PlayerPortrait';
 import {bestPicks,conservativeMargin} from '@/lib/bestPicks';
 import styles from './Overview.module.css';
@@ -50,6 +51,9 @@ type Metrics = {
 
 type DashboardData = {
   forecasts?: EVSignal[];
+  picks?: EVSignal[];
+  forecastsComplete?: boolean;
+  forecastTotal?: number;
   markets?: MarketData;
   scan?: Scan;
   games?: Array<unknown>;
@@ -102,13 +106,17 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
       json<Record<Sport, Scan>>('/api/scans', controller.signal),
       json<{ games: Array<unknown> }>(`/api/games?sport=${sport}`, controller.signal),
       json<Metrics>(`/api/metrics?sport=${sport}`, controller.signal),
-      json<{signals:EVSignal[]}>(`/api/signals?sport=${sport}`,controller.signal).then(body=>publicSignals(body.signals)),
+      fetchForecasts(sport,controller.signal),
+      fetchForecasts(sport,controller.signal,'qualified').then(body=>{
+        if(!body.complete) throw new Error('Incomplete candidate coverage');
+        return body;
+      }),
     ]);
     window.clearTimeout(timeout);
     if (request.current !== controller) return;
     const errors: string[] = [];
     results.forEach((result, index) => {
-      if (result.status === 'rejected') errors.push(['Markets', 'Model scan', 'Schedule', 'Evaluation','Player forecasts'][index]);
+      if (result.status === 'rejected') errors.push(['Markets', 'Model scan', 'Schedule', 'Evaluation','Player forecasts','Qualified picks'][index]);
     });
     setData({
       markets: results[0].status === 'fulfilled' ? results[0].value : undefined,
@@ -116,6 +124,9 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
       games: results[2].status === 'fulfilled' ? results[2].value.games : undefined,
       metrics: results[3].status === 'fulfilled' ? results[3].value : undefined,
       forecasts: results[4].status==='fulfilled' ? results[4].value.signals : undefined,
+      forecastsComplete: results[4].status==='fulfilled' ? results[4].value.complete : undefined,
+      forecastTotal: results[4].status==='fulfilled' ? results[4].value.total_count : undefined,
+      picks: results[5].status==='fulfilled' ? results[5].value.signals : undefined,
       errors,
       checkedAt: Date.now(),
     });
@@ -145,11 +156,11 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
   const current = marketFreshness(data.markets?.captured_at, data.checkedAt) === 'current';
   const players=[...new Map((data.forecasts ?? []).map(signal=>[signal.player,signal])).values()];
   const upcoming=(data.forecasts ?? []).filter(signal=>forecastWindow(signal,data.checkedAt)==='upcoming').length;
-  const picks=bestPicks(data.forecasts ?? []);
+  const picks=bestPicks(data.picks ?? []);
   const cards = useMemo(() => [
     { label: 'Games observed', value: data.games?.length ?? null, note: `${sport.toUpperCase()} schedule window`, tone: 'blue' },
     { label: 'Kalshi player props', value: kalshi ? linkedProps : null, note: kalshi ? `${twoSided} with two-sided quotes` : 'No market capture', tone: 'violet' },
-    { label: 'Recorded forecasts', value: data.forecasts?.length ?? null, note: `${players.length} players · ${upcoming} upcoming forecasts`, tone: 'green' },
+    { label: data.forecastsComplete===false ? 'Loaded forecasts' : 'Recorded forecasts', value: data.forecasts?.length ?? null, note: data.forecastsComplete===false ? `Research window · ${data.forecastTotal} recent records available` : `${players.length} players · ${upcoming} upcoming forecasts`, tone: 'green' },
     { label: 'Evaluation sample', value: data.metrics?.sample_size ?? null, note: data.metrics ? `${data.metrics.pending_count} pending · ${data.metrics.settled_count} settled · ${data.metrics.excluded_missing_metadata} excluded` : 'No metrics snapshot', tone: 'slate' },
   ], [data, kalshi, linkedProps, sport, twoSided,players.length,upcoming]);
 
@@ -193,7 +204,7 @@ export default function Overview({ sport, onOpenMarkets,onOpenPlayers }: { sport
             </div>
 
             <section className={styles.shortlist} aria-label="Qualified picks">
-              <div><h2>Strongest qualified picks <span>{picks.length}</span></h2><p>{picks.length ? 'Ranked by the margin that remains at the reported 95% lower probability bound.' : 'No picks clear every current check. Explore the recorded forecasts below.'}</p></div>
+              <div><h2>Strongest qualified picks <span>{picks.length}</span></h2><p>{data.errors.includes('Qualified picks') ? 'The shortlist could not be fully checked. Refresh to try again; recorded forecasts remain available.' : picks.length ? 'Ranked by the margin that remains at the reported 95% lower probability bound.' : 'No picks clear every current check. Explore the recorded forecasts below.'}</p></div>
               <details><summary>How picks qualify</summary><p>Fresh prices, at least 20 prior games, verified roster and injury screening, a positive lower-bound margin above the price’s break-even probability, and approved risk limits. At most three distinct player/game choices; the list can stay empty. Ranking measures model evidence, not guaranteed profit or proven future performance.</p></details>
               {picks.length>0 && <div className={styles.pickRows}>{picks.map(pick=><button key={pick.id} type="button" onClick={()=>onOpenPlayers(pick.player)}><PlayerPortrait signal={pick} /><div><strong>{pick.player}</strong><small>{pick.direction} {pick.line} {pick.prop_type.replaceAll('_',' ')} · {pick.sportsbook}</small></div><span>+{(conservativeMargin(pick)!*100).toFixed(1)}pp<small>Lower-bound margin</small></span></button>)}</div>}
             </section>

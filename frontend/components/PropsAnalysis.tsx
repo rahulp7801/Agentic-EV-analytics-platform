@@ -8,6 +8,7 @@ import PlayerPortrait from './PlayerPortrait';
 import {Bookmark,RefreshCw,LayoutGrid,List} from 'lucide-react';
 import {motion,useReducedMotion} from 'motion/react';
 import {compareQuality} from '@/lib/bestPicks';
+import {fetchForecasts} from '@/lib/fetchForecasts';
 
 // PropAnalysis is derived from real EV signals — no mock data
 interface PropsAnalysisProps { sport: Sport; initialPlayer?:string; }
@@ -79,6 +80,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
   const [sort,setSort]=useState('quality');
   const [refresh,setRefresh]=useState(0);
   const [storageNotice,setStorageNotice]=useState('');
+  const [coverageNotice,setCoverageNotice]=useState('');
   const reduceMotion=useReducedMotion();
   useEffect(()=>{
     const timer=window.setTimeout(()=>{
@@ -112,12 +114,10 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
       busy=true;
       setLoading(true);
       try {
-        const response=await fetch(`/api/signals?sport=${sport}`, {cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15_000)])});
-        const body=await response.json();
-        if(!response.ok) throw new Error('Recorded forecasts could not be refreshed.');
-        if(!Array.isArray(body.signals)) throw new Error('Invalid forecast response.');
+        const body=await fetchForecasts(sport,AbortSignal.any([controller.signal,AbortSignal.timeout(15_000)]));
         if(!controller.signal.aborted) {
           setAllProps(body.signals);
+          setCoverageNotice(body.complete ? '' : `Showing ${body.signals.length} of ${body.total_count} recent forecasts. Search and filters apply to this loaded research window; the qualified shortlist is checked independently.`);
           setError('');
         }
       } catch {
@@ -165,6 +165,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
         <div><h2>Your player research</h2><p>Real forecasts. Familiar faces. The evidence behind every estimate.</p></div>
         <button className={styles.uxButton} type="button" onClick={()=>setRefresh(n=>n+1)} disabled={loading} aria-label="Refresh forecasts"><RefreshCw size={16} />{loading?'Refreshing...':'Refresh'}</button>
       </div>
+      {coverageNotice && <p role="status" style={{padding:'8px 20px',color:'var(--text-secondary)'}}>{coverageNotice}</p>}
       <div className={styles.forecastControls}>
         <input aria-label="Search player" className="term-input" placeholder="Find a player..." value={playerFilter} onChange={e=>{setPlayerFilter(e.target.value);setVisibleCount(24);}} />
         <select aria-label="Forecast window" className="term-select" value={windowFilter} onChange={e=>{setWindowFilter(e.target.value);setVisibleCount(24);}}><option value="latest">Available forecasts</option><option value="upcoming">Upcoming games</option><option value="archive">Past games</option><option value="all">All recorded forecasts</option></select>
