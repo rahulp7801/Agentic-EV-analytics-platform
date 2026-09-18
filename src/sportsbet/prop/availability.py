@@ -21,6 +21,18 @@ def fresh_timestamp(value: str, now: datetime) -> str:
     return parsed.isoformat()
 
 
+def injury_report(player: str, position: str, report: dict, now: datetime) -> dict:
+    reported = datetime.fromisoformat(report['date'].replace('Z', '+00:00'))
+    if reported.tzinfo is None or reported > now or any(
+        not isinstance(value, str) or not value.strip() or len(value) > limit
+        or any(ord(character) < 32 for character in value)
+        for value, limit in ((player, 100), (position, 10), (report['status'], 100))
+    ):
+        raise ValueError('Invalid injury report')
+    return dict(player=player, status=report['status'], position=position,
+                reported_at=reported.isoformat())
+
+
 async def fetch_event_availability(event: dict, sport: str) -> dict:
     """Fetch both exact teams and rosters, preserving raw source commitments."""
     now = datetime.now(timezone.utc)
@@ -43,7 +55,10 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
                                 retrieved_at=now.isoformat(), response_text=response.text))
             return data
         try:
-            directory, injuries = await asyncio.gather(read(base+'/teams'), read(base+'/injuries'))
+            directory, injuries = await asyncio.gather(
+                read(base+'/teams'), read(base+'/injuries'), return_exceptions=True)
+            if isinstance(directory, Exception):
+                raise ValueError('Team directory unavailable')
             teams = [entry['team'] for entry in directory['sports'][0]['leagues'][0]['teams']]
             selected = []
             for name in (event['home_team'], event['away_team']):
@@ -58,8 +73,9 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
             for team, roster in zip(selected, rosters, strict=True):
                 if str(roster['team']['id']) != str(team['id']):
                     raise ValueError('Roster team identity mismatch')
-                groups = [group for group in injuries['injuries'] if str(group['id']) == str(team['id'])
-                          and group['displayName'] == team['displayName']]
+                groups = [] if isinstance(injuries, Exception) else [
+                    group for group in injuries['injuries'] if str(group['id']) == str(team['id'])
+                    and group['displayName'] == team['displayName']]
                 if len(groups) > 1:
                     raise ValueError('Ambiguous injury team coverage')
                 athletes = roster['athletes']
@@ -73,13 +89,33 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
                     athlete = injury['athlete']
                     if str(athlete['team']['id']) != str(team['id']):
                         raise ValueError('Injury team identity mismatch')
-                    reported = datetime.fromisoformat(injury['date'].replace('Z', '+00:00'))
-                    if reported.tzinfo is None or reported > now:
-                        raise ValueError('Invalid injury report date')
-                    flags.append(dict(player=athlete['displayName'], status=injury['status'],
-                                      position=athlete['position']['abbreviation'], reported_at=reported.isoformat()))
+                    flags.append(injury_report(athlete['displayName'],
+                        athlete['position']['abbreviation'], injury, now))
                 if len(flags) > 64 or len({flag['player'] for flag in flags}) != len(flags):
                     raise ValueError('Ambiguous injury reports')
+                # A team omitted from the league feed is not an empty injury report.
+                # Its roster is a fallback only when EVERY athlete explicitly carries
+                # an injuries array in this fresh, exact-team response.
+                roster_complete = all(isinstance(athlete.get('injuries'), list) for athlete in athletes)
+                if any('injuries' in athlete for athlete in athletes):
+                    reports = {flag['player']: flag for flag in flags}
+                    for athlete in athletes:
+                        entries = athlete.get('injuries', [])
+                        if not isinstance(entries, list) or len(entries) > 1:
+                            raise ValueError('Ambiguous roster injury reports')
+                        for injury in entries:
+                            flag = injury_report(athlete['displayName'],
+                                athlete['position']['abbreviation'], injury, now)
+                            previous = reports.get(flag['player'])
+                            if previous and previous['status'] != flag['status']:
+                                raise ValueError('Conflicting injury source statuses')
+                            if not previous or datetime.fromisoformat(flag['reported_at']) > datetime.fromisoformat(previous['reported_at']):
+                                reports[flag['player']] = flag
+                    flags = list(reports.values())
+                if len(flags) > 64 or len({flag['player'] for flag in flags}) != len(flags):
+                    raise ValueError('Ambiguous injury reports')
+                roster_url = base+'/teams/'+str(team['id'])+'/roster'
+                injury_url = base+'/injuries' if groups else roster_url
                 result.append(dict(name=team['displayName'], abbreviation=team['abbreviation'],
                                    portraits={athlete['displayName']:dict(player_id=str(athlete.get('id','')),
                                        player_image_url=athlete.get('headshot',{}).get('href','')) for athlete in athletes
@@ -87,16 +123,19 @@ async def fetch_event_availability(event: dict, sport: str) -> dict:
                                        f"https://a.espncdn.com/i/headshots/{sport}/players/full/{athlete['id']}.png"},
                                    roster_names=names, roster_statuses={athlete['displayName']:
                                        athlete.get('status',{}).get('name','Unknown') for athlete in athletes},reports=flags,
-                                   injury_coverage='observed' if groups else 'unavailable',
-                                   roster_source_url=base+'/teams/'+str(team['id'])+'/roster',
+                                   injury_coverage='observed' if groups or roster_complete else 'unavailable',
+                                   injury_source_url=injury_url,
+                                   injury_source_sha256=next(source['source_sha256'] for source in sources
+                                       if source['url']==injury_url),
+                                   roster_source_url=roster_url,
                                    roster_source_sha256=next(source['source_sha256'] for source in sources
                                        if source['url']==base+'/teams/'+str(team['id'])+'/roster')))
             write_archive(dict(sport=sport, game_id=event['id'], sources=sources),
                           directory=Path('.local/availability'))
             return dict(status='observed' if all(team['injury_coverage']=='observed' for team in result)
                         else 'partial', captured_at=now.isoformat(),
-                        source_url=base+'/injuries', source_sha256=next(
-                            source['source_sha256'] for source in sources if source['url']==base+'/injuries'),
+                        source_url=base+'/injuries', source_sha256=next((
+                            source['source_sha256'] for source in sources if source['url']==base+'/injuries'), None),
                         teams=result)
         except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError, AttributeError, OSError):
             return dict(status='unavailable', captured_at=now.isoformat())
@@ -122,7 +161,8 @@ def player_availability(context: dict | None, player: str, now: datetime) -> tup
         status = subject[0]['status'] if subject else ('Not listed on injury report'
             if roster_status=='Active' else 'Roster status: '+roster_status)
         evidence = dict(status='observed', captured_at=context['captured_at'],
-                        source_url=context['source_url'], source_sha256=context['source_sha256'],
+                        source_url=team.get('injury_source_url',context['source_url']),
+                        source_sha256=team.get('injury_source_sha256',context['source_sha256']),
                         roster_confirmed=True, team=team['abbreviation'], subject_status=status,
                         roster_source_url=team['roster_source_url'],roster_source_sha256=team['roster_source_sha256'],
                         teammates=teammates, probability_adjusted=False)

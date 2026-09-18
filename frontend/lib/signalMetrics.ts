@@ -80,7 +80,9 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
   const url=sport==='nfl' ? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries'
     : 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries';
   if(a.status!=='observed' || a.roster_confirmed!==true || a.probability_adjusted!==false
-    || !timestamp(a.captured_at) || a.source_url!==url || !bounded(a.source_sha256,64)
+    || !timestamp(a.captured_at)
+    || !(a.source_url===url || (a.source_url===a.roster_source_url && a.source_sha256===a.roster_source_sha256))
+    || !bounded(a.source_sha256,64)
     || !/^[a-f0-9]{64}$/.test(a.source_sha256) || !bounded(a.roster_source_sha256,64)
     || !/^[a-f0-9]{64}$/.test(a.roster_source_sha256) || !rosterSource(a.roster_source_url,sport)
     || !bounded(a.subject_status,100)
@@ -94,7 +96,7 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     teammates.push({player:row.player,status:row.status,position:row.position,reported_at:row.reported_at});
   }
   return {status:'observed',roster_confirmed:true,subject_status:a.subject_status,
-    captured_at:a.captured_at,source_url:url,source_sha256:a.source_sha256,team:a.team,
+    captured_at:a.captured_at,source_url:a.source_url as string,source_sha256:a.source_sha256,team:a.team,
     roster_source_url:a.roster_source_url,roster_source_sha256:a.roster_source_sha256,
     ...(bounded(a.player_id,20) && /^[0-9]+$/.test(a.player_id)
       && a.player_image_url===`https://a.espncdn.com/i/headshots/${sport}/players/full/${a.player_id}.png`
