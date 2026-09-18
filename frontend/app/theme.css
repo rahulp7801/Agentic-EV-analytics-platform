@@ -431,3 +431,5 @@ select:focus-visible {
 .data-table th { background: var(--bg-raised); color: var(--text-muted); font-size: 10px; letter-spacing: .02em; }
 .data-table td { border-color: var(--border-dim); }
 .badge { border-radius: 999px; }
+.badge-purple { background: #f3edf9; color: #633da3; border-color: #dcd0ed; }
+.badge-red { background: #fff1f2; color: #9f1239; border-color: #fecdd3; }

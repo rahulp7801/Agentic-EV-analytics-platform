@@ -237,6 +237,7 @@ function PropRow({ prop,onExplain,saved,onSave,now }: { prop: EVSignal;onExplain
       <td>
         <div className={styles.playerHeading}><PlayerPortrait signal={prop} /><SaveButton prop={prop} saved={saved} onSave={onSave} /></div>
         <button id={`forecast-${prop.id}`} type="button" className={styles.forecastPlayer} onClick={onExplain}>{prop.player}<span>Why this forecast →</span></button>
+        <div style={{color:'var(--text-secondary)',fontSize:12}}>{prop.player_profile?.team ?? prop.availability?.team ?? prop.sport.toUpperCase()}{prop.player_profile?.jersey ? ` · #${prop.player_profile.jersey}` : ''}{prop.player_profile?.position ? ` · ${prop.player_profile.position}` : ''}</div>
         <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{prop.team || prop.home_team} vs {prop.opponent || prop.away_team}</div>
         <span className={`badge ${prop.gated ? 'badge-dim' : 'badge-mint'}`}>{prop.gated ? 'Blocked estimate' : 'Research eligible'}</span>
       </td>
