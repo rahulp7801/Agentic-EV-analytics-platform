@@ -1,0 +1,463 @@
+{
+  "source": "Published nflverse game logs, captured through the restricted public game-log projection",
+  "captured_at": "2026-09-18",
+  "season_floor": 2024,
+  "records": {
+    "Brock Purdy": [
+      {
+        "date": "2026-01-03",
+        "opponent": "SEA",
+        "yards": 127
+      },
+      {
+        "date": "2025-12-28",
+        "opponent": "CHI",
+        "yards": 303
+      },
+      {
+        "date": "2025-12-22",
+        "opponent": "IND",
+        "yards": 295
+      },
+      {
+        "date": "2025-12-14",
+        "opponent": "TEN",
+        "yards": 295
+      },
+      {
+        "date": "2025-11-30",
+        "opponent": "CLE",
+        "yards": 168
+      },
+      {
+        "date": "2025-11-24",
+        "opponent": "CAR",
+        "yards": 193
+      },
+      {
+        "date": "2025-11-16",
+        "opponent": "ARI",
+        "yards": 200
+      },
+      {
+        "date": "2025-09-28",
+        "opponent": "JAX",
+        "yards": 309
+      },
+      {
+        "date": "2025-09-07",
+        "opponent": "SEA",
+        "yards": 277
+      },
+      {
+        "date": "2024-12-30",
+        "opponent": "DET",
+        "yards": 377
+      },
+      {
+        "date": "2024-12-22",
+        "opponent": "MIA",
+        "yards": 313
+      },
+      {
+        "date": "2024-12-12",
+        "opponent": "LA",
+        "yards": 142
+      },
+      {
+        "date": "2024-12-08",
+        "opponent": "CHI",
+        "yards": 325
+      },
+      {
+        "date": "2024-12-01",
+        "opponent": "BUF",
+        "yards": 94
+      },
+      {
+        "date": "2024-11-17",
+        "opponent": "SEA",
+        "yards": 159
+      },
+      {
+        "date": "2024-11-10",
+        "opponent": "TB",
+        "yards": 353
+      },
+      {
+        "date": "2024-10-27",
+        "opponent": "DAL",
+        "yards": 260
+      },
+      {
+        "date": "2024-10-20",
+        "opponent": "KC",
+        "yards": 212
+      },
+      {
+        "date": "2024-10-10",
+        "opponent": "SEA",
+        "yards": 255
+      },
+      {
+        "date": "2024-10-06",
+        "opponent": "ARI",
+        "yards": 244
+      },
+      {
+        "date": "2024-09-29",
+        "opponent": "NE",
+        "yards": 288
+      },
+      {
+        "date": "2024-09-22",
+        "opponent": "LA",
+        "yards": 292
+      },
+      {
+        "date": "2024-09-15",
+        "opponent": "MIN",
+        "yards": 319
+      },
+      {
+        "date": "2024-09-09",
+        "opponent": "NYJ",
+        "yards": 231
+      }
+    ],
+    "Matthew Stafford": [
+      {
+        "date": "2026-01-04",
+        "opponent": "ARI",
+        "yards": 259
+      },
+      {
+        "date": "2025-12-29",
+        "opponent": "ATL",
+        "yards": 269
+      },
+      {
+        "date": "2025-12-18",
+        "opponent": "SEA",
+        "yards": 457
+      },
+      {
+        "date": "2025-12-14",
+        "opponent": "DET",
+        "yards": 368
+      },
+      {
+        "date": "2025-12-07",
+        "opponent": "ARI",
+        "yards": 281
+      },
+      {
+        "date": "2025-11-30",
+        "opponent": "CAR",
+        "yards": 243
+      },
+      {
+        "date": "2025-11-23",
+        "opponent": "TB",
+        "yards": 273
+      },
+      {
+        "date": "2025-11-16",
+        "opponent": "SEA",
+        "yards": 130
+      },
+      {
+        "date": "2025-11-09",
+        "opponent": "SF",
+        "yards": 280
+      },
+      {
+        "date": "2025-11-02",
+        "opponent": "NO",
+        "yards": 281
+      },
+      {
+        "date": "2025-10-19",
+        "opponent": "JAX",
+        "yards": 182
+      },
+      {
+        "date": "2025-10-12",
+        "opponent": "BAL",
+        "yards": 181
+      },
+      {
+        "date": "2025-10-02",
+        "opponent": "SF",
+        "yards": 389
+      },
+      {
+        "date": "2025-09-28",
+        "opponent": "IND",
+        "yards": 375
+      },
+      {
+        "date": "2025-09-21",
+        "opponent": "PHI",
+        "yards": 196
+      },
+      {
+        "date": "2025-09-14",
+        "opponent": "TEN",
+        "yards": 298
+      },
+      {
+        "date": "2025-09-07",
+        "opponent": "HOU",
+        "yards": 245
+      },
+      {
+        "date": "2024-12-28",
+        "opponent": "ARI",
+        "yards": 189
+      },
+      {
+        "date": "2024-12-22",
+        "opponent": "NYJ",
+        "yards": 110
+      },
+      {
+        "date": "2024-12-12",
+        "opponent": "SF",
+        "yards": 160
+      },
+      {
+        "date": "2024-12-08",
+        "opponent": "BUF",
+        "yards": 320
+      },
+      {
+        "date": "2024-12-01",
+        "opponent": "NO",
+        "yards": 183
+      },
+      {
+        "date": "2024-11-24",
+        "opponent": "PHI",
+        "yards": 243
+      },
+      {
+        "date": "2024-11-17",
+        "opponent": "NE",
+        "yards": 295
+      },
+      {
+        "date": "2024-11-11",
+        "opponent": "MIA",
+        "yards": 293
+      },
+      {
+        "date": "2024-11-03",
+        "opponent": "SEA",
+        "yards": 298
+      },
+      {
+        "date": "2024-10-24",
+        "opponent": "MIN",
+        "yards": 279
+      },
+      {
+        "date": "2024-10-20",
+        "opponent": "LV",
+        "yards": 154
+      },
+      {
+        "date": "2024-10-06",
+        "opponent": "GB",
+        "yards": 260
+      },
+      {
+        "date": "2024-09-29",
+        "opponent": "CHI",
+        "yards": 224
+      },
+      {
+        "date": "2024-09-22",
+        "opponent": "SF",
+        "yards": 221
+      },
+      {
+        "date": "2024-09-15",
+        "opponent": "ARI",
+        "yards": 216
+      },
+      {
+        "date": "2024-09-08",
+        "opponent": "DET",
+        "yards": 317
+      }
+    ],
+    "Aaron Rodgers": [
+      {
+        "date": "2026-01-04",
+        "opponent": "BAL",
+        "yards": 294
+      },
+      {
+        "date": "2025-12-28",
+        "opponent": "CLE",
+        "yards": 168
+      },
+      {
+        "date": "2025-12-21",
+        "opponent": "DET",
+        "yards": 266
+      },
+      {
+        "date": "2025-12-15",
+        "opponent": "MIA",
+        "yards": 224
+      },
+      {
+        "date": "2025-12-07",
+        "opponent": "BAL",
+        "yards": 284
+      },
+      {
+        "date": "2025-11-30",
+        "opponent": "BUF",
+        "yards": 117
+      },
+      {
+        "date": "2025-11-16",
+        "opponent": "CIN",
+        "yards": 116
+      },
+      {
+        "date": "2025-11-09",
+        "opponent": "LAC",
+        "yards": 161
+      },
+      {
+        "date": "2025-11-02",
+        "opponent": "IND",
+        "yards": 203
+      },
+      {
+        "date": "2025-10-26",
+        "opponent": "GB",
+        "yards": 219
+      },
+      {
+        "date": "2025-10-16",
+        "opponent": "CIN",
+        "yards": 249
+      },
+      {
+        "date": "2025-10-12",
+        "opponent": "CLE",
+        "yards": 235
+      },
+      {
+        "date": "2025-09-28",
+        "opponent": "MIN",
+        "yards": 200
+      },
+      {
+        "date": "2025-09-21",
+        "opponent": "NE",
+        "yards": 139
+      },
+      {
+        "date": "2025-09-14",
+        "opponent": "SEA",
+        "yards": 203
+      },
+      {
+        "date": "2025-09-07",
+        "opponent": "NYJ",
+        "yards": 244
+      },
+      {
+        "date": "2025-01-05",
+        "opponent": "MIA",
+        "yards": 274
+      },
+      {
+        "date": "2024-12-29",
+        "opponent": "BUF",
+        "yards": 112
+      },
+      {
+        "date": "2024-12-22",
+        "opponent": "LA",
+        "yards": 256
+      },
+      {
+        "date": "2024-12-15",
+        "opponent": "JAX",
+        "yards": 289
+      },
+      {
+        "date": "2024-12-08",
+        "opponent": "MIA",
+        "yards": 339
+      },
+      {
+        "date": "2024-12-01",
+        "opponent": "SEA",
+        "yards": 185
+      },
+      {
+        "date": "2024-11-17",
+        "opponent": "IND",
+        "yards": 184
+      },
+      {
+        "date": "2024-11-10",
+        "opponent": "ARI",
+        "yards": 151
+      },
+      {
+        "date": "2024-10-31",
+        "opponent": "HOU",
+        "yards": 211
+      },
+      {
+        "date": "2024-10-27",
+        "opponent": "NE",
+        "yards": 233
+      },
+      {
+        "date": "2024-10-20",
+        "opponent": "PIT",
+        "yards": 276
+      },
+      {
+        "date": "2024-10-14",
+        "opponent": "BUF",
+        "yards": 294
+      },
+      {
+        "date": "2024-10-06",
+        "opponent": "MIN",
+        "yards": 244
+      },
+      {
+        "date": "2024-09-29",
+        "opponent": "DEN",
+        "yards": 225
+      },
+      {
+        "date": "2024-09-19",
+        "opponent": "NE",
+        "yards": 281
+      },
+      {
+        "date": "2024-09-15",
+        "opponent": "TEN",
+        "yards": 176
+      },
+      {
+        "date": "2024-09-09",
+        "opponent": "SF",
+        "yards": 167
+      }
+    ]
+  }
+}
