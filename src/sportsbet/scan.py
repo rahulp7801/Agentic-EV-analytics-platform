@@ -131,7 +131,8 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         accepted=False
         reason=state.get('gate_reason') or 'no_positive_edge'
         now=datetime.now(timezone.utc)
-        availability_evidence, availability_reason=player_availability(availability,player,now)
+        availability_evidence, availability_reason=player_availability(availability,player,now,
+            player_id=player_id if sport=='nfl' else None)
         if signal:
             if now >= start: reason='game_started'
             elif not -60 <= (now-quote.snapped_at).total_seconds() <= 300: reason='stale_quote'
@@ -274,7 +275,8 @@ async def run(sports: list[str], daily_credit_limit: int):
                     screens[sport].append(dict(status=screened['status'],
                         coverage=screened['coverage'],
                         comparisons=sportsbook_screen['comparisons']+screened['comparisons']))
-                    availability=await fetch_event_availability(quoted,sport)
+                    availability=await fetch_event_availability(quoted,sport,
+                        player_names={quote.player_name for quote in quotes})
                     result=await asyncio.wait_for(evaluate_event(pool,quoted,sport,ledger,scan_id,availability),timeout=120)
                     result['cross_venue']=screened
                     result['sportsbook_arb']=sportsbook_screen

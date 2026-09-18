@@ -123,15 +123,21 @@ def test_api_budget_survives_restart(tmp_path):
 
 @pytest.mark.parametrize('injuries,expected',[(None,None),('Player','player_availability_risk'),
     ('Teammate','teammate_availability_unmodeled')])
-async def test_availability_really_controls_daily_recommendations(tmp_path,injuries,expected):
-    conn=AsyncMock();conn.fetch.return_value=[{'player_id':1}]
+@pytest.mark.parametrize('id_match',[False,True])
+async def test_availability_really_controls_daily_recommendations(tmp_path,injuries,expected,id_match):
+    conn=AsyncMock();conn.fetch.return_value=[{'player_id':'00-0037248'}]
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
     now=datetime.now(timezone.utc)
+    roster_name='Player III' if id_match else 'Player'
     availability=dict(status='observed',captured_at=now.isoformat(),source_url='source',source_sha256='a'*64,
-        teams=[dict(abbreviation='KC',roster_names=['Player','Teammate'],
-        roster_statuses={'Player':'Active','Teammate':'Active'},roster_source_url='roster',roster_source_sha256='b'*64,reports=[] if injuries is None else
-        [dict(player=injuries,status='Out',position='WR',reported_at=now.isoformat())])])
+        teams=[dict(abbreviation='KC',roster_names=[roster_name,'Teammate'],roster_ids={'123':roster_name},
+        roster_statuses={roster_name:'Active','Teammate':'Active'},roster_source_url='roster',roster_source_sha256='b'*64,reports=[] if injuries is None else
+        [dict(player=roster_name if injuries=='Player' else injuries,status='Out',position='WR',reported_at=now.isoformat())])])
+    if id_match:
+        from sportsbet.prop.availability import NFL_PLAYER_IDS_URL
+        availability.update(player_identities={'00-0037248':'123'},identity_source=dict(
+            url=NFL_PLAYER_IDS_URL,source_sha256='c'*64,retrieved_at=now.isoformat()))
     result_model=PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24'),
         confidence_interval=(Decimal('.55'),Decimal('.65')))
     ledger=Ledger(tmp_path/'audit.sqlite')
@@ -139,6 +145,9 @@ async def test_availability_really_controls_daily_recommendations(tmp_path,injur
         result=await evaluate_event(pool,event('nfl'),'nfl',ledger,'scan',availability)
     assert len(result['signals'])==2
     assert all(s['true_prob'] in [.6,.4] for s in result['signals'])
+    if id_match:
+        assert all(s['availability']['roster_player_name']==roster_name
+            and s['availability']['probability_adjusted'] is False for s in result['signals'])
     if expected:
         reserve.assert_not_called()
         assert all(s['gate_reason']==expected and s['gated'] and s['kelly_fraction']==0 for s in result['signals'])

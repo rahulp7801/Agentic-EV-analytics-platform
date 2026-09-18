@@ -88,6 +88,11 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     || !bounded(a.subject_status,100)
     || !bounded(a.team,5) || !Array.isArray(a.teammates) || a.teammates.length>64) return undefined;
   const teammates:AvailabilityEvidence['teammates']=[];
+  const identityFields=['roster_player_name','identity_source_url','identity_source_sha256'];
+  const identified=identityFields.some(key=>a[key]!==undefined);
+  if(identified && (sport!=='nfl' || !bounded(a.roster_player_name,100)
+    || a.identity_source_url!=='https://github.com/nflverse/nflverse-data/releases/download/players/players.csv'
+    || !bounded(a.identity_source_sha256,64) || !/^[a-f0-9]{64}$/.test(a.identity_source_sha256)))return undefined;
   for(const value of a.teammates) {
     if(!value || typeof value!=='object' || Array.isArray(value)) return undefined;
     const row=value as Record<string,unknown>;
@@ -101,6 +106,9 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     ...(bounded(a.player_id,20) && /^[0-9]+$/.test(a.player_id)
       && a.player_image_url===`https://a.espncdn.com/i/headshots/${sport}/players/full/${a.player_id}.png`
       ? {player_id:a.player_id,player_image_url:a.player_image_url} : {}),
+    ...(identified ? {roster_player_name:a.roster_player_name as string,
+      identity_source_url:a.identity_source_url as string,
+      identity_source_sha256:a.identity_source_sha256 as string} : {}),
     teammates,probability_adjusted:false};
 }
 

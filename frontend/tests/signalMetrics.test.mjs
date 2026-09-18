@@ -75,6 +75,25 @@ test('forecast windows change at kickoff',()=>{
   assert.equal(forecastWindow({},now),'archive');
 });
 
+test('roster identity explanations require the NFL crosswalk commitment and strip internals',()=>{
+  const availability={...quote.availability,roster_player_name:'Player III',
+    identity_source_url:'https://github.com/nflverse/nflverse-data/releases/download/players/players.csv',
+    identity_source_sha256:'c'.repeat(64),player_identities:{private:'internal'}};
+  const project=a=>publicSignals([{...publicQuote,availability:a}],now).signals[0];
+  const result=project(availability);
+  assert.equal(result.availability.roster_player_name,'Player III');
+  assert.equal(result.availability.identity_source_url,availability.identity_source_url);
+  assert.equal('player_identities' in result.availability,false);
+  assert.equal(result.true_prob,.6);
+  for(const patch of [{identity_source_url:'https://evil.example/players.csv'},
+    {identity_source_url:availability.identity_source_url+'?secret=1'},
+    {identity_source_sha256:undefined},{roster_player_name:undefined},
+    {identity_source_sha256:'bad'}]) {
+    const rejected=project({...availability,...patch});
+    assert.equal(rejected.availability,undefined);assert.equal(rejected.gated,true);
+  }
+});
+
 test('roster injury sources require the exact committed roster URL and hash',()=>{
   const availability={...quote.availability, source_url:quote.availability.roster_source_url,
     source_sha256:quote.availability.roster_source_sha256,

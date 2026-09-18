@@ -18,6 +18,9 @@ export interface AvailabilityEvidence {
   team?: string;
   player_id?: string;
   player_image_url?: string;
+  roster_player_name?: string;
+  identity_source_url?: string;
+  identity_source_sha256?: string;
   teammates: Array<{player:string; status:string; position:string; reported_at:string}>;
 }
 
