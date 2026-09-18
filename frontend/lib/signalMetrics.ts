@@ -53,6 +53,7 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
 const SPORTS = new Set<Sport>(['nba','nfl']);
 const PROPS = new Set<PropType>(['points','rebounds','assists','threes','pra','steals','blocks',
   'pass_yds','pass_tds','rush_yds','rec_yds','receptions']);
+const NFL_PROPS=new Set<PropType>(['pass_yds','pass_tds','rush_yds','rec_yds','receptions']);
 
 function finite(value:unknown):value is number {
   return typeof value === 'number' && Number.isFinite(value);
@@ -159,7 +160,7 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
   const mean=s.mean_stat;
   if (!bounded(s.id,128) || !bounded(s.player,100) || !bounded(s.team,20,true)
       || !bounded(s.opponent,20,true) || !bounded(s.home_team,100) || !bounded(s.away_team,100)
-      || !bounded(s.game_id,128) || !sport || !prop
+      || !bounded(s.game_id,128) || !sport || !prop || (sport==='nfl')!==NFL_PROPS.has(prop)
       || !finite(s.line) || Number(s.line)<0 || Number(s.line)>10000
       || (s.direction !== 'over' && s.direction !== 'under')
       || !bounded(s.sportsbook,64) || s.sportsbook.toLowerCase()==='prizepicks'

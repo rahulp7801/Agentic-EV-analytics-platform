@@ -2,9 +2,15 @@ import {publicSignalSnapshots} from './signalMetrics.ts';
 import {bestPicks} from './bestPicks.ts';
 import type {Sport} from './types';
 
+export type ForecastCursor={offset:number;revision:string;total_count:number};
+
 /** Bounded pages, stable snapshot revision, explicit coverage; never silently complete. */
-export async function fetchForecasts(sport:Sport,signal?:AbortSignal,view='library',fetchImpl=fetch,maximum=1000) {
-  let offset=0,revision:string|undefined,total=0,complete=false,invalid=0;
+export async function fetchForecasts(sport:Sport,signal?:AbortSignal,view='library',fetchImpl=fetch,maximum=1000,cursor?:ForecastCursor) {
+  if(!Number.isSafeInteger(maximum) || maximum<1 || maximum>1000 || (cursor &&
+    (view!=='library' || !Number.isSafeInteger(cursor.offset) || cursor.offset<1 || cursor.offset>=maximum
+      || !Number.isSafeInteger(cursor.total_count) || cursor.total_count>50000 || cursor.total_count<=cursor.offset
+      || !/^[a-f0-9]{64}$/.test(cursor.revision)))) throw new Error('Invalid forecast cursor');
+  let offset=cursor?.offset ?? 0,revision:string|undefined=cursor?.revision,total=cursor?.total_count ?? 0,complete=false,invalid=0;
   const signals:ReturnType<typeof publicSignalSnapshots>['signals']=[];
   const games=new Map<string,ReturnType<typeof publicSignalSnapshots>['games'][number]>();
   let generated_at:string|null=null;
@@ -30,6 +36,7 @@ export async function fetchForecasts(sport:Sport,signal?:AbortSignal,view='libra
     const empty=body.generated_at===null && body.signals.length===0 && body.games.length===0;
     const page=publicSignalSnapshots(empty ? [] : [{...body,games:[]}],Date.now(),sport);
     const pagination=body.pagination;
+    if(pagination===undefined && (offset || revision)) throw new Error('Invalid forecast coverage');
     if(pagination!==undefined && (!Number.isSafeInteger(body.total_count) || body.total_count<0 || body.total_count>50000
       || pagination.offset!==offset || !/^[a-f0-9]{64}$/.test(pagination.revision)
       || (revision && (revision!==pagination.revision || total!==body.total_count)) || typeof pagination.complete!=='boolean'
@@ -50,5 +57,6 @@ export async function fetchForecasts(sport:Sport,signal?:AbortSignal,view='libra
     offset=next;
   }
   return {signals:view==='qualified' ? (complete ? bestPicks(signals) : []) : signals,
-    games:[...games.values()],game:null,generated_at,invalid_signals:invalid,total_count:total,complete};
+    games:[...games.values()],game:null,generated_at,invalid_signals:invalid,total_count:total,complete,revision,
+    cursor:view==='library' && !complete && revision && offset<total ? {offset,revision,total_count:total} : null};
 }

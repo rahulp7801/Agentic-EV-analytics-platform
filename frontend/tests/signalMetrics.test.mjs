@@ -17,7 +17,8 @@ const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
 test('full legitimate NFL/NBA team names survive both public forecast boundaries',()=>{
   for(const [sport,home,away] of [['nfl','Washington Commanders','Tampa Bay Buccaneers'],
     ['nba','Minnesota Timberwolves','Oklahoma City Thunder'],['nba','Golden State Warriors','Portland Trail Blazers']]) {
-    const forecast={...publicQuote,sport,home_team:home,away_team:away};
+    const forecast={...publicQuote,sport,prop_type:sport==='nfl' ? 'pass_yds' : 'points',
+      market_type:sport==='nfl' ? 'player_pass_yds' : 'player_points',home_team:home,away_team:away};
     const game={sport,game_id:'game',home_team:home,away_team:away,date:'20260910'};
     const result=publicSignalSnapshots([{generated_at:new Date(now).toISOString(),signals:[forecast],games:[game]}],now,sport);
     assert.equal(result.signals.length,1);assert.equal(result.invalid_signals,0);

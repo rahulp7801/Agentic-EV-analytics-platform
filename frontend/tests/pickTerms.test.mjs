@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {pickTerms} from '../lib/pickTerms.ts';
+import {pickTerms,latestRecordedQuote} from '../lib/pickTerms.ts';
 import {base,now} from './fixtures/qualifiedSignal.mjs';
 test('displayed bet returns equal an independent win/loss/refund payout calculation',()=>{
   let checked=0;
@@ -29,7 +29,30 @@ test('missing approval, stale prices, contradictory uncertainty and invalid cuto
   assert.ok(pickTerms(base,now));assert.equal(pickTerms(base,now+300001),null);
   assert.equal(pickTerms({...base,game_start_time:new Date(now).toISOString()},now),null);
 });
-test('cutoffs use the event Eastern calendar day, including an NBA event after midnight UTC',()=>{
+test('cutoffs use the event Eastern calendar day, including a game after midnight UTC',()=>{
   const quote={...base,game_start_time:'2026-09-11T02:00:00Z'};
   assert.ok(pickTerms(quote,now));assert.equal(pickTerms({...quote,forecast_cutoff:'2026-09-11'},now),null);
+});
+
+test('NBA terms use the same payout calculation and reject football props in basketball',()=>{
+  const nba={...base,sport:'nba',prop_type:'points',line:24.5,mean_stat:26,
+    home_team:'Los Angeles Lakers',away_team:'Boston Celtics',market_type:'player_points',
+    availability:{...base.availability,team:'LAL',
+      source_url:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries',
+      roster_source_url:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/13/roster'}};
+  const terms=pickTerms(nba,now);
+  assert.equal(terms.pick,'Over 24.5 points');assert.ok(Math.abs(terms.expectedPer100-30)<1e-9);
+  assert.equal(pickTerms({...nba,prop_type:'pass_yds'},now),null);
+  assert.equal(pickTerms({...base,prop_type:'points'},now),null);
+  assert.ok(pickTerms({...nba,game_start_time:'2026-09-11T02:00:00Z'},now));
+});
+
+test('empty-shortlist context describes only real validated loaded quote timestamps',()=>{
+  assert.equal(latestRecordedQuote([],now),null);
+  assert.equal(latestRecordedQuote([{player:'Invented',snapped_at:new Date(now).toISOString()}],now),null);
+  assert.deepEqual(latestRecordedQuote([base],now),{observed_at:base.snapped_at,expired:false});
+  assert.equal(latestRecordedQuote([base],now+300001).expired,true);
+  assert.equal(latestRecordedQuote([{...base,snapped_at:new Date(now+60001).toISOString()}],now),null);
+  const older={...base,snapped_at:new Date(now-3600000).toISOString()};
+  assert.equal(latestRecordedQuote([older,base],now).observed_at,base.snapped_at);
 });
