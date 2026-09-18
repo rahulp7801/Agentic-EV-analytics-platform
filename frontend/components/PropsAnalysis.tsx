@@ -184,7 +184,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
       {storageNotice && <p role="status" className={styles.forecastIntro}>{storageNotice}</p>}
 
       {error && <div className={styles.notice} role="alert">{error}</div>}
-      {effectiveWindow==='archive' && currentProps.length>0 && <div className={styles.archiveNotice}><strong>Past games · Prices expired</strong><span>Original forecasts and player history remain available for research.</span></div>}
+      {props.length>0 && props.every(p=>forecastWindow(p,now)==='archive') && <div className={styles.archiveNotice}><strong>Past games · Prices expired</strong><span>Original forecasts and player history remain available for research.</span></div>}
       {players.length>0 && <nav className={styles.playerShelf} aria-label="Players with recorded forecasts">{players.map(p=><button type="button" key={p.player} aria-pressed={playerFilter===p.player} onClick={()=>{setPlayerFilter(playerFilter===p.player?'':p.player);setVisibleCount(24);}}><PlayerPortrait signal={p} /><strong>{p.player}</strong><small>{p.player_profile?.team ?? p.availability?.team ?? sport.toUpperCase()}{p.player_profile?.jersey ? ` · #${p.player_profile.jersey}` : ''}{p.player_profile?.position ? ` · ${p.player_profile.position}` : ''}</small></button>)}</nav>}
       <p className={styles.forecastIntro}>Prices are recorded observations, not live quotes. Quotes expire after five minutes. Saved players stay in this browser.</p>
       {selected && <PredictionEvidence signal={selected} onClose={()=>{setSelectedId(null);document.getElementById(`forecast-${selected.id}`)?.focus();}} />}
@@ -200,9 +200,9 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
         ) : view==='cards' ? <><div className={styles.forecastGrid}>{props.slice(0,visibleCount).map(p=><motion.article key={p.id} className={styles.forecastCard} initial={reduceMotion ? false : {opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.2}}>
           <div className={styles.playerHeading}><PlayerPortrait signal={p} /><div><button id={`forecast-${p.id}`} type="button" className={styles.forecastPlayer} onClick={()=>setSelectedId(p.id)}>{p.player}<span>Explore forecast →</span></button><small>{p.player_profile?.team ?? p.availability?.team ?? p.sport.toUpperCase()}{p.player_profile?.jersey ? ` · #${p.player_profile.jersey}` : ''}{p.player_profile?.position ? ` · ${p.player_profile.position}` : ''}</small></div><SaveButton prop={p} saved={shortlist.includes(`${p.sport}:${p.player}`)} onSave={()=>savePlayer(p)} /></div>
           <h3>{p.direction} {p.line} <span>{PROP_LABELS[p.prop_type]}</span></h3>
-          <p className={styles.cardMatchup}>{p.home_team} vs {p.away_team} | <QuoteAge signal={p} now={now} /></p>
+          <p className={styles.cardMatchup}><time dateTime={p.game_start_time}>{new Date(p.game_start_time ?? '').toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time><br />{p.home_team} vs {p.away_team} | <QuoteAge signal={p} now={now} /></p>
           <ProbabilityComparison model={p.true_prob} implied={p.implied_prob} gated={p.gated} />
-          <div className={styles.cardFooter}><span className={`badge ${p.gated ? 'badge-dim' : 'badge-mint'}`}>{p.gated ? 'Blocked estimate' : 'Research eligible'}</span><span>{p.sample_size} games · {p.sportsbook}</span></div>
+          <div className={styles.cardFooter}><span className={`badge ${p.gated ? 'badge-dim' : 'badge-mint'}`}>{forecastWindow(p,now)==='archive' ? 'Historical forecast' : p.gated ? 'Blocked estimate' : 'Research eligible'}</span><span>{p.sample_size} games · {p.sportsbook}</span></div>
           {p.gated && <p className={styles.cardGate}>{REASONS[p.gate_reason ?? ''] ?? 'A model or portfolio risk gate blocked this pick.'}</p>}
         </motion.article>)}</div>{props.length>visibleCount && <div className={styles.moreForecasts}><button type="button" className={styles.uxButton} onClick={()=>setVisibleCount(n=>n+24)}>Show 24 more · {props.length-visibleCount} remaining</button></div>}</> : <table className="data-table">
           <thead>
