@@ -39,6 +39,12 @@ def test_browser_role_migration_closes_owner_view_and_preserves_data():
                     conn.execute(sa.text(f'CREATE ROLE {role} NOLOGIN'))
                     created.append(role)
                 conn.execute(sa.text(f'GRANT ALL ON public.dashboard_snapshots, public.dashboard_gamelogs TO {role}'))
+                for schema in ('public','analytics'):
+                    for kind in ('TABLES','SEQUENCES'):
+                        conn.execute(sa.text(f'ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT ALL ON {kind} TO {role}'))
+            for schema in ('public','analytics'):
+                for kind in ('TABLES','SEQUENCES'):
+                    conn.execute(sa.text(f'ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT ALL ON {kind} TO PUBLIC'))
             conn.execute(sa.text("INSERT INTO dashboard_snapshots(snapshot_key,payload) VALUES ('acl-proof','{}')"))
         alembic.command.upgrade(cfg, 'head')
         with engine.connect() as conn:
@@ -55,7 +61,28 @@ def test_browser_role_migration_closes_owner_view_and_preserves_data():
         alembic.command.downgrade(cfg, '0023_worker_snapshot_append')
         with engine.connect() as conn:
             assert not conn.execute(sa.text("SELECT has_table_privilege('anon','public.dashboard_gamelogs','SELECT')")).scalar_one()
+        # Verify defaults remain closed even after downgrade, without RLS masking grants.
+        with engine.begin() as conn:
+            for schema in ('public','analytics'):
+                conn.execute(sa.text(f'CREATE TABLE {schema}.browser_default_probe(id SERIAL PRIMARY KEY)'))
+                conn.execute(sa.text(f'INSERT INTO {schema}.browser_default_probe DEFAULT VALUES'))
+                conn.execute(sa.text(f'CREATE VIEW {schema}.browser_default_view AS SELECT * FROM {schema}.browser_default_probe'))
+                for role in ('anon','authenticated'):
+                    for table in ('browser_default_probe','browser_default_view'):
+                        assert not conn.execute(sa.text("SELECT has_table_privilege(:role,:table,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')"),
+                                                {'role':role,'table':f'{schema}.{table}'}).scalar_one()
+                    assert not conn.execute(sa.text("SELECT has_sequence_privilege(:role,pg_get_serial_sequence(:table,'id'),'USAGE,SELECT,UPDATE')"),
+                                            {'role':role,'table':f'{schema}.browser_default_probe'}).scalar_one()
+        for role in ('anon','authenticated'):
+            with pytest.raises(sa.exc.ProgrammingError):
+                with engine.begin() as conn:
+                    conn.execute(sa.text(f'SET LOCAL ROLE {role}'))
+                    conn.execute(sa.text('SELECT * FROM public.browser_default_view'))
     finally:
+        with engine.begin() as conn:
+            for schema in ('public','analytics'):
+                conn.execute(sa.text(f'DROP VIEW IF EXISTS {schema}.browser_default_view'))
+                conn.execute(sa.text(f'DROP TABLE IF EXISTS {schema}.browser_default_probe'))
         alembic.command.downgrade(cfg, 'base')
         with engine.begin() as conn:
             for role in created:

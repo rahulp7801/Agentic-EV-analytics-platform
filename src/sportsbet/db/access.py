@@ -31,6 +31,11 @@ def deny_browser_roles(conn):
     for role in ('anon', 'authenticated'):
         if conn.execute('SELECT 1 FROM pg_roles WHERE rolname=%s', (role,)).fetchone():
             grantees.append(sql.Identifier(role))
+    # Defaults belong to the connected application creator, not provider-admin roles.
+    for schema in ('public', 'analytics'):
+        for kind in ('TABLES', 'SEQUENCES'):
+            conn.execute(sql.SQL('ALTER DEFAULT PRIVILEGES IN SCHEMA {} REVOKE ALL ON {} FROM {}').format(
+                sql.Identifier(schema), sql.SQL(kind), sql.SQL(', ').join(grantees)))
     conn.execute(sql.SQL('REVOKE ALL ON {} FROM {}').format(
         sql.SQL(', ').join(targets), sql.SQL(', ').join(grantees)))
 

@@ -69,7 +69,23 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
             # Reproduce Supabase defaults, including its owner-executed view.
             admin.execute(sql.SQL('GRANT ALL ON public.dashboard_snapshots, public.dashboard_gamelogs TO {}')
                           .format(sql.Identifier(browser_role)))
+            for schema in ('public','analytics'):
+                for kind in ('TABLES','SEQUENCES'):
+                    admin.execute(sql.SQL('ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT ALL ON {} TO {}')
+                                  .format(sql.Identifier(schema),sql.SQL(kind),sql.Identifier(browser_role)))
         provision_roles(admin, passwords)
+        for schema in ('public','analytics'):
+            admin.execute(sql.SQL('CREATE TABLE {}(id SERIAL)').format(sql.Identifier(schema,'browser_provisioning_probe')))
+            admin.execute(sql.SQL('CREATE VIEW {} AS SELECT * FROM {}').format(
+                sql.Identifier(schema,'browser_provisioning_view'),sql.Identifier(schema,'browser_provisioning_probe')))
+            for browser_role in ('anon','authenticated'):
+                for name in ('browser_provisioning_probe','browser_provisioning_view'):
+                    assert not admin.execute("SELECT has_table_privilege(%s,%s,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')",
+                                             (browser_role,f'{schema}.{name}')).fetchone()[0]
+                assert not admin.execute("SELECT has_sequence_privilege(%s,pg_get_serial_sequence(%s,'id'),'USAGE,SELECT,UPDATE')",
+                                         (browser_role,f'{schema}.browser_provisioning_probe')).fetchone()[0]
+            admin.execute(sql.SQL('DROP VIEW {}').format(sql.Identifier(schema,'browser_provisioning_view')))
+            admin.execute(sql.SQL('DROP TABLE {}').format(sql.Identifier(schema,'browser_provisioning_probe')))
         admin.execute("INSERT INTO dashboard_snapshots(snapshot_key,payload) VALUES (%s,'{}')", (key,))
     try:
         with psycopg.connect(dsn, user=READER, password=passwords[READER], autocommit=True) as reader:
