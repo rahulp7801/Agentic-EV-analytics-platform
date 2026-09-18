@@ -14,6 +14,13 @@ export const REASONS:Record<string,string>={
   game_started:'The game has started.',
   insufficient_sample:'There are fewer than 20 historical observations.',
   no_positive_edge:'The estimate did not pass the model edge and uncertainty gates.',
+  uncertainty_unavailable:'A supported uncertainty interval is unavailable.',
+  edge_not_confident:'The lower probability bound does not exceed the observed price’s break-even probability.',
+  edge_review_limit:'The point estimate exceeds the model-review ceiling and cannot be recommended.',
+  correlated_exposure:'Another selection already uses this player’s correlated exposure slot.',
+  daily_exposure_limit:'This selection would exceed the daily research exposure limit.',
+  previously_reserved:'This selection is already reserved in the research portfolio.',
+  missing_matching_prop_quote:'No observed quote matches this exact player, market, line and side.',
 };
 
 function time(value?:string) {

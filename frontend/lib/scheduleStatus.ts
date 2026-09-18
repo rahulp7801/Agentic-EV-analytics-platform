@@ -33,13 +33,17 @@ function easternDay(value:number) {
   return ['year','month','day'].map(type=>parts.find(part=>part.type===type)?.value).join('');
 }
 
-function publicGames(value:unknown, asOfDate:string) {
+function publicGames(value:unknown, asOfDate:string,lookahead:number) {
   if (!Array.isArray(value) || value.length>100) throw new Error('Invalid schedule');
   const base=new Date(`${asOfDate}T00:00:00Z`);
   const labels=new Map<number,string>();
   for (const [offset,label] of [[-1,'Yesterday'],[0,'Today'],[1,'Tomorrow']] as const) {
     const day=new Date(base);day.setUTCDate(day.getUTCDate()+offset);
     labels.set(Number(day.toISOString().slice(0,10).replaceAll('-','')),label);
+  }
+  for(let offset=2;offset<=lookahead;offset++) {
+    const day=new Date(base);day.setUTCDate(day.getUTCDate()+offset);
+    labels.set(Number(day.toISOString().slice(0,10).replaceAll('-','')),day.toISOString().slice(0,10));
   }
   const ids=new Set<string>();
   return value.map(item=>{
@@ -51,14 +55,16 @@ function publicGames(value:unknown, asOfDate:string) {
     ids.add(id);
     return {home_abbr:text(game.home_abbr,10),away_abbr:text(game.away_abbr,10),
       home_name:text(game.home_name,100),away_name:text(game.away_name,100),date,
-      label:expectedLabel,game_time:start};
+      label:expectedLabel,game_time:start,
+      ...(lookahead>1 ? {provider_event_id:id,completed:game.completed} : {})};
   });
 }
 
-export function scheduleSnapshot(data: Row | null, sport:Sport, now=Date.now()) {
+export function scheduleSnapshot(data: Row | null, sport:Sport, now=Date.now(),lookahead=1) {
   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',
     month:'2-digit',day:'2-digit'}).format(now);
   try {
+    if(lookahead!==1 && lookahead!==6) throw new Error('Invalid schedule window');
     if (!data || data.sport!==sport || (data.status!=='complete' && data.status!=='partial')
         || data.partial!==(data.status==='partial') || calendar(data.as_of_date)!==today) {
       throw new Error('Invalid schedule');
@@ -67,7 +73,7 @@ export function scheduleSnapshot(data: Row | null, sport:Sport, now=Date.now()) 
     // Schedules change far less often than prices. Keep a same-day snapshot usable
     // across ordinary GitHub Actions scheduling delays while prices retain tighter gates.
     if (!Number.isFinite(age) || age<0 || age>4*60*60000) throw new Error('Invalid schedule');
-    return {status:200,body:{games:publicGames(data.games,today),partial:data.status==='partial',
+    return {status:200,body:{games:publicGames(data.games,today,lookahead),partial:data.status==='partial',
       captured_at:captured}};
   } catch {
     return {status:503,body:{games:[],partial:true,error:'Schedules are temporarily unavailable.'}};

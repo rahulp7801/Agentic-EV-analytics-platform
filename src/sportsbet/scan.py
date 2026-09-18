@@ -239,7 +239,7 @@ async def run(sports: list[str], daily_credit_limit: int):
                     cadence_deferred_events=0,next_refresh_at=None,
                     failures=[],coverage={},attempts=previous.get('attempts',{}),
                     model_complete_events=0,model_partial_events=0,model_unavailable_events=0,
-                    execution_ready=False)
+                    events=[],execution_ready=False)
                 reports[sport]=report
                 publish_snapshot('scan:'+sport,report)
                 try:
@@ -249,6 +249,9 @@ async def run(sports: list[str], daily_credit_limit: int):
                     if len({e['id'] for e in events})!=len(events):
                         raise ValueError('Duplicate provider event identity')
                     report['eligible_events']=len(events)
+                    report['events']=[dict(game_id=e['id'],home_team=e['home_team'],
+                        away_team=e['away_team'],game_start_time=e['commence_time'],state='waiting_quotes')
+                        for e in events]
                     report['attempts']={e['id']:report['attempts'][e['id']] for e in events if e['id'] in report['attempts']}
                     queues[sport]=sorted(events,key=lambda e:(timestamp(e['commence_time'])>now+timedelta(hours=1),
                         report['attempts'].get(e['id'],''),timestamp(e['commence_time']),e['id']))
@@ -262,17 +265,21 @@ async def run(sports: list[str], daily_credit_limit: int):
                      for sport in order if i<len(queues[sport])]
             for sport,event in pending:
                 report=reports[sport]
+                event_state=next(item for item in report['events'] if item['game_id']==event['id'])
                 check=next_quote_check(event,report['attempts'].get(event['id']),datetime.now(timezone.utc))
                 if check>datetime.now(timezone.utc):
+                    event_state.update(state='scheduled',next_refresh_at=check.isoformat())
                     report['cadence_deferred_events']+=1
                     if not report['next_refresh_at'] or check<timestamp(report['next_refresh_at']):
                         report['next_refresh_at']=check.isoformat()
                     continue
                 close=timestamp(event['commence_time'])-datetime.now(timezone.utc)<=timedelta(hours=1)
                 if not ledger.reserve_api_credits(len(MARKETS[sport]),daily_credit_limit,holdback=0 if close else held):
+                    event_state['state']='api_budget'
                     report['budget_skipped_events']+=1
                     continue
                 report['attempted_events']+=1
+                event_state['state']='evaluating'
                 report['attempts'][event['id']]=datetime.now(timezone.utc).isoformat()
                 # Persist before I/O so interrupted runs don't repeatedly consume the same game's budget.
                 publish_snapshot('scan:'+sport,report)
@@ -301,7 +308,9 @@ async def run(sports: list[str], daily_credit_limit: int):
                     publish_snapshot(f'signals:{sport}:{event["id"]}',result)
                     report['completed_events']+=1
                     report['coverage'][event['id']]=result['coverage']|{'cross_venue':screened['coverage']}
+                    event_state['state']='evaluated'
                 except Exception as exc:
+                    event_state['state']='failed'
                     report['failures'].append(dict(stage='event_evaluation',event_id=event['id'],error_type=type(exc).__name__))
             for sport,report in reports.items():
                 model_statuses=Counter(item.get('model_status') for item in report['coverage'].values())
