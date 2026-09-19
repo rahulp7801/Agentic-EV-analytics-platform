@@ -117,6 +117,26 @@ Full frontend dependency audit found no known vulnerabilities. Backend tests,
 dependency/static scans, migrations, PostgreSQL, worker isolation and all three
 CodeQL analyses must pass on the exact PR head before merging.
 
+A subsequent public-surface pass exercised 11 representative landing and
+research states at desktop and mobile widths (22 route/viewport combinations).
+It found no horizontal overflow, broken images, unnamed accessibility controls
+or runtime exceptions. Disclosure, evidence-link and option controls now have
+clear keyboard focus and larger touch targets while retaining native semantics.
+The deployment verifier also requires the published retrospective evidence and
+its limitation language, so a stale landing bundle cannot pass readiness.
+
+Browser Fetch Metadata is accepted only for `same-origin` or direct navigation,
+and a supplied `Origin` must match the request origin. Non-browser server clients
+may omit both headers. Public archive offsets stop before 1,000 rows; game-log
+player filters require normalized human-name characters and an explicit limit
+of at most 200. Production readiness probes exercise these denial paths before
+database reads and require rejection responses to be non-cacheable. All API
+validation and availability errors explicitly use `Cache-Control: no-store`.
+Responses also opt into an origin-keyed agent cluster and deny
+legacy cross-domain policy files. The frontend production dependency audit,
+backend environment audit and Bandit scan reported no known findings in this
+pass; this remains point-in-time evidence rather than a guarantee.
+
 These controls reduce abuse; **no public website is immune to DDoS**. Distributed
 clients can evade a per-IP allowance, low-rate expensive requests can still
 consume capacity, and platform/provider outages remain possible. Monitor Vercel

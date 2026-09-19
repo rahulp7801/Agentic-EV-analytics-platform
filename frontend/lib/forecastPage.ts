@@ -12,7 +12,9 @@ export function forecastRequest(url:URL) {
   const limit=url.searchParams.get('limit') ?? String(FORECAST_PAGE_SIZE);
   const revision=url.searchParams.get('revision');
   if((sport!==null && sport!=='nba' && sport!=='nfl') || !['library','qualified'].includes(view)
-    || !/^(0|[1-9][0-9]{0,4})$/.test(offset) || Number(offset)>50000
+    // The public research window is deliberately capped at 1,000 rows. Larger
+    // offsets add expensive cache keys without serving any product workflow.
+    || !/^(0|[1-9][0-9]{0,3})$/.test(offset) || Number(offset)>=1000
     || !/^[1-9][0-9]{0,2}$/.test(limit) || Number(limit)>FORECAST_PAGE_SIZE
     || (revision!==null && !/^[a-f0-9]{64}$/.test(revision))
     || (view==='qualified' && (Number(offset)!==0 || revision!==null))) throw new Error('Invalid forecast request');

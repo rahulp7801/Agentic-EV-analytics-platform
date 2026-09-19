@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       {key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains'},
       {key: 'Cross-Origin-Opener-Policy', value: 'same-origin'},
       {key: 'Cross-Origin-Resource-Policy', value: 'same-origin'},
+      {key: 'Origin-Agent-Cluster', value: '?1'},
+      {key: 'X-Permitted-Cross-Domain-Policies', value: 'none'},
       {key: 'X-DNS-Prefetch-Control', value: 'off'},
       {key: 'Permissions-Policy', value: 'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=()'},
     ]}];

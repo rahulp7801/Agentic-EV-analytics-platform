@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   let query:ReturnType<typeof gameLogRequest>;
   try {query=gameLogRequest(new URL(request.url).searchParams);} catch {
-    return NextResponse.json({error:'Invalid game-log request'}, {status:400});
+    return NextResponse.json({error:'Invalid game-log request'}, {status:400,headers:{'Cache-Control':'no-store'}});
   }
   const {sport,player,limit,before,exact}=query;
   try {
@@ -19,6 +19,6 @@ export async function GET(request: Request) {
     return NextResponse.json({logs:publicGameLogs(rows.map(row=>row.payload),sport)},
       {headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
-    return NextResponse.json({error:'Game logs are temporarily unavailable.',logs:[]}, {status:503});
+    return NextResponse.json({error:'Game logs are temporarily unavailable.',logs:[]}, {status:503,headers:{'Cache-Control':'no-store'}});
   }
 }

@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const sport = new URL(request.url).searchParams.get('sport') ?? 'nfl';
   if (sport !== 'nfl' && sport !== 'nba') {
-    return NextResponse.json({error:'Invalid benchmark request.'}, {status:400});
+    return NextResponse.json({error:'Invalid benchmark request.'}, {status:400,headers:{'Cache-Control':'no-store'}});
   }
   return NextResponse.json({benchmarks:sport === 'nfl' ? [
     publicForecastBenchmark(weekOne),

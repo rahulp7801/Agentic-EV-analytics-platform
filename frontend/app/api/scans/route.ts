@@ -8,6 +8,6 @@ export async function GET() {
     const data=await snapshots(['scan:nfl','scan:nba']);
     return NextResponse.json({nfl:scanStatus(data['scan:nfl']),nba:scanStatus(data['scan:nba'])}, {headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
-    return NextResponse.json({error:'Daily scan status is temporarily unavailable.'},{status:503});
+    return NextResponse.json({error:'Daily scan status is temporarily unavailable.'},{status:503,headers:{'Cache-Control':'no-store'}});
   }
 }

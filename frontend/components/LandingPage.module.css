@@ -42,7 +42,7 @@
 .resultsFoot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 40px; align-items: start; margin-top: 26px; padding: 24px 2px 0; border-top: 1px solid var(--landing-line); }
 .resultsFoot p { max-width: 560px; color: #72737a; font-size: 11px; line-height: 1.55; }
 .resultsFoot p strong { color: #3f4046; }
-.resultsFoot a { display: inline-flex; align-items: center; gap: 8px; color: var(--landing-purple); font-size: 12px; font-weight: 650; white-space: nowrap; }
+.resultsFoot a { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; color: var(--landing-purple); font-size: 12px; font-weight: 650; white-space: nowrap; }
 .story { position: relative; min-height: 100svh; padding: 8vh 6vw; display: grid; grid-template-columns: .72fr 1.28fr; gap: 7vw; align-items: center; background: #0d0d0f; color: #fff; overflow: hidden; }
 .story::before { content: ''; position: absolute; width: 740px; height: 740px; right: -150px; bottom: -390px; border-radius: 50%; background: rgba(99,91,255,.18); filter: blur(100px); }
 .storyCopy { position: relative; z-index: 2; }.storyWord { margin: 13px 0; color: rgba(255,255,255,.17); font-size: clamp(38px, 5vw, 80px); line-height: 1.02; letter-spacing: -.058em; font-weight: 600; }.wordActive { color: #fff; }

@@ -4,7 +4,7 @@ import {slateReadiness,settlementProgress} from '../../../lib/slateReadiness.ts'
 export const dynamic='force-dynamic';
 export async function GET(request:Request) {
   const sport=new URL(request.url).searchParams.get('sport') ?? 'nfl';
-  if(sport!=='nba' && sport!=='nfl') return Response.json({error:'Unsupported sport.'},{status:400});
+  if(sport!=='nba' && sport!=='nfl') return Response.json({error:'Unsupported sport.'},{status:400,headers:{'Cache-Control':'no-store'}});
   const now=Date.now();
   let result:ReturnType<typeof scheduleSnapshot>|null=null;
   let scan:Record<string,unknown>|null=null,reports:unknown[]=[],coverage_available=false;

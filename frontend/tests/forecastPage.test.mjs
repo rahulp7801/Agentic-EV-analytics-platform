@@ -19,7 +19,7 @@ function input(values,total=values.length) {
     profiles:{},total_count:total,revision:'a'.repeat(64),metadata,invalid_envelopes:0,window_complete:true};
 }
 test('forecast requests reject unbounded offsets, limits and unsupported views',()=>{
-  for(const query of ['sport=mlb','offset=-1','offset=50001','offset=01','limit=101','limit=0',
+  for(const query of ['sport=mlb','offset=-1','offset=1000','offset=50001','offset=01','limit=101','limit=0',
     'view=other','revision=bad','view=qualified&offset=1','view=qualified&revision='+ 'a'.repeat(64)]) {
     assert.throws(()=>forecastRequest(new URL('https://example.test/api/signals?'+query)));
   }

@@ -3,15 +3,17 @@ import test from 'node:test';
 
 import {
   paidPipelinePaths,
+  publicSecurityProbes,
   publicPipelinePaths,
   requiredCssMarkers,
+  requiredHtmlMarkers,
   readinessStatuses,
   verifyProduction,
   verifyProductionWithRetry,
   verifySecurityHeaders,
 } from '../scripts/verify-production.mjs';
 
-const deploymentHtml = '<html><head><link rel="stylesheet" href="/app.css"></head></html>';
+const deploymentHtml = `<html><head><link rel="stylesheet" href="/app.css"></head><body>${requiredHtmlMarkers.join(' ')}</body></html>`;
 const deploymentCss = requiredCssMarkers.join(' ');
 const securityHeaderValues = {
   'x-content-type-options': 'nosniff',
@@ -20,11 +22,23 @@ const securityHeaderValues = {
   'cross-origin-opener-policy': 'same-origin',
   'cross-origin-resource-policy': 'same-origin',
   'x-dns-prefetch-control': 'off',
+  'origin-agent-cluster': '?1',
+  'x-permitted-cross-domain-policies': 'none',
+  'cache-control': 'no-store',
   'strict-transport-security': 'max-age=63072000; includeSubDomains',
   'permissions-policy': 'camera=(), microphone=()',
   'content-security-policy': "default-src 'self'; script-src 'self' 'nonce-YWJjZA==' 'strict-dynamic'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
 };
 const securityHeaders = { get: name => securityHeaderValues[name.toLowerCase()] ?? null };
+
+function securityProbeStatus(path, options = {}) {
+  const method = (options.method ?? 'GET').toUpperCase();
+  const headers = new Headers(options.headers);
+  const probe = publicSecurityProbes.find(candidate => candidate.path === path
+    && (candidate.options?.method ?? 'GET') === method
+    && Object.entries(candidate.options?.headers ?? {}).every(([name, value]) => headers.get(name) === value));
+  return probe?.statuses[0];
+}
 
 test('production security policy requires nonce scripts and isolation headers', () => {
   assert.doesNotThrow(() => verifySecurityHeaders(securityHeaders));
@@ -46,10 +60,11 @@ test('paid pipeline makes all data endpoints mandatory', () => {
 });
 
 test('production verification rejects unavailable public data when its pipeline is enabled', async () => {
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, options = {}) => {
     const path = new URL(url).pathname + new URL(url).search;
     if (path === '/app.css') return { status: 200, text: async () => deploymentCss };
-    const status = path === '/api/markets?sport=nfl' ? 503 : path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200;
+    const status = path === '/api/markets?sport=nfl' ? 503 : securityProbeStatus(path, options)
+      ?? (path === '/.env' || path === '/signals_cache.json' ? 404 : 200);
     return {
       status,
       headers: securityHeaders,
@@ -68,7 +83,7 @@ test('production verification binds public endpoints to the current collection r
     markets: { nfl: { captured_at: '2026-09-12T23:14:02Z' } },
     schedules: { nfl: { captured_at: '2026-09-12T23:13:52Z' } },
   };
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, options = {}) => {
     const parsed = new URL(url);
     const path = parsed.pathname + parsed.search;
     if (path === '/app.css') return { status: 200, text: async () => deploymentCss };
@@ -78,7 +93,7 @@ test('production verification binds public endpoints to the current collection r
         ? '2026-09-12T23:13:52Z'
         : undefined;
     return {
-      status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
+      status: securityProbeStatus(path, options) ?? (path === '/.env' || path === '/signals_cache.json' ? 404 : 200),
       headers: securityHeaders,
       text: async () => deploymentHtml,
       json: async () => ({ captured_at }),
@@ -107,11 +122,11 @@ test('production verification binds public endpoints to the current collection r
 });
 
 test('production verification rejects a stale or incomplete stylesheet bundle', async () => {
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, options = {}) => {
     const path = new URL(url).pathname + new URL(url).search;
     if (path === '/app.css') return { status: 200, text: async () => ':root{--accent-mint:#00e5a0}' };
     return {
-      status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
+      status: securityProbeStatus(path, options) ?? (path === '/.env' || path === '/signals_cache.json' ? 404 : 200),
       headers: securityHeaders,
       text: async () => deploymentHtml,
       json: async () => ({}),
@@ -126,14 +141,14 @@ test('production verification rejects a stale or incomplete stylesheet bundle', 
 
 test('production verification retries a transient deployment propagation mismatch', async () => {
   let stylesheetRequests = 0;
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, options = {}) => {
     const path = new URL(url).pathname + new URL(url).search;
     if (path === '/app.css') {
       stylesheetRequests += 1;
       return { status: 200, text: async () => stylesheetRequests === 1 ? ':root{}' : deploymentCss };
     }
     return {
-      status: path === '/api/scan' ? 403 : path === '/.env' || path === '/signals_cache.json' ? 404 : 200,
+      status: securityProbeStatus(path, options) ?? (path === '/.env' || path === '/signals_cache.json' ? 404 : 200),
       headers: securityHeaders,
       text: async () => deploymentHtml,
       json: async () => ({}),

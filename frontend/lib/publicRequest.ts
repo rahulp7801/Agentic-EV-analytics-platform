@@ -13,7 +13,15 @@ export function publicRequest(request:Pick<Request,'url'|'method'|'headers'>):nu
   if(!url.pathname.startsWith('/api/')) return null;
   if(!['GET','HEAD'].includes(request.method)) return request.method==='POST' && url.pathname==='/api/scan' ? 403 : 405;
   if(request.url.length>2048) return 414;
-  if(request.headers.get('sec-fetch-site')==='cross-site') return 403;
+  // The dashboard only makes same-origin browser requests. Server clients omit
+  // Fetch Metadata and Origin, so they remain able to read the public API.
+  const fetchSite=request.headers.get('sec-fetch-site');
+  if(fetchSite && fetchSite!=='same-origin' && fetchSite!=='none') return 403;
+  const origin=request.headers.get('origin');
+  if(origin) {
+    try {if(new URL(origin).origin!==url.origin) return 403;}
+    catch {return 403;}
+  }
   const allowed=PARAMETERS[url.pathname];
   if(!allowed) return 404;
   const seen=new Set<string>();
