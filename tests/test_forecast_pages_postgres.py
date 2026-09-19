@@ -34,6 +34,9 @@ def test_forecast_pages_remain_bounded_with_large_history_and_exclude_old_candid
             values=dict(p1='signals:nfl:%',p2=['player-profiles:nfl'],p3=False,p4=100,p5=0)
             first=connection.execute(sa.text(query),values).scalar_one()
             assert first['total_count']==6500 and len(first['rows'])==100
+            # A row carries one signal only. Repeating the snapshot's entire
+            # game list for every signal made the public query exceed its timeout.
+            assert all(row['payload']['games']==[] for row in first['rows'])
             second=connection.execute(sa.text(query),{**values,'p5':100}).scalar_one()
             assert first['revision']==second['revision']
             first_ids={row['payload']['signals'][0]['id'] for row in first['rows']}

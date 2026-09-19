@@ -175,7 +175,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
       <div className={styles.forecastHeading}>
-        <div><h2>Your player research</h2><p>Real forecasts. Familiar faces. The evidence behind every estimate.</p></div>
+        <div><h2>Player board</h2><p>One primary threshold per market, with every alternate line kept within reach.</p></div>
         <button className={styles.uxButton} type="button" onClick={()=>setRefresh(n=>n+1)} disabled={loading} aria-label="Refresh forecasts"><RefreshCw size={16} />{loading?'Refreshing...':'Refresh'}</button>
       </div>
       {coverageNotice && <p role="status" style={{padding:'8px 20px',color:'var(--text-secondary)'}}>{coverageNotice}</p>}

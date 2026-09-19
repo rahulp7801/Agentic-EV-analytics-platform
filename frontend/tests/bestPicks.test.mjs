@@ -44,4 +44,6 @@ test('research grouping preserves its supplied ranking and removes duplicate off
   assert.equal(groups.length,1);
   assert.equal(groups[0].pick.id,base.id);
   assert.deepEqual(groups[0].alternatives.map(value=>value.id),['alternate']);
+  const crowded=groupAlternateLines(Array.from({length:15},(_,index)=>({...base,id:`line-${index}`,line:200+index})));
+  assert.equal(crowded[0].alternatives.length,10);
 });

@@ -19,7 +19,7 @@ function marketKey(signal:EVSignal) {
 }
 
 /** Collapse alternate thresholds for the same player market, preserving the supplied ranking. */
-export function groupAlternateLines(signals:EVSignal[],alternativeLimit=5):PickGroup[] {
+export function groupAlternateLines(signals:EVSignal[],alternativeLimit=10):PickGroup[] {
   const groups=new Map<string,PickGroup>(),seen=new Map<string,Set<string>>();
   for(const signal of signals) {
     const key=marketKey(signal),identity=`${signal.line}:${signal.sportsbook}:${signal.american_odds}`;

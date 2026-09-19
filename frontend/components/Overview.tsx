@@ -1,7 +1,7 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {RefreshCw,ArrowUpRight} from 'lucide-react';
-import {bestPickGroups} from '@/lib/bestPicks';
+import {bestPickGroups,compareQuality,groupAlternateLines} from '@/lib/bestPicks';
 import {fetchForecasts} from '@/lib/fetchForecasts';
 import {publicSignals,forecastWindow} from '@/lib/signalMetrics';
 import {PROP_LABELS,latestRecordedQuote} from '@/lib/pickTerms';
@@ -41,7 +41,8 @@ export default function Overview({sport,onOpenMarkets,onOpenPlayers}:{sport:Spor
     return()=>{request.current?.abort();window.clearTimeout(initial);window.clearInterval(poll);window.clearInterval(clock);document.removeEventListener('visibilitychange',load);};
   },[load]);
   const pickGroups=bestPickGroups(candidates,now),picks=pickGroups.map(group=>group.pick),records=publicSignals(forecasts,now).signals;
-  const players=[...new Map(records.map(signal=>[signal.player,signal])).values()].slice(0,4);
+  const previewMarkets=groupAlternateLines([...records].sort((a,b)=>Number(a.gated)-Number(b.gated) || compareQuality(a,b)));
+  const players=[...new Map(previewMarkets.map(group=>[group.pick.player,group.pick])).values()].slice(0,4);
   const explained=picks.find(signal=>signal.id===selected);
   const latestQuote=latestRecordedQuote(records,now);
   return <section className={styles.overview} aria-label={`${sport.toUpperCase()} decision desk`}>

@@ -273,7 +273,7 @@
 .uxButton { border: 1px solid var(--border-dim); }
 .uxButton[aria-pressed="true"] { background:var(--bg-surface); color:var(--accent); border-color:var(--accent); }
 .savePlayer:focus-visible,.uxButton:focus-visible,.viewSwitch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.forecastGrid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,320px),1fr)); gap: 16px; padding: 20px; }
+.forecastGrid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,320px),1fr)); align-items:start; gap: 16px; padding: 20px; }
 .forecastCard { min-width: 0; padding: 20px; border: 1px solid var(--border-dim); border-radius: 20px; background: var(--bg-surface); box-shadow: var(--shadow-sm); }
 .forecastCard h3 { margin: 20px 0 6px; color: var(--text-primary); font: 600 24px var(--font-sans),sans-serif; letter-spacing: -.04em; text-transform: capitalize; }
 .forecastCard h3 span { font-size: 16px; letter-spacing: -.02em; }

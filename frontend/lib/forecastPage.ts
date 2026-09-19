@@ -27,19 +27,18 @@ export const FORECAST_PAGE_QUERY=`WITH latest AS MATERIALIZED (
   WHERE snapshot_key LIKE $1 AND ($3::boolean=false OR updated_at>=now()-interval '6 minutes')
   ORDER BY updated_at DESC,snapshot_key DESC LIMIT 100
 ), forecasts AS MATERIALIZED (
-  SELECT snapshot_key,updated_at,ordinality,
-    jsonb_build_object('generated_at',payload->'generated_at','games',payload->'games',
-      'signals',jsonb_build_array(signal)) AS payload
+  SELECT snapshot_key,updated_at,ordinality,payload->'generated_at' AS generated_at,signal
   FROM latest CROSS JOIN LATERAL jsonb_array_elements(
     CASE WHEN jsonb_typeof(payload->'signals')='array' THEN payload->'signals' ELSE '[]'::jsonb END
   ) WITH ORDINALITY AS items(signal,ordinality)
   WHERE $3::boolean=false OR (signal->>'gated'='false' AND updated_at>=now()-interval '6 minutes')
 ), page AS (
-  SELECT snapshot_key,payload,updated_at,ordinality FROM forecasts ORDER BY updated_at DESC,snapshot_key DESC,ordinality
+  SELECT snapshot_key,generated_at,signal,updated_at,ordinality FROM forecasts ORDER BY updated_at DESC,snapshot_key DESC,ordinality
   LIMIT $4 OFFSET $5
 )
 SELECT jsonb_build_object(
-  'rows',COALESCE((SELECT jsonb_agg(jsonb_build_object('payload',payload)
+  'rows',COALESCE((SELECT jsonb_agg(jsonb_build_object('payload',jsonb_build_object(
+      'generated_at',generated_at,'games','[]'::jsonb,'signals',jsonb_build_array(signal)))
     ORDER BY updated_at DESC,snapshot_key DESC,ordinality) FROM page),'[]'::jsonb),
   'profiles',COALESCE((SELECT jsonb_object_agg(snapshot_key,payload) FROM dashboard_snapshots
     WHERE snapshot_key=ANY($2::text[])),'{}'::jsonb),
