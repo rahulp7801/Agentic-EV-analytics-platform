@@ -23,7 +23,7 @@ export default function SlateReadiness({sport}:{sport:Sport}) {
   },[sport]);
   return <section className={styles.playersPanel} aria-label="Upcoming game readiness">
     <div className={styles.comparisonHeading}><div><span>Next seven days</span><h2>Your upcoming slate</h2></div><small>{data ? data.games.length+' games' : 'Checking schedule'}</small></div>
-    <p>Games appear before prop scanning begins. Research capture covers the next 48 hours; a completed evaluation does not guarantee a qualified pick.</p>
+    <p>Games appear before prop scanning begins. Research capture covers the next 48 hours; a completed evaluation does not guarantee a qualified pick. Finished games never appear as live picks, and later games enter the scan window only when they are close enough.</p>
     {error && <p role="status">Refresh unavailable. Previously loaded fixtures may be stale.</p>}
     {data?.partial && <p>Schedule coverage is partial; some dates could not be checked.</p>}
     {data && !data.coverage_available && <p>Worker coverage could not be checked. Fixtures remain visible.</p>}

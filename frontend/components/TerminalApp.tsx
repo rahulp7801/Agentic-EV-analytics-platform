@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
 import Overview from '@/components/Overview';
@@ -18,6 +18,7 @@ export default function TerminalApp() {
   const [sport, setSport] = useState<Sport>('nfl');
   const [player,setPlayer]=useState('');
   const [parlayLegs, setParlayLegs] = useState<EVSignal[]>([]);
+  const viewport=useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const syncLocation = () => {
@@ -31,6 +32,8 @@ export default function TerminalApp() {
     window.addEventListener('hashchange', syncLocation);
     return () => window.removeEventListener('hashchange', syncLocation);
   }, []);
+
+  useEffect(()=>{viewport.current?.scrollTo({top:0,left:0});},[view,sport]);
 
   const changeView = (nextView: string) => {
     setPlayer('');
@@ -61,7 +64,7 @@ export default function TerminalApp() {
             <span aria-hidden="true">/</span>
             <strong>{{dashboard:'Picks',props:'Players',arbitrage:'Markets',backtest:'Backtesting',gamelogs:'Game logs',parlay:'Scenario lab',kelly:'Stake calculator'}[view]}</strong>
           </div>
-          <div className="terminal-view">
+          <div className="terminal-view" ref={viewport}>
             {view === 'dashboard' && (
               <Overview key={sport} sport={sport} onOpenMarkets={() => changeView('arbitrage')} onOpenPlayers={name=>{changeView('props');setPlayer(name ?? '');}} />
             )}

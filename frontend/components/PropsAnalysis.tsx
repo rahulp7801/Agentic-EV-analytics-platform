@@ -7,7 +7,7 @@ import {forecastWindow,latestForecastWindow,publicSignals} from '@/lib/signalMet
 import PlayerPortrait from './PlayerPortrait';
 import {Bookmark,RefreshCw,LayoutGrid,List} from 'lucide-react';
 import {motion,useReducedMotion} from 'motion/react';
-import {compareQuality} from '@/lib/bestPicks';
+import {compareQuality,groupAlternateLines} from '@/lib/bestPicks';
 import {fetchForecasts} from '@/lib/fetchForecasts';
 
 // PropAnalysis is derived from real EV signals — no mock data
@@ -116,7 +116,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
       busy.current=true;
       setLoading(true);
       try {
-        const body=await fetchForecasts(sport,AbortSignal.any([controller.signal,AbortSignal.timeout(15_000)]),'library',fetch,100);
+        const body=await fetchForecasts(sport,AbortSignal.any([controller.signal,AbortSignal.timeout(15_000)]),'library',fetch,36);
         if(!controller.signal.aborted) {
           setLibrary(previous=>body.revision && previous?.revision===body.revision && previous.total_count===body.total_count ? {...previous,
             generated_at:body.generated_at,signals:[...new Map([...previous.signals,...body.signals].map(p=>[p.id,p])).values()]} : body);
@@ -168,20 +168,14 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
     if (minEV>0 && p.ev_pct < minEV / 100) return false;
     return true;
   }).sort((a,b)=>sort==='quality' ? Number(a.gated)-Number(b.gated) || compareQuality(a,b) : sort==='player' ? a.player.localeCompare(b.player) : sort==='sample' ? (b.sample_size ?? 0)-(a.sample_size ?? 0) : b.ev_pct-a.ev_pct);
+  const propGroups=groupAlternateLines(props);
 
-  if (loading && !allProps.length) return (
-    <div className={styles.loadingState}>
-      <div className={styles.loadingPanel}>
-        <span className="live-dot" style={{ width: 8, height: 8 }} />
-        <span>Loading recorded prop estimates…</span>
-      </div>
-    </div>
-  );
+  if (loading && !allProps.length) return <ForecastSkeleton />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
       <div className={styles.forecastHeading}>
-        <div><h2>Your player research</h2><p>Real forecasts. Familiar faces. The evidence behind every estimate.</p></div>
+        <div><h2>Player board</h2><p>One primary threshold per market, with every alternate line kept within reach.</p></div>
         <button className={styles.uxButton} type="button" onClick={()=>setRefresh(n=>n+1)} disabled={loading} aria-label="Refresh forecasts"><RefreshCw size={16} />{loading?'Refreshing...':'Refresh'}</button>
       </div>
       {coverageNotice && <p role="status" style={{padding:'8px 20px',color:'var(--text-secondary)'}}>{coverageNotice}</p>}
@@ -202,7 +196,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
         </details>
         <div className={styles.viewSwitch} aria-label="Forecast view"><button type="button" aria-pressed={view==='cards'} onClick={()=>setView('cards')}><LayoutGrid size={16} />Cards</button><button type="button" aria-pressed={view==='table'} onClick={()=>setView('table')}><List size={16} />Table</button></div>
       </div>
-      <div className={styles.forecastSummary} role="status"><span>{props.length} forecasts | {new Set(props.map(p=>p.player)).size} players</span><span>{props.filter(p=>!p.gated).length} research eligible</span></div>
+      <div className={styles.forecastSummary} role="status"><span>{propGroups.length} player markets / {props.length} recorded lines / {new Set(props.map(p=>p.player)).size} players</span><span>{propGroups.filter(group=>!group.pick.gated).length} research eligible</span></div>
       {storageNotice && <p role="status" className={styles.forecastIntro}>{storageNotice}</p>}
 
       {error && <div className={styles.notice} role="alert">{error}</div>}
@@ -219,14 +213,15 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
             <span>{!allProps.length && error ? 'Try Refresh. A failed request does not mean there are no forecasts.' : scope==='saved' ? 'Use the bookmark next to a player to save them. Other filters still apply to your saved players.' : allProps.length ? 'Try all recorded forecasts, another player, or a lower minimum edge.' : 'The scheduled scan covers the next 48 hours, subject to source availability and the API budget. Forecasts require real pregame prices and sufficient player history.'}</span>
             {allProps.length>0 && <button className={styles.uxButton} type="button" onClick={()=>{resetFilters();setWindowFilter('all');}}>Show all forecasts</button>}
           </div>
-        ) : view==='cards' ? <><div className={styles.forecastGrid}>{props.slice(0,visibleCount).map(p=><motion.article key={p.id} className={styles.forecastCard} initial={reduceMotion ? false : {opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.2}}>
+        ) : view==='cards' ? <><div className={styles.forecastGrid}>{propGroups.slice(0,visibleCount).map(({pick:p,alternatives})=><motion.article key={p.id} className={styles.forecastCard} initial={reduceMotion ? false : {opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.2}}>
           <div className={styles.playerHeading}><PlayerPortrait signal={p} /><div><button id={`forecast-${p.id}`} type="button" className={styles.forecastPlayer} onClick={()=>setSelectedId(p.id)}>{p.player}<span>Explore forecast →</span></button><small>{p.player_profile?.team ?? p.availability?.team ?? p.sport.toUpperCase()}{p.player_profile?.jersey ? ` · #${p.player_profile.jersey}` : ''}{p.player_profile?.position ? ` · ${p.player_profile.position}` : ''}</small></div><SaveButton prop={p} saved={shortlist.includes(`${p.sport}:${p.player}`)} onSave={()=>savePlayer(p)} /></div>
           <h3>{p.direction} {p.line} <span>{PROP_LABELS[p.prop_type]}</span></h3>
           <p className={styles.cardMatchup}><time dateTime={p.game_start_time}>{new Date(p.game_start_time ?? '').toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</time><br />{p.home_team} vs {p.away_team} | <QuoteAge signal={p} now={now} /></p>
           <ProbabilityComparison model={p.true_prob} implied={p.implied_prob} gated={p.gated} />
           <div className={styles.cardFooter}><span className={`badge ${p.gated ? 'badge-dim' : 'badge-mint'}`}>{forecastWindow(p,now)==='archive' ? 'Historical forecast' : p.gated ? 'Blocked estimate' : 'Research eligible'}</span><span>{p.sample_size} games · {p.sportsbook}</span></div>
           {p.gated && <p className={styles.cardGate}>{REASONS[p.gate_reason ?? ''] ?? 'A model or portfolio risk gate blocked this pick.'}</p>}
-        </motion.article>)}</div>{props.length>visibleCount && <div className={styles.moreForecasts}><button type="button" className={styles.uxButton} onClick={()=>setVisibleCount(n=>n+24)}>Show 24 more · {props.length-visibleCount} remaining</button></div>}</> : <table className="data-table">
+          <AlternateLines alternatives={alternatives} now={now} onExplain={setSelectedId} />
+        </motion.article>)}</div>{propGroups.length>visibleCount && <div className={styles.moreForecasts}><button type="button" className={styles.uxButton} onClick={()=>setVisibleCount(n=>n+24)}>Show 24 more / {propGroups.length-visibleCount} markets remaining</button></div>}</> : <table className="data-table">
           <thead>
             <tr>
               <th>Player</th>
@@ -240,7 +235,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
             </tr>
           </thead>
           <tbody>
-            {props.map(p => <PropRow key={p.id} prop={p} onExplain={()=>setSelectedId(p.id)} saved={shortlist.includes(`${p.sport}:${p.player}`)} onSave={()=>savePlayer(p)} now={now} />)}
+            {propGroups.map(({pick:p,alternatives}) => <PropRow key={p.id} prop={p} alternatives={alternatives} onExplain={id=>setSelectedId(id ?? p.id)} saved={shortlist.includes(`${p.sport}:${p.player}`)} onSave={()=>savePlayer(p)} now={now} />)}
           </tbody>
         </table>}
       </div>
@@ -248,17 +243,26 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
   );
 }
 
+function ForecastSkeleton() {
+  return <div className={styles.forecastSkeleton} role="status" aria-label="Loading recorded prop estimates"><div className={styles.skeletonHeading} /><div className={styles.skeletonControls} /><div className={styles.skeletonCards}>{[0,1,2].map(item=><div key={item}><span /><span /><span /><b /></div>)}</div></div>;
+}
+
+function AlternateLines({alternatives,now,onExplain}:{alternatives:EVSignal[];now:number;onExplain:(id:string)=>void}) {
+  if(!alternatives.length) return null;
+  return <details className={styles.alternateLines}><summary>{alternatives.length} alternate {alternatives.length===1 ? 'line' : 'lines'}</summary><div>{alternatives.map(option=><button key={option.id} type="button" onClick={()=>onExplain(option.id)}><span><strong>{option.direction} {option.line}</strong> {PROP_LABELS[option.prop_type]}</span><span>{option.sportsbook} / {option.american_odds>0?'+':''}{option.american_odds}</span><span>{(option.true_prob*100).toFixed(1)}% model / <QuoteAge signal={option} now={now} /></span></button>)}</div></details>;
+}
+
 function SaveButton({prop,saved,onSave}:{prop:EVSignal;saved:boolean;onSave:()=>void}) {
   return <button type="button" className={styles.savePlayer} aria-label={`${saved?'Unsave':'Save'} ${prop.player}`} aria-pressed={saved} onClick={onSave}><Bookmark size={18} fill={saved?'currentColor':'none'} /></button>;
 }
 
-function PropRow({ prop,onExplain,saved,onSave,now }: { prop: EVSignal;onExplain:()=>void;saved:boolean;onSave:()=>void;now:number }) {
+function PropRow({ prop,alternatives,onExplain,saved,onSave,now }: { prop: EVSignal;alternatives:EVSignal[];onExplain:(id?:string)=>void;saved:boolean;onSave:()=>void;now:number }) {
   const evPct = prop.ev_pct * 100;
   return (
     <tr>
       <td>
         <div className={styles.playerHeading}><PlayerPortrait signal={prop} /><SaveButton prop={prop} saved={saved} onSave={onSave} /></div>
-        <button id={`forecast-${prop.id}`} type="button" className={styles.forecastPlayer} onClick={onExplain}>{prop.player}<span>Why this forecast →</span></button>
+        <button id={`forecast-${prop.id}`} type="button" className={styles.forecastPlayer} onClick={()=>onExplain()}>{prop.player}<span>Why this forecast →</span></button>
         <div style={{color:'var(--text-secondary)',fontSize:12}}>{prop.player_profile?.team ?? prop.availability?.team ?? prop.sport.toUpperCase()}{prop.player_profile?.jersey ? ` · #${prop.player_profile.jersey}` : ''}{prop.player_profile?.position ? ` · ${prop.player_profile.position}` : ''}</div>
         <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{prop.team || prop.home_team} vs {prop.opponent || prop.away_team}</div>
         <span className={`badge ${prop.gated ? 'badge-dim' : 'badge-mint'}`}>{prop.gated ? 'Blocked estimate' : 'Research eligible'}</span>
@@ -276,6 +280,7 @@ function PropRow({ prop,onExplain,saved,onSave,now }: { prop: EVSignal;onExplain
         <span className={`badge ${prop.direction === 'over' ? 'badge-mint' : 'badge-red'}`}>
           {prop.direction.toUpperCase()}
         </span>
+        <AlternateLines alternatives={alternatives} now={now} onExplain={onExplain} />
       </td>
       <td>
         <ProbabilityComparison model={prop.true_prob} implied={prop.implied_prob} gated={prop.gated} />

@@ -20,7 +20,7 @@ export async function liveSchedule(sport:Sport,now=Date.now(),lookahead:1|6=1) {
     const day=new Date(today+'T00:00:00Z');day.setUTCDate(day.getUTCDate()+offset);
     const date=day.toISOString().slice(0,10).replaceAll('-','');
     const response=await fetch(`https://site.api.espn.com/apis/site/v2/sports/${SPORTS[sport]}/scoreboard?dates=${date}`,{
-      headers:{'User-Agent':'QuantSports/1.0'},signal:AbortSignal.timeout(5000),redirect:'error',next:{revalidate:60}});
+      headers:{'User-Agent':'LineworkSports/1.0'},signal:AbortSignal.timeout(5000),redirect:'error',next:{revalidate:60}});
     if(!response.ok || Number(response.headers.get('content-length'))>2*1024*1024) throw new Error('Scoreboard unavailable');
     const text=await response.text();if(text.length>2*1024*1024) throw new Error('Scoreboard too large');
     const events=row(JSON.parse(text)).events;

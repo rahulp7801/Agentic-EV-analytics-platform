@@ -4,7 +4,7 @@ import type {EVSignal} from '@/lib/types';
 import {pickTerms} from '@/lib/pickTerms';
 import PlayerPortrait from './PlayerPortrait';
 import styles from './Overview.module.css';
-export default function PickCard({signal,now,onExplain}:{signal:EVSignal;now:number;onExplain:()=>void}) {
+export default function PickCard({signal,alternatives=[],now,onExplain}:{signal:EVSignal;alternatives?:EVSignal[];now:number;onExplain:(signal:EVSignal)=>void}) {
   const [notice,setNotice]=useState('');
   const terms=pickTerms(signal,now);
   if(!terms) return null;
@@ -24,7 +24,8 @@ export default function PickCard({signal,now,onExplain}:{signal:EVSignal;now:num
     <dl className={styles.betMetrics}><div><dt>Model win probability</dt><dd>{(pick.true_prob*100).toFixed(1)}%</dd></div><div><dt>Price break-even</dt><dd>{(pick.implied_prob*100).toFixed(1)}%</dd></div><div><dt>Expected net per $100</dt><dd>+${terms.expectedPer100.toFixed(2)}</dd></div></dl>
     <p className={styles.betReason}>{pick.sample_size} prior games{pick.mean_stat!==null && pick.mean_stat!==undefined ? ` / historical mean ${pick.mean_stat.toFixed(1)}` : ''}. Even the reported lower probability bound clears this price by {(terms.margin*100).toFixed(1)} percentage points.</p>
     <small>Price observed {terms.quoteAgeSeconds}s ago. Estimated return is uncertain, not a payout promise.</small>
-    <div className={styles.betActions}><button type="button" onClick={onExplain}>Why this pick</button><button type="button" onClick={()=>void copy()}>Copy exact pick</button></div>
+    {alternatives.length>0 && <details className={styles.altLines}><summary>{alternatives.length} other observed {alternatives.length===1 ? 'line' : 'lines'}</summary><div>{alternatives.map(alternative=>{const option=pickTerms(alternative,now);return option ? <article key={alternative.id}><div><strong>{option.pick}</strong><span>{alternative.sportsbook} / {option.price}</span></div><div><span>{(alternative.true_prob*100).toFixed(1)}% model</span><button type="button" onClick={()=>onExplain(alternative)}>Evidence</button></div></article> : null;})}</div></details>}
+    <div className={styles.betActions}><button type="button" onClick={()=>onExplain(pick)}>Why this pick</button><button type="button" onClick={()=>void copy()}>Copy exact pick</button></div>
     <p className={styles.copyNotice} role="status">{notice}</p>
   </article>;
 }
