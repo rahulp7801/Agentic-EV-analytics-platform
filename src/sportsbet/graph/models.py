@@ -178,7 +178,7 @@ class PropParams(BaseModel):
     game_id: str
     player_id: str
     season: Annotated[int, Field(ge=2000, le=2030)]
-    sport: Literal["nfl", "nba"]
+    sport: Literal["nfl", "nba", "cfb"]
     prop_type: Literal[
         "pass_yds",
         "pass_tds",

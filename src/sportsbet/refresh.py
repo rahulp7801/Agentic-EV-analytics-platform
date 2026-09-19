@@ -7,24 +7,26 @@ from requests.exceptions import RequestException
 from sportsbet.db.connection import get_sync_engine
 from sportsbet.dashboard import publish_snapshot
 from sportsbet.ingestion.games import ingest_games_seasons
+from sportsbet.ingestion.cfb_gamelogs import ingest_cfb_gamelogs_season
 from sportsbet.ingestion.nba_gamelogs import ingest_nba_gamelogs_season
 from sportsbet.ingestion.player_stats import ingest_player_stats_seasons
 from sportsbet.ingestion.snap_counts import ingest_snap_counts_seasons
 
 
 def refresh(sport: str, today: date, backfill: bool = False):
-    if sport not in ('nba','nfl'):
+    if sport not in ('nba','nfl','cfb'):
         raise ValueError('Unsupported sport')
-    start = today.year if today.month >= (10 if sport == 'nba' else 9) else today.year-1
+    boundary=10 if sport=='nba' else 8 if sport=='cfb' else 9
+    start = today.year if today.month >= boundary else today.year-1
     # NFL requires multiple seasons to reach the minimum sample; NBA prior season covers opening night.
-    years = list(range(start-(2 if sport == 'nfl' else 1), start+1)) if backfill else [start]
+    years = list(range(start-(2 if sport in ('nfl','cfb') else 1), start+1)) if backfill else [start]
     engine = get_sync_engine()
     try:
         if sport == 'nfl':
             ingest_games_seasons(years, engine)
             ingest_player_stats_seasons(years, engine)
             ingest_snap_counts_seasons(years, engine)
-        else:
+        elif sport == 'nba':
             for season in years:
                 try:
                     ingest_nba_gamelogs_season(season, engine)
@@ -33,6 +35,9 @@ def refresh(sport: str, today: date, backfill: bool = False):
                         raise  # Bounded recent updates cannot substitute for a full backfill.
                     from sportsbet.ingestion.nba_espn import refresh_recent
                     return refresh_recent(season,today,engine)
+        else:
+            coverage=[ingest_cfb_gamelogs_season(season,engine) for season in years]
+            return {'provider':'sportsdataverse_espn','seasons':coverage}
         return {'provider':'nba' if sport=='nba' else 'nflverse'}
     finally:
         engine.dispose()
@@ -40,7 +45,7 @@ def refresh(sport: str, today: date, backfill: bool = False):
 
 def refresh_history(sport: str, today: date, backfill: bool = False) -> dict:
     """Both manual and daily refreshes publish the same success/failure contract."""
-    if sport not in ('nba','nfl'):
+    if sport not in ('nba','nfl','cfb'):
         raise ValueError('Unsupported sport')
     publish_snapshot('refresh:'+sport,dict(status='running',started_at=datetime.now(timezone.utc).isoformat()))
     try:
@@ -54,7 +59,7 @@ def refresh_history(sport: str, today: date, backfill: bool = False) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--sport', choices=['nba','nfl','both'], default='both')
+    parser.add_argument('--sport', choices=['nba','nfl','cfb','both'], default='both')
     parser.add_argument('--backfill', action='store_true')
     args = parser.parse_args()
     try:

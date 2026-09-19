@@ -147,6 +147,9 @@ def make_prop_quant_agent(
             # Convert line to Decimal — prop_line may arrive as float, int, str, or Decimal
             line = Decimal(str(prop_line_raw if prop_line_raw is not None else "0"))
 
+            sport=state.get('sport') or 'nfl'
+            if sport not in ('nfl','cfb'):
+                raise ValueError('Invalid football prop sport')
             params = PropParams(
                 game_id=game_id,
                 player_id=player_id,
@@ -155,7 +158,7 @@ def make_prop_quant_agent(
                 opponent_team=state.get("opponent_team"),
                 home_away=state.get("home_away"),
                 last_n_games=state.get("last_n_games"),
-                sport="nfl",
+                sport=sport,
                 prop_type=prop_type,  # type: ignore[arg-type]
                 line=line,
                 filters=prop_filters if prop_filters else {},
@@ -198,7 +201,7 @@ def make_prop_quant_agent(
                 session_id=session_id,
                 prop_type=params.prop_type,
             )
-        if settings.experimental_probability_adjustments:
+        if settings.experimental_probability_adjustments and params.sport=='nfl':
             result = _apply_kinematic_adjustment(result, kinematic_result, params.prop_type)
 
         log.info(

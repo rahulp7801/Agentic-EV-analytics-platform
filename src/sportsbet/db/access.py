@@ -14,10 +14,10 @@ from sportsbet.config import settings
 
 READER = 'sportsbet_dashboard'
 WORKER = 'sportsbet_worker'
-READ_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'nba_player_gamelogs', 'nba_player_stats',
+READ_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'cfb_player_gamelogs', 'nba_player_gamelogs', 'nba_player_stats',
                'play_by_play', 'ngs_stats', 'injury_reports', 'odds_snapshots',
                'player_prop_snapshots', 'dashboard_snapshots')
-WRITE_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'nba_player_gamelogs', 'dashboard_snapshots')
+WRITE_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'cfb_player_gamelogs', 'nba_player_gamelogs', 'dashboard_snapshots')
 APPEND_TABLES = ('odds_snapshots', 'player_prop_snapshots')
 CACHE_TABLES = ('provider_response_cache',)
 ANALYTICS_TABLES = ('predictions', 'exposure', 'quotes', 'api_usage')

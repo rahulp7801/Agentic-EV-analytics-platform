@@ -24,6 +24,11 @@ test('forecast requests reject unbounded offsets, limits and unsupported views',
     assert.throws(()=>forecastRequest(new URL('https://example.test/api/signals?'+query)));
   }
 });
+
+test('forecast requests accept the bounded CFB research library',()=>{
+  assert.deepEqual(forecastRequest(new URL('https://example.test/api/signals?sport=cfb&view=library&offset=0&limit=36')),
+    {sport:'cfb',view:'library',offset:0,limit:36,revision:null});
+});
 test('an accumulated archive exceeding 5,000 records still yields a bounded usable page',()=>{
   const result=forecastPage(input(Array(100).fill(base),6000),request(),now);
   assert.equal(result.signals.length,100);assert.equal(result.pagination.next_offset,100);

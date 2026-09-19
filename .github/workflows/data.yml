@@ -64,8 +64,8 @@ jobs:
             echo 'Provider selection is supported only for watch operations.'
             exit 1
           fi
-          if [ "$SPORT" = cfb ] && [ "$OPERATION" != watch ]; then
-            echo 'CFB currently supports only a manual watch operation with the sportsbook provider.'
+          if [ "$SPORT" = cfb ] && [ "$OPERATION" != watch ] && [ "$OPERATION" != scan ] && [ "$OPERATION" != refresh ] && [ "$OPERATION" != backfill ]; then
+            echo 'CFB currently supports manual sportsbook watch, scan, and source-backed history refresh operations.'
             exit 1
           fi
           if [ "$SPORT" = cfb ] && [ "$PROVIDER" != sportsbook ] && [ "$PROVIDER" != all ]; then

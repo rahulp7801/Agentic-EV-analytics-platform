@@ -45,7 +45,7 @@ export default function TerminalApp() {
   const changeSport = (nextSport: Sport) => {
     setPlayer('');
     setSport(nextSport);
-    const nextView=nextSport==='cfb' ? 'arbitrage' : view;
+    const nextView=nextSport==='cfb' && !['dashboard','props','arbitrage'].includes(view) ? 'dashboard' : view;
     setView(nextView);
     window.location.hash = terminalHash(nextSport, nextView);
   };

@@ -89,7 +89,7 @@ def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None
             raise ValueError('Provider timestamp requires a timezone')
         return parsed
 
-    if sport not in ('nba', 'nfl') or not isinstance(event.get('id'), str) or not event['id'].strip():
+    if sport not in ('nba', 'nfl', 'cfb') or not isinstance(event.get('id'), str) or not event['id'].strip():
         return []
     try:
         start = timestamp(event['commence_time'])
@@ -131,7 +131,7 @@ def parse_event_quotes(event: dict, sport: str, allowed_markets: set[str] | None
 def prop_quote_evidence_valid(snapshot: PlayerPropSnapshotCreate) -> bool:
     """Verify the normalized row commitment and the complete pregame contract."""
     strings = ((snapshot.game_id,64),(snapshot.player_name,100),(snapshot.sportsbook,50),(snapshot.prop_type,40))
-    return (snapshot.sport in ('nba','nfl')
+    return (snapshot.sport in ('nba','nfl','cfb')
         and all(isinstance(value,str) and bool(value.strip()) and len(value)<=limit for value,limit in strings)
         and isinstance(snapshot.line,Decimal) and snapshot.line.is_finite()
         and Decimal(0)<=snapshot.line<=Decimal('99999.99')

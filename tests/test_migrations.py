@@ -117,6 +117,7 @@ def test_alembic_upgrade_clean() -> None:
     assert "player_prop_snapshots" in tables, "player_prop_snapshots table missing after upgrade head"
     assert "nba_player_stats" in tables, "nba_player_stats table missing after upgrade head"
     assert "provider_response_cache" in tables, "provider response cache missing after upgrade head"
+    assert "cfb_player_gamelogs" in tables, "CFB player game logs missing after upgrade head"
     # Cleanup — leave DB clean for next test run
     alembic.command.downgrade(cfg, "base")
 
@@ -145,6 +146,7 @@ def test_alembic_downgrade_clean() -> None:
     assert "odds_snapshots" not in tables, "odds_snapshots still present after downgrade base"
     assert "player_prop_snapshots" not in tables, "player_prop_snapshots still present after downgrade base"
     assert "nba_player_stats" not in tables, "nba_player_stats still present after downgrade base"
+    assert "cfb_player_gamelogs" not in tables, "CFB player game logs still present after downgrade base"
 
 
 @pytest.mark.serial

@@ -339,6 +339,43 @@ class ProviderResponseCache(Base):
     __table_args__ = (Index("idx_provider_cache_expiry", "expires_at"),)
 
 
+class CFBPlayerGameLog(Base):
+    """One exact ESPN athlete/game row from SportsDataverse CFB releases."""
+
+    __tablename__ = "cfb_player_gamelogs"
+
+    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
+    athlete_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    game_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    season: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    week: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    game_date: Mapped[date] = mapped_column(Date, nullable=False)
+    player_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    team_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    team_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    team_abbreviation: Mapped[str] = mapped_column(String(10), nullable=False)
+    opponent_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    opponent_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    opponent_abbreviation: Mapped[str] = mapped_column(String(10), nullable=False)
+    is_home: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    passing_yards: Mapped[Optional[int]] = mapped_column(Integer)
+    rushing_yards: Mapped[Optional[int]] = mapped_column(Integer)
+    receiving_yards: Mapped[Optional[int]] = mapped_column(Integer)
+    receptions: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    source_provider: Mapped[str] = mapped_column(String, nullable=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_player_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_schedule_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_record_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_observed_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("athlete_id", "game_id", name="uq_cfb_gamelog_player_game"),
+        Index("idx_cfb_gamelog_athlete_date", "athlete_id", "game_date"),
+        Index("idx_cfb_gamelog_team_week", "team_id", "season", "week"),
+    )
+
+
 class NBAPlayerStats(Base):
     """NBA player season-level statistics sourced from nba_api.
 

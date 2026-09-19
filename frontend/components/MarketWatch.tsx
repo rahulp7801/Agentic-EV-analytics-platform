@@ -78,7 +78,6 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
     }
 
     async function loadProps() {
-      if(sport==='cfb') return;
       try {
         const response = await fetch(`/api/prop-screens?sport=${sport}`, { signal: controller.signal, cache: 'no-store' });
         const body = await response.json();
@@ -122,10 +121,10 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
           <small>Cross-venue observation · {sport.toUpperCase()}</small>
           <h2 id="market-watch-title">Market gaps</h2>
         </div>
-        <p>{sport==='cfb' ? 'Upcoming FBS games and captured sportsbook moneylines. College player models, Kalshi links, and PrizePicks comparisons remain unavailable until their identities and settlement contracts are verified.' : 'Sportsbooks, Kalshi, and PrizePicks are compared from captured quotes. Every displayed lead stays unverified until timing, settlement, fees, and executable depth align.'}</p>
+        <p>{sport==='cfb' ? 'Upcoming FBS games, captured sportsbook prices, and college player-prop screening from exact ESPN athlete histories. College estimates remain research-only when current roster or injury evidence is incomplete.' : 'Sportsbooks, Kalshi, and PrizePicks are compared from captured quotes. Every displayed lead stays unverified until timing, settlement, fees, and executable depth align.'}</p>
       </header>
 
-      {sport==='cfb' && <div className={styles.notice}>CFB market-only beta. The existing credit ledger permits at most one bounded game-market request per capture; no player pick is inferred from an NFL model.</div>}
+      {sport==='cfb' && <div className={styles.notice}>CFB beta uses a separate SportsDataverse/ESPN player history and exact college athlete IDs. It never borrows NFL rows. Player estimates require a manual history refresh and paid scan; missing current availability keeps them gated.</div>}
       {sport==='cfb' && slate && <div className={styles.sourceGrid} aria-label="Upcoming CFB schedule">
         {slate.games.slice(0,12).map(game=><article className={styles.sourceCard} key={game.provider_event_id}>
           <div className={styles.sourceCardHeader}><span>{game.away_name} at {game.home_name}</span><span>{new Date(game.game_time).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'})}</span></div>
@@ -185,7 +184,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
               </div>
             </>
           )}
-          {sport!=='cfb' && propError && <div className={styles.notice}>Cross-venue prop scan: {propError}</div>}
+          {propError && <div className={styles.notice}>Cross-venue prop scan: {propError}</div>}
 
           {data.comparisons.length === 0 ? (
             <div className={styles.emptyInline}>No comparisons could be built from this capture.</div>

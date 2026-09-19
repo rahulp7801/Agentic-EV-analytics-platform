@@ -89,6 +89,7 @@ PROP_COLUMN_MAP: dict[str, str] = {
     "pra": "pra",
     "double_double": "double_double",  # NBA composite prop — forwarded to NBAQueryBuilder path
 }
+CFB_PROP_TYPES=frozenset({'pass_yds','rush_yds','rec_yds','receptions'})
 
 # ---------------------------------------------------------------------------
 # Static SQL template
@@ -109,6 +110,24 @@ FROM player_stats
 WHERE player_id = $1
   AND season >= $2
   AND {col} IS NOT NULL
+"""
+
+_CFB_PROP_TEMPLATE = """\
+SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN stat > CAST($3 AS double precision) THEN 1 ELSE 0 END) AS successes,
+    SUM(CASE WHEN stat = CAST($3 AS double precision) THEN 1 ELSE 0 END) AS pushes,
+    AVG(stat::float) AS mean_val
+FROM (
+    SELECT {col} AS stat
+    FROM cfb_player_gamelogs
+    WHERE athlete_id = CAST($1 AS bigint)
+      AND season >= $2
+      AND {col} IS NOT NULL
+      AND game_date < $4
+    ORDER BY game_date DESC, game_id DESC
+    LIMIT $5
+) history
 """
 
 
@@ -153,6 +172,13 @@ class PropQueryBuilder:
         for correct "last N vs opponent" semantics.
         """
         col: str = PROP_COLUMN_MAP[params.prop_type]  # allowlist substitution, not user input
+        if params.sport=='cfb':
+            if (params.prop_type not in CFB_PROP_TYPES or not params.player_id.isdigit()
+                    or params.as_of_date is None):
+                raise ValueError('CFB queries require an ESPN athlete ID and exclusive cutoff')
+            return _CFB_PROP_TEMPLATE.format(col=col),(
+                params.player_id,params.season,float(params.line),params.as_of_date,
+                params.last_n_games or 40)
 
         # Substitute column name from static map — column name is NOT user data
         sql: str = _NFL_PROP_TEMPLATE.format(col=col)

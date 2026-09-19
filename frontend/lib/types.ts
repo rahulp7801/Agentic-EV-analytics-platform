@@ -1,5 +1,5 @@
 export type Sport = 'nba' | 'nfl' | 'cfb';
-export type ModelSport = Exclude<Sport,'cfb'>;
+export type ModelSport = Sport;
 export type PropType = 'points' | 'rebounds' | 'assists' | 'threes' | 'pra' | 'steals' | 'blocks' |
   'pass_yds' | 'pass_tds' | 'rush_yds' | 'rec_yds' | 'receptions';
 

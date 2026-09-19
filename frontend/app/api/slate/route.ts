@@ -19,8 +19,7 @@ export async function GET(request:Request) {
   // from every page view when the stored slate is absent or stale.
   result ??=sport==='cfb' ? scheduleSnapshot(null,sport,now,6) : await liveSchedule(sport,now,6);
   if(result.status!==200) return Response.json(result.body,{status:503,headers:{'Cache-Control':'no-store'}});
-  const games=sport==='cfb' ? result.body.games.filter(game=>Date.parse(game.game_time)>now && !game.completed)
-    .map(game=>({...game,state:'Sportsbook market capture only'})) : slateReadiness(result.body.games,scan,now);
+  const games=slateReadiness(result.body.games,scan,now);
   return Response.json({...result.body,games,coverage_available,
     settlements:settlementProgress(reports,sport,now),window_days:7},{headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
 }

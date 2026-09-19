@@ -14,11 +14,12 @@ const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
   home_team:'Home',away_team:'Away',game_id:'game',sport:'nfl',prop_type:'pass_yds',line:249.5,
   mean_stat:260,confidence_interval:[.55,.7],trade_plan:[],injury_flags:{},
   market_type:'player_pass_yds',strength:'unrated'};
-test('full legitimate NFL/NBA team names survive both public forecast boundaries',()=>{
+test('full legitimate NFL/NBA/CFB team names survive both public forecast boundaries',()=>{
   for(const [sport,home,away] of [['nfl','Washington Commanders','Tampa Bay Buccaneers'],
+    ['cfb','Ohio State Buckeyes','Texas Longhorns'],
     ['nba','Minnesota Timberwolves','Oklahoma City Thunder'],['nba','Golden State Warriors','Portland Trail Blazers']]) {
-    const forecast={...publicQuote,sport,prop_type:sport==='nfl' ? 'pass_yds' : 'points',
-      market_type:sport==='nfl' ? 'player_pass_yds' : 'player_points',home_team:home,away_team:away};
+    const forecast={...publicQuote,sport,prop_type:sport==='nba' ? 'points' : 'pass_yds',
+      market_type:sport==='nba' ? 'player_points' : 'player_pass_yds',home_team:home,away_team:away};
     const game={sport,game_id:'game',home_team:home,away_team:away,date:'20260910'};
     const result=publicSignalSnapshots([{generated_at:new Date(now).toISOString(),signals:[forecast],games:[game]}],now,sport);
     assert.equal(result.signals.length,1);assert.equal(result.invalid_signals,0);
@@ -26,6 +27,20 @@ test('full legitimate NFL/NBA team names survive both public forecast boundaries
     assert.equal(publicSignals([{...forecast,home_team:'x'.repeat(101)}],now).signals.length,0);
     assert.throws(()=>publicSignalSnapshots([{generated_at:new Date(now).toISOString(),signals:[],games:[{...game,away_team:'bad\nname'}]}],now));
   }
+});
+test('CFB availability keeps exact college sources and rejects unsupported context splits',()=>{
+  const availability={...quote.availability,
+    source_url:'https://site.api.espn.com/apis/site/v2/sports/football/college-football/injuries',
+    roster_source_url:'https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/194/roster',
+    player_id:'4429000',player_image_url:'https://a.espncdn.com/i/headshots/college-football/players/full/4429000.png'};
+  const signal={...publicQuote,sport:'cfb',availability};
+  const projected=publicSignals([signal],now).signals[0];
+  assert.equal(projected.sport,'cfb');
+  assert.equal(projected.availability.player_id,'4429000');
+  const withSplit={...availability,context_splits:[{player:'Defender'}]};
+  const rejected=publicSignals([{...signal,availability:withSplit}],now).signals[0];
+  assert.equal(rejected.availability,undefined);assert.equal(rejected.gated,true);
+  assert.deepEqual(publicSignals([{...signal,prop_type:'points'}],now),{signals:[],invalid_signals:1});
 });
 test('latest available view retains archived forecasts without loosening eligibility',()=>{
   assert.equal(latestForecastWindow([publicQuote],now),'upcoming');

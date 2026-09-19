@@ -5,8 +5,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const data=await snapshots(['scan:nfl','scan:nba']);
-    return NextResponse.json({nfl:scanStatus(data['scan:nfl']),nba:scanStatus(data['scan:nba'])}, {headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
+    const data=await snapshots(['scan:nfl','scan:nba','scan:cfb']);
+    return NextResponse.json({nfl:scanStatus(data['scan:nfl']),nba:scanStatus(data['scan:nba']),
+      cfb:scanStatus(data['scan:cfb'])}, {headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
     return NextResponse.json({error:'Daily scan status is temporarily unavailable.'},{status:503,headers:{'Cache-Control':'no-store'}});
   }

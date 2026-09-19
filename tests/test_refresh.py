@@ -32,6 +32,7 @@ def test_opening_season_backfill_and_daily_refresh():
          patch('sportsbet.refresh.ingest_games_seasons') as games, \
          patch('sportsbet.refresh.ingest_player_stats_seasons') as nfl, \
          patch('sportsbet.refresh.ingest_snap_counts_seasons') as snaps, \
+         patch('sportsbet.refresh.ingest_cfb_gamelogs_season',return_value={'rows':12}) as cfb, \
          patch('sportsbet.refresh.ingest_nba_gamelogs_season') as nba:
         refresh('nfl', date(2026,9,10), backfill=True)
         games.assert_called_once_with([2024,2025,2026], engine)
@@ -42,4 +43,7 @@ def test_opening_season_backfill_and_daily_refresh():
         nba.reset_mock()
         refresh('nba', date(2027,1,10))
         nba.assert_called_once_with(2026,engine)
-        assert engine.dispose.call_count == 3
+        assert refresh('cfb',date(2026,9,10),backfill=True)=={
+            'provider':'sportsdataverse_espn','seasons':[{'rows':12}]*3}
+        assert [call.args[0] for call in cfb.call_args_list]==[2024,2025,2026]
+        assert engine.dispose.call_count == 4

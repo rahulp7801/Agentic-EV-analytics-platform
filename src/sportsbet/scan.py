@@ -30,7 +30,7 @@ from sportsbet.quant.vig import american_to_raw_prob
 
 MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl','cfb':'americanfootball_ncaaf'}
-MODEL_SPORTS = frozenset({'nba','nfl'})
+MODEL_SPORTS = frozenset({'nba','nfl','cfb'})
 MAX_MODEL_CONCURRENCY = 8
 FORECAST_HORIZON_HOURS = 48
 RECOMMENDATION_POLICY_VERSION = 'lower-bound-margin-v1'
@@ -172,7 +172,8 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                          availability: dict | None = None) -> dict:
     start=timestamp(event['commence_time'])
     game_date=start.astimezone(ZoneInfo('America/New_York')).date()
-    season=game_date.year if game_date.month >= (10 if sport=='nba' else 9) else game_date.year-1
+    boundary=10 if sport=='nba' else 8 if sport=='cfb' else 9
+    season=game_date.year if game_date.month >= boundary else game_date.year-1
     graph=create_graph(nba_quant_node=make_nba_quant_agent(pool),prop_quant_node=make_prop_quant_agent(pool),
         prop_arbitrage_node=make_prop_arbitrage_agent(sport=sport),
         nba_context_producer_node=(make_nba_context_signals_producer(pool,target_date=game_date)
@@ -185,13 +186,25 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     # A separate model evaluation per line; prices are compared only for identical outcomes.
     selections=sorted({(q.player_name,q.prop_type,q.line,q.side) for q in quotes})
     player_ids={}
-    table='nba_player_gamelogs' if sport=='nba' else 'player_stats'
-    for player in sorted({selection[0] for selection in selections}):
+    table='nba_player_gamelogs' if sport=='nba' else 'cfb_player_gamelogs' if sport=='cfb' else 'player_stats'
+    identity_column='athlete_id' if sport=='cfb' else 'player_id'
+    quoted_players=sorted({selection[0] for selection in selections})
+    normalized_players=sorted({player.lower() for player in quoted_players})
+    if normalized_players:
         async with pool.acquire() as conn:
-            players=await conn.fetch(
-                f'SELECT DISTINCT player_id FROM {table} WHERE LOWER(player_name)=LOWER($1)',player)
-        if len(players)==1:
-            player_ids[player]=str(players[0]['player_id'])
+            rows=await conn.fetch(f'''SELECT LOWER(player_name) AS normalized_name,
+                {identity_column}::text AS player_id FROM {table}
+                WHERE LOWER(player_name)=ANY($1::text[])
+                GROUP BY LOWER(player_name),{identity_column}''',normalized_players)
+        identities={name: set() for name in normalized_players}
+        for row in rows:
+            name=row['normalized_name'];identity=row['player_id']
+            if name in identities and isinstance(identity,str) and identity:
+                identities[name].add(identity)
+        for player in quoted_players:
+            matches=identities[player.lower()]
+            if len(matches)==1:
+                player_ids[player]=next(iter(matches))
     prepared=[]
     selection_time=datetime.now(timezone.utc)
     for player,market,line,side in selections:
@@ -240,7 +253,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         # the public desk can surface. Avoid multiplying up to eight split
         # queries across every alternate threshold for that player.
         context_key=player
-        if availability_evidence['status']=='observed' and context_key not in explained_contexts:
+        if sport in ('nba','nfl') and availability_evidence['status']=='observed' and context_key not in explained_contexts:
             explained_contexts.add(context_key)
             splits=await historical_availability_splits(pool,context=availability,
                 subject_team=availability_evidence['team'],subject_player=availability_evidence.get('roster_player_name',player),
@@ -494,7 +507,7 @@ async def run(sports: list[str], daily_credit_limit: int):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--sport',choices=['nba','nfl','both'],default='both')
+    parser.add_argument('--sport',choices=['nba','nfl','cfb','both'],default='both')
     parser.add_argument('--daily-credit-limit',type=int,default=25)
     args=parser.parse_args()
     try:

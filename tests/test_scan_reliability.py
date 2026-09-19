@@ -260,7 +260,14 @@ async def test_scan_preserves_last_credits_for_last_hour_checks(monkeypatch,work
 
 
 @pytest.mark.asyncio
-async def test_cfb_cannot_enter_the_nfl_or_nba_player_model():
+async def test_cfb_uses_its_own_manual_player_model_path(monkeypatch,worker):
+    stored,events,evaluated,_=worker
     assert scan.SPORT_KEYS['cfb']=='americanfootball_ncaaf'
-    with pytest.raises(ValueError,match='Invalid scan scope'):
-        await scan.run(['cfb'],25)
+    events['cfb']=[dict(id='college1',home_team='Home College',away_team='Away College',
+        commence_time=(datetime.now(timezone.utc)+timedelta(hours=2)).isoformat())]
+    def handle(request):
+        return httpx.Response(200,json=events['cfb'] if request.url.path.endswith('/events') else events['cfb'][0])
+    transport(monkeypatch,handle)
+    report=(await scan.run(['cfb'],25))['cfb']
+    assert evaluated==['college1'] and report['completed_events']==1
+    assert stored['signals:cfb:college1']['games']==[]

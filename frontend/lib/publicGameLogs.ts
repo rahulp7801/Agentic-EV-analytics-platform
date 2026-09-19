@@ -4,6 +4,7 @@ type Row = Record<string, unknown>;
 const STATS = {
   nba: ['points','rebounds','assists','threes','steals','blocks','minutes'],
   nfl: ['pass_yds','pass_tds','rush_yds','rec_yds','receptions'],
+  cfb: ['pass_yds','rush_yds','rec_yds','receptions'],
 } as const;
 const NONNEGATIVE = new Set(['points','rebounds','assists','threes','steals','blocks','minutes',
   'pass_tds','receptions']);
@@ -61,7 +62,7 @@ export function gameLogRequest(params:URLSearchParams) {
   const limit=params.get('limit') ?? '40';
   const exact=params.get('exact') ?? '0';
   const before=params.get('before');
-  if(!['nba','nfl'].includes(sport) || rawPlayer!==player || player.normalize('NFC')!==player
+  if(!['nba','nfl','cfb'].includes(sport) || rawPlayer!==player || player.normalize('NFC')!==player
     || (player!=='' && !/^[\p{L}\p{M}.'’ -]{1,80}$/u.test(player))
     || !/^[0-9]{1,3}$/.test(limit) || Number(limit)<1 || Number(limit)>200 || !['0','1'].includes(exact)
     || (exact==='1' && !player)) throw new Error('Invalid game-log request');

@@ -36,7 +36,7 @@ def test_availability_never_infers_healthy_or_boosts_probability():
     assert player_availability(data,'Opponent',now)[1]=='availability_unavailable'
 
 
-@pytest.mark.parametrize('sport,missing_team',[('nfl',False),('nba',False),('nba',True)])
+@pytest.mark.parametrize('sport,missing_team',[('nfl',False),('nba',False),('nba',True),('cfb',False),('cfb',True)])
 async def test_exact_team_rosters_and_archived_response_hashes(sport,missing_team,tmp_path,monkeypatch):
     monkeypatch.chdir(tmp_path)
     now=datetime.now(timezone.utc).isoformat()
@@ -52,15 +52,17 @@ async def test_exact_team_rosters_and_archived_response_hashes(sport,missing_tea
         else:
             identity=request.url.path.split('/')[-2]
             body['team']=dict(id=identity)
-            athletes=[dict(id='123',headshot={'href':f'https://a.espncdn.com/i/headshots/{sport}/players/full/123.png'},displayName='Player' if identity=='1' else 'Opponent',status={'name':'Active'})]
-            body['athletes']=[dict(items=athletes)] if sport=='nfl' else athletes
+            image_sport='college-football' if sport=='cfb' else sport
+            athletes=[dict(id='123',headshot={'href':f'https://a.espncdn.com/i/headshots/{image_sport}/players/full/123.png'},displayName='Player' if identity=='1' else 'Opponent',status={'name':'Active'})]
+            body['athletes']=[dict(items=athletes)] if sport in ('nfl','cfb') else athletes
         return httpx.Response(200,json=body)
     original=httpx.AsyncClient
     with patch('sportsbet.prop.availability.httpx.AsyncClient',lambda **kwargs:original(**kwargs,transport=httpx.MockTransport(handle))):
         result=await fetch_event_availability(dict(id='event',home_team='Home',away_team='Away'),sport)
         assert result['status']==('partial' if missing_team else 'observed') and len(result['source_sha256'])==64
         assert player_availability(result,'Player',datetime.now(timezone.utc))[0]['team']=='Home'
-        assert player_availability(result,'Player',datetime.now(timezone.utc))[0]['player_image_url']==f'https://a.espncdn.com/i/headshots/{sport}/players/full/123.png'
+        image_sport='college-football' if sport=='cfb' else sport
+        assert player_availability(result,'Player',datetime.now(timezone.utc))[0]['player_image_url']==f'https://a.espncdn.com/i/headshots/{image_sport}/players/full/123.png'
         assert player_availability(result,'Opponent',datetime.now(timezone.utc))[0]['status']==('unavailable' if missing_team else 'observed')
         assert len(list((tmp_path/'.local/availability').glob('*.json')))==1
         result=await fetch_event_availability(dict(id='event',home_team='Wrong',away_team='Away'),sport)
