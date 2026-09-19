@@ -60,7 +60,7 @@ export default function Overview({sport,onOpenMarkets,onOpenPlayers}:{sport:Spor
       {players.length>0 && <p>{complete ? `${records.length} published research records.` : `Previewing ${records.length} of ${total} recent records. Open All forecasts for a larger research window.`} These cards are separate from the qualified shortlist.</p>}
     </section>
     <details className={styles.deskDetails} onToggle={event=>setShowSchedule(event.currentTarget.open)}><summary>Upcoming games and coverage</summary>{showSchedule && <SlateReadiness sport={sport} />}</details>
-    <details className={styles.deskDetails} onToggle={event=>setShowStatus(event.currentTarget.open)}><summary>Data status and market sources</summary>{showStatus && <><ScanStatus /><p>Source availability and price comparisons are separate from qualified player picks.</p><button type="button" className={styles.refresh} onClick={onOpenMarkets}>Inspect market sources <ArrowUpRight size={15} /></button></>}</details>
+    <details className={styles.deskDetails} onToggle={event=>setShowStatus(event.currentTarget.open)}><summary>Data status and market sources</summary>{showStatus && <><ScanStatus sport={sport} /><p>Source availability and price comparisons are separate from qualified player picks.</p><button type="button" className={styles.refresh} onClick={onOpenMarkets}>Inspect market sources <ArrowUpRight size={15} /></button></>}</details>
   </section>;
 }
 

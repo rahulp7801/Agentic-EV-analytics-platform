@@ -164,16 +164,26 @@ def test_dashboard_game_logs_expose_stats_and_reject_ambiguous_nfl_games():
                 VALUES (:id,:name,'VV1',2026,1,210,'nflverse',:source,:source,:observed)"""),
                 {'name':name,'id':identity,'source':source,'observed':observed})
             conn.execute(sa.text("INSERT INTO games(game_id,season,week,home_team,away_team,game_date) VALUES (:id,2026,1,'VV1','VV2','2026-09-10')"),{'id':identity})
+            conn.execute(sa.text("""INSERT INTO cfb_player_gamelogs(
+                athlete_id,game_id,season,week,game_date,player_name,team_id,team_name,
+                team_abbreviation,opponent_id,opponent_name,opponent_abbreviation,is_home,
+                passing_yards,source_provider,source_sha256,source_player_sha256,
+                source_schedule_sha256,source_record_sha256,source_observed_at)
+                VALUES (1,:id,2026,1,'2026-09-12',:name,10,'View University','VU',20,
+                'Other State','OS',true,245,'sportsdataverse_espn',:source,:source,:source,:source,:observed)"""),
+                {'name':name,'id':identity,'source':source,'observed':observed})
             rows=conn.execute(sa.text('SELECT sport,payload FROM dashboard_gamelogs WHERE player_name=:name'),{'name':name}).all()
             result=dict(rows)
             assert result['nba']['points']==0 and result['nba']['rebounds'] is None
             assert result['nfl']['pass_yds']==210 and result['nfl']['is_home'] is True
             assert result['nfl']['opponent']=='VV2'
+            assert result['cfb']['pass_yds']==245 and result['cfb']['opponent']=='OS'
             assert 'player_id' not in result['nfl']
             conn.execute(sa.text("INSERT INTO games(game_id,season,week,home_team,away_team,game_date) VALUES (:id,2026,1,'VV1','VV3','2026-09-11')"),{'id':identity+'x'})
             assert conn.execute(sa.text("SELECT count(*) FROM dashboard_gamelogs WHERE sport='nfl' AND player_name=:name"),{'name':name}).scalar_one()==0
     finally:
         with engine.begin() as conn:
+            conn.execute(sa.text('DELETE FROM cfb_player_gamelogs WHERE game_id=:id'),{'id':identity})
             conn.execute(sa.text('DELETE FROM nba_player_gamelogs WHERE game_id=:id'),{'id':identity})
             conn.execute(sa.text('DELETE FROM player_stats WHERE player_id=:id'),{'id':identity})
             conn.execute(sa.text('DELETE FROM games WHERE game_id IN (:id,:other)'),{'id':identity,'other':identity+'x'})

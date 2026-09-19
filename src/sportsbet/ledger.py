@@ -23,6 +23,8 @@ STAT_COLUMNS = {
     'nba': {'points': 'points', 'rebounds': 'rebounds', 'assists': 'assists'},
     'nfl': {'pass_yds': 'passing_yards', 'rush_yds': 'rushing_yards',
             'rec_yds': 'receiving_yards', 'receptions': 'receptions'},
+    'cfb': {'pass_yds': 'passing_yards', 'rush_yds': 'rushing_yards',
+            'rec_yds': 'receiving_yards', 'receptions': 'receptions'},
 }
 
 
@@ -528,7 +530,7 @@ def main():
     parser.add_argument('--list', action='store_true', help='Export prediction IDs and observations for settlement')
     parser.add_argument('--recommendations-only',action='store_true')
     parser.add_argument('--model-version',help='Report one recorded model version; use unversioned for legacy rows')
-    parser.add_argument('--sport',choices=['nba','nfl'])
+    parser.add_argument('--sport',choices=['nba','nfl','cfb'])
     args=parser.parse_args(); ledger=Ledger(args.path)
     if args.settlements:
         raw=Path(args.settlements).read_bytes()

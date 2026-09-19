@@ -50,7 +50,7 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
     kelly_fraction: reason ? 0 : s.kelly_fraction};
 }
 
-const SPORTS = new Set<ModelSport>(['nba','nfl']);
+const SPORTS = new Set<ModelSport>(['nba','nfl','cfb']);
 const PROPS = new Set<PropType>(['points','rebounds','assists','threes','pra','steals','blocks',
   'pass_yds','pass_tds','rush_yds','rec_yds','receptions']);
 const NFL_PROPS=new Set<PropType>(['pass_yds','pass_tds','rush_yds','rec_yds','receptions']);
@@ -74,6 +74,7 @@ function rosterSource(value:unknown,sport:Sport):value is string {
   try {
     const url=new URL(value);
     const path=sport==='nfl' ? /^\/apis\/site\/v2\/sports\/football\/nfl\/teams\/[0-9]+\/roster$/
+      : sport==='cfb' ? /^\/apis\/site\/v2\/sports\/football\/college-football\/teams\/[0-9]+\/roster$/
       : /^\/apis\/site\/v2\/sports\/basketball\/nba\/teams\/[0-9]+\/roster$/;
     return url.origin==='https://site.api.espn.com' && !url.username && !url.password
       && !url.search && !url.hash && path.test(url.pathname);
@@ -86,6 +87,7 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
   if(a.status==='unavailable') return {status:'unavailable',roster_confirmed:false,
     subject_status:'Unknown',teammates:[],probability_adjusted:false};
   const url=sport==='nfl' ? 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries'
+    : sport==='cfb' ? 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/injuries'
     : 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries';
   if(a.status!=='observed' || a.roster_confirmed!==true || a.probability_adjusted!==false
     || !timestamp(a.captured_at)
@@ -110,6 +112,7 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     teammates.push({player:row.player,status:row.status,position:row.position,reported_at:row.reported_at});
   }
   if(a.context_splits!==undefined) {
+    if(sport==='cfb') return undefined;
     if(!Array.isArray(a.context_splits) || a.context_splits.length>8) return undefined;
     for(const value of a.context_splits) {
       if(!value || typeof value!=='object' || Array.isArray(value)) return undefined;
@@ -138,7 +141,7 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     captured_at:a.captured_at,source_url:a.source_url as string,source_sha256:a.source_sha256,team:a.team,
     roster_source_url:a.roster_source_url,roster_source_sha256:a.roster_source_sha256,
     ...(bounded(a.player_id,20) && /^[0-9]+$/.test(a.player_id)
-      && a.player_image_url===`https://a.espncdn.com/i/headshots/${sport}/players/full/${a.player_id}.png`
+      && a.player_image_url===`https://a.espncdn.com/i/headshots/${sport==='cfb'?'college-football':sport}/players/full/${a.player_id}.png`
       ? {player_id:a.player_id,player_image_url:a.player_image_url} : {}),
     ...(identified ? {roster_player_name:a.roster_player_name as string,
       identity_source_url:a.identity_source_url as string,
@@ -152,7 +155,7 @@ export function publicPlayerProfile(value:unknown,sport:Sport,player:string,now=
   const p=value as Record<string,unknown>;
   if(p.player!==player || !bounded(p.name,100) || !bounded(p.team,5)
     || !bounded(p.player_id,20) || !/^[1-9][0-9]*$/.test(p.player_id)
-    || p.image_url!==`https://a.espncdn.com/i/headshots/${sport}/players/full/${p.player_id}.png`
+    || p.image_url!==`https://a.espncdn.com/i/headshots/${sport==='cfb'?'college-football':sport}/players/full/${p.player_id}.png`
     || !timestamp(p.captured_at) || Date.parse(p.captured_at)>now+60000
     || now-Date.parse(p.captured_at)>14*86400000 || !rosterSource(p.source_url,sport)
     || !bounded(p.source_sha256,64) || !/^[a-f0-9]{64}$/.test(p.source_sha256)) return undefined;
@@ -186,7 +189,7 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
   const mean=s.mean_stat;
   if (!bounded(s.id,128) || !bounded(s.player,100) || !bounded(s.team,20,true)
       || !bounded(s.opponent,20,true) || !bounded(s.home_team,100) || !bounded(s.away_team,100)
-      || !bounded(s.game_id,128) || !sport || !prop || (sport==='nfl')!==NFL_PROPS.has(prop)
+      || !bounded(s.game_id,128) || !sport || !prop || (sport==='nba' ? NFL_PROPS.has(prop) : !NFL_PROPS.has(prop))
       || !finite(s.line) || Number(s.line)<0 || Number(s.line)>10000
       || (s.direction !== 'over' && s.direction !== 'under')
       || !bounded(s.sportsbook,64) || s.sportsbook.toLowerCase()==='prizepicks'
@@ -240,7 +243,7 @@ function publicGame(value:unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid signal game');
   const game=value as Record<string,unknown>;
   if (!bounded(game.game_id,128) || !bounded(game.home_team,100) || !bounded(game.away_team,100)
-      || (game.sport!=='nfl' && game.sport!=='nba') || !bounded(game.date,8)
+      || (game.sport!=='nfl' && game.sport!=='nba' && game.sport!=='cfb') || !bounded(game.date,8)
       || !/^\d{8}$/.test(game.date)) throw new Error('Invalid signal game');
   const calendar=`${game.date.slice(0,4)}-${game.date.slice(4,6)}-${game.date.slice(6,8)}`;
   const parsed=new Date(`${calendar}T00:00:00Z`);

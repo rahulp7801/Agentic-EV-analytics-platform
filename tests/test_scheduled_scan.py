@@ -14,7 +14,7 @@ async def test_strongest_uncertainty_margin_gets_correlated_risk_slot_first(tmp_
     raw['bookmakers'][0]['markets'][0]['outcomes']=[
         dict(name='Over',description='Player',point=20.5,price=100),
         dict(name='Over',description='Player',point=21.5,price=100)]
-    conn=AsyncMock();conn.fetch.return_value=[{'player_id':'00-0037248'}]
+    conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'00-0037248'}]
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
     now=datetime.now(timezone.utc)
@@ -56,7 +56,7 @@ def test_quotes_require_real_timestamps_and_sides():
 @pytest.mark.parametrize('sport',['nba','nfl'])
 async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_path):
     conn=AsyncMock()
-    conn.fetch.return_value=[{'player_id':1}]
+    conn.fetch.return_value=[{'normalized_name':'player','player_id':'1'}]
     conn.fetchrow.return_value={'team_abbreviation':'BOS','game_date':datetime.now(timezone.utc).date()-timedelta(days=2)}
     pool=MagicMock()
     pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
@@ -96,7 +96,7 @@ async def test_scheduled_graph_routes_real_quotes_and_retains_recency(sport,tmp_
     assert result['coverage']['model_estimates']==2
     assert result['coverage']['model_status']=='complete'
     assert result['coverage']['model_concurrency_limit']==8
-    assert conn.fetch.await_count==1  # One identity lookup per player, not per line/side.
+    assert conn.fetch.await_count==1  # One batched identity lookup per event, not per player/line/side.
     assert all(call.args[1].last_n_games==40 for call in quant.call_args_list)
     assert all(call.args[1].as_of_date is not None for call in quant.call_args_list)
     if sport=='nba':
@@ -121,7 +121,7 @@ async def test_quote_archive_failure_blocks_unrecorded_model_output(tmp_path):
 
 
 async def test_graph_query_failure_cannot_be_reported_as_successful_empty_scan(tmp_path):
-    conn=AsyncMock();conn.fetch.return_value=[{'player_id':1}]
+    conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'1'}]
     conn.fetchrow.return_value={'team_abbreviation':'BOS','game_date':datetime.now(timezone.utc).date()-timedelta(days=2)}
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
@@ -157,7 +157,7 @@ def test_api_budget_survives_restart(tmp_path):
     ('Teammate','teammate_availability_unmodeled')])
 @pytest.mark.parametrize('id_match',[False,True])
 async def test_availability_really_controls_daily_recommendations(tmp_path,injuries,expected,id_match):
-    conn=AsyncMock();conn.fetch.return_value=[{'player_id':'00-0037248'}]
+    conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'00-0037248'}]
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
     now=datetime.now(timezone.utc)
@@ -189,7 +189,7 @@ async def test_availability_really_controls_daily_recommendations(tmp_path,injur
 
 
 async def test_non_recommended_forecast_is_not_silently_discarded(tmp_path):
-    conn=AsyncMock();conn.fetch.return_value=[{'player_id':1}]
+    conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'1'}]
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
     prop=PropResult(true_probability=Decimal('.5'),sample_size=40,mean_stat=Decimal('24'),

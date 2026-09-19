@@ -7,11 +7,30 @@ import pytest
 
 from sportsbet import scan
 from sportsbet.ledger import Ledger
+from sportsbet.provider_cache import CachedResponse
 
 
 @pytest.fixture
 def worker(monkeypatch,tmp_path):
     stored={}
+    class MemoryCache:
+        def __init__(self):
+            self.records={};self.leases={}
+        def load(self,key,provider,sport,now):
+            record=self.records.get(key)
+            return record if record and record.expires_at>now else None
+        def claim(self,key,provider,sport,owner,now,lease=None):
+            if key in self.leases and self.leases[key]!=owner:return False
+            self.leases[key]=owner;return True
+        def store(self,key,provider,sport,owner,payload,captured_at,expires_at,release=True):
+            assert self.leases.get(key)==owner
+            self.records[key]=CachedResponse(deepcopy(payload),captured_at,expires_at)
+            if release:self.leases.pop(key,None)
+        def release(self,key,provider,sport,owner):
+            if self.leases.get(key)==owner:self.leases.pop(key,None)
+        def close(self):pass
+    cache=MemoryCache()
+    monkeypatch.setattr(scan,'ProviderResponseCache',lambda:cache)
     monkeypatch.setattr(scan.settings,'odds_api_key','test-key')
     monkeypatch.setattr(scan.settings,'analytics_database_url','test-configured')
     ledger=Ledger(tmp_path/'ledger.sqlite')
@@ -19,6 +38,7 @@ def worker(monkeypatch,tmp_path):
     monkeypatch.setattr(scan,'load_snapshot',lambda key:deepcopy(stored.get(key)))
     monkeypatch.setattr(scan,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
     pool=AsyncMock()
+    pool.provider_cache=cache
     monkeypatch.setattr(scan,'create_async_pool',AsyncMock(return_value=pool))
     events={sport:[dict(id=sport+str(i),home_team='Home',away_team='Away',
         commence_time=(datetime.now(timezone.utc)+timedelta(hours=2+i)).isoformat()) for i in range(2)]
@@ -27,7 +47,8 @@ def worker(monkeypatch,tmp_path):
     monkeypatch.setattr(scan,'fetch_event_availability',AsyncMock(return_value={'status':'unavailable'}))
     async def evaluate(pool,event,sport,ledger,scan_id,availability=None):
         evaluated.append(event['id'])
-        return {'signals':[], 'games':[], 'coverage':{'quotes':0,'selections':0,'counts':{}}}
+        return {'generated_at':datetime.now(timezone.utc).isoformat(),'signals':[], 'games':[],
+            'coverage':{'quotes':0,'selections':0,'counts':{}}}
     monkeypatch.setattr(scan,'evaluate_event',evaluate)
     return stored,events,evaluated,pool
 
@@ -213,7 +234,7 @@ async def test_repeated_monitor_defers_network_requests_without_relabeling_old_q
     original=deepcopy(stored['signals:nba:nba0'])
     report=(await scan.run(['nba'],25))['nba']
     assert evaluated==['nba0','nba1']
-    assert len(requests)==4  # Two discovery requests and just two paid event requests.
+    assert len(requests)==3  # One cached discovery request and just two paid event requests.
     assert report['status']=='scheduled' and report['cadence_deferred_events']==2
     assert report['next_refresh_at'] and report['completed_events']==0
     assert stored['signals:nba:nba0']==original  # No timestamp or eligibility rewrite.
@@ -231,6 +252,7 @@ async def test_scan_preserves_last_credits_for_last_hour_checks(monkeypatch,work
     assert distant['budget_skipped_events']==2 and not evaluated
     for event in events['nfl']:
         event['commence_time']=(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat()
+    pool.provider_cache.records.pop('odds:events:nfl')  # Provider schedule changed between synthetic runs.
     close=(await scan.run(['nfl'],25))['nfl']
     assert close['completed_events']==2 and close['budget_skipped_events']==0
     assert evaluated==['nfl0','nfl1']
@@ -238,7 +260,14 @@ async def test_scan_preserves_last_credits_for_last_hour_checks(monkeypatch,work
 
 
 @pytest.mark.asyncio
-async def test_cfb_cannot_enter_the_nfl_or_nba_player_model():
+async def test_cfb_uses_its_own_manual_player_model_path(monkeypatch,worker):
+    stored,events,evaluated,_=worker
     assert scan.SPORT_KEYS['cfb']=='americanfootball_ncaaf'
-    with pytest.raises(ValueError,match='Invalid scan scope'):
-        await scan.run(['cfb'],25)
+    events['cfb']=[dict(id='college1',home_team='Home College',away_team='Away College',
+        commence_time=(datetime.now(timezone.utc)+timedelta(hours=2)).isoformat())]
+    def handle(request):
+        return httpx.Response(200,json=events['cfb'] if request.url.path.endswith('/events') else events['cfb'][0])
+    transport(monkeypatch,handle)
+    report=(await scan.run(['cfb'],25))['cfb']
+    assert evaluated==['college1'] and report['completed_events']==1
+    assert stored['signals:cfb:college1']['games']==[]

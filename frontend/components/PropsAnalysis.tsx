@@ -152,7 +152,7 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
     } finally {busy.current=false;if(!controller.signal.aborted)setLoading(false);}
   }
 
-  const leagueProps=PROP_TYPES.filter(p=>sport==='nfl' ? ['pass_yds','pass_tds','rush_yds','rec_yds','receptions'].includes(p) : !['pass_yds','pass_tds','rush_yds','rec_yds','receptions'].includes(p));
+  const leagueProps=PROP_TYPES.filter(p=>sport==='nba' ? !['pass_yds','pass_tds','rush_yds','rec_yds','receptions'].includes(p) : ['pass_yds','pass_tds','rush_yds','rec_yds','receptions'].includes(p));
   const effectivePropFilter=leagueProps.includes(propFilter as PropType) ? propFilter : 'all';
   const currentProps=publicSignals(allProps,now).signals;
   const effectiveWindow=windowFilter==='latest' ? latestForecastWindow(currentProps,now) : windowFilter;

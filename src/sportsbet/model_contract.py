@@ -7,6 +7,8 @@ PROP_MARKETS = {
             'player_assists': 'assists'},
     'nfl': {'player_pass_yds': 'pass_yds', 'player_rush_yds': 'rush_yds',
             'player_reception_yds': 'rec_yds', 'player_receptions': 'receptions'},
+    'cfb': {'player_pass_yds': 'pass_yds', 'player_rush_yds': 'rush_yds',
+            'player_reception_yds': 'rec_yds', 'player_receptions': 'receptions'},
 }
 
 # These scanner cohorts were introduced after quote source and normalized-row

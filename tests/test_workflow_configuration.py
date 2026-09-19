@@ -111,13 +111,13 @@ def test_paid_collection_reports_degraded_coverage_without_masking_fatal_errors(
     assert 'exit "$status"' in step
 
 
-def test_cfb_is_manual_sportsbook_only_and_cannot_increase_scheduled_usage() -> None:
+def test_cfb_watch_and_history_are_manual_and_cannot_increase_scheduled_usage() -> None:
     paid = WORKFLOW.read_text(encoding="utf-8")
     configuration = _step(paid, "Check worker configuration")
     profiles = _step(paid, "Update source-backed player profiles")
     assert "options: [both, nfl, nba, cfb]" in paid
     assert 'if [ "$SPORT" = cfb ]' in configuration
-    assert '[ "$SPORT" = cfb ] && [ "$OPERATION" != watch ]' in configuration
+    assert '[ "$SPORT" = cfb ] && [ "$OPERATION" != watch ] && [ "$OPERATION" != scan ] && [ "$OPERATION" != refresh ] && [ "$OPERATION" != backfill ]' in configuration
     assert '[ "$SPORT" = cfb ] && [ "$PROVIDER" != sportsbook ] && [ "$PROVIDER" != all ]' in configuration
     assert "if: env.SPORT != 'cfb'" in profiles
     assert "SPORT: ${{ inputs.sport || 'both' }}" in paid

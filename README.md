@@ -1,6 +1,6 @@
 # Agentic EV Analytics
 
-NFL/NBA player-prop research with a deterministic LangGraph pipeline, PostgreSQL game history, and a Next.js dashboard. The graph estimates historical outcome frequencies and evaluates real bookmaker payouts. No LLM API key is currently consumed. These estimates have not established predictive profitability.
+NFL/NBA player-prop research plus a manual CFB beta, built on a deterministic LangGraph pipeline, PostgreSQL game history, and a Next.js dashboard. The graph estimates historical outcome frequencies and evaluates real bookmaker payouts. No LLM API key is currently consumed. These estimates have not established predictive profitability.
 
 Production: https://agentic-ev-analytics-platform.vercel.app
 
@@ -46,17 +46,20 @@ After migrating, backfill the history before the first scan:
 ```sh
 uv run python -m sportsbet.refresh --sport both --backfill
 uv run python -m sportsbet.scan --sport both --daily-credit-limit 25
+# CFB stays manual so it cannot silently consume the NFL/NBA budget:
+uv run python -m sportsbet.refresh --sport cfb --backfill
+uv run python -m sportsbet.scan --sport cfb --daily-credit-limit 25
 ```
 
-`refresh` selects season years from the current date, uses regular-season samples, and upserts stats to apply provider corrections. Initial NFL backfill covers three season years; NBA covers current/prior season. Daily refresh covers the active season. NFL schedules must be present for pre-game cutoffs.
+`refresh` selects season years from the current date, uses regular-season samples, and upserts stats to apply provider corrections. Initial NFL and CFB backfills cover three season years; NBA covers current/prior season. Daily refresh covers the active season. NFL schedules must be present for pre-game cutoffs. CFB history comes from the public versioned SportsDataverse ESPN player-box and schedule releases and needs no additional API key. CFB uses exact ESPN athlete/game IDs and never reads NFL player tables.
 
 The **Live paid market data** Actions workflow offers `scan`, `refresh`, and `backfill` dispatches. When explicitly enabled, it refreshes stats daily and attempts scans every 30 minutes. Scans share a persistent daily credit budget and recommendation-exposure ledger. The default 25-credit ceiling does **not** cover a full slate repeatedly; a capped worker stops requesting additional events. Establish an appropriate provider plan and measured coverage before enabling schedules. Published quotes older than five minutes cannot recommend a stake. A completed worker with partial provider/model coverage leaves a GitHub warning and keeps the published dashboard state degraded; crashes, configuration errors, schema drift, and evidence-scan failures still fail the workflow.
 
-The public website only reads results. It cannot start scans or spend provider credits. The older `scan_game_ev.py` remains a local NBA CLI; use `sportsbet.scan` for durable hosted snapshots.
+The public website only reads results. It cannot start scans or spend provider credits. The older `scan_game_ev.py` remains a local NBA CLI; use `sportsbet.scan` for durable hosted snapshots. Paid discovery and event responses are retained in a private, hash-verified PostgreSQL cache for five minutes. Database leases coalesce concurrent workers, and an event response is cached before modeling so an interrupted run can resume without purchasing the same response again. Cache reuse never extends the five-minute quote-eligibility rule.
 
 ## Model and metric contract
 
-- The current `empirical-jeffreys-v4` cohort uses one shared NBA/NFL finite-sample estimator for per-game prop outcomes. It preserves observed push mass and uses a fixed Jeffreys half-count for decided Over/Under outcomes, preventing exact 0%/100% forecasts from finite histories. NBA matchup/availability cohorts below the 20-observation signal gate fall back to the same cutoff-safe rolling window. See [model and validation details](docs/model-validation.md).
+- The current `empirical-jeffreys-v4` cohort uses one shared NBA/NFL/CFB finite-sample estimator for per-game prop outcomes. It preserves observed push mass and uses a fixed Jeffreys half-count for decided Over/Under outcomes, preventing exact 0%/100% forecasts from finite histories. NBA matchup/availability cohorts below the 20-observation signal gate fall back to the same cutoff-safe rolling window. See [model and validation details](docs/model-validation.md).
 - Target-date queries use only earlier game dates; the most recent 40 qualifying games are selected after filters. Missing or ambiguous player identities are skipped.
 - Quotes must match player, event, market, line and Over/Under side. Synthetic PrizePicks payouts are not treated as bookmaker prices.
 - `ev_pct` is probability edge, displayed in percentage points. `expected_return` is expected net return per unit stake at the quoted payout, including push refunds. Dollar expected profit is stake times expected return.
@@ -134,7 +137,7 @@ npx tsc --noEmit
 npm run build
 ```
 
-PostgreSQL tests require `SPORTSBET_TEST_DATABASE_URL` pointing to a **disposable** database. Tests never fall back to the runtime database. Pytest stores generated temporary files and cache under ignored `.local/` by default.
+PostgreSQL tests require `SPORTSBET_TEST_DATABASE_URL` pointing to a **disposable** database. Tests never fall back to the runtime database. Pytest stores generated temporary files and cache under ignored `.local/` by default. CFB model scans and history refreshes remain manual; `both` still means NFL+NBA so adding CFB cannot silently increase scheduled paid usage.
 
 ## Readiness still requiring evidence
 

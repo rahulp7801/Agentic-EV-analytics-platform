@@ -11,7 +11,7 @@ export function forecastRequest(url:URL) {
   const offset=url.searchParams.get('offset') ?? '0';
   const limit=url.searchParams.get('limit') ?? String(FORECAST_PAGE_SIZE);
   const revision=url.searchParams.get('revision');
-  if((sport!==null && sport!=='nba' && sport!=='nfl') || !['library','qualified'].includes(view)
+  if((sport!==null && sport!=='nba' && sport!=='nfl' && sport!=='cfb') || !['library','qualified'].includes(view)
     // The public research window is deliberately capped at 1,000 rows. Larger
     // offsets add expensive cache keys without serving any product workflow.
     || !/^(0|[1-9][0-9]{0,3})$/.test(offset) || Number(offset)>=1000

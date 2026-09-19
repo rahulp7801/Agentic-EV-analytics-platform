@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type {Sport} from '@/lib/types';
 import styles from './TerminalChrome.module.css';
 
 type Status = {
@@ -24,7 +25,7 @@ function tone(state: string) {
   return styles.scanQuiet;
 }
 
-export default function ScanStatus() {
+export default function ScanStatus({sport}:{sport?:Sport}) {
   const [data, setData] = useState<Record<string, Status> | null>(null);
   const [error, setError] = useState('');
 
@@ -58,10 +59,10 @@ export default function ScanStatus() {
         <div className={`${styles.scanCard} ${styles.scanWarning}`}><strong>{error}</strong></div>
       ) : !data ? (
         <div className={`${styles.scanCard} ${styles.scanQuiet}`}><strong>Checking daily scans…</strong></div>
-      ) : Object.entries(data).map(([sport, status]) => (
-        <article className={`${styles.scanCard} ${tone(status.state)}`} key={sport}>
+      ) : Object.entries(data).filter(([key])=>!sport || key===sport).map(([key, status]) => (
+        <article className={`${styles.scanCard} ${tone(status.state)}`} key={key}>
           <div className={styles.scanIdentity}>
-            <span>{sport.toUpperCase()}</span>
+            <span>{key.toUpperCase()}</span>
             <strong>{status.label}</strong>
           </div>
           <div className={styles.scanMetrics}>

@@ -35,7 +35,7 @@ export default function SlateReadiness({sport}:{sport:Sport}) {
       {game.model_estimates!==null && <p>{game.model_estimates} of {game.selections} selections modeled{game.accepted_at_capture!==null ? ` · ${game.accepted_at_capture} accepted at capture` : ''}. Freshness is rechecked for the shortlist.</p>}
       {game.next_refresh_at && <p>Next permitted check: {new Date(game.next_refresh_at).toLocaleString()}. Scheduler timing can vary.</p>}
       {game.reasons.length>0 && <details><summary>Why selections were blocked</summary><ul>{game.reasons.map(reason=><li key={reason.label}>{reason.label}: {reason.count}</li>)}</ul></details>}
-      {game.provider_event_id && <a href={`https://www.espn.com/${sport}/game/_/gameId/${encodeURIComponent(game.provider_event_id)}`} target="_blank" rel="noreferrer">View source game ↗</a>}
+      {game.provider_event_id && <a href={`https://www.espn.com/${sport==='cfb'?'college-football':sport}/game/_/gameId/${encodeURIComponent(game.provider_event_id)}`} target="_blank" rel="noreferrer">View source game ↗</a>}
     </article>)}</div>
     <details className={styles.settlementDetails}><summary>How results get verified</summary><p>After final whistle, exact game and player identities must match a source-backed final stat. Missing or ambiguous evidence stays pending. All eligible forecasts and accepted recommendations are evaluated separately in Backtest lab; demo replays never enter those totals.</p>
       {data?.settlements ? <><p>Last check: {new Date(data.settlements.checked_at).toLocaleString()} · {data.settlements.stale ? 'Stale' : data.settlements.status}. {data.settlements.blocked}</p>

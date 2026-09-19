@@ -14,7 +14,8 @@ import httpx
 from sportsbet.ingestion.archive import write_archive
 
 BASES = {'nfl': 'https://site.api.espn.com/apis/site/v2/sports/football/nfl',
-         'nba': 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'}
+         'nba': 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba',
+         'cfb': 'https://site.api.espn.com/apis/site/v2/sports/football/college-football'}
 NFL_PLAYER_IDS_URL = 'https://github.com/nflverse/nflverse-data/releases/download/players/players.csv'
 
 
@@ -125,7 +126,7 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
                 if len(groups) > 1:
                     raise ValueError('Ambiguous injury team coverage')
                 athletes = roster['athletes']
-                if sport == 'nfl':
+                if sport in ('nfl','cfb'):
                     athletes = [athlete for group in athletes for athlete in group['items']]
                 names = [athlete['displayName'] for athlete in athletes]
                 if not names or len(names) != len(set(names)):
@@ -171,7 +172,7 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
                                        jersey=str(athlete.get('jersey','')),position=athlete.get('position',{}).get('abbreviation',''),
                                        player_image_url=athlete.get('headshot',{}).get('href','')) for athlete in athletes
                                        if str(athlete.get('id','')).isdigit() and athlete.get('headshot',{}).get('href')==
-                                       f"https://a.espncdn.com/i/headshots/{sport}/players/full/{athlete['id']}.png"},
+                                       f"https://a.espncdn.com/i/headshots/{'college-football' if sport=='cfb' else sport}/players/full/{athlete['id']}.png"},
                                    roster_names=names, roster_statuses={athlete['displayName']:
                                        athlete.get('status',{}).get('name','Unknown') for athlete in athletes},reports=flags,
                                    roster_ids=roster_ids,

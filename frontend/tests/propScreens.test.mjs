@@ -34,6 +34,13 @@ test('public prop screen omits internal evidence and retains all non-executable 
     'active_no_snap_fair_market_price');
 });
 
+test('CFB screens accept only the bounded football prop contract',()=>{
+  const cfb=snapshot();cfb.sport='cfb';
+  assert.equal(publicPropScreen(cfb,Date.parse('2026-09-11T12:01:00Z')).sport,'cfb');
+  cfb.comparisons[0].prop_type='points';
+  assert.throws(()=>publicPropScreen(cfb,Date.parse('2026-09-11T12:01:00Z')));
+});
+
 test('public prop screen validates and exposes only compact hypothetical fee costs', () => {
   const changed=snapshot();changed.comparisons[0].exchange_fee_scenarios={
     kalshi_leg:{direct:{principal:'0.45',exchange_fee:'0.0174',total_cost:'0.4674',trade_fee:'internal'},
