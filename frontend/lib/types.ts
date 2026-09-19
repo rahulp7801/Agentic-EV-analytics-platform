@@ -5,6 +5,19 @@ export type PropType = 'points' | 'rebounds' | 'assists' | 'threes' | 'pra' | 's
 export type SignalStrength = 'high' | 'medium' | 'low' | 'unrated';
 export type Direction = 'over' | 'under';
 
+export interface AvailabilityContextSplit {
+  player: string;
+  status: string;
+  position: string;
+  team: string;
+  relationship: 'teammate' | 'opponent';
+  unit: 'offense' | 'defense';
+  source: 'nflverse_snap_counts' | 'nba_final_box_scores';
+  participation: 'verified game snaps' | 'verified minutes played';
+  active: {games:number; mean:number|null; hit_rate:number|null};
+  absent: {games:number; mean:number|null; hit_rate:number|null};
+}
+
 export interface AvailabilityEvidence {
   status: 'observed' | 'unavailable';
   roster_confirmed: boolean;
@@ -22,6 +35,7 @@ export interface AvailabilityEvidence {
   identity_source_url?: string;
   identity_source_sha256?: string;
   teammates: Array<{player:string; status:string; position:string; reported_at:string}>;
+  context_splits?: AvailabilityContextSplit[];
 }
 
 export interface EVSignal {

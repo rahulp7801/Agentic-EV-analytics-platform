@@ -18,6 +18,7 @@ from sportsbet.ledger import Ledger
 from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.availability import fetch_event_availability, player_availability
+from sportsbet.prop.injury_context import historical_availability_splits
 from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
@@ -133,6 +134,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     # Alphabetical/line order must not consume a player's risk slot ahead of a
     # stronger qualified estimate. Keep all forecasts; retain every existing gate.
     modeled.sort(key=lambda candidate:recommendation_quality(candidate[1].get('ev_signal')),reverse=True)
+    explained_contexts=set()
     for selection,state in modeled:
         player,market,line,side,quote,player_id=selection
         prop=state.get('nba_prop_result' if sport=='nba' else 'prop_result')
@@ -149,6 +151,18 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         now=datetime.now(timezone.utc)
         availability_evidence, availability_reason=player_availability(availability,player,now,
             player_id=player_id if sport=='nfl' else None)
+        # The sorted first selection is the same strongest per-player exposure
+        # the public desk can surface. Avoid multiplying up to eight split
+        # queries across every alternate threshold for that player.
+        context_key=player
+        if availability_evidence['status']=='observed' and context_key not in explained_contexts:
+            explained_contexts.add(context_key)
+            splits=await historical_availability_splits(pool,context=availability,
+                subject_team=availability_evidence['team'],subject_player=availability_evidence.get('roster_player_name',player),
+                sport=sport,player_id=player_id,season=season-2,cutoff=game_date,
+                prop_type=MARKETS[sport][market],line=float(line),direction=side.lower())
+            if splits:
+                availability_evidence['context_splits']=splits
         if signal:
             if now >= start: reason='game_started'
             elif not -60 <= (now-quote.snapped_at).total_seconds() <= 300: reason='stale_quote'
@@ -187,9 +201,10 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                     f'95% probability interval {uncertainty}. Approved research stake at capture: '
                     f'{float(signal.kelly_fraction) if accepted else 0:.1%} of bankroll.')
             if availability_evidence['status']=='observed':
+                split_count=len(availability_evidence.get('context_splits',[]))
                 trade_plan[-1]=(f"Availability: {availability_evidence['subject_status']}; "
-                    f"{len(availability_evidence['teammates'])} teammates listed on the captured injury report. "
-                    'Reports screen eligibility; no injury probability boost is applied.')
+                    f"{split_count} exact historical on/off comparison{'s' if split_count != 1 else ''} retained. "
+                    'Current reports screen eligibility; descriptive splits do not change the probability.')
             public_signal=dict(player=player,sport=sport,
                 game_id=event['id'],prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
                 team='',opponent='',home_team=event['home_team'],away_team=event['away_team'],

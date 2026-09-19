@@ -19,6 +19,7 @@ from sportsbet.ingestion.games import ingest_games_seasons
 from sportsbet.ingestion.ngs import NGS_MIN_SEASON, ingest_ngs_seasons
 from sportsbet.ingestion.pbp import ingest_pbp_seasons
 from sportsbet.ingestion.player_stats import ingest_player_stats_seasons
+from sportsbet.ingestion.snap_counts import ingest_snap_counts_seasons
 
 log = structlog.get_logger()
 
@@ -59,6 +60,7 @@ def main() -> None:
     if not args.pbp_only:
         log.info("ingesting_player_stats", seasons=seasons)
         ingest_player_stats_seasons(seasons, engine)
+        ingest_snap_counts_seasons(seasons, engine)
 
         ngs_seasons = [s for s in seasons if s >= NGS_MIN_SEASON]
         if ngs_seasons:

@@ -186,10 +186,6 @@ def make_nba_quant_agent(
             prop_type: str = state.get("prop_type", "points")  # type: ignore[union-attr]
             prop_line_raw = state.get("prop_line", "0")  # type: ignore[union-attr]
             prop_filters: dict[str, object] = state.get("prop_filters", {})  # type: ignore[union-attr]
-            situational: dict = state.get("situational_params") or {}  # type: ignore[union-attr]
-            teammate_out: list[str] | None = situational.get("teammate_out_signals") or None
-            teammate_out_contexts: list[dict[str, str]] | None = situational.get("teammate_out_contexts") or None
-
             # Derive opponent_team and home_away from nba_context_signals + game state.
             # nba_context_producer runs before this node so context is available.
             # Using these activates the gamelog conditional path (real frequency counts
@@ -216,8 +212,10 @@ def make_nba_quant_agent(
                 prop_type=prop_type,  # type: ignore[arg-type]
                 line=line,
                 filters=prop_filters if prop_filters else {},
-                teammate_out=teammate_out,
-                teammate_out_contexts=teammate_out_contexts,
+                # Current injury names are not stable historical identifiers. Exact
+                # on/off evidence is attached after modeling from box-score minutes.
+                teammate_out=None,
+                teammate_out_contexts=None,
                 opponent_team=opponent_team,
                 home_away=home_away_param,  # type: ignore[arg-type]
                 last_n_games=state.get("last_n_games"),

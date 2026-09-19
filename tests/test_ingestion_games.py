@@ -234,8 +234,9 @@ def test_cli_games_flag_calls_ingest() -> None:
 
     with (
         patch("sportsbet.ingestion.cli.ingest_pbp_seasons"),
-        patch("sportsbet.ingestion.cli.ingest_player_stats_seasons"),
-        patch("sportsbet.ingestion.cli.ingest_ngs_seasons"),
+            patch("sportsbet.ingestion.cli.ingest_player_stats_seasons"),
+            patch("sportsbet.ingestion.cli.ingest_snap_counts_seasons"),
+            patch("sportsbet.ingestion.cli.ingest_ngs_seasons"),
         patch("sportsbet.ingestion.cli.ingest_games_seasons") as mock_games,
         patch("sportsbet.ingestion.cli.get_sync_engine") as mock_engine_fn,
     ):

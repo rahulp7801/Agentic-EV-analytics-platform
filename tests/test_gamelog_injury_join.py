@@ -18,14 +18,12 @@ def test_conditional_filters_keep_untrusted_values_in_parameters(sport,builder):
         as_of_date=date(2025,1,15),last_n_games=20,opponent_team=opponent,
         teammate_out=[teammate],filters={})
     sql,args=builder.build(params)
-    for value in (opponent,teammate):
+    for value in (opponent,):
         assert value not in sql
         assert value in args
         assert f'${args.index(value)+1}' in sql
+    assert teammate not in sql and teammate not in args
     assert date(2025,1,15) in args
     assert f'< ${args.index(date(2025,1,15))+1}' in sql
     assert 'LIMIT' in sql and 20 in args
-    if sport=='nfl':
-        assert 'INTERVAL' in sql and 'injury_reports' in sql
-    else:
-        assert 'NOT EXISTS' in sql and 'nba_player_gamelogs' in sql
+    assert 'injury_reports' not in sql

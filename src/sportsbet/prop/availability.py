@@ -18,8 +18,8 @@ BASES = {'nfl': 'https://site.api.espn.com/apis/site/v2/sports/football/nfl',
 NFL_PLAYER_IDS_URL = 'https://github.com/nflverse/nflverse-data/releases/download/players/players.csv'
 
 
-async def nfl_player_identities(client: httpx.AsyncClient, roster_ids: set[str], now: datetime) -> tuple[dict, dict]:
-    """Use the published GSIS/ESPN crosswalk, never a guessed name alias."""
+async def nfl_player_identities(client: httpx.AsyncClient, roster_ids: set[str], now: datetime) -> tuple[dict, dict, dict]:
+    """Use the published GSIS/ESPN/PFR crosswalk, never a guessed name alias."""
     url = httpx.URL(NFL_PLAYER_IDS_URL)
     for _ in range(3):
         response = await client.get(url)
@@ -36,7 +36,7 @@ async def nfl_player_identities(client: httpx.AsyncClient, roster_ids: set[str],
     reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
     if not reader.fieldnames or len(set(reader.fieldnames)) != len(reader.fieldnames) or not {'gsis_id','espn_id'} <= set(reader.fieldnames):
         raise ValueError('Invalid identity columns')
-    mappings, seen_gsis, seen_espn = {}, set(), set()
+    mappings, pfr_mappings, seen_gsis, seen_espn, seen_pfr = {}, {}, set(), set(), set()
     for count, row in enumerate(reader, 1):
         if count > 50_000 or None in row:
             raise ValueError('Invalid identity rows')
@@ -49,7 +49,13 @@ async def nfl_player_identities(client: httpx.AsyncClient, roster_ids: set[str],
         seen_espn.add(espn)
         if espn in roster_ids:
             mappings[gsis] = espn
-    return mappings, dict(url=NFL_PLAYER_IDS_URL,
+            pfr = row.get('pfr_id')
+            if isinstance(pfr,str) and re.fullmatch(r'[A-Za-z0-9]{1,20}',pfr):
+                if pfr in seen_pfr:
+                    raise ValueError('Ambiguous player identities')
+                seen_pfr.add(pfr)
+                pfr_mappings[espn] = pfr
+    return mappings, pfr_mappings, dict(url=NFL_PLAYER_IDS_URL,
         source_sha256=hashlib.sha256(response.content).hexdigest(),
         retrieved_at=now.isoformat(), response_text=response.content.decode('utf-8'))
 
@@ -177,10 +183,16 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
                                    roster_source_sha256=next(source['source_sha256'] for source in sources
                                        if source['url']==base+'/teams/'+str(team['id'])+'/roster')))
             identities = {}
+            pfr_identities = {}
             identity_source = None
-            if sport=='nfl' and player_names and not player_names <= {name for team in result for name in team['roster_names']}:
+            unmatched = bool(player_names and not player_names <= {
+                name for team in result for name in team['roster_names']})
+            # Injury-context evidence also needs exact PFR IDs for reported
+            # offensive and defensive participants, even when display names match.
+            has_reports = any(team['reports'] for team in result)
+            if sport=='nfl' and (unmatched or has_reports):
                 try:
-                    identities, identity_source = await nfl_player_identities(client,
+                    identities, pfr_identities, identity_source = await nfl_player_identities(client,
                         {identity for team in result for identity in team['roster_ids']}, now)
                     sources.append(identity_source)
                     identity_source = {key: identity_source[key] for key in ('url','source_sha256','retrieved_at')}
@@ -193,6 +205,7 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
                         source_url=base+'/injuries', source_sha256=next((
                             source['source_sha256'] for source in sources if source['url']==base+'/injuries'), None),
                         teams=result, player_identities=identities,
+                        pfr_player_identities=pfr_identities,
                         identity_source=identity_source)
         except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError, AttributeError, OSError):
             return dict(status='unavailable', captured_at=now.isoformat())
@@ -212,8 +225,14 @@ def player_availability(context: dict | None, player: str, now: datetime, *, pla
             if identity_source['url'] != NFL_PLAYER_IDS_URL or not re.fullmatch(r'[a-f0-9]{64}',identity_source['source_sha256']):
                 raise ValueError('Invalid identity commitment')
             espn_id = context['player_identities'].get(player_id)
-            matches = [(team, team['roster_ids'][espn_id]) for team in context['teams']
-                       if espn_id in team['roster_ids']]
+            if espn_id:
+                matches = [(team, team['roster_ids'][espn_id]) for team in context['teams']
+                           if espn_id in team['roster_ids']]
+            else:
+                # Loading the crosswalk for an injured teammate must not erase
+                # an exact subject-name roster match when that subject has no ID row.
+                identity_source = None
+                matches = [(team, player) for team in context['teams'] if player in team['roster_names']]
         else:
             matches = [(team, player) for team in context['teams'] if player in team['roster_names']]
         if len(matches) != 1:

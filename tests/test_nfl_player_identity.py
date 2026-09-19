@@ -12,9 +12,9 @@ from sportsbet.prop.availability import NFL_PLAYER_IDS_URL, fetch_event_availabi
 async def test_crosswalk_binds_exact_player_ids_and_unknown_identity_never_borrows_history(defect,tmp_path,monkeypatch):
     monkeypatch.chdir(tmp_path)
     now=datetime.now(timezone.utc)
-    csv='gsis_id,espn_id\n00-0037248,4379399\n'
-    if defect=='duplicate_gsis':csv+='00-0037248,123\n'
-    if defect=='duplicate_espn':csv+='00-0000001,4379399\n'
+    csv='gsis_id,espn_id,pfr_id\n00-0037248,4379399,CookJa01\n'
+    if defect=='duplicate_gsis':csv+='00-0037248,123,Other00\n'
+    if defect=='duplicate_espn':csv+='00-0000001,4379399,Other00\n'
     if defect=='missing_columns':csv='name,id\nJames Cook,4379399\n'
     requests=[]
     def handle(request):
@@ -52,9 +52,12 @@ async def test_crosswalk_binds_exact_player_ids_and_unknown_identity_never_borro
         assert reason is None and evidence['roster_player_name']=='James Cook III'
         assert evidence['identity_source_url']==NFL_PLAYER_IDS_URL
         assert evidence['identity_source_sha256']==hashlib.sha256(csv.encode()).hexdigest()
+        assert result['pfr_player_identities']=={'4379399':'CookJa01'}
         assert evidence['probability_adjusted'] is False
         assert 'response_text' not in result['identity_source']
         assert player_availability(result,'James Cook',now,player_id='00-0000001')[1]=='roster_unconfirmed'
         assert player_availability(result,'James Cook',now)[1]=='roster_unconfirmed'
+        exact,exact_reason=player_availability(result,'Opponent',now,player_id='00-0000001')
+        assert exact_reason is None and exact['status']=='observed' and 'roster_player_name' not in exact
         result['teams'][0]['reports']=[dict(player='James Cook III',status='Out',position='RB',reported_at=now.isoformat())]
         assert player_availability(result,'James Cook',now,player_id='00-0037248')[1]=='player_availability_risk'
