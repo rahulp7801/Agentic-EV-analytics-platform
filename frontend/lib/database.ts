@@ -6,7 +6,7 @@ export const hosted = process.env.VERCEL === '1';
 
 export function databaseQuery<T extends QueryResultRow>(text: string, values: unknown[] = []) {
   const client = new Client({...databaseConfig(process.env.DATABASE_URL, process.env.DATABASE_SSL_CA,hosted),
-    connectionTimeoutMillis: 8000, statement_timeout: 5000,query_timeout:9000});
+    connectionTimeoutMillis: 5000, statement_timeout: 5000,query_timeout:6000});
   return queryWithClient<T>(client, text, values);
 }
 

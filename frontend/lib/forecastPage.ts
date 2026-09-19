@@ -26,15 +26,30 @@ export const FORECAST_PAGE_QUERY=`WITH latest AS MATERIALIZED (
   SELECT snapshot_key,payload,updated_at FROM dashboard_snapshots
   WHERE snapshot_key LIKE $1 AND ($3::boolean=false OR updated_at>=now()-interval '6 minutes')
   ORDER BY updated_at DESC,snapshot_key DESC LIMIT 100
-), forecasts AS MATERIALIZED (
-  SELECT snapshot_key,updated_at,ordinality,payload->'generated_at' AS generated_at,signal
-  FROM latest CROSS JOIN LATERAL jsonb_array_elements(
-    CASE WHEN jsonb_typeof(payload->'signals')='array' THEN payload->'signals' ELSE '[]'::jsonb END
-  ) WITH ORDINALITY AS items(signal,ordinality)
-  WHERE $3::boolean=false OR (signal->>'gated'='false' AND updated_at>=now()-interval '6 minutes')
+), envelopes AS MATERIALIZED (
+  SELECT snapshot_key,payload,updated_at,
+    CASE WHEN jsonb_typeof(payload->'signals')='array' THEN payload->'signals' ELSE '[]'::jsonb END AS signals
+  FROM latest
+), indexed AS MATERIALIZED (
+  SELECT *,jsonb_array_length(signals) AS signal_count,
+    COALESCE(sum(jsonb_array_length(signals)) OVER (ORDER BY updated_at DESC,snapshot_key DESC
+      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0)::bigint AS base_offset
+  FROM envelopes
+), library_page AS (
+  SELECT snapshot_key,payload->'generated_at' AS generated_at,signal,updated_at,ordinality
+  FROM indexed CROSS JOIN LATERAL jsonb_array_elements(signals) WITH ORDINALITY AS items(signal,ordinality)
+  WHERE $3::boolean=false AND base_offset<$5::bigint+$4::bigint AND base_offset+signal_count>$5::bigint
+    AND base_offset+ordinality>$5::bigint AND base_offset+ordinality<=$5::bigint+$4::bigint
+), qualified AS MATERIALIZED (
+  SELECT snapshot_key,payload->'generated_at' AS generated_at,signal,updated_at,ordinality
+  FROM envelopes CROSS JOIN LATERAL jsonb_array_elements(signals) WITH ORDINALITY AS items(signal,ordinality)
+  WHERE $3::boolean=true AND signal->>'gated'='false'
 ), page AS (
-  SELECT snapshot_key,generated_at,signal,updated_at,ordinality FROM forecasts ORDER BY updated_at DESC,snapshot_key DESC,ordinality
-  LIMIT $4 OFFSET $5
+  SELECT * FROM (
+    SELECT * FROM library_page
+    UNION ALL
+    SELECT * FROM qualified
+  ) candidates ORDER BY updated_at DESC,snapshot_key DESC,ordinality LIMIT $4
 )
 SELECT jsonb_build_object(
   'rows',COALESCE((SELECT jsonb_agg(jsonb_build_object('payload',jsonb_build_object(
@@ -42,7 +57,8 @@ SELECT jsonb_build_object(
     ORDER BY updated_at DESC,snapshot_key DESC,ordinality) FROM page),'[]'::jsonb),
   'profiles',COALESCE((SELECT jsonb_object_agg(snapshot_key,payload) FROM dashboard_snapshots
     WHERE snapshot_key=ANY($2::text[])),'{}'::jsonb),
-  'total_count',(SELECT count(*) FROM forecasts),
+  'total_count',(CASE WHEN $3::boolean THEN (SELECT count(*) FROM qualified)
+    ELSE (SELECT COALESCE(sum(signal_count),0) FROM indexed) END),
   'window_complete',($3::boolean=false OR (SELECT count(*) FROM dashboard_snapshots
     WHERE snapshot_key LIKE $1 AND updated_at>=now()-interval '6 minutes')<=100),
   'revision',(SELECT encode(sha256(convert_to(COALESCE(string_agg(snapshot_key||':'||updated_at::text,','
