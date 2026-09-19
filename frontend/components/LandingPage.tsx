@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Check, Database, Eye, Layers3, ShieldCheck, Sparkles } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { marketFreshness, type MarketFreshness } from '@/lib/marketFreshness';
+import { replicatedReceptionEvidence } from '@/lib/publicBenchmarks';
 import HistoricalFlowDemo from './HistoricalFlowDemo';
 import styles from './LandingPage.module.css';
 
@@ -34,6 +35,12 @@ const method = [
   { icon: Database, title: 'Estimate honestly', copy: 'Use only history available before the event and retain the model version and uncertainty.' },
   { icon: ShieldCheck, title: 'Gate the result', copy: 'Freshness, fees, liquidity, rules, and settlement coverage decide what reaches the dashboard.' },
 ];
+
+const resultPeriods = [replicatedReceptionEvidence.prior, replicatedReceptionEvidence.current];
+
+function percent(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
+}
 
 function count(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -174,7 +181,7 @@ export default function LandingPage() {
     <div className={styles.page} ref={root}>
       <header className={styles.nav}>
         <Link className={styles.brand} href="/"><span>Q</span><strong>Quant</strong></Link>
-            <nav aria-label="Landing navigation"><a href="#platform">Platform</a><a href="#demo">Demo</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton} aria-label="Open dashboard"><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
+            <nav aria-label="Landing navigation"><a href="#results">Results</a><a href="#platform">Platform</a><a href="#demo">Demo</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton} aria-label="Open dashboard"><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
       </header>
 
       <main>
@@ -188,6 +195,39 @@ export default function LandingPage() {
           </motion.div>
           <motion.div className={styles.heroPulse} initial={reduceMotion ? false : { opacity: 0, y: 35 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .28, duration: .8 }}><MarketPulse pulse={pulse} /></motion.div>
           <div className={styles.heroFine}><span>NBA + NFL</span><span>Sportsbooks · Kalshi · PrizePicks</span><span>Read-only analysis</span></div>
+        </section>
+
+        <section className={styles.results} id="results" aria-labelledby="results-title">
+          <div className={styles.resultsIntro}>
+            <div>
+              <span>Verified retrospective performance</span>
+              <h2 id="results-title">{percent(replicatedReceptionEvidence.prior.hit_rate)}.<br />Then {percent(replicatedReceptionEvidence.current.hit_rate)}.</h2>
+            </div>
+            <div className={styles.resultsSummary}>
+              <div><ShieldCheck size={18} /><strong>Above 60% in both periods</strong></div>
+              <p>The same fixed reception rule was evaluated on two separate NFL periods. Every win and loss remains in the denominator.</p>
+            </div>
+          </div>
+
+          <div className={styles.resultsGrid}>
+            {resultPeriods.map(period => (
+              <article className={styles.resultCard} key={period.label}>
+                <span>{period.label}</span>
+                <strong>{percent(period.hit_rate)}</strong>
+                <p>{period.correct} correct <i>/</i> {period.sample} forecasts</p>
+                <dl>
+                  <div><dt>Games</dt><dd>{period.game_count}</dd></div>
+                  <div><dt>95% game-cluster interval</dt><dd>{percent(period.game_cluster_interval[0])}–{percent(period.game_cluster_interval[1])}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+
+          <div className={styles.resultsFoot}>
+            <p><strong>Rule:</strong> at least {percent(replicatedReceptionEvidence.called_side_minimum)} probability on the called side of a fixed {replicatedReceptionEvidence.research_threshold} reception threshold, using only prior games.</p>
+            <p>Retrospective directional forecasts without archived sportsbook prices. These results establish repeatable accuracy, not betting profit.</p>
+            <Link href="/terminal#nfl/backtest">Inspect every forecast <ArrowUpRight size={16} /></Link>
+          </div>
         </section>
 
         <section className={styles.story} id="platform">
