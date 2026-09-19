@@ -49,6 +49,23 @@ export function bestPickGroups(value:unknown,now=Date.now(),maximum=3):PickGroup
   }).slice(0,maximum);
 }
 
+/** Recent source-backed leans for an empty live board; every result remains explicitly gated. */
+export function recentCandidateGroups(value:unknown,now=Date.now(),maximum=3):PickGroup[] {
+  const ranked=publicSignals(value,now).signals.filter(signal=>signal.gated
+    && Date.parse(signal.game_start_time ?? '')>now && Date.parse(signal.snapped_at)<=now+60000
+    && signal.sample_size!==undefined && signal.sample_size>=20
+    && signal.availability?.status==='observed' && signal.availability.roster_confirmed
+    && signal.confidence_interval!==null && signal.expected_return!==null
+    && (signal.expected_return ?? 0)>0 && signal.true_prob>signal.implied_prob
+    && signal.ev_pct<=.15+1e-12).sort(compareQuality);
+  const players=new Set<string>();
+  return groupAlternateLines(ranked).filter(group=>{
+    const key=`${group.pick.game_id}:${group.pick.player}`;
+    if(players.has(key)) return false;
+    players.add(key);return true;
+  }).slice(0,maximum);
+}
+
 /** Transport primaries with their alternatives; consumers can render or collapse them. */
 export function bestPickOptions(value:unknown,now=Date.now()) {
   return bestPickGroups(value,now).flatMap(group=>[group.pick,...group.alternatives]);
