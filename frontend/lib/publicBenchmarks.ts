@@ -190,6 +190,43 @@ export function forecastResult(record: ForecastEvidenceRecord) {
   return {side,correct:(side==='over')===record.outcome};
 }
 
+/** Fixed descriptive tier: at least 60% probability on the called direction. */
+export function highestConvictionForecast(record: ForecastEvidenceRecord) {
+  return Math.abs(record.model_probability - 0.5) >= 0.1 - Number.EPSILON;
+}
+
+export function forecastCohort(records: ForecastEvidenceRecord[]) {
+  const correct=records.filter(record=>forecastResult(record).correct).length;
+  const sample=records.length;
+  if (!sample) return {sample:0,correct:0,hit_rate:null,wilson_interval:null,
+    game_count:0,game_cluster_rate:null,game_cluster_interval:null};
+  const hitRate=correct/sample,z=1.959963984540054,denominator=1+z*z/sample;
+  const center=(hitRate+z*z/(2*sample))/denominator;
+  const radius=z*Math.sqrt(hitRate*(1-hitRate)/sample+z*z/(4*sample*sample))/denominator;
+  const groups=new Map<string,ForecastEvidenceRecord[]>();
+  for (const record of records) groups.set(record.event_id,[...(groups.get(record.event_id) ?? []),record]);
+  const gameRates=[...groups.values()].map(group=>
+    group.filter(record=>forecastResult(record).correct).length/group.length);
+  const gameRate=gameRates.reduce((total,value)=>total+value,0)/gameRates.length;
+  let gameInterval:[number,number]|null=null;
+  if (gameRates.length>=2) {
+    const variance=gameRates.reduce((total,value)=>total+(value-gameRate)**2,0)/(gameRates.length-1);
+    const critical=gameRates.length<=10 ? 2.262 : gameRates.length<=15 ? 2.145
+      : gameRates.length<=20 ? 2.093 : gameRates.length<=30 ? 2.045 : 1.96;
+    const gameRadius=critical*Math.sqrt(variance/gameRates.length);
+    gameInterval=[Math.max(0,gameRate-gameRadius),Math.min(1,gameRate+gameRadius)];
+  }
+  return {sample,correct,hit_rate:hitRate,wilson_interval:[center-radius,center+radius] as [number,number],
+    game_count:gameRates.length,game_cluster_rate:gameRate,game_cluster_interval:gameInterval};
+}
+
+/** Evidence display gate. This never admits a wager or substitutes for priced validation. */
+export function forecastEvidenceGate(stats: ReturnType<typeof forecastCohort>, minimumRate=0.65,
+  minimumSample=100, minimumGames=10) {
+  return stats.sample>=minimumSample && stats.game_count>=minimumGames
+    && stats.game_cluster_interval!==null && stats.game_cluster_interval[0]>=minimumRate;
+}
+
 export function forecastChecks(benchmark: ForecastBenchmark) {
   return {
     brier: benchmark.brier_score_game_cluster_interval[1] < benchmark.baseline_50_brier,

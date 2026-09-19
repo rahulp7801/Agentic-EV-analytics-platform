@@ -5,7 +5,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight, Check, FlaskConical, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { BACKTEST_METRICS, formatBacktestMetric, mispricedProps, strategySuggestions,
   type BacktestMetric, type BacktestReport } from '@/lib/backtestLab';
-import {forecastChecks, forecastResult, type ForecastBenchmarkBundle} from '@/lib/publicBenchmarks';
+import {forecastChecks, forecastCohort, forecastEvidenceGate, forecastResult, highestConvictionForecast,
+  type ForecastBenchmarkBundle} from '@/lib/publicBenchmarks';
 import type { EVSignal, Sport } from '@/lib/types';
 import {fetchForecasts} from '@/lib/fetchForecasts';
 import styles from './BacktestLab.module.css';
@@ -14,6 +15,7 @@ type Cohort = 'all' | 'recommendations';
 type Props = { sport: Sport; preview?: boolean };
 type EvidenceProp = 'all' | 'pass_yds' | 'receptions';
 type EvidenceGrade = 'all' | 'correct' | 'missed';
+type EvidenceConviction = 'all' | 'highest';
 
 const INITIAL_METRICS: BacktestMetric[] = ['roi', 'brier_score', 'clv_mean'];
 
@@ -38,6 +40,7 @@ export default function BacktestLab({ sport, preview = false }: Props) {
   const [signals, setSignals] = useState<EVSignal[]>([]);
   const [evidenceProp, setEvidenceProp] = useState<EvidenceProp>('all');
   const [evidenceGrade, setEvidenceGrade] = useState<EvidenceGrade>('all');
+  const [evidenceConviction, setEvidenceConviction] = useState<EvidenceConviction>('all');
   const [evidenceLimit, setEvidenceLimit] = useState(20);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -49,25 +52,32 @@ export default function BacktestLab({ sport, preview = false }: Props) {
     request.current = controller;
     setLoading(true);
     setError('');
-    const [all, recommendations, signalEnvelope, benchmarkEnvelope] = await Promise.allSettled([
+    const signalRequest = fetchForecasts(sport,controller.signal,'qualified');
+    const metricsRequest = Promise.allSettled([
       responseJson<BacktestReport>(`/api/metrics?cohort=all&sport=${sport}`, controller.signal),
       responseJson<BacktestReport>(`/api/metrics?cohort=recommendations&sport=${sport}`, controller.signal),
-      fetchForecasts(sport,controller.signal,'qualified'),
+    ]);
+    const [benchmarkEnvelope] = await Promise.allSettled([
       responseJson<{benchmarks: ForecastBenchmarkBundle[]}>(`/api/benchmarks?sport=${sport}`, controller.signal),
     ]);
     if (controller.signal.aborted || request.current !== controller) return;
 
+    setBenchmark(benchmarkEnvelope.status === 'fulfilled' && Array.isArray(benchmarkEnvelope.value.benchmarks)
+      ? benchmarkEnvelope.value.benchmarks[0] ?? null : null);
+    setLoading(false);
+    const [all, recommendations] = await metricsRequest;
+    if (controller.signal.aborted || request.current !== controller) return;
     setReports({
       all: all.status === 'fulfilled' ? all.value : null,
       recommendations: recommendations.status === 'fulfilled' ? recommendations.value : null,
     });
-    setSignals(signalEnvelope.status === 'fulfilled' && Array.isArray(signalEnvelope.value.signals)
-      ? signalEnvelope.value.signals : []);
-    setBenchmark(benchmarkEnvelope.status === 'fulfilled' && Array.isArray(benchmarkEnvelope.value.benchmarks)
-      ? benchmarkEnvelope.value.benchmarks[0] ?? null : null);
     const unavailable = [all, recommendations].filter(result => result.status === 'rejected').length;
     setError(unavailable ? `${unavailable === 2 ? 'League replay snapshots are' : 'One replay snapshot is'} not published yet. Available evidence remains visible.` : '');
-    setLoading(false);
+    const signalEnvelope = await Promise.allSettled([signalRequest]);
+    if (controller.signal.aborted || request.current !== controller) return;
+    const liveSignals = signalEnvelope[0];
+    setSignals(liveSignals.status === 'fulfilled' && Array.isArray(liveSignals.value.signals)
+      ? liveSignals.value.signals : []);
   }, [sport]);
 
   useEffect(() => {
@@ -83,15 +93,18 @@ export default function BacktestLab({ sport, preview = false }: Props) {
     Object.values(reports).filter((value): value is BacktestReport => value !== null), selected, minimumSample),
   [reports, selected, minimumSample]);
   const candidates = useMemo(() => mispricedProps(signals, sport), [signals, sport]);
-  const evidence = useMemo(() => (benchmark?.records ?? [])
+  const evidenceScope = useMemo(() => (benchmark?.records ?? [])
     .filter(record => evidenceProp === 'all' || record.prop_type === evidenceProp)
+    .filter(record => evidenceConviction === 'all' || highestConvictionForecast(record)),
+  [benchmark, evidenceConviction, evidenceProp]);
+  const evidence = useMemo(() => evidenceScope
     .filter(record => evidenceGrade === 'all'
       || forecastResult(record).correct === (evidenceGrade === 'correct'))
     .sort((left,right) => right.game_start_time.localeCompare(left.game_start_time)
       || left.player_name.localeCompare(right.player_name)),
-  [benchmark, evidenceGrade, evidenceProp]);
-  const evidenceCorrect = useMemo(() => (benchmark?.records ?? [])
-    .filter(record => forecastResult(record).correct).length, [benchmark]);
+  [evidenceGrade, evidenceScope]);
+  const evidenceStats = useMemo(() => forecastCohort(evidenceScope), [evidenceScope]);
+  const clearsEvidenceFloor = forecastEvidenceGate(evidenceStats);
   const displayedEvidence = evidence.slice(0, preview ? 6 : evidenceLimit);
 
   function toggleMetric(metric: BacktestMetric) {
@@ -207,10 +220,19 @@ export default function BacktestLab({ sport, preview = false }: Props) {
         <div className={styles.evidenceHeading}>
           <div><span>Prediction-level evidence</span><h4>Every forecast, graded.</h4>
             <p>The model call uses a transparent 50% probability cutoff. Final stats grade the fixed research threshold; this is directional forecast accuracy, not betting profit.</p></div>
-          <div><strong>{evidenceCorrect} / {benchmark.records.length}</strong><span>50% model calls correct</span>
-            <small>{((evidenceCorrect / benchmark.records.length) * 100).toFixed(1)}% directional accuracy</small></div>
+          <div><strong>{evidenceStats.correct} / {evidenceStats.sample}</strong><span>{evidenceConviction==='highest' ? 'highest-conviction' : '50% model'} calls correct</span>
+            <small>{evidenceStats.hit_rate===null ? 'No scored forecasts' : `${(evidenceStats.hit_rate*100).toFixed(1)}% directional accuracy`}</small></div>
+        </div>
+        <div className={styles.convictionProof} role="status">
+          <div><span>Selected evidence</span><strong>{evidenceStats.hit_rate===null ? 'Unavailable' : `${(evidenceStats.hit_rate*100).toFixed(1)}%`}</strong><small>{evidenceStats.correct}/{evidenceStats.sample} correct</small></div>
+          <div><span>95% game-cluster interval</span><strong>{evidenceStats.game_cluster_interval ? evidenceStats.game_cluster_interval.map(value=>`${(value*100).toFixed(1)}%`).join('–') : 'Unavailable'}</strong><small>{evidenceStats.game_count} game clusters</small></div>
+          <p data-clears-evidence-floor={clearsEvidenceFloor}>{clearsEvidenceFloor ? 'Observed cohort clears the 65% evidence floor at the lower game-cluster bound. ' : ''}{evidenceConviction==='highest' ? 'Highest conviction requires at least 60% model probability on the called side. This descriptive filter was inspected after outcomes and is not a priced sportsbook acceptance rule.' : 'All natural Over/Under calls are included. Correct and missed filters below never change this denominator.'}</p>
         </div>
         <div className={styles.evidenceFilters}>
+          <div aria-label="Evidence conviction filter">
+            {([['all','All forecasts'],['highest','Highest conviction']] as const).map(([value,label]) =>
+              <button type="button" key={value} aria-pressed={evidenceConviction===value} onClick={()=>{setEvidenceConviction(value);setEvidenceLimit(20);}}>{label}</button>)}
+          </div>
           <div aria-label="Evidence prop filter">
             {([['all','All props'],['pass_yds','Passing yards'],['receptions','Receptions']] as const).map(([value,label]) =>
               <button type="button" key={value} aria-pressed={evidenceProp===value} onClick={()=>{setEvidenceProp(value);setEvidenceLimit(20);}}>{label}</button>)}
@@ -219,7 +241,7 @@ export default function BacktestLab({ sport, preview = false }: Props) {
             {([['all','All results'],['correct','Correct'],['missed','Missed']] as const).map(([value,label]) =>
               <button type="button" key={value} aria-pressed={evidenceGrade===value} onClick={()=>{setEvidenceGrade(value);setEvidenceLimit(20);}}>{label}</button>)}
           </div>
-          <span>{evidence.length} records</span>
+          <span>{evidence.length} match · {evidenceStats.sample} in performance denominator</span>
         </div>
         <div className={styles.evidenceScroll} role="region" aria-label="Verified forecast results" tabIndex={0}>
           <table className={styles.evidenceTable}>

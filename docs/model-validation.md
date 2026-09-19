@@ -136,3 +136,18 @@ remain unavailable. The outcome archive contains 15 games and 627 player-stat ro
 its SHA-256 is `1b027a0540b5bb1be3c664a5e31a33ebd16ad5fbccfcab7e0b545b743ee086df`.
 The evaluated Python source hash is
 `dfd37ceb9a6a18a00b476c116477a2b3f0717f4b70669294fed6de87a1092d6d`.
+
+The public Backtest Lab also exposes the natural directional calls behind those
+scores. Across both prop types, 123 of 170 calls were correct (72.4%). A descriptive
+highest-conviction view requires at least 60% probability on the model's called
+side; 112 of 142 such calls were correct (78.9%). The unweighted mean accuracy
+across the 15 game clusters was 78.6%, with an approximate t interval of
+72.5%-84.6%. That lower game-cluster bound clears the dashboard's 65% evidence
+floor with more than 100 forecasts and 10 games.
+
+This tier was inspected after the outcomes were available. It is therefore a
+descriptive cohort, not a predeclared or untouched holdout selection rule. The
+thresholds are research thresholds without archived sportsbook prices, so these
+rows cannot establish bet hit rate, ROI, CLV, fillability, or profit. The dashboard
+keeps result filters out of the performance denominator so selecting only correct
+or missed rows cannot change the reported rate.
