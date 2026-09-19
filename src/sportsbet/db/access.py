@@ -19,13 +19,14 @@ READ_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'nba_player_gamelogs'
                'player_prop_snapshots', 'dashboard_snapshots')
 WRITE_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'nba_player_gamelogs', 'dashboard_snapshots')
 APPEND_TABLES = ('odds_snapshots', 'player_prop_snapshots')
+CACHE_TABLES = ('provider_response_cache',)
 ANALYTICS_TABLES = ('predictions', 'exposure', 'quotes', 'api_usage')
 
 
 def deny_browser_roles(conn):
     """Supabase defaults can grant named browser roles independently of PUBLIC/RLS."""
     targets = [sql.Identifier('public', table) for table in
-               (*READ_TABLES, 'alembic_version', 'ev_signals', 'dashboard_gamelogs')]
+               (*READ_TABLES, *CACHE_TABLES, 'alembic_version', 'ev_signals', 'dashboard_gamelogs')]
     targets.extend(sql.Identifier('analytics', table) for table in ANALYTICS_TABLES)
     grantees = [sql.SQL('PUBLIC')]
     for role in ('anon', 'authenticated'):
@@ -44,6 +45,7 @@ def _lock_policy_tables(conn):
     """Acquire policy-table locks before role/catalog writes can form a deadlock."""
     targets = [sql.Identifier('public', 'alembic_version')]
     targets.extend(sql.Identifier('public', table) for table in READ_TABLES)
+    targets.extend(sql.Identifier('public', table) for table in CACHE_TABLES)
     targets.extend(sql.Identifier('analytics', table) for table in ANALYTICS_TABLES)
     conn.execute(sql.SQL('LOCK TABLE {} IN ACCESS EXCLUSIVE MODE').format(sql.SQL(', ').join(targets)))
 
@@ -80,6 +82,17 @@ def apply_access(conn):
         conn.execute(sql.SQL('DROP POLICY IF EXISTS sportsbet_worker_insert ON {}').format(target))
         conn.execute(sql.SQL('CREATE POLICY sportsbet_worker_insert ON {} FOR INSERT TO {} WITH CHECK (true)')
                      .format(target, sql.Identifier(WORKER)))
+    for table in CACHE_TABLES:
+        target = sql.Identifier('public', table)
+        conn.execute(sql.SQL('GRANT SELECT, INSERT, UPDATE ON {} TO {}').format(target, sql.Identifier(WORKER)))
+        conn.execute(sql.SQL('ALTER TABLE {} ENABLE ROW LEVEL SECURITY').format(target))
+        for command in ('SELECT', 'INSERT', 'UPDATE'):
+            policy = sql.Identifier('sportsbet_worker_' + command.lower())
+            conn.execute(sql.SQL('DROP POLICY IF EXISTS {} ON {}').format(policy, target))
+            clause = sql.SQL('USING (true)' if command == 'SELECT' else
+                'WITH CHECK (true)' if command == 'INSERT' else 'USING (true) WITH CHECK (true)')
+            conn.execute(sql.SQL('CREATE POLICY {} ON {} FOR {} TO {} {}').format(
+                policy, target, sql.SQL(command), sql.Identifier(WORKER), clause))
     conn.execute(sql.SQL('GRANT USAGE ON SCHEMA analytics TO {}').format(sql.Identifier(WORKER)))
     for table in ANALYTICS_TABLES:
         target = sql.Identifier('analytics', table)

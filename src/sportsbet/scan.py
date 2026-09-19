@@ -25,6 +25,7 @@ from sportsbet.prop.nba_context_producer import make_nba_context_signals_produce
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.prop.cross_venue import PROP_MARKETS, screen as screen_cross_venue, screen_sportsbooks
 from sportsbet.prop.probability import outcome_interval_for_side
+from sportsbet.provider_cache import CachedResponse, ProviderResponseCache
 from sportsbet.quant.vig import american_to_raw_prob
 
 MARKETS = PROP_MARKETS
@@ -33,6 +34,11 @@ MODEL_SPORTS = frozenset({'nba','nfl'})
 MAX_MODEL_CONCURRENCY = 8
 FORECAST_HORIZON_HOURS = 48
 RECOMMENDATION_POLICY_VERSION = 'lower-bound-margin-v1'
+PROVIDER_CACHE_TTL = timedelta(minutes=5)
+
+
+class ProviderRefreshInProgress(RuntimeError):
+    pass
 
 
 def recommendation_quality(signal):
@@ -76,6 +82,84 @@ def next_quote_check(event: dict, attempted_at: str | None, now: datetime) -> da
 
 def quotes_from_event(event: dict, sport: str) -> list[PlayerPropSnapshotCreate]:
     return parse_event_quotes(event, sport, set(MARKETS[sport]))
+
+
+def validate_provider_event(event: object, discovered: dict | None = None) -> dict:
+    if not isinstance(event, dict):
+        raise ValueError('Invalid provider event')
+    try:
+        identity = (event['id'], event['home_team'], event['away_team'])
+        start = timestamp(event['commence_time'])
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise ValueError('Invalid provider event') from None
+    if (not all(isinstance(value, str) and 0 < len(value) <= 100 for value in identity)
+            or identity[1] == identity[2]):
+        raise ValueError('Invalid provider event identity')
+    if discovered is not None and (identity != (discovered.get('id'), discovered.get('home_team'),
+            discovered.get('away_team')) or start != timestamp(discovered['commence_time'])):
+        raise ValueError('Quote response does not match the discovered event')
+    return event
+
+
+def validate_event_listing(payload: object) -> list[dict]:
+    if not isinstance(payload, list) or len(payload) > 1000:
+        raise ValueError('Invalid provider event list')
+    events = [validate_provider_event(event) for event in payload]
+    if len({event['id'] for event in events}) != len(events):
+        raise ValueError('Duplicate provider event identity')
+    return events
+
+
+def cache_key(kind: str, sport: str, event_id: str | None = None) -> str:
+    suffix = ':' + event_id.lower() if event_id else ''
+    key = f'odds:{kind}:{sport}{suffix}'
+    if len(key) > 255 or any(character not in 'abcdefghijklmnopqrstuvwxyz0123456789:_-' for character in key):
+        raise ValueError('Invalid provider cache key')
+    return key
+
+
+def unprocessed_cached_event(cache: ProviderResponseCache, event: dict, sport: str,
+                             now: datetime) -> tuple[CachedResponse, dict] | None:
+    cached = cache.load(cache_key('event', sport, event['id']), 'the_odds_api', sport, now)
+    if not cached:
+        return None
+    try:
+        quoted = validate_provider_event(cached.payload, event)
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return None
+    try:
+        prior = load_snapshot(f'signals:{sport}:{event["id"]}') or {}
+        if timestamp(prior['generated_at']) >= cached.captured_at:
+            return None
+    except (KeyError, ValueError, TypeError, AttributeError):
+        pass
+    return cached, quoted
+
+
+async def discover_events(client: httpx.AsyncClient, cache: ProviderResponseCache,
+                          sport: str, owner: str, now: datetime) -> list[dict]:
+    key = cache_key('events', sport)
+    cached = cache.load(key, 'the_odds_api', sport, now)
+    if cached:
+        try:
+            return validate_event_listing(cached.payload)
+        except ValueError:
+            pass
+    if not cache.claim(key, 'the_odds_api', sport, owner, now):
+        raise ProviderRefreshInProgress('Event discovery refresh already in progress')
+    try:
+        response = await client.get(f'/sports/{SPORT_KEYS[sport]}/events',
+            params={'apiKey': settings.odds_api_key})
+        if response.status_code != 200:
+            raise RuntimeError(f'Event provider HTTP {response.status_code}')
+        events = validate_event_listing(response.json())
+        captured = datetime.now(timezone.utc)
+        cache.store(key, 'the_odds_api', sport, owner, events, captured,
+            captured + PROVIDER_CACHE_TTL)
+        return events
+    except Exception:
+        cache.release(key, 'the_odds_api', sport, owner)
+        raise
 
 def quote_coverage(quotes: list[PlayerPropSnapshotCreate]) -> dict:
     selections={(q.player_name,q.prop_type,q.line,q.side) for q in quotes}
@@ -239,6 +323,7 @@ async def run(sports: list[str], daily_credit_limit: int):
     if not settings.odds_api_key or not settings.analytics_database_url:
         raise ValueError('Worker credentials are not configured')
     ledger=Ledger()
+    cache=ProviderResponseCache()
     pool=await create_async_pool()
     scan_id=uuid.uuid4().hex
     now=datetime.now(timezone.utc)
@@ -252,18 +337,15 @@ async def run(sports: list[str], daily_credit_limit: int):
                 previous=load_snapshot('scan:'+sport) or {}
                 report=dict(scan_id=scan_id,sport=sport,started_at=now.isoformat(),finished_at=None,status='running',
                     eligible_events=None,attempted_events=0,completed_events=0,budget_skipped_events=0,
-                    cadence_deferred_events=0,next_refresh_at=None,
+                    cadence_deferred_events=0,cache_hits=0,coalesced_events=0,next_refresh_at=None,
                     failures=[],coverage={},attempts=previous.get('attempts',{}),
                     model_complete_events=0,model_partial_events=0,model_unavailable_events=0,
                     events=[],execution_ready=False)
                 reports[sport]=report
                 publish_snapshot('scan:'+sport,report)
                 try:
-                    response=await client.get(f'/sports/{SPORT_KEYS[sport]}/events',params={'apiKey':settings.odds_api_key})
-                    if response.status_code!=200: raise RuntimeError(f'Event provider HTTP {response.status_code}')
-                    events=[e for e in response.json() if now < timestamp(e['commence_time']) <= now+timedelta(hours=FORECAST_HORIZON_HOURS)]
-                    if len({e['id'] for e in events})!=len(events):
-                        raise ValueError('Duplicate provider event identity')
+                    discovered=await discover_events(client,cache,sport,scan_id,now)
+                    events=[e for e in discovered if now < timestamp(e['commence_time']) <= now+timedelta(hours=FORECAST_HORIZON_HOURS)]
                     report['eligible_events']=len(events)
                     report['events']=[dict(game_id=e['id'],home_team=e['home_team'],
                         away_team=e['away_team'],game_start_time=e['commence_time'],state='waiting_quotes')
@@ -282,30 +364,56 @@ async def run(sports: list[str], daily_credit_limit: int):
             for sport,event in pending:
                 report=reports[sport]
                 event_state=next(item for item in report['events'] if item['game_id']==event['id'])
+                quote_key=cache_key('event',sport,event['id'])
+                cached=unprocessed_cached_event(cache,event,sport,datetime.now(timezone.utc))
+                cache_owned=False
+                quoted=None
+                if cached:
+                    if cache.claim(quote_key,'the_odds_api',sport,scan_id,datetime.now(timezone.utc)):
+                        cache_owned=True
+                        quoted=cached[1]
+                        event_state['cache']='hit'
+                        report['cache_hits']=report.get('cache_hits',0)+1
+                    else:
+                        event_state['state']='provider_busy'
+                        report['coalesced_events']=report.get('coalesced_events',0)+1
+                        continue
                 check=next_quote_check(event,report['attempts'].get(event['id']),datetime.now(timezone.utc))
-                if check>datetime.now(timezone.utc):
+                if quoted is None and check>datetime.now(timezone.utc):
                     event_state.update(state='scheduled',next_refresh_at=check.isoformat())
                     report['cadence_deferred_events']+=1
                     if not report['next_refresh_at'] or check<timestamp(report['next_refresh_at']):
                         report['next_refresh_at']=check.isoformat()
                     continue
-                close=timestamp(event['commence_time'])-datetime.now(timezone.utc)<=timedelta(hours=1)
-                if not ledger.reserve_api_credits(len(MARKETS[sport]),daily_credit_limit,holdback=0 if close else held):
-                    event_state['state']='api_budget'
-                    report['budget_skipped_events']+=1
-                    continue
-                report['attempted_events']+=1
+                if quoted is None:
+                    if not cache.claim(quote_key,'the_odds_api',sport,scan_id,datetime.now(timezone.utc)):
+                        event_state['state']='provider_busy'
+                        report['coalesced_events']=report.get('coalesced_events',0)+1
+                        continue
+                    cache_owned=True
+                    close=timestamp(event['commence_time'])-datetime.now(timezone.utc)<=timedelta(hours=1)
+                    if not ledger.reserve_api_credits(len(MARKETS[sport]),daily_credit_limit,holdback=0 if close else held):
+                        cache.release(quote_key,'the_odds_api',sport,scan_id)
+                        cache_owned=False
+                        event_state['state']='api_budget'
+                        report['budget_skipped_events']+=1
+                        continue
+                    report['attempted_events']+=1
                 event_state['state']='evaluating'
-                report['attempts'][event['id']]=datetime.now(timezone.utc).isoformat()
-                # Persist before I/O so interrupted runs don't repeatedly consume the same game's budget.
-                publish_snapshot('scan:'+sport,report)
+                if quoted is None:
+                    report['attempts'][event['id']]=datetime.now(timezone.utc).isoformat()
+                    # Persist before I/O so interrupted runs don't repeatedly consume the same game's budget.
+                    publish_snapshot('scan:'+sport,report)
                 try:
-                    response=await client.get(f'/sports/{SPORT_KEYS[sport]}/events/{event["id"]}/odds',params={
-                        'apiKey':settings.odds_api_key,'regions':'us','markets':','.join(MARKETS[sport]),'oddsFormat':'american'})
-                    if response.status_code!=200: raise RuntimeError(f'Quote provider returned HTTP {response.status_code}')
-                    quoted=response.json()
-                    if quoted.get('id')!=event['id'] or any(quoted.get(k)!=event.get(k) for k in ('home_team','away_team')) or timestamp(quoted['commence_time'])!=timestamp(event['commence_time']):
-                        raise ValueError('Quote response does not match the discovered event')
+                    if quoted is None:
+                        response=await client.get(f'/sports/{SPORT_KEYS[sport]}/events/{event["id"]}/odds',params={
+                            'apiKey':settings.odds_api_key,'regions':'us','markets':','.join(MARKETS[sport]),'oddsFormat':'american'})
+                        if response.status_code!=200: raise RuntimeError(f'Quote provider returned HTTP {response.status_code}')
+                        quoted=validate_provider_event(response.json(),event)
+                        captured=datetime.now(timezone.utc)
+                        # Retain the paid response before downstream work so a crashed model can resume it.
+                        cache.store(quote_key,'the_odds_api',sport,scan_id,quoted,captured,
+                            captured+PROVIDER_CACHE_TTL,release=False)
                     quotes=quotes_from_event(quoted,sport)
                     sportsbook_screen=screen_sportsbooks(quoted,sport,quotes,datetime.now(timezone.utc))
                     screened=screen_cross_venue(quoted,sport,quotes,
@@ -322,10 +430,14 @@ async def run(sports: list[str], daily_credit_limit: int):
                     result['cross_venue']=screened
                     result['sportsbook_arb']=sportsbook_screen
                     publish_snapshot(f'signals:{sport}:{event["id"]}',result)
+                    cache.release(quote_key,'the_odds_api',sport,scan_id)
+                    cache_owned=False
                     report['completed_events']+=1
                     report['coverage'][event['id']]=result['coverage']|{'cross_venue':screened['coverage']}
                     event_state['state']='evaluated'
                 except Exception as exc:
+                    if cache_owned:
+                        cache.release(quote_key,'the_odds_api',sport,scan_id)
                     event_state['state']='failed'
                     report['failures'].append(dict(stage='event_evaluation',event_id=event['id'],error_type=type(exc).__name__))
             for sport,report in reports.items():
@@ -335,7 +447,7 @@ async def run(sports: list[str], daily_credit_limit: int):
                 report['model_unavailable_events']=model_statuses['unavailable']
                 model_incomplete=report['model_partial_events'] or report['model_unavailable_events']
                 report['status']='degraded' if report['failures'] or report['budget_skipped_events'] or model_incomplete else (
-                    'scheduled' if report['cadence_deferred_events'] else 'complete')
+                    'scheduled' if report['cadence_deferred_events'] or report['coalesced_events'] else 'complete')
                 report['finished_at']=datetime.now(timezone.utc).isoformat()
                 publish_snapshot('scan:'+sport,report)
                 comparisons=[row for screen in screens[sport] for row in screen['comparisons']]
@@ -377,6 +489,7 @@ async def run(sports: list[str], daily_credit_limit: int):
                 ledger.report(True,model_version=MODEL_VERSION,sport=sport))
         return reports
     finally:
+        cache.close()
         await pool.close()
 
 def main():

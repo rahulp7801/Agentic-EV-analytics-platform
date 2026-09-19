@@ -10,6 +10,7 @@ from sqlalchemy.engine import make_url
 from sportsbet.db.access import (
     ANALYTICS_TABLES,
     APPEND_TABLES,
+    CACHE_TABLES,
     READER,
     READ_TABLES,
     WORKER,
@@ -40,7 +41,7 @@ def test_provisioning_locks_policy_tables_before_reading_or_writing_role_catalog
     first_statement = connection.statements[0][0]
     assert first_statement.startswith('LOCK TABLE ')
     assert first_statement.endswith(' IN ACCESS EXCLUSIVE MODE')
-    for table in ('alembic_version', *READ_TABLES, *APPEND_TABLES, *ANALYTICS_TABLES):
+    for table in ('alembic_version', *READ_TABLES, *APPEND_TABLES, *CACHE_TABLES, *ANALYTICS_TABLES):
         assert f'"{table}"' in first_statement
     assert connection.statements[1][0].startswith('SELECT 1 FROM pg_roles')
 
@@ -90,7 +91,8 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
     try:
         with psycopg.connect(dsn, user=READER, password=passwords[READER], autocommit=True) as reader:
             for browser_role in ('anon', 'authenticated'):
-                for table in ('public.dashboard_snapshots', 'public.dashboard_gamelogs'):
+                for table in ('public.dashboard_snapshots', 'public.dashboard_gamelogs',
+                              'public.provider_response_cache'):
                     assert not reader.execute("SELECT has_table_privilege(%s,%s,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')",
                                               (browser_role, table)).fetchone()[0]
             assert reader.execute('SELECT count(*) FROM dashboard_snapshots WHERE snapshot_key=%s', (key,)).fetchone()[0] == 1
@@ -99,7 +101,8 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
             reader.execute('SET default_transaction_read_only=off')
             for statement in ('DELETE FROM dashboard_snapshots WHERE false', 'SELECT * FROM analytics.predictions',
                               'SELECT * FROM nba_player_gamelogs',
-                              'SELECT * FROM player_stats', 'CREATE TABLE public.forbidden_test(id int)'):
+                              'SELECT * FROM player_stats', 'SELECT * FROM provider_response_cache',
+                              'CREATE TABLE public.forbidden_test(id int)'):
                 with pytest.raises(psycopg.errors.InsufficientPrivilege):
                     reader.execute(statement)
         with psycopg.connect(dsn, user=WORKER, password=passwords[WORKER], autocommit=True) as worker:
@@ -118,6 +121,13 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
                     (sportsbook,market_type,line,price,outcome_name,game_start_time,snapped_at)
                     VALUES ('book','h2h',NULL,-110,'Fixture',NOW()+INTERVAL '1 day',NOW())
                     RETURNING id""").fetchone()[0]
+                assert worker.execute("""INSERT INTO provider_response_cache
+                    (cache_key,provider,sport,lease_owner,lease_until)
+                    VALUES (%s,'the_odds_api','nfl',%s,NOW()+INTERVAL '1 minute')
+                    RETURNING cache_key""", ('odds:event:nfl:test', 'a'*32)).fetchone()[0]
+                assert worker.execute("""UPDATE provider_response_cache
+                    SET lease_until=NOW()+INTERVAL '2 minutes'
+                    WHERE cache_key='odds:event:nfl:test'""").rowcount == 1
             for statement in ('DELETE FROM dashboard_snapshots WHERE false',
                               'UPDATE public.alembic_version SET version_num=version_num',
                               'UPDATE player_prop_snapshots SET line=line WHERE false',
@@ -134,6 +144,11 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
                                           ('public.'+table,)).fetchone()[0]
                 assert worker.execute("SELECT has_sequence_privilege(current_user,"
                     "pg_get_serial_sequence(%s,'id'),'USAGE')", ('public.'+table,)).fetchone()[0]
+            for table in CACHE_TABLES:
+                assert worker.execute("SELECT has_table_privilege(current_user,%s,'SELECT,INSERT,UPDATE')",
+                                      ('public.'+table,)).fetchone()[0]
+                assert not worker.execute("SELECT has_table_privilege(current_user,%s,'DELETE,TRUNCATE')",
+                                          ('public.'+table,)).fetchone()[0]
             for column in ('outcome','outcome_source','outcome_ref','outcome_observed_at','actual_value',
                            'outcome_evidence'):
                 assert worker.execute("SELECT has_column_privilege(current_user,'analytics.predictions',%s,'UPDATE')",(column,)).fetchone()[0]

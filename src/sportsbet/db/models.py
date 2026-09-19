@@ -319,6 +319,26 @@ class PlayerPropSnapshot(Base):
     )
 
 
+class ProviderResponseCache(Base):
+    """Private, mutable cache used only by restricted collection workers."""
+
+    __tablename__ = "provider_response_cache"
+
+    cache_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    sport: Mapped[str] = mapped_column(String(5), nullable=False)
+    payload: Mapped[Optional[dict]] = mapped_column(JSONB)
+    payload_sha256: Mapped[Optional[str]] = mapped_column(String(64))
+    captured_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMPTZ(timezone=True))
+    expires_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMPTZ(timezone=True))
+    lease_owner: Mapped[Optional[str]] = mapped_column(String(64))
+    lease_until: Mapped[Optional[datetime]] = mapped_column(TIMESTAMPTZ(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (Index("idx_provider_cache_expiry", "expires_at"),)
+
+
 class NBAPlayerStats(Base):
     """NBA player season-level statistics sourced from nba_api.
 

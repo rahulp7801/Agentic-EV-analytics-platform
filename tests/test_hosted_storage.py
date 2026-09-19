@@ -5,9 +5,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
 import pytest
+import sqlalchemy as sa
 from sportsbet.ledger import Ledger
 from sportsbet.graph.models import EVSignal
 from sportsbet.config import settings
+from sportsbet.provider_cache import ProviderResponseCache
 
 pytestmark = pytest.mark.skipif(not os.environ.get('SPORTSBET_TEST_DATABASE_URL'),reason='Disposable test database required')
 
@@ -55,3 +57,26 @@ def test_postgres_rolling_api_budget_is_atomic_across_connections(monkeypatch):
         # This module only runs against the explicitly configured disposable test DB.
         with ledger.connect() as db:
             db.execute('DELETE FROM api_usage WHERE risk_day IN (?,?)', ('2020-01-01', '2020-01-02'))
+
+
+def test_provider_cache_coalesces_refresh_and_verifies_payload():
+    engine=sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
+    cache=ProviderResponseCache(engine)
+    key='odds:event:nfl:'+uuid.uuid4().hex
+    now=datetime.now(timezone.utc)
+    owners=[uuid.uuid4().hex for _ in range(8)]
+    try:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            claims=list(pool.map(lambda owner:cache.claim(key,'the_odds_api','nfl',owner,now),owners))
+        assert sum(claims)==1
+        owner=owners[claims.index(True)]
+        payload={'id':'event','home_team':'Home','away_team':'Away','commence_time':
+            (now+timedelta(hours=1)).isoformat(),'bookmakers':[]}
+        cache.store(key,'the_odds_api','nfl',owner,payload,now,now+timedelta(minutes=5))
+        loaded=cache.load(key,'the_odds_api','nfl',now+timedelta(seconds=1))
+        assert loaded and loaded.payload==payload and loaded.captured_at==now
+        assert cache.load(key,'the_odds_api','nfl',now+timedelta(minutes=6)) is None
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text('DELETE FROM provider_response_cache WHERE cache_key=:key'),{'key':key})
+        engine.dispose()
