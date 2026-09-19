@@ -32,3 +32,11 @@ test('hosted schedules validate real games and expose only display fields',()=>{
   }
   assert.equal(scheduleSnapshot({...data,games:[game,{...game}]},'nfl',now).status,503);
 });
+
+test('CFB schedules use the same fail-closed public contract',()=>{
+  const now=Date.parse('2026-09-11T18:00:00Z');
+  const data={sport:'cfb',status:'complete',partial:false,captured_at:'2026-09-11T17:59:00Z',
+    as_of_date:'2026-09-11',games:[]};
+  assert.equal(scheduleSnapshot(data,'cfb',now,6).status,200);
+  assert.equal(scheduleSnapshot({...data,sport:'nfl'},'cfb',now,6).status,503);
+});

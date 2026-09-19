@@ -1,4 +1,4 @@
-import type { Sport } from './types';
+import type { ModelSport } from './types';
 
 type Row = Record<string, unknown>;
 const STATS = {
@@ -29,7 +29,7 @@ function date(value: unknown) {
   return result;
 }
 
-function gameLog(value: unknown, sport: Sport) {
+function gameLog(value: unknown, sport: ModelSport) {
   const source=row(value);
   if (source.is_home !== null && source.is_home !== undefined && typeof source.is_home !== 'boolean') {
     throw new Error('Invalid game log');
@@ -48,7 +48,7 @@ function gameLog(value: unknown, sport: Sport) {
 }
 
 /** Validate and project public historical stats without exposing future view fields. */
-export function publicGameLogs(value: unknown, sport: Sport) {
+export function publicGameLogs(value: unknown, sport: ModelSport) {
   if (!Array.isArray(value) || value.length>200) throw new Error('Invalid game logs');
   return value.map(item=>gameLog(item,sport));
 }
@@ -65,6 +65,6 @@ export function gameLogRequest(params:URLSearchParams) {
     || (player!=='' && !/^[\p{L}\p{M}.'’ -]{1,80}$/u.test(player))
     || !/^[0-9]{1,3}$/.test(limit) || Number(limit)<1 || Number(limit)>200 || !['0','1'].includes(exact)
     || (exact==='1' && !player)) throw new Error('Invalid game-log request');
-  return {sport:sport as Sport,player,limit:Number(limit),exact:exact==='1',
+  return {sport:sport as ModelSport,player,limit:Number(limit),exact:exact==='1',
     before:before===null ? null : date(before)};
 }

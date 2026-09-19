@@ -68,6 +68,17 @@ async def test_schedule_collects_bounded_future_days_without_weekwide_duplicates
 
 
 @pytest.mark.asyncio
+async def test_cfb_schedule_uses_college_football_scoreboard(monkeypatch):
+    client=httpx.AsyncClient
+    def respond(request):
+        assert request.url.path.endswith('/football/college-football/scoreboard')
+        return httpx.Response(200,json=board())
+    monkeypatch.setattr(schedules.httpx,'AsyncClient',lambda **kwargs:client(transport=httpx.MockTransport(respond),**kwargs))
+    result=await schedules.collect('cfb',datetime(2026,9,11,18,tzinfo=timezone.utc),offsets=(0,))
+    assert result['sport']=='cfb' and result['status']=='complete' and len(result['games'])==1
+
+
+@pytest.mark.asyncio
 async def test_schedule_custom_window_is_unavailable_only_when_every_date_fails(monkeypatch):
     client=httpx.AsyncClient
     monkeypatch.setattr(schedules.httpx,'AsyncClient',lambda **kwargs:client(

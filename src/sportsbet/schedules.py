@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-SPORTS = {'nba':'basketball/nba', 'nfl':'football/nfl'}
-STAT_TEAM_ALIASES = {'nba':{}, 'nfl':{'LAR':'LA', 'WSH':'WAS'}}
+SPORTS = {'nba':'basketball/nba', 'nfl':'football/nfl', 'cfb':'football/college-football'}
+STAT_TEAM_ALIASES = {'nba':{}, 'nfl':{'LAR':'LA', 'WSH':'WAS'}, 'cfb':{}}
 
 
 def scheduled_stat_teams(sport: str, game: dict) -> frozenset[str]:

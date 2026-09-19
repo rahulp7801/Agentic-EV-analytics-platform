@@ -256,6 +256,25 @@ async def test_selected_provider_does_not_call_or_invent_coverage_for_others(mon
     with pytest.raises(ValueError):await market_watch.run('nfl',25,1,False,'unknown')
 
 
+@pytest.mark.asyncio
+async def test_cfb_collects_only_bounded_sportsbook_markets(monkeypatch,tmp_path):
+    from unittest.mock import AsyncMock
+    from sportsbet import market_watch
+    books=AsyncMock(return_value={'status':'observed','events':[],'partial_coverage':False})
+    kalshi=AsyncMock();prizepicks=AsyncMock()
+    monkeypatch.setattr(market_watch,'sportsbooks',books)
+    monkeypatch.setattr(market_watch,'kalshi_games',kalshi)
+    monkeypatch.setattr(market_watch,'capture_projections',prizepicks)
+    monkeypatch.chdir(tmp_path)
+    report,_=await market_watch.run('cfb',25,1,False)
+    books.assert_awaited_once();kalshi.assert_not_called();prizepicks.assert_not_called()
+    assert report['sport']=='cfb' and report['sources']['sportsbook']['status']=='observed'
+    assert report['sources']['kalshi']['status']==report['sources']['prizepicks']['status']=='not_requested'
+    for provider in ('public','kalshi','prizepicks'):
+        with pytest.raises(ValueError,match='sportsbook game markets only'):
+            await market_watch.run('cfb',25,1,False,provider)
+
+
 @pytest.mark.parametrize('provider_status',['unavailable','budget_exhausted'])
 def test_cli_reports_provider_failures_without_discarding_archives(monkeypatch,tmp_path,capsys,provider_status):
     import json

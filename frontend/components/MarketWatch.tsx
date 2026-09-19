@@ -36,6 +36,7 @@ interface PropFunnel {
 }
 
 interface PropScreen { generated_at: string; status: string; coverage: Partial<PropFunnel> }
+interface Slate { games: {provider_event_id:string;home_name:string;away_name:string;game_time:string;state:string}[]; partial:boolean }
 
 function hasPropFunnel(value: Partial<PropFunnel>): value is PropFunnel {
   return ['kalshi_quotes', 'kalshi_exact_markets', 'kalshi_paired_sides', 'kalshi_missing_ask_sides',
@@ -48,6 +49,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
   const [error, setError] = useState('');
   const [propScreen, setPropScreen] = useState<PropScreen | null>(null);
   const [propError, setPropError] = useState('');
+  const [slate,setSlate]=useState<Slate|null>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -56,6 +58,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
     setError('');
     setPropScreen(null);
     setPropError('');
+    setSlate(null);
 
     async function load() {
       try {
@@ -75,6 +78,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
     }
 
     async function loadProps() {
+      if(sport==='cfb') return;
       try {
         const response = await fetch(`/api/prop-screens?sport=${sport}`, { signal: controller.signal, cache: 'no-store' });
         const body = await response.json();
@@ -90,9 +94,20 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
       }
     }
 
+    async function loadSlate() {
+      if(sport!=='cfb') return;
+      try {
+        const response=await fetch('/api/slate?sport=cfb',{signal:controller.signal,cache:'no-store'});
+        const body=await response.json();
+        if(!response.ok) throw new Error('Schedule unavailable');
+        if(!controller.signal.aborted) setSlate(body);
+      } catch { if(!controller.signal.aborted) setSlate(null); }
+    }
+
     void load();
     void loadProps();
-    const timer = setInterval(() => { void load(); void loadProps(); }, 30_000);
+    void loadSlate();
+    const timer = setInterval(() => { void load(); void loadProps(); void loadSlate(); }, 30_000);
     return () => { controller.abort(); clearInterval(timer); };
   }, [sport]);
 
@@ -107,8 +122,24 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
           <small>Cross-venue observation · {sport.toUpperCase()}</small>
           <h2 id="market-watch-title">Market gaps</h2>
         </div>
-        <p>Sportsbooks, Kalshi, and PrizePicks are compared from captured quotes. Every displayed lead stays unverified until timing, settlement, fees, and executable depth align.</p>
+        <p>{sport==='cfb' ? 'Upcoming FBS games and captured sportsbook moneylines. College player models, Kalshi links, and PrizePicks comparisons remain unavailable until their identities and settlement contracts are verified.' : 'Sportsbooks, Kalshi, and PrizePicks are compared from captured quotes. Every displayed lead stays unverified until timing, settlement, fees, and executable depth align.'}</p>
       </header>
+
+      {sport==='cfb' && <div className={styles.notice}>CFB market-only beta. The existing credit ledger permits at most one bounded game-market request per capture; no player pick is inferred from an NFL model.</div>}
+      {sport==='cfb' && slate && <div className={styles.sourceGrid} aria-label="Upcoming CFB schedule">
+        {slate.games.slice(0,12).map(game=><article className={styles.sourceCard} key={game.provider_event_id}>
+          <div className={styles.sourceCardHeader}><span>{game.away_name} at {game.home_name}</span><span>{new Date(game.game_time).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'})}</span></div>
+          <p>{game.state}</p>
+        </article>)}
+      </div>}
+      {sport==='cfb' && slate && slate.games.length>12 && <details className={styles.marketDetails}>
+        <summary>Show {slate.games.length-12} more upcoming games</summary>
+        <div className={styles.sourceGrid}>{slate.games.slice(12).map(game=><article className={styles.sourceCard} key={game.provider_event_id}>
+          <div className={styles.sourceCardHeader}><span>{game.away_name} at {game.home_name}</span><span>{new Date(game.game_time).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'})}</span></div>
+          <p>{game.state}</p>
+        </article>)}</div>
+      </details>}
+      {sport==='cfb' && slate && !slate.games.length && <div className={styles.emptyInline}>No upcoming FBS games were returned for the seven-day schedule window.</div>}
 
       {error && <div className={styles.notice} role="alert">{error}</div>}
       {!data && !error && <div className={styles.notice}>Loading current observations…</div>}
@@ -154,7 +185,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
               </div>
             </>
           )}
-          {propError && <div className={styles.notice}>Cross-venue prop scan: {propError}</div>}
+          {sport!=='cfb' && propError && <div className={styles.notice}>Cross-venue prop scan: {propError}</div>}
 
           {data.comparisons.length === 0 ? (
             <div className={styles.emptyInline}>No comparisons could be built from this capture.</div>

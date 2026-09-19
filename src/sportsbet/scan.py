@@ -28,7 +28,8 @@ from sportsbet.prop.probability import outcome_interval_for_side
 from sportsbet.quant.vig import american_to_raw_prob
 
 MARKETS = PROP_MARKETS
-SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl'}
+SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl','cfb':'americanfootball_ncaaf'}
+MODEL_SPORTS = frozenset({'nba','nfl'})
 MAX_MODEL_CONCURRENCY = 8
 FORECAST_HORIZON_HOURS = 48
 RECOMMENDATION_POLICY_VERSION = 'lower-bound-margin-v1'
@@ -233,7 +234,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         home_team=event['home_team'],away_team=event['away_team'],date=game_date.strftime('%Y%m%d'),sport=sport)])
 
 async def run(sports: list[str], daily_credit_limit: int):
-    if not sports or len(sports)!=len(set(sports)) or any(s not in SPORT_KEYS for s in sports) or daily_credit_limit<1:
+    if not sports or len(sports)!=len(set(sports)) or any(s not in MODEL_SPORTS for s in sports) or daily_credit_limit<1:
         raise ValueError('Invalid scan scope or budget')
     if not settings.odds_api_key or not settings.analytics_database_url:
         raise ValueError('Worker credentials are not configured')
