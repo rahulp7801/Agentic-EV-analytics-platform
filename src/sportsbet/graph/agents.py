@@ -329,8 +329,8 @@ def make_context_agent(
 
         # --- Step 2: Fetch injury reports ---
         injury_flags: dict[str, str] = {}
-        # injury_details: richer per-player context (name, team, position, status)
-        # Used to build teammate_out_contexts for PropQueryBuilder's player_stats absence filter.
+        # Keep team and position for display and availability review. A current
+        # name is not a verified historical participation identifier.
         injury_details: list[dict[str, str]] = []
         try:
             if sport == "nba":
@@ -410,20 +410,14 @@ def make_context_agent(
             odds_snapshot=odds_snapshot,
             signals_captured_at=datetime.now(timezone.utc),
         )
-        # Extract situational params from injury signals (Phase 18 — SC-3).
-        # Non-None when Out/Inactive players exist; None otherwise (no noise).
-        # Build richer situational_params from injury_details (has team+position context).
-        # teammate_out_contexts enables PropQueryBuilder's player_stats absence filter,
-        # which works for historical data (unlike the injury_reports INTERVAL approach).
+        # Retain current names for the explanation layer only. Quant agents reject
+        # these names as historical filters; verified on/off evidence is built from
+        # PFR snap identities or NBA box-score identities in the scheduled scan.
         out_details = [d for d in injury_details if d["status"] == "Out"]
         situational_params: dict | None = None
         if out_details:
             situational_params = {
                 "teammate_out_signals": [d["name"] for d in out_details],
-                "teammate_out_contexts": [
-                    {"name": d["name"], "team": d["team"], "position": d["position"]}
-                    for d in out_details
-                ],
             }
         log.info(
             "context_agent_complete",

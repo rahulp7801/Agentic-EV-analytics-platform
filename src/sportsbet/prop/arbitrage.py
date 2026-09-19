@@ -153,7 +153,7 @@ def _build_prop_trade_plan(
         teammate_tag = ""
         if teammate_out:
             absent = ", ".join(teammate_out[:2])
-            teammate_tag = f" · sample conditioned on {absent} inactive"
+            teammate_tag = f" · availability flag: {absent}; baseline not injury-adjusted"
         bullet_2 = f"Context: {def_tag} · {rest_tag} · {home_tag}{teammate_tag}"
 
         # Bullet 3: Kelly sizing + injury

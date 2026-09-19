@@ -112,10 +112,10 @@ class GraphState(TypedDict):
         Set to "nba" to route context agent to fetch_nba_odds() (Phase 15 — CTXT-04).
         Access via state.get("sport") or "nfl" in agents — never require presence.
     situational_params : dict[str, Any] | None
-        Situational filter context injected by ContextAgent after news/injury parsing
-        (Phase 18 — SC-3). Non-None when injury_flags contains Out/Inactive players.
-        Contains "teammate_out_signals" list for use by PropQueryBuilder in Plan 03.
-        None for routes with no relevant injury context. Access via state.get().
+        Current availability flags injected by ContextAgent after injury parsing.
+        These names may be used in explanations, but never define historical
+        model cohorts. Exact on/off evidence is computed from stable identities
+        and game-level participation after the baseline estimate.
     player_prop_snapshots : list[Any] | None
         List of PlayerPropSnapshotCreate objects produced during Step 1c of
         context_agent (Phase 23 — PROP-06). Populated when Odds API player prop

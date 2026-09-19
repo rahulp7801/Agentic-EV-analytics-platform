@@ -9,6 +9,7 @@ from sportsbet.dashboard import publish_snapshot
 from sportsbet.ingestion.games import ingest_games_seasons
 from sportsbet.ingestion.nba_gamelogs import ingest_nba_gamelogs_season
 from sportsbet.ingestion.player_stats import ingest_player_stats_seasons
+from sportsbet.ingestion.snap_counts import ingest_snap_counts_seasons
 
 
 def refresh(sport: str, today: date, backfill: bool = False):
@@ -22,6 +23,7 @@ def refresh(sport: str, today: date, backfill: bool = False):
         if sport == 'nfl':
             ingest_games_seasons(years, engine)
             ingest_player_stats_seasons(years, engine)
+            ingest_snap_counts_seasons(years, engine)
         else:
             for season in years:
                 try:

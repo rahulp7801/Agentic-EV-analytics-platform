@@ -143,6 +143,34 @@ class PlayerStat(Base):
     )
 
 
+class NFLSnapCount(Base):
+    """Verified game-level participation from nflverse's snap-count release."""
+
+    __tablename__ = "nfl_snap_counts"
+
+    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
+    game_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    season: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    week: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    player_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    pfr_player_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    position: Mapped[Optional[str]] = mapped_column(String(5))
+    team: Mapped[str] = mapped_column(String(3), nullable=False)
+    opponent: Mapped[str] = mapped_column(String(3), nullable=False)
+    offense_snaps: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    defense_snaps: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    source_provider: Mapped[str] = mapped_column(String, nullable=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_record_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_observed_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("game_id", "pfr_player_id", name="uq_nfl_snap_game_player"),
+        Index("idx_nfl_snap_player_season", "pfr_player_id", "season"),
+        Index("idx_nfl_snap_team_week", "team", "season", "week"),
+    )
+
+
 class NgsStats(Base):
     """AWS Next Gen Stats (separation, time-to-throw, press-man coverage).
 

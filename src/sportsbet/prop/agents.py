@@ -126,17 +126,9 @@ def make_prop_quant_agent(
         asyncpg connection pool. Injected at construction time so the agent
         closure holds a stable reference throughout the process lifetime.
 
-    Invocation ordering (CTXT-04/PROP-04):
-        For situational_params (injury-adjusted queries), callers must invoke
-        "context_update" before "prop_analysis" in the same thread_id. The context_agent
-        populates situational_params in GraphState; prop_quant_agent reads it via
-        state.get("situational_params") or {}.
-
-        When no prior context_update has been called, situational_params is None.
-        The agent falls back to {} (empty dict), which means teammate_out=None in
-        PropParams — the query runs without injury-adjusted WHERE clauses. This is
-        the correct production fallback for callers that run prop queries without
-        injury context.
+    Injury reports do not alter the probability query. Historical on/off evidence
+    is computed separately from exact participation data and used by the scan gate;
+    name-only injury reports are not a valid historical cohort definition.
     """
 
     async def prop_quant_agent(state: GraphState) -> dict[str, Any]:  # type: ignore[type-arg]
@@ -152,10 +144,6 @@ def make_prop_quant_agent(
             prop_type: str = state.get("prop_type", "pass_yds")  # type: ignore[union-attr]
             prop_line_raw = state.get("prop_line", "0")  # type: ignore[union-attr]
             prop_filters: dict[str, object] = state.get("prop_filters", {})  # type: ignore[union-attr]
-            situational: dict = state.get("situational_params") or {}  # type: ignore[union-attr]
-            teammate_out: list[str] | None = situational.get("teammate_out_signals") or None
-            teammate_out_contexts: list[dict[str, str]] | None = situational.get("teammate_out_contexts") or None
-
             # Convert line to Decimal — prop_line may arrive as float, int, str, or Decimal
             line = Decimal(str(prop_line_raw if prop_line_raw is not None else "0"))
 
@@ -171,8 +159,8 @@ def make_prop_quant_agent(
                 prop_type=prop_type,  # type: ignore[arg-type]
                 line=line,
                 filters=prop_filters if prop_filters else {},
-                teammate_out=teammate_out,
-                teammate_out_contexts=teammate_out_contexts,
+                teammate_out=None,
+                teammate_out_contexts=None,
             )
         except (ValueError, TypeError, KeyError, AttributeError, DecimalException) as exc:
             # Validation text can echo input; clear any estimate retained by a checkpoint.

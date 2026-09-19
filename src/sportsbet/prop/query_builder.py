@@ -190,59 +190,45 @@ class PropQueryBuilder:
             args.append(params.home_away)
             next_idx += 1
 
-        # teammate_out filter — date-window approximation via injury_reports table
-        # Uses INTERVAL window of [-2 days, +1 day] around the game date.
-        # Direct game_id join is unreliable because injury_reports.game_id is nullable
-        # in v1 schema (migration 0005). Date-window is v1 solution (RESEARCH.md Pitfall 4).
-        # Teammate player IDs are in args (positional) — never embedded in SQL string.
-        if params.teammate_out:
-            for teammate_id in params.teammate_out:
-                sql = sql + (
-                    f"  AND EXISTS (\n"
-                    f"      SELECT 1 FROM injury_reports ir\n"
-                    f"      WHERE ir.player_name = ${next_idx}\n"
-                    f"        AND ir.status = 'Out'\n"
-                    f"        AND ir.scraped_at BETWEEN\n"
-                    f"            (SELECT MIN(game_date) FROM games g"
-                    f" WHERE g.season = player_stats.season"
-                    f" AND g.week = player_stats.week) - INTERVAL '2 days'\n"
-                    f"            AND\n"
-                    f"            (SELECT MIN(game_date) FROM games g"
-                    f" WHERE g.season = player_stats.season"
-                    f" AND g.week = player_stats.week) + INTERVAL '1 day'\n"
-                    f"  )\n"
-                )
-                args.append(teammate_id)
-                next_idx += 1
+        # Legacy name-only teammate_out values are intentionally ignored. A
+        # current injury name and a date window cannot prove historical identity,
+        # team membership, or participation.
 
-        # teammate_out_contexts: player_stats absence detection by team+position.
-        # When a player (e.g., "QB from KC") has no stat row for a given week,
-        # they didn't play — this is a reliable historical proxy for injury absence.
-        # Preferred over the injury_reports INTERVAL path because player_stats has
-        # multi-season history; injury_reports only has live/recent data.
-        # team and position come from StaticDict (NFL_SITUATIONAL_ALLOWED_KEYS expanded) — not user input.
+        # Exact named-player absence from nflverse snap participation. Legacy
+        # team+position guesses are ignored because they cannot prove whether
+        # the reported player participated.
         if params.teammate_out_contexts:
             for ctx in params.teammate_out_contexts:
                 team = ctx.get("team", "")
-                position = ctx.get("position", "")
-                if not team or not position or position == "Unknown":
+                pfr_player_id = ctx.get("pfr_player_id", "")
+                unit = ctx.get("unit", "")
+                if not team or not pfr_player_id or unit not in ("offense", "defense"):
                     continue
+                snap_column = "offense_snaps" if unit == "offense" else "defense_snaps"
                 sql = sql + (
+                    f"  AND EXISTS (\n"
+                    f"      SELECT 1 FROM nfl_snap_counts coverage\n"
+                    f"      WHERE coverage.season = player_stats.season\n"
+                    f"        AND coverage.week = player_stats.week\n"
+                    f"        AND coverage.team = ${next_idx}\n"
+                    f"        AND coverage.source_provider = 'nflverse'\n"
+                    f"        AND coverage.source_sha256 ~ '^[0-9a-f]{{64}}$'\n"
+                    f"        AND coverage.source_record_sha256 ~ '^[0-9a-f]{{64}}$'\n"
+                    f"  )\n"
                     f"  AND NOT EXISTS (\n"
-                    f"      SELECT 1 FROM player_stats ps2\n"
-                    f"      WHERE ps2.season = player_stats.season\n"
-                    f"        AND ps2.week = player_stats.week\n"
-                    f"        AND ps2.team = ${next_idx}\n"
-                    f"        AND ps2.position = ${next_idx + 1}\n"
-                    f"        AND (\n"
-                    f"          COALESCE(ps2.passing_yards, 0) > 0\n"
-                    f"          OR COALESCE(ps2.rushing_yards, 0) > 0\n"
-                    f"          OR COALESCE(ps2.receiving_yards, 0) > 0\n"
-                    f"        )\n"
+                    f"      SELECT 1 FROM nfl_snap_counts sc\n"
+                    f"      WHERE sc.season = player_stats.season\n"
+                    f"        AND sc.week = player_stats.week\n"
+                    f"        AND sc.team = ${next_idx}\n"
+                    f"        AND sc.pfr_player_id = ${next_idx + 1}\n"
+                    f"        AND sc.{snap_column} > 0\n"
+                    f"        AND sc.source_provider = 'nflverse'\n"
+                    f"        AND sc.source_sha256 ~ '^[0-9a-f]{{64}}$'\n"
+                    f"        AND sc.source_record_sha256 ~ '^[0-9a-f]{{64}}$'\n"
                     f"  )\n"
                 )
                 args.append(team)
-                args.append(position)
+                args.append(pfr_player_id)
                 next_idx += 2
 
         if params.as_of_date is not None:

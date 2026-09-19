@@ -257,17 +257,13 @@ async def run_nba_prop_query(pool: asyncpg.Pool, params: PropParams) -> PropResu
     # window instead of returning an estimate that can never be acted on.
     is_conditional = bool(
         params.last_n_games is not None
-        or params.teammate_out
-        or params.teammate_out_contexts
         or params.opponent_team is not None
         or params.home_away is not None
     )
     if params.as_of_date is not None or (is_conditional and params.prop_type != "double_double"):
         gamelog_result = await run_nba_gamelog_query(pool, params)
         has_narrow_context = bool(
-            params.teammate_out
-            or params.teammate_out_contexts
-            or params.opponent_team is not None
+            params.opponent_team is not None
             or params.home_away is not None
         )
         if (

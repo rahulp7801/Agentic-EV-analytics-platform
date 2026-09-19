@@ -203,7 +203,8 @@ class PropParams(BaseModel):
     ]
     line: Decimal
     filters: dict[str, object]
-    # Situational filter extensions (Phase 18 — SC-3)
+    # Situational query extensions. teammate_out is retained for compatibility;
+    # production agents never derive it from current name-only injury reports.
     # All Optional with None defaults — backward compatible; existing callers unchanged.
     # ConfigDict(strict=True) accepts Optional[T] = None per Phase 9 locked decision.
     last_n_games: Optional[Annotated[int, Field(ge=1)]] = None

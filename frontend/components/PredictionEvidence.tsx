@@ -32,6 +32,10 @@ function time(value?:string) {
   return value ? new Date(value).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}) : 'Unavailable';
 }
 
+function cohort(label:string,value:{games:number;mean:number|null;hit_rate:number|null}) {
+  return <div><dt>{label}</dt><dd>{value.games ? <><strong>{(value.hit_rate!*100).toFixed(0)}%</strong> hit rate · {value.games} game{value.games===1?'':'s'} · mean {value.mean!.toFixed(1)}</> : 'No verified games'}</dd></div>;
+}
+
 export default function PredictionEvidence({signal,onClose}:{signal:EVSignal;onClose:()=>void}) {
   const availability=signal.availability;
   const panel=useRef<HTMLElement>(null);
@@ -57,13 +61,22 @@ export default function PredictionEvidence({signal,onClose}:{signal:EVSignal;onC
       <div><h3>Injuries & teammates</h3>
         {signal.player_profile && <p>Player profile: <strong>{signal.player_profile.name} · {signal.player_profile.team}{signal.player_profile.jersey ? ` · #${signal.player_profile.jersey}` : ''}{signal.player_profile.position ? ` · ${signal.player_profile.position}` : ''}</strong>. <a href={signal.player_profile.source_url} target="_blank" rel="noreferrer">Profile roster source</a> · Captured {time(signal.player_profile.captured_at)}. This presentation metadata does not update the original forecast’s availability evidence.</p>}
         <p><strong>{availability?.status==='observed' ? availability.subject_status : 'Current availability unavailable'}</strong></p>
-        <p>{availability?.roster_confirmed ? `Matched to the captured ${availability.team} roster. ` : 'Roster identity is not confirmed. '}An unlisted injury does not confirm game-day participation. Final starters, minutes and snap counts are not verified here.</p>
+        <p>{availability?.roster_confirmed ? `Matched to the captured ${availability.team} roster. ` : 'Roster identity is not confirmed. '}An unlisted injury does not confirm game-day participation. Final game-day starters and current-game snaps or minutes are not yet verified.</p>
         {availability?.status==='observed' && <>
           {availability.roster_player_name && <p>Roster name: <strong>{availability.roster_player_name}</strong>. Matched through verified player IDs. <a href={availability.identity_source_url} target="_blank" rel="noreferrer">Player ID source</a></p>}
           <p><a href={availability.source_url} target="_blank" rel="noreferrer">{availability.source_url===availability.roster_source_url ? 'Roster injury report' : 'ESPN injury report'}</a> · <a href={availability.roster_source_url} target="_blank" rel="noreferrer">Roster source</a><br />Captured {time(availability.captured_at)}</p>
           {availability.teammates.length ? <ul tabIndex={0} aria-label="Reported teammate availability" className={styles.teammateReports}>{[...availability.teammates].sort((a,b)=>Number(a.status==='Active')-Number(b.status==='Active')).map(row=><li key={row.player}><strong>{row.player}</strong><span>{row.position} · {row.status}</span><small>Reported {time(row.reported_at)}</small></li>)}</ul> : <p>No teammates listed in this captured injury report.</p>}
+          {availability.context_splits?.length ? <div className={styles.contextSplits}>
+            <h4>Historical availability comparisons</h4>
+            <p>For this exact side and line, using only games before the forecast cutoff.</p>
+            {availability.context_splits.map(split=><article key={`${split.relationship}-${split.player}`}>
+              <header><strong>{split.player}</strong><span>{split.team} {split.position} · {split.relationship} {split.unit} · {split.status}</span></header>
+              <dl>{cohort('When active',split.active)}{cohort('When absent',split.absent)}</dl>
+              <small>{split.participation}. Descriptive comparison; roster changes, role and matchup can confound the difference.</small>
+            </article>)}
+          </div> : <p>No exact pre-cutoff on/off comparison is available for a relevant reported offensive teammate or opposing defender.</p>}
         </>}
-        <p className={styles.evidenceLimitation}>The probability is a historical baseline. Injury and teammate reports screen recommendations; no unvalidated injury, usage or rotation boost is added.</p>
+        <p className={styles.evidenceLimitation}>The probability remains the historical baseline. Verified on/off splits explain the availability context and reports screen recommendations; they do not become a causal probability boost without walk-forward validation.</p>
       </div>
     </div>
     <PlayerHistory key={signal.id} signal={signal} />

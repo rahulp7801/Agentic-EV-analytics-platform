@@ -1,4 +1,4 @@
-import type {AvailabilityEvidence,EVSignal,PlayerProfile,PropType,Sport} from './types';
+import type {AvailabilityContextSplit,AvailabilityEvidence,EVSignal,PlayerProfile,PropType,Sport} from './types';
 
 const CURRENT_MODEL_VERSION = 'empirical-jeffreys-v4';
 
@@ -96,6 +96,7 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     || !bounded(a.subject_status,100)
     || !bounded(a.team,5) || !Array.isArray(a.teammates) || a.teammates.length>64) return undefined;
   const teammates:AvailabilityEvidence['teammates']=[];
+  const contextSplits:NonNullable<AvailabilityEvidence['context_splits']>=[];
   const identityFields=['roster_player_name','identity_source_url','identity_source_sha256'];
   const identified=identityFields.some(key=>a[key]!==undefined);
   if(identified && (sport!=='nfl' || !bounded(a.roster_player_name,100)
@@ -108,6 +109,31 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
       || !timestamp(row.reported_at) || Date.parse(row.reported_at)>Date.parse(a.captured_at)+60000) return undefined;
     teammates.push({player:row.player,status:row.status,position:row.position,reported_at:row.reported_at});
   }
+  if(a.context_splits!==undefined) {
+    if(!Array.isArray(a.context_splits) || a.context_splits.length>8) return undefined;
+    for(const value of a.context_splits) {
+      if(!value || typeof value!=='object' || Array.isArray(value)) return undefined;
+      const row=value as Record<string,unknown>;
+      const active=row.active as Record<string,unknown>|undefined;
+      const absent=row.absent as Record<string,unknown>|undefined;
+      const cohort=(item:Record<string,unknown>|undefined)=>!!item
+        && typeof item.games==='number' && Number.isSafeInteger(item.games) && item.games>=0 && item.games<=40
+        && (item.mean===null || (finite(item.mean) && Math.abs(Number(item.mean))<=10000))
+        && (item.hit_rate===null || (finite(item.hit_rate) && Number(item.hit_rate)>=0 && Number(item.hit_rate)<=1))
+        && ((item.games===0)===(item.mean===null && item.hit_rate===null));
+      const source=sport==='nfl' ? 'nflverse_snap_counts' : 'nba_final_box_scores';
+      const participation=sport==='nfl' ? 'verified game snaps' : 'verified minutes played';
+      if(!bounded(row.player,100) || !bounded(row.status,100) || !bounded(row.position,10)
+        || !bounded(row.team,5) || !['teammate','opponent'].includes(String(row.relationship))
+        || !['offense','defense'].includes(String(row.unit)) || row.source!==source
+        || row.participation!==participation || !cohort(active) || !cohort(absent)
+        || Number(active!.games)+Number(absent!.games)<1) return undefined;
+      contextSplits.push({player:row.player,status:row.status,position:row.position,team:row.team,
+        relationship:row.relationship as 'teammate'|'opponent',unit:row.unit as 'offense'|'defense',
+        source,participation,active:active as AvailabilityContextSplit['active'],
+        absent:absent as AvailabilityContextSplit['absent']});
+    }
+  }
   return {status:'observed',roster_confirmed:true,subject_status:a.subject_status,
     captured_at:a.captured_at,source_url:a.source_url as string,source_sha256:a.source_sha256,team:a.team,
     roster_source_url:a.roster_source_url,roster_source_sha256:a.roster_source_sha256,
@@ -117,7 +143,7 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     ...(identified ? {roster_player_name:a.roster_player_name as string,
       identity_source_url:a.identity_source_url as string,
       identity_source_sha256:a.identity_source_sha256 as string} : {}),
-    teammates,probability_adjusted:false};
+    teammates,...(contextSplits.length ? {context_splits:contextSplits} : {}),probability_adjusted:false};
 }
 
 /** Current identity metadata never supplies historical availability or eligibility. */

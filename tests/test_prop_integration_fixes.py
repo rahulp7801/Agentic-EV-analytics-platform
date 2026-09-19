@@ -1,16 +1,13 @@
 """Phase 19 integration regression tests (19-01-PLAN.md).
 
-Covers two integration gaps identified in the v1.0 milestone audit:
+Covers integration boundaries identified in the v1.0 milestone audit:
 
   INT-2 — NBA prop snapshots written with sport='nfl' hardcoded (agents.py line 304).
            PlayerPropSnapshotCreate must use the sport variable, not a literal.
 
-  INT-1 — make_prop_quant_agent and make_nba_quant_agent never read
-           situational_params from GraphState, so teammate_out conditional WHERE
-           clauses in Phase 18 never fire in automated pipeline runs.
-
-TDD: tests 1, 3, 4 written RED before source fixes.
-     tests 2, 5 are regression guards — already green before any changes.
+  INT-1 — current injury names must not be mistaken for verified historical
+           participation. Automated model queries remain baseline; exact on/off
+           evidence is computed and displayed separately.
 After Task 2 applies the three source-file fixes, all 5 tests must turn GREEN.
 """
 from __future__ import annotations
@@ -230,16 +227,12 @@ def test_prop_snapshot_sport_defaults_to_nfl() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 3: INT-1 NFL — prop_quant_agent forwards teammate_out (currently RED)
+# Test 3: NFL name-only injury reports never condition the probability
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_prop_quant_agent_forwards_teammate_out() -> None:
-    """INT-1 NFL: make_prop_quant_agent must forward teammate_out_signals from
-    situational_params to PropParams.teammate_out.
-
-    Fails BEFORE the fix because prop_quant_agent never reads situational_params.
-    """
+async def test_prop_quant_agent_rejects_name_only_injury_conditioning() -> None:
+    """A current player name cannot prove historical participation."""
     from sportsbet.prop.agents import make_prop_quant_agent
 
     captured_params: list[Any] = []
@@ -259,23 +252,17 @@ async def test_prop_quant_agent_forwards_teammate_out() -> None:
 
     assert captured_params, "run_prop_query was never called"
     params = captured_params[0]
-    assert params.teammate_out == ["Davante Adams"], (
-        f"INT-1: Expected params.teammate_out=['Davante Adams'] but got {params.teammate_out!r}. "
-        "Bridge from situational_params to PropParams not yet applied."
-    )
+    assert params.teammate_out is None
+    assert params.teammate_out_contexts is None
 
 
 # ---------------------------------------------------------------------------
-# Test 4: INT-1 NBA — nba_quant_agent forwards teammate_out (currently RED)
+# Test 4: NBA name-only injury reports never condition the probability
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_nba_quant_agent_forwards_teammate_out() -> None:
-    """INT-1 NBA: make_nba_quant_agent must forward teammate_out_signals from
-    situational_params to PropParams.teammate_out.
-
-    Fails BEFORE the fix because nba_quant_agent never reads situational_params.
-    """
+async def test_nba_quant_agent_rejects_name_only_injury_conditioning() -> None:
+    """NBA availability effects require exact game-level minutes evidence."""
     from sportsbet.prop.nba_agents import make_nba_quant_agent
 
     captured_params: list[Any] = []
@@ -296,10 +283,8 @@ async def test_nba_quant_agent_forwards_teammate_out() -> None:
 
     assert captured_params, "run_nba_prop_query was never called"
     params = captured_params[0]
-    assert params.teammate_out == ["Anthony Davis"], (
-        f"INT-1 NBA: Expected params.teammate_out=['Anthony Davis'] but got {params.teammate_out!r}. "
-        "Bridge from situational_params to PropParams not yet applied."
-    )
+    assert params.teammate_out is None
+    assert params.teammate_out_contexts is None
 
 
 # ---------------------------------------------------------------------------

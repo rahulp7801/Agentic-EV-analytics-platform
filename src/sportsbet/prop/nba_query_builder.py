@@ -6,7 +6,7 @@ Data model note:
     must be derived via normal approximation using per-game averages computed
     from season totals divided by games_played.
 
-    For CONDITIONAL queries (opponent_team, home_away, last_n_games, teammate_out set),
+    For CONDITIONAL queries (opponent_team, home_away, last_n_games set),
     NBAQueryBuilder dispatches to nba_player_gamelogs templates instead. Gamelogs
     provide per-game binary outcome counts, enabling Wilson CI (frequency counting)
     rather than NormalDist approximation.
@@ -25,7 +25,7 @@ player_id cast:
     NBAQueryBuilder.build() always casts int(params.player_id) for $1.
 
 Dispatch logic (Phase 18 updated):
-    Conditional = any of (last_n_games, teammate_out, opponent_team, home_away) set:
+    Conditional = any of (last_n_games, opponent_team, home_away) set:
         - prop_type == "double_double" → season-aggregate path (gamelog DD not modeled)
         - prop_type == "pra"          → _NBA_GAMELOG_PRA_TEMPLATE + situational filters
         - else                         → _NBA_GAMELOG_SINGLE_TEMPLATE + situational filters
@@ -186,8 +186,6 @@ def _is_conditional(params: "PropParams") -> bool:
     return bool(
         params.as_of_date is not None
         or params.last_n_games is not None
-        or params.teammate_out
-        or params.teammate_out_contexts
         or params.opponent_team is not None
         or params.home_away is not None
     )
@@ -233,8 +231,8 @@ class NBAQueryBuilder:
         asyncpg raises DataError on str vs INTEGER mismatch without explicit cast.
 
         Phase 18 conditional dispatch:
-        When any situational filter is set (opponent_team, home_away, last_n_games,
-        teammate_out), dispatch to nba_player_gamelogs templates for per-game binary
+        When any verified situational filter is set (opponent_team, home_away,
+        last_n_games), dispatch to nba_player_gamelogs templates for per-game binary
         frequency counting. double_double is excluded from gamelog path (no per-game
         composite binary model in v1 — falls through to season-aggregate path).
 
@@ -293,21 +291,6 @@ class NBAQueryBuilder:
                 sql = sql + f"  AND is_home = ${next_idx}\n"
                 args.append(params.home_away == "home")  # "home" -> True, "away" -> False
                 next_idx += 1
-
-            # teammate_out filter — uses nba_player_gamelogs absence by player_name.
-            # nba_player_gamelogs has player_name column; NOT EXISTS checks teammate
-            # was absent on the same game_date (didn't appear in gamelogs = didn't play).
-            if params.teammate_out:
-                for teammate_name in params.teammate_out:
-                    sql = sql + (
-                        f"  AND NOT EXISTS (\n"
-                        f"      SELECT 1 FROM nba_player_gamelogs gl2\n"
-                        f"      WHERE gl2.game_id = nba_player_gamelogs.game_id\n"
-                        f"        AND gl2.player_name ILIKE ${next_idx}\n"
-                        f"  )\n"
-                    )
-                    args.append(teammate_name)
-                    next_idx += 1
 
             # last_n_games filter — game_id IN subquery (gamelogs have game_id)
             if params.last_n_games is not None:

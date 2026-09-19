@@ -106,6 +106,22 @@ test('availability screens recommendations without changing model probabilities'
   }
 });
 
+test('verified injury context retains exact on off cohorts and strips internal identities',()=>{
+  const split={player:'Defender',status:'Out',position:'CB',team:'LV',relationship:'opponent',unit:'defense',
+    source:'nflverse_snap_counts',participation:'verified game snaps',participant_id:'private-pfr-id',
+    active:{games:8,mean:241.25,hit_rate:.625},absent:{games:2,mean:278,hit_rate:1}};
+  const result=publicSignals([{...publicQuote,availability:{...quote.availability,context_splits:[split]}}],now).signals[0];
+  assert.deepEqual(result.availability.context_splits,[{player:'Defender',status:'Out',position:'CB',team:'LV',
+    relationship:'opponent',unit:'defense',source:'nflverse_snap_counts',participation:'verified game snaps',
+    active:split.active,absent:split.absent}]);
+  assert.equal(result.true_prob,.6);assert.equal(result.availability.probability_adjusted,false);
+  for(const broken of [{...split,source:'private_feed'},{...split,active:{games:41,mean:1,hit_rate:.5}},
+    {...split,absent:{games:0,mean:0,hit_rate:null}}]) {
+    const projected=publicSignals([{...publicQuote,availability:{...quote.availability,context_splits:[broken]}}],now).signals[0];
+    assert.equal(projected.availability,undefined);assert.equal(projected.gated,true);
+  }
+});
+
 test('forecast windows change at kickoff',()=>{
   assert.equal(forecastWindow(quote,now),'upcoming');
   assert.equal(forecastWindow(quote,now+3600000),'archive');

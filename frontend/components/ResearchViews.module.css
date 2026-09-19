@@ -315,12 +315,22 @@
 .teammateReports { max-height: 240px; overflow-y: auto; list-style: none; padding-left: 0 !important; }
 .teammateReports li { display: grid; grid-template-columns: 1fr auto; padding: 8px 0; border-bottom: 1px solid var(--border-dim); }
 .teammateReports small { grid-column: 1/-1; }
+.contextSplits { margin: 18px 0; }
+.contextSplits h4 { margin: 0; color: var(--text-primary); font-size: 14px; }
+.contextSplits article { margin-top: 10px; padding: 12px; border: 1px solid var(--border-dim); border-radius: 12px; background: var(--bg-base); }
+.contextSplits article > header { display: grid; gap: 2px; }
+.contextSplits article > header span,.contextSplits article > small { font-size: 11px; color: var(--text-secondary); }
+.contextSplits dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+.contextSplits dl div { display: block; margin: 0; padding: 9px; border-radius: 9px; background: var(--bg-surface); }
+.contextSplits dt { font-size: 10px; color: var(--text-secondary); }
+.contextSplits dd { margin-top: 3px; color: var(--text-primary); }
 .evidenceLimitation { padding: 12px; border: 1px solid var(--border-dim); border-radius: 10px; }
 @media(max-width:720px) {
   .predictionEvidence { margin: 10px; padding: 18px; }
   .predictionEvidence header { flex-wrap: wrap; }
   .evidenceMetrics,.evidenceColumns { grid-template-columns: 1fr; gap: 12px; }
   .teammateReports li { grid-template-columns: 1fr; }
+  .contextSplits dl { grid-template-columns: 1fr; }
 }
 .panelHeader, .controlBar { border-color: var(--border-dim); }.analysisReadout { border-color: var(--border-dim); border-radius: 13px; background: var(--bg-surface); }.analysisReadout strong { color: var(--accent); }
 .emptyState, .loadingState { background: var(--bg-base); }.emptyPanel { overflow: hidden; border-color: var(--border-dim); border-radius: 22px; background: var(--bg-surface); box-shadow: var(--shadow-md); }.emptyCopy h2 { color: var(--text-primary); font-family: var(--font-sans), sans-serif; font-weight: 600; letter-spacing: -.045em; text-transform: none; }.emptyChecks, .emptyChecks div, .emptyEyebrow { border-color: var(--border-dim); }.emptyEyebrow { color: var(--accent-amber); }
