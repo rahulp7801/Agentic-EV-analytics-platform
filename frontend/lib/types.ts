@@ -1,4 +1,5 @@
-export type Sport = 'nba' | 'nfl';
+export type Sport = 'nba' | 'nfl' | 'cfb';
+export type ModelSport = Exclude<Sport,'cfb'>;
 export type PropType = 'points' | 'rebounds' | 'assists' | 'threes' | 'pra' | 'steals' | 'blocks' |
   'pass_yds' | 'pass_tds' | 'rush_yds' | 'rec_yds' | 'receptions';
 
@@ -46,7 +47,7 @@ export interface EVSignal {
   opponent: string;
   home_team?: string;
   away_team?: string;
-  sport: Sport;
+  sport: ModelSport;
   prop_type: PropType;
   line: number;
   direction: Direction;
@@ -103,7 +104,7 @@ export interface GameLog {
   player: string;
   team: string;
   opponent: string;
-  sport: Sport;
+  sport: ModelSport;
   date: string;
   home_away?: 'home' | 'away';
   result?: 'W' | 'L';
@@ -129,7 +130,7 @@ export interface PropAnalysis {
   player_id: string;
   team: string;
   opponent: string;
-  sport: Sport;
+  sport: ModelSport;
   prop_type: PropType;
   line: number;
   direction: Direction;
@@ -147,7 +148,7 @@ export interface PropAnalysis {
 export interface ArbitrageAlert {
   id: string;
   player: string;
-  sport: Sport;
+  sport: ModelSport;
   prop_type: PropType;
   line: number;
   book_a: string;

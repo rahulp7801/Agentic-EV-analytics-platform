@@ -8,7 +8,7 @@ on:
         default: daily
       sport:
         type: choice
-        options: [both, nfl, nba]
+        options: [both, nfl, nba, cfb]
         default: both
       provider:
         description: 'Provider for watch only; leave all for other operations'
@@ -64,6 +64,14 @@ jobs:
             echo 'Provider selection is supported only for watch operations.'
             exit 1
           fi
+          if [ "$SPORT" = cfb ] && [ "$OPERATION" != watch ]; then
+            echo 'CFB currently supports only a manual watch operation with the sportsbook provider.'
+            exit 1
+          fi
+          if [ "$SPORT" = cfb ] && [ "$PROVIDER" != sportsbook ] && [ "$PROVIDER" != all ]; then
+            echo 'CFB currently supports only a manual watch operation with the sportsbook provider.'
+            exit 1
+          fi
           case "$OPERATION:$PROVIDER" in
             daily:*|monitor:*|scan:*|watch:all|watch:sportsbook)
               test -n "$ODDS_API_KEY" || { echo 'Configure the odds repository secret for this operation.'; exit 1; } ;;
@@ -101,6 +109,7 @@ jobs:
           fi
           exit "$status"
       - name: Update source-backed player profiles
+        if: env.SPORT != 'cfb'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}

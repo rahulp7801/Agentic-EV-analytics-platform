@@ -1,4 +1,4 @@
-import type {AvailabilityContextSplit,AvailabilityEvidence,EVSignal,PlayerProfile,PropType,Sport} from './types';
+import type {AvailabilityContextSplit,AvailabilityEvidence,EVSignal,ModelSport,PlayerProfile,PropType,Sport} from './types';
 
 const CURRENT_MODEL_VERSION = 'empirical-jeffreys-v4';
 
@@ -50,7 +50,7 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
     kelly_fraction: reason ? 0 : s.kelly_fraction};
 }
 
-const SPORTS = new Set<Sport>(['nba','nfl']);
+const SPORTS = new Set<ModelSport>(['nba','nfl']);
 const PROPS = new Set<PropType>(['points','rebounds','assists','threes','pra','steals','blocks',
   'pass_yds','pass_tds','rush_yds','rec_yds','receptions']);
 const NFL_PROPS=new Set<PropType>(['pass_yds','pass_tds','rush_yds','rec_yds','receptions']);
@@ -179,7 +179,7 @@ export function latestForecastWindow(signals:EVSignal[],now=Date.now()) {
 export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const s=value as Record<string,unknown>;
-  const sport=SPORTS.has(s.sport as Sport) ? s.sport as Sport : null;
+  const sport=SPORTS.has(s.sport as ModelSport) ? s.sport as ModelSport : null;
   const prop=PROPS.has(s.prop_type as PropType) ? s.prop_type as PropType : null;
   const tradePlan=s.trade_plan;
   const flags=s.injury_flags;

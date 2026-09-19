@@ -8,7 +8,8 @@ export type TerminalView = typeof TERMINAL_VIEWS[number];
 
 export function parseTerminalHash(hash: string): { sport: Sport; view: TerminalView } | null {
   const [sport, view] = hash.replace(/^#/, '').split('/');
-  if ((sport !== 'nba' && sport !== 'nfl') || !TERMINAL_VIEWS.includes(view as TerminalView)) {
+  if ((sport !== 'nba' && sport !== 'nfl' && sport !== 'cfb')
+      || !TERMINAL_VIEWS.includes(view as TerminalView) || (sport==='cfb' && view!=='arbitrage')) {
     return null;
   }
   return { sport, view: view as TerminalView };

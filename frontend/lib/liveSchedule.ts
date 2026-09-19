@@ -1,7 +1,7 @@
 import {scheduleSnapshot} from './scheduleStatus.ts';
 import type {Sport} from './types';
 
-const SPORTS={nfl:'football/nfl',nba:'basketball/nba'};
+const SPORTS={nfl:'football/nfl',nba:'basketball/nba',cfb:'football/college-football'};
 function row(value:unknown):Record<string,unknown> {
   if(!value || typeof value!=='object' || Array.isArray(value)) throw new Error('Invalid scoreboard');
   return value as Record<string,unknown>;

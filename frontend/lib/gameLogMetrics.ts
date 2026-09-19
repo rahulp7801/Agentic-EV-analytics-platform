@@ -1,6 +1,7 @@
 import type { GameLog, Sport } from './types';
 
 export function gameLog(row: Record<string, unknown>, sport: Sport, id: string): GameLog {
+  if(sport==='cfb') throw new Error('CFB player logs are not available');
   const result: GameLog = {id, sport, player:String(row.player ?? ''), team:String(row.team ?? ''),
     opponent:String(row.opponent ?? ''), date:String(row.date ?? ''),
     home_away:row.is_home === true ? 'home' : row.is_home === false ? 'away' : undefined};

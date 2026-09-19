@@ -707,14 +707,16 @@ def price_row(kind, identity, title, legs, reasons):
 
 
 async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: bool, provider: str='all', *, credit_holdback: int = 0, sportsbook_cadence_hours: int = 0):
-    if sport not in ('nba','nfl') or provider not in ('all','public','sportsbook','kalshi','prizepicks') or type(game_limit) is not int or not 1<=game_limit<=MAX_GAME_LIMIT or daily_credit_limit<1 or type(credit_holdback) is not int or credit_holdback<0:
+    if sport not in ('nba','nfl','cfb') or provider not in ('all','public','sportsbook','kalshi','prizepicks') or type(game_limit) is not int or not 1<=game_limit<=MAX_GAME_LIMIT or daily_credit_limit<1 or type(credit_holdback) is not int or credit_holdback<0:
         raise ValueError('Invalid market collection request')
+    if sport=='cfb' and provider not in ('all','sportsbook'):
+        raise ValueError('CFB currently supports sportsbook game markets only')
     if type(sportsbook_cadence_hours) is not int or not 0<=sportsbook_cadence_hours<=24 or (sportsbook_cadence_hours and not publish):
         raise ValueError('Invalid sportsbook cadence')
     now = datetime.now(timezone.utc)
     collectors={'sportsbook':lambda:sportsbooks(sport,daily_credit_limit,credit_holdback,sportsbook_cadence_hours),
         'kalshi':lambda:kalshi_games(sport,now,game_limit),'prizepicks':lambda:capture_projections(sport)}
-    selected=list(collectors) if provider=='all' else ['kalshi','prizepicks'] if provider=='public' else [provider]
+    selected=(['sportsbook'] if sport=='cfb' else list(collectors)) if provider=='all' else ['kalshi','prizepicks'] if provider=='public' else [provider]
     sources = {name:dict(status='not_requested',partial_coverage=True) for name in collectors if name not in selected}
     # Independent source failures are retained; a blocked endpoint is not an empty successful scan.
     results = await asyncio.gather(*(collectors[name]() for name in selected),return_exceptions=True)
@@ -746,7 +748,7 @@ async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: boo
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--sport', choices=['nba','nfl','both'], default='both')
+    parser.add_argument('--sport', choices=['nba','nfl','cfb','both'], default='both')
     parser.add_argument('--daily-credit-limit', type=int, default=25)
     parser.add_argument('--game-limit', type=int, choices=range(1,MAX_GAME_LIMIT+1), default=DEFAULT_GAME_LIMIT)
     parser.add_argument('--publish', action='store_true')
