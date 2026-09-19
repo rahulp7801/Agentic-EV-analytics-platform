@@ -2,7 +2,7 @@
 
 export async function GET(request:Request) {
   const sport=new URL(request.url).searchParams.get('sport') ?? 'nba';
-  if(sport!=='nba' && sport!=='nfl') return Response.json({error:'Invalid sport'},{status:400});
+  if(sport!=='nba' && sport!=='nfl') return Response.json({error:'Invalid sport'},{status:400,headers:{'Cache-Control':'no-store'}});
   if(process.env.VERCEL==='1') {
     try {
       const {snapshot}=await import('@/lib/database');

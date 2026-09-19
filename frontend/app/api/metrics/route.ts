@@ -9,11 +9,11 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const cohort = metricCohort(request.url);
   const sport = metricSport(request.url);
-  if (!cohort || !sport) return NextResponse.json({error: 'Invalid metric request.'}, {status: 400});
+  if (!cohort || !sport) return NextResponse.json({error: 'Invalid metric request.'}, {status:400,headers:{'Cache-Control':'no-store'}});
   try {
     if (hosted) {
       const data = await snapshot(metricSnapshotKey(cohort, sport));
-      if (!data) return NextResponse.json({error:'No evaluation metrics have been published yet.'}, {status:503});
+      if (!data) return NextResponse.json({error:'No evaluation metrics have been published yet.'}, {status:503,headers:{'Cache-Control':'no-store'}});
       return NextResponse.json(publicMetrics(data, cohort, sport), {headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
     }
     const { stdout } = await promisify(execFile)(PYTHON, metricLedgerArgs(cohort, sport), {
@@ -21,6 +21,6 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(publicMetrics(JSON.parse(stdout), cohort, sport), {headers: {'Cache-Control': 'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
-    return NextResponse.json({error: 'Evaluation metrics are temporarily unavailable.'}, {status: 503});
+    return NextResponse.json({error: 'Evaluation metrics are temporarily unavailable.'}, {status:503,headers:{'Cache-Control':'no-store'}});
   }
 }

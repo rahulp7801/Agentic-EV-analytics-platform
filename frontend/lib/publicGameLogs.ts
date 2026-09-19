@@ -56,13 +56,15 @@ export function publicGameLogs(value: unknown, sport: Sport) {
 /** Bound historical queries before constructing parameterized SQL. */
 export function gameLogRequest(params:URLSearchParams) {
   const sport=params.get('sport') ?? 'nba';
-  const player=(params.get('player') ?? '').trim();
+  const rawPlayer=params.get('player') ?? '';
+  const player=rawPlayer.trim();
   const limit=params.get('limit') ?? '40';
   const exact=params.get('exact') ?? '0';
   const before=params.get('before');
-  if(!['nba','nfl'].includes(sport) || player.length>100 || /[\u0000-\u001f]/.test(player)
-    || !/^[0-9]{1,6}$/.test(limit) || Number(limit)<1 || !['0','1'].includes(exact)
+  if(!['nba','nfl'].includes(sport) || rawPlayer!==player || player.normalize('NFC')!==player
+    || (player!=='' && !/^[\p{L}\p{M}.'’ -]{1,80}$/u.test(player))
+    || !/^[0-9]{1,3}$/.test(limit) || Number(limit)<1 || Number(limit)>200 || !['0','1'].includes(exact)
     || (exact==='1' && !player)) throw new Error('Invalid game-log request');
-  return {sport:sport as Sport,player,limit:Math.min(Number(limit),200),exact:exact==='1',
+  return {sport:sport as Sport,player,limit:Number(limit),exact:exact==='1',
     before:before===null ? null : date(before)};
 }

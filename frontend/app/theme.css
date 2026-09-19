@@ -51,7 +51,9 @@ body { min-height: 100%; }
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 3px;
 }

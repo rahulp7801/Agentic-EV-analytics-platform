@@ -32,6 +32,22 @@ export const requiredCssMarkers = [
   '__demo{',
 ];
 
+export const requiredHtmlMarkers = [
+  'id="results"',
+  'Above 60% in both periods',
+  '84.5%',
+  '82.0%',
+  'not betting profit',
+];
+
+export const publicSecurityProbes = [
+  { path: '/api/scan', statuses: [403], options: { method: 'POST' } },
+  { path: '/api/scans', statuses: [403], options: { headers: { 'sec-fetch-site': 'same-site' } } },
+  { path: '/api/scans', statuses: [403], options: { headers: { origin: 'https://attacker.invalid' } } },
+  { path: '/api/signals?sport=nfl&offset=1000', statuses: [400] },
+  { path: '/api/gamelogs?sport=nfl&player=%25', statuses: [400] },
+];
+
 export function readinessStatuses(path, { paidEnabled, publicEnabled }) {
   if (paidPipelinePaths.includes(path)) return paidEnabled ? [200] : [200, 503];
   if (publicPipelinePaths.includes(path)) return paidEnabled || publicEnabled ? [200] : [200, 503];
@@ -46,6 +62,8 @@ export function verifySecurityHeaders(headers) {
     'cross-origin-opener-policy': 'same-origin',
     'cross-origin-resource-policy': 'same-origin',
     'x-dns-prefetch-control': 'off',
+    'origin-agent-cluster': '?1',
+    'x-permitted-cross-domain-policies': 'none',
   };
   for (const [name, value] of Object.entries(expected)) {
     if (headers.get(name) !== value) throw new Error(`Production security header is missing or invalid: ${name}`);
@@ -103,6 +121,9 @@ export async function verifyProduction({
   });
   verifySecurityHeaders(home.headers);
   const html = await home.text();
+  for (const marker of requiredHtmlMarkers) {
+    if (!html.includes(marker)) throw new Error(`Production landing evidence is stale or incomplete: ${marker}`);
+  }
   const stylesheetUrls = [...html.matchAll(/href=["']([^"']+\.css(?:\?[^"']*)?)["']/gi)]
     .map(match => new URL(match[1], base).toString());
   if (!stylesheetUrls.length) throw new Error('Production stylesheets are missing');
@@ -114,7 +135,12 @@ export async function verifyProduction({
   for (const marker of requiredCssMarkers) {
     if (!css.includes(marker)) throw new Error(`Production stylesheet is stale or incomplete: ${marker}`);
   }
-  await check('/api/scan', [403], { method: 'POST' });
+  for (const probe of publicSecurityProbes) {
+    const response = await check(probe.path, probe.statuses, probe.options);
+    if (!response.headers.get('cache-control')?.includes('no-store')) {
+      throw new Error(`${probe.path}: rejected request may be cached`);
+    }
+  }
   await check('/.env', [404]);
   await check('/signals_cache.json', [404]);
 

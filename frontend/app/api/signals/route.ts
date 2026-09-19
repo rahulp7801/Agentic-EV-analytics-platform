@@ -10,7 +10,7 @@ export const dynamic='force-dynamic';
 export async function GET(request:Request) {
   let options:ReturnType<typeof forecastRequest>;
   try {options=forecastRequest(new URL(request.url));}
-  catch {return NextResponse.json({error:'Unsupported forecast request.'},{status:400});}
+  catch {return NextResponse.json({error:'Unsupported forecast request.'},{status:400,headers:{'Cache-Control':'no-store'}});}
   try {
     let data:ForecastPageInput;
     if(hosted) {
@@ -35,10 +35,10 @@ export async function GET(request:Request) {
       if(options.view==='qualified') data.rows=signals.map((signal:unknown)=>({payload:{...snapshot,signals:[signal]}}));
     }
     if(options.revision && options.revision!==data.revision) {
-      return NextResponse.json({error:'Forecasts changed during browsing. Refresh to reload.'},{status:409});
+      return NextResponse.json({error:'Forecasts changed during browsing. Refresh to reload.'},{status:409,headers:{'Cache-Control':'no-store'}});
     }
     return NextResponse.json(forecastPage(data,options),{headers:{'Cache-Control':'no-store','Vercel-CDN-Cache-Control':'public, s-maxage=10'}});
   } catch {
-    return NextResponse.json({error:'Results are temporarily unavailable.',signals:[]},{status:503});
+    return NextResponse.json({error:'Results are temporarily unavailable.',signals:[]},{status:503,headers:{'Cache-Control':'no-store'}});
   }
 }
