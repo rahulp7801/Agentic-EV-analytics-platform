@@ -54,6 +54,32 @@ export type ForecastBenchmarkBundle = {
   records: ForecastEvidenceRecord[];
 };
 
+/**
+ * Small, presentation-safe summary for the landing page. The public benchmark
+ * regression recomputes these values from the row-level evidence so the copy
+ * cannot silently drift from the published forecasts.
+ */
+export const replicatedReceptionEvidence = {
+  called_side_minimum: 0.6,
+  research_threshold: 4.5,
+  prior: {
+    label: '2025 · Weeks 1–2',
+    correct: 180,
+    sample: 213,
+    game_count: 26,
+    hit_rate: 180 / 213,
+    game_cluster_interval: [0.7968980810625521, 0.8962032620387912] as [number, number],
+  },
+  current: {
+    label: '2026 · Week 1',
+    correct: 100,
+    sample: 122,
+    game_count: 15,
+    hit_rate: 100 / 122,
+    game_cluster_interval: [0.7283324726683298, 0.8980167336808766] as [number, number],
+  },
+} as const;
+
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid benchmark');
   return value as Record<string, unknown>;

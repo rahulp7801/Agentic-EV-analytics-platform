@@ -4,7 +4,7 @@ import priorWeekOne from '../data/nfl-week1-2025-receptions.json' with {type:'js
 import priorWeekTwo from '../data/nfl-week2-2025-receptions.json' with {type:'json'};
 import weekOne from '../data/nfl-week1-2026.json' with {type:'json'};
 import {forecastChecks, forecastCohort, forecastEvidenceGate, forecastResult, highestConvictionForecast,
-  publicForecastBenchmark} from '../lib/publicBenchmarks.ts';
+  publicForecastBenchmark, replicatedReceptionEvidence} from '../lib/publicBenchmarks.ts';
 
 test('published Week 1 benchmark retains verified aggregate evidence', () => {
   const bundle=publicForecastBenchmark(weekOne);
@@ -51,6 +51,16 @@ test('the same conviction rule replicates across separate 2025 and 2026 receptio
   assert.ok(holdout.game_cluster_interval[0]>.72);
   assert.equal(forecastEvidenceGate(historical),true);
   assert.equal(forecastEvidenceGate(holdout),true);
+  assert.deepEqual(replicatedReceptionEvidence,{
+    called_side_minimum:.6,
+    research_threshold:4.5,
+    prior:{label:'2025 · Weeks 1–2',correct:historical.correct,sample:historical.sample,
+      game_count:historical.game_count,hit_rate:historical.hit_rate,
+      game_cluster_interval:historical.game_cluster_interval},
+    current:{label:'2026 · Week 1',correct:holdout.correct,sample:holdout.sample,
+      game_count:holdout.game_count,hit_rate:holdout.hit_rate,
+      game_cluster_interval:holdout.game_cluster_interval},
+  });
 });
 
 test('benchmark evidence binds each result to its threshold and ESPN source', () => {
