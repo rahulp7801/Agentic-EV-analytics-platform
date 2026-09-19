@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {bestPickGroups,bestPickOptions,bestPicks,compareQuality,groupAlternateLines} from '../lib/bestPicks.ts';
+import {bestPickGroups,bestPickOptions,bestPicks,compareQuality,groupAlternateLines,recentCandidateGroups} from '../lib/bestPicks.ts';
 import {base,now} from './fixtures/qualifiedSignal.mjs';
 
 test('lower raw edge can outrank a less supported high point estimate',()=>{
@@ -46,4 +46,20 @@ test('research grouping preserves its supplied ranking and removes duplicate off
   assert.deepEqual(groups[0].alternatives.map(value=>value.id),['alternate']);
   const crowded=groupAlternateLines(Array.from({length:15},(_,index)=>({...base,id:`line-${index}`,line:200+index})));
   assert.equal(crowded[0].alternatives.length,10);
+});
+test('empty-board fallback keeps only bounded upcoming source-backed leans',()=>{
+  const stale=new Date(now-300001).toISOString();
+  const candidate={...base,snapped_at:stale};
+  const groups=recentCandidateGroups([
+    candidate,
+    {...candidate,id:'alt',line:240.5},
+    {...candidate,id:'second',player:'Second player'},
+    {...candidate,id:'negative',player:'Negative',true_prob:.4},
+    {...candidate,id:'extreme',player:'Extreme',true_prob:.8},
+    {...candidate,id:'started',player:'Started',game_start_time:new Date(now-1).toISOString()},
+    {...candidate,id:'unknown',player:'Unknown',availability:undefined},
+  ],now);
+  assert.deepEqual(groups.map(group=>group.pick.id),[base.id,'second']);
+  assert.deepEqual(groups[0].alternatives.map(signal=>signal.id),['alt']);
+  assert.ok(groups.every(group=>group.pick.gated));
 });
