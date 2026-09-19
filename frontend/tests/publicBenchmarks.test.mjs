@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import weekOne from '../data/nfl-week1-2026.json' with {type:'json'};
-import {forecastChecks, forecastResult, publicForecastBenchmark} from '../lib/publicBenchmarks.ts';
+import {forecastChecks, forecastCohort, forecastEvidenceGate, forecastResult, highestConvictionForecast,
+  publicForecastBenchmark} from '../lib/publicBenchmarks.ts';
 
 test('published Week 1 benchmark retains verified aggregate evidence', () => {
   const bundle=publicForecastBenchmark(weekOne);
@@ -14,6 +15,22 @@ test('published Week 1 benchmark retains verified aggregate evidence', () => {
   assert.deepEqual(forecastResult(bundle.records[0]),{side:'over',correct:false});
   assert.deepEqual(forecastChecks(bundle.benchmarks[0]),{brier:false,log_loss:false,calibration:false});
   assert.deepEqual(forecastChecks(bundle.benchmarks[1]),{brier:true,log_loss:true,calibration:false});
+});
+
+test('fixed conviction filter reports every win and loss without changing the denominator', () => {
+  const bundle=publicForecastBenchmark(weekOne);
+  const all=forecastCohort(bundle.records);
+  const highest=forecastCohort(bundle.records.filter(highestConvictionForecast));
+  assert.deepEqual({sample:all.sample,correct:all.correct,games:all.game_count},
+    {sample:170,correct:123,games:15});
+  assert.equal(all.hit_rate,123/170);
+  assert.deepEqual({sample:highest.sample,correct:highest.correct,games:highest.game_count},
+    {sample:142,correct:112,games:15});
+  assert.equal(highest.hit_rate,112/142);
+  assert.ok(highest.game_cluster_interval[0] > .72);
+  assert.ok(highest.game_cluster_interval[1] < .85);
+  assert.equal(forecastEvidenceGate(all),false);
+  assert.equal(forecastEvidenceGate(highest),true);
 });
 
 test('benchmark evidence binds each result to its threshold and ESPN source', () => {
