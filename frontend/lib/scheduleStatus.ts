@@ -72,7 +72,8 @@ export function scheduleSnapshot(data: Row | null, sport:Sport, now=Date.now(),l
     const captured=timestamp(data.captured_at), age=now-Date.parse(captured);
     // Schedules change far less often than prices. Keep a same-day snapshot usable
     // across ordinary GitHub Actions scheduling delays while prices retain tighter gates.
-    if (!Number.isFinite(age) || age<0 || age>4*60*60000) throw new Error('Invalid schedule');
+    const maximumAge=sport==='cfb' ? 24*60*60000 : 4*60*60000;
+    if (!Number.isFinite(age) || age<0 || age>maximumAge) throw new Error('Invalid schedule');
     return {status:200,body:{games:publicGames(data.games,today,lookahead),partial:data.status==='partial',
       captured_at:captured}};
   } catch {
