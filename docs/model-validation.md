@@ -151,3 +151,27 @@ thresholds are research thresholds without archived sportsbook prices, so these
 rows cannot establish bet hit rate, ROI, CLV, fillability, or profit. The dashboard
 keeps result filters out of the performance denominator so selecting only correct
 or missed rows cannot change the reported rate.
+
+### Cross-season conviction replication
+
+The same 60% called-side confidence rule was applied to the two retained 2025
+reception replays and the 2026 Week 1 reception replay. All three use the fixed 4.5
+research threshold, an exclusive game-date cutoff, at most 40 prior games, and a
+minimum of 20 observations. The v4 push-mass change does not alter a half-line
+reception forecast because a 4.5 threshold cannot push.
+
+| Replay cohort | Games | Forecasts | Correct | Directional accuracy | 95% game-cluster interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2025 Weeks 1-2 | 26 | 213 | 180 | 84.5% | 79.7%-89.6% |
+| 2026 Week 1 | 15 | 122 | 100 | 82.0% | 72.8%-89.8% |
+
+Both lower game-cluster bounds clear 65% with more than 100 forecasts and 10
+games. The 2025 row-level evidence is published alongside the 2026 evidence with
+the original ESPN event URLs, response hashes, dataset hashes, and evaluated
+source hashes.
+
+This comparison is stronger than selecting a threshold from one outcome set, but
+it remains retrospective research rather than a preregistered live trial. Neither
+cohort contains archived sportsbook prices or recorded accept/reject decisions.
+It proves repeatable fixed-threshold directional accuracy for this narrow
+reception task; it does not prove a 60% priced-bet win rate or positive returns.
