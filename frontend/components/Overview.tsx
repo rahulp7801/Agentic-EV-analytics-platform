@@ -1,7 +1,7 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {RefreshCw,ArrowUpRight} from 'lucide-react';
-import {bestPicks} from '@/lib/bestPicks';
+import {bestPickGroups} from '@/lib/bestPicks';
 import {fetchForecasts} from '@/lib/fetchForecasts';
 import {publicSignals,forecastWindow} from '@/lib/signalMetrics';
 import {PROP_LABELS,latestRecordedQuote} from '@/lib/pickTerms';
@@ -24,7 +24,7 @@ export default function Overview({sport,onOpenMarkets,onOpenPlayers}:{sport:Spor
     const controller=new AbortController();request.current=controller;
     const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(15_000)]);
     try {
-      const results=await Promise.allSettled([fetchForecasts(sport,signal,'qualified'),fetchForecasts(sport,signal,'library',fetch,100)]);
+      const results=await Promise.allSettled([fetchForecasts(sport,signal,'qualified',fetch,1000,undefined,true),fetchForecasts(sport,signal,'library',fetch,36)]);
       if(controller.signal.aborted) return;
       const failures:string[]=[];
       if(results[0].status==='fulfilled' && results[0].value.complete) setCandidates(results[0].value.signals);
@@ -40,15 +40,15 @@ export default function Overview({sport,onOpenMarkets,onOpenPlayers}:{sport:Spor
     document.addEventListener('visibilitychange',load);
     return()=>{request.current?.abort();window.clearTimeout(initial);window.clearInterval(poll);window.clearInterval(clock);document.removeEventListener('visibilitychange',load);};
   },[load]);
-  const picks=bestPicks(candidates,now),records=publicSignals(forecasts,now).signals;
+  const pickGroups=bestPickGroups(candidates,now),picks=pickGroups.map(group=>group.pick),records=publicSignals(forecasts,now).signals;
   const players=[...new Map(records.map(signal=>[signal.player,signal])).values()].slice(0,4);
   const explained=picks.find(signal=>signal.id===selected);
   const latestQuote=latestRecordedQuote(records,now);
   return <section className={styles.overview} aria-label={`${sport.toUpperCase()} decision desk`}>
-    <header className={styles.hero}><div><span className={styles.kicker}>{sport.toUpperCase()} / DECISION DESK</span><h1>Find your next pick.</h1><p>The exact selection, the observed price, and the evidence behind it.</p></div><div className={styles.heroActions}><button type="button" className={styles.refresh} disabled={refreshing} onClick={()=>void load()}><RefreshCw size={16} className={refreshing ? styles.spinning : undefined} />Refresh</button><span>{checked ? `Checked ${new Date(checked).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}` : 'Checking published data'}</span></div></header>
+    <header className={styles.hero}><div><span className={styles.kicker}>{sport.toUpperCase()} / PLAYER PROP DESK</span><h1>The board, distilled.</h1><p>One strongest line per player, the exact observed price, and the evidence that survived every gate.</p></div><div className={styles.heroActions}><button type="button" className={styles.refresh} disabled={refreshing} onClick={()=>void load()}><RefreshCw size={16} className={refreshing ? styles.spinning : undefined} />Refresh</button><span>{checked ? `Checked ${new Date(checked).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}` : 'Checking published data'}</span></div></header>
     {errors.length>0 && <p className={styles.partialNotice} role="status">{errors.join(' ')} Refresh to try again.</p>}
-    <section className={styles.shortlist} aria-label="Qualified picks"><div className={styles.comparisonHeading}><div><h2>Best available picks</h2><p>At most three. Fresh prices and every quality check must pass.</p></div><span className={styles.qualified}>{loading ? 'Checking' : `${picks.length} qualified`}</span></div>
-      {loading ? <p className={styles.loading} role="status">Checking prices and model evidence...</p> : picks.length ? <div className={styles.betGrid}>{picks.map(pick=><PickCard key={pick.id} signal={pick} now={now} onExplain={()=>setSelected(pick.id)} />)}</div> : <div className={styles.noPicks}><h3>{errors[0]?.startsWith('Current picks') ? 'Picks are temporarily unavailable.' : 'No picks qualify right now.'}</h3><p>{errors[0]?.startsWith('Current picks') ? 'The current shortlist could not be verified.' : 'The published prices or model evidence do not clear every check. Historical forecasts remain useful for research, but are not current bets.'}</p>{latestQuote && <p>Newest loaded quote: <time dateTime={latestQuote.observed_at}>{new Date(latestQuote.observed_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}</time>. {latestQuote.expired ? 'That price has expired. Current picks require a quote no more than five minutes old.' : 'A recent quote must also clear the model, roster and risk checks.'}</p>}<button type="button" className={styles.primary} onClick={()=>onOpenPlayers()}>Explore player forecasts <ArrowUpRight size={16} /></button></div>}
+    <section className={styles.shortlist} aria-label="Qualified picks"><div className={styles.comparisonHeading}><div><span>Live shortlist</span><h2>Best available picks</h2><p>One primary line per player. Fresh prices and every evidence gate must pass.</p></div><span className={styles.qualified}>{loading ? 'Checking' : `${picks.length} qualified`}</span></div>
+      {loading ? <PickSkeleton /> : picks.length ? <div className={styles.betGrid}>{pickGroups.map(group=><PickCard key={group.pick.id} signal={group.pick} alternatives={group.alternatives} now={now} onExplain={pick=>setSelected(pick.id)} />)}</div> : <div className={styles.noPicks}><span className={styles.noPicksStatus}>No verified live price</span><h3>{errors[0]?.startsWith('Current picks') ? 'The live shortlist could not be checked.' : 'No line clears every gate right now.'}</h3><p>{errors[0]?.startsWith('Current picks') ? 'The evidence service did not return a complete shortlist, so the dashboard is withholding picks.' : 'The scan may have evaluated games without producing a bet. A pick appears only while its exact sportsbook price is five minutes old or newer and its model, roster, uncertainty, and risk checks all pass.'}</p>{latestQuote && <p>Newest research quote: <time dateTime={latestQuote.observed_at}>{new Date(latestQuote.observed_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}</time>. {latestQuote.expired ? 'It is retained for research, but its price has expired.' : 'It still needs to clear every decision gate.'}</p>}<button type="button" className={styles.primary} onClick={()=>onOpenPlayers()}>Review recorded forecasts <ArrowUpRight size={16} /></button></div>}
       {explained && <PredictionEvidence signal={explained} onClose={()=>setSelected(null)} />}
       <details className={styles.deskDetails}><summary>What makes a pick qualify?</summary><p>Explicit worker approval, a price no more than five minutes old, a future game, at least 20 prior observations with the correct game-date cutoff, supported uncertainty, current roster and injury screening, positive expected return and approved risk limits. Ranking uses the lower probability bound, not the largest headline estimate. Estimates do not guarantee profit. Recheck the exact line and odds at the sportsbook.</p></details>
     </section>
@@ -60,4 +60,8 @@ export default function Overview({sport,onOpenMarkets,onOpenPlayers}:{sport:Spor
     <details className={styles.deskDetails} onToggle={event=>setShowSchedule(event.currentTarget.open)}><summary>Upcoming games and coverage</summary>{showSchedule && <SlateReadiness sport={sport} />}</details>
     <details className={styles.deskDetails} onToggle={event=>setShowStatus(event.currentTarget.open)}><summary>Data status and market sources</summary>{showStatus && <><ScanStatus /><p>Source availability and price comparisons are separate from qualified player picks.</p><button type="button" className={styles.refresh} onClick={onOpenMarkets}>Inspect market sources <ArrowUpRight size={15} /></button></>}</details>
   </section>;
+}
+
+function PickSkeleton() {
+  return <div className={styles.skeletonGrid} role="status" aria-label="Checking prices and model evidence">{[0,1,2].map(item=><div className={styles.skeletonCard} key={item} aria-hidden="true"><span className={styles.skeletonAvatar} /><span className={styles.skeletonLine} /><span className={styles.skeletonLineShort} /><span className={styles.skeletonBlock} /><span className={styles.skeletonLine} /></div>)}</div>;
 }

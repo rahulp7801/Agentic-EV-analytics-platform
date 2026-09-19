@@ -124,10 +124,10 @@ function ProductFrame({ pulse }: { pulse: Pulse }) {
 
   return (
     <div className={styles.productFrame}>
-      <div className={styles.frameBar}><span /><span /><span /><b>quant / live markets</b></div>
+      <div className={styles.frameBar}><span /><span /><span /><b>linework / live markets</b></div>
       <div className={styles.frameBody}>
         <div className={styles.frameSide}>
-          <div className={styles.miniBrand}>Q</div>
+          <div className={styles.miniBrand}>L</div>
           <span className={styles.activeNav} /><span /><span /><span /><span />
         </div>
         <div className={styles.frameMain}>
@@ -180,7 +180,7 @@ export default function LandingPage() {
   return (
     <div className={styles.page} ref={root}>
       <header className={styles.nav}>
-        <Link className={styles.brand} href="/"><span>Q</span><strong>Quant</strong></Link>
+        <Link className={styles.brand} href="/"><span>L</span><strong>Linework</strong></Link>
             <nav aria-label="Landing navigation"><a href="#results">Results</a><a href="#platform">Platform</a><a href="#demo">Demo</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton} aria-label="Open dashboard"><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
       </header>
 
@@ -258,7 +258,7 @@ export default function LandingPage() {
           <div className={styles.integrityGlow} aria-hidden="true" />
           <span>Designed for evidence</span>
           <h2>Unknown is a valid answer.</h2>
-          <p>Quant does not turn missing outcomes into performance, stale quotes into opportunities, or public projections into invented payouts.</p>
+          <p>Linework does not turn missing outcomes into performance, stale quotes into opportunities, or public projections into invented payouts.</p>
           <div className={styles.checks}><span><Check /> No order execution</span><span><Check /> Immutable evidence</span><span><Check /> Explicit provider health</span></div>
         </section>
 
@@ -268,7 +268,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className={styles.footer}><Link href="/" className={styles.brand}><span>Q</span><strong>Quant</strong></Link><p>Sports market intelligence with source, time, and uncertainty attached.</p><span>Research only · {new Date().getFullYear()}</span></footer>
+      <footer className={styles.footer}><Link href="/" className={styles.brand}><span>L</span><strong>Linework</strong></Link><p>Sports market intelligence with source, time, and uncertainty attached.</p><span>Research only · {new Date().getFullYear()}</span></footer>
     </div>
   );
 }

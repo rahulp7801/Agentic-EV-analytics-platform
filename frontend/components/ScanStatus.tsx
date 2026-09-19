@@ -66,7 +66,7 @@ export default function ScanStatus() {
           </div>
           <div className={styles.scanMetrics}>
             {status.eligible !== null && status.completed !== null && (
-              <span><b>{status.completed}/{status.eligible}</b> games</span>
+              <span title="Game evaluations, not betting recommendations"><b>{status.completed}/{status.eligible}</b> games evaluated</span>
             )}
             {status.selections !== null && status.selections > 0 && (
               <span><b>{status.model_estimates}/{status.selections}</b> modeled</span>

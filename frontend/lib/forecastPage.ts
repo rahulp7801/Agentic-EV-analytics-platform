@@ -1,5 +1,5 @@
 import {publicSignalSnapshots,publicPlayerProfile} from './signalMetrics.ts';
-import {bestPicks} from './bestPicks.ts';
+import {bestPickOptions} from './bestPicks.ts';
 import type {Sport} from './types';
 
 export const FORECAST_PAGE_SIZE=100;
@@ -92,7 +92,7 @@ export function forecastPage(data:ForecastPageInput,request:ReturnType<typeof fo
   const complete=request.offset+consumed>=data.total_count
     && (!qualified || (data.total_count<=5000 && data.window_complete===true));
   // An incomplete candidate inspection cannot advertise the strongest picks.
-  const selected=qualified ? (complete ? bestPicks(signals,now) : []) : signals;
+  const selected=qualified ? (complete ? bestPickOptions(signals,now) : []) : signals;
   return {generated_at:metadata.generated_at,games:qualified ? [] : [...games.values()],signals:selected,
     invalid_signals:invalid,total_count:data.total_count,
     pagination:{offset:request.offset,next_offset:!qualified && !complete ? request.offset+consumed : null,

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {bestPicks,compareQuality} from '../lib/bestPicks.ts';
+import {bestPickGroups,bestPickOptions,bestPicks,compareQuality,groupAlternateLines} from '../lib/bestPicks.ts';
 import {base,now} from './fixtures/qualifiedSignal.mjs';
 
 test('lower raw edge can outrank a less supported high point estimate',()=>{
@@ -26,4 +26,22 @@ test('push-adjusted price and uncertainty drive ranking with stable missing-inte
   const pushed={...base,push_probability:.1,true_prob:.6,confidence_interval:[.5,.7]};
   assert.equal(bestPicks([pushed],now).length,1);
   assert.equal(compareQuality({...base,implied_prob:.5,confidence_interval:null},{...base,implied_prob:.5,confidence_interval:null}),0);
+});
+test('groups alternate thresholds beneath the strongest supported line',()=>{
+  const best={...base,id:'best',line:235.5,confidence_interval:[.58,.7]};
+  const alternate={...base,id:'alt',line:225.5,confidence_interval:[.54,.68]};
+  const otherMarket={...base,id:'td',prop_type:'pass_tds',line:1.5,confidence_interval:[.53,.68]};
+  const groups=bestPickGroups([alternate,otherMarket,best],now);
+  assert.equal(groups.length,1);
+  assert.equal(groups[0].pick.id,'best');
+  assert.deepEqual(groups[0].alternatives.map(value=>value.id),['alt']);
+  assert.deepEqual(bestPickOptions([alternate,best],now).map(value=>value.id),['best','alt']);
+});
+test('research grouping preserves its supplied ranking and removes duplicate offers',()=>{
+  const duplicate={...base,id:'duplicate'};
+  const alternate={...base,id:'alternate',line:230.5};
+  const groups=groupAlternateLines([base,duplicate,alternate]);
+  assert.equal(groups.length,1);
+  assert.equal(groups[0].pick.id,base.id);
+  assert.deepEqual(groups[0].alternatives.map(value=>value.id),['alternate']);
 });

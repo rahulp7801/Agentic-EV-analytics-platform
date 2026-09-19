@@ -6,7 +6,7 @@ import "@fontsource/ibm-plex-mono/600.css";
 import "./theme.css";
 
 export const metadata: Metadata = {
-  title: "QUANT — Sports market intelligence",
+  title: "Linework — Sports market intelligence",
   description: "An evidence-first research surface for sportsbook, Kalshi, and daily fantasy player markets.",
 };
 

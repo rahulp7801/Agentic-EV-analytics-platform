@@ -1,11 +1,11 @@
 import {publicSignalSnapshots} from './signalMetrics.ts';
-import {bestPicks} from './bestPicks.ts';
+import {bestPickOptions,bestPicks} from './bestPicks.ts';
 import type {Sport} from './types';
 
 export type ForecastCursor={offset:number;revision:string;total_count:number};
 
 /** Bounded pages, stable snapshot revision, explicit coverage; never silently complete. */
-export async function fetchForecasts(sport:Sport,signal?:AbortSignal,view='library',fetchImpl=fetch,maximum=1000,cursor?:ForecastCursor) {
+export async function fetchForecasts(sport:Sport,signal?:AbortSignal,view='library',fetchImpl=fetch,maximum=1000,cursor?:ForecastCursor,includeAlternatives=false) {
   if(!Number.isSafeInteger(maximum) || maximum<1 || maximum>1000 || (cursor &&
     (view!=='library' || !Number.isSafeInteger(cursor.offset) || cursor.offset<1 || cursor.offset>=maximum
       || !Number.isSafeInteger(cursor.total_count) || cursor.total_count>50000 || cursor.total_count<=cursor.offset
@@ -56,7 +56,7 @@ export async function fetchForecasts(sport:Sport,signal?:AbortSignal,view='libra
     if(!Number.isSafeInteger(next) || next<=offset || next>offset+100 || next>total) throw new Error('Invalid forecast cursor');
     offset=next;
   }
-  return {signals:view==='qualified' ? (complete ? bestPicks(signals) : []) : signals,
+  return {signals:view==='qualified' ? (complete ? (includeAlternatives ? bestPickOptions(signals) : bestPicks(signals)) : []) : signals,
     games:[...games.values()],game:null,generated_at,invalid_signals:invalid,total_count:total,complete,revision,
     cursor:view==='library' && !complete && revision && offset<total ? {offset,revision,total_count:total} : null};
 }

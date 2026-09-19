@@ -1,4 +1,4 @@
-# QUANT web interface
+# Linework web interface
 
 The Next.js application has two surfaces:
 
