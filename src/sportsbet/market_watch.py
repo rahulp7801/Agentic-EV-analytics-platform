@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -20,6 +21,7 @@ from sportsbet.ingestion.kalshi_history import SERIES as KALSHI_PROP_SERIES
 from sportsbet.ingestion.prizepicks import PrizePicksUnavailable, capture as capture_projections
 from sportsbet.ledger import Ledger
 from sportsbet.scan import SPORT_KEYS, timestamp
+from sportsbet.schedules import collect as collect_schedule
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost, taker_depth_cost
 
@@ -706,6 +708,31 @@ def price_row(kind, identity, title, legs, reasons):
         fee_adjusted_profit=None, realized_profit=None, execution_ready=False)
 
 
+async def publish_cfb_slate(now: datetime) -> str:
+    """Publish one bounded daily FBS slate instead of querying ESPN per page view."""
+    today=str(now.astimezone(ZoneInfo('America/New_York')).date())
+    previous=load_snapshot('slate:cfb') or {}
+    try:
+        age=now-timestamp(previous['captured_at'])
+        if (previous.get('as_of_date')==today and previous.get('status') in ('complete','partial')
+                and timedelta(0)<=age<=timedelta(hours=24)):
+            return 'cached'
+    except (KeyError,ValueError,TypeError,AttributeError):
+        pass
+    slate=await collect_schedule('cfb',now,offsets=tuple(range(7)))
+    games=sorted((game for game in slate.get('games',[])
+        if game.get('completed') is False and timestamp(game['game_time'])>now),
+        key=lambda game:(timestamp(game['game_time']),game['provider_event_id']))
+    truncated=len(games)>100
+    status=slate['status']
+    if status=='complete' and truncated:
+        status='partial'
+    bounded={**slate,'games':games[:100],'partial':status=='partial','status':status}
+    if status in ('complete','partial'):
+        publish_snapshot('slate:cfb',bounded)
+    return status
+
+
 async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: bool, provider: str='all', *, credit_holdback: int = 0, sportsbook_cadence_hours: int = 0):
     if sport not in ('nba','nfl','cfb') or provider not in ('all','public','sportsbook','kalshi','prizepicks') or type(game_limit) is not int or not 1<=game_limit<=MAX_GAME_LIMIT or daily_credit_limit<1 or type(credit_holdback) is not int or credit_holdback<0:
         raise ValueError('Invalid market collection request')
@@ -731,6 +758,12 @@ async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: boo
             sources[name]['status']='observed'
     evidence = dict(schema_version=2, sport=sport, captured_at=datetime.now(timezone.utc).isoformat(), sources=sources)
     rows = comparisons(evidence)
+    schedule_status=None
+    if publish and sport=='cfb':
+        try:
+            schedule_status=await publish_cfb_slate(now)
+        except Exception:
+            schedule_status='unavailable'
     summary = dict(schema_version=2, sport=sport, captured_at=evidence['captured_at'], evidence_sha256=digest(evidence),
         sources={name:dict(status=source['status'], count=len(source.get('events',source.get('games',source.get('projections',[])))),
             partial_coverage=source.get('partial_coverage',True),
@@ -738,6 +771,8 @@ async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: boo
             **({'coverage':source['coverage']} if 'coverage' in source else {})) for name,source in sources.items()},
         comparisons=rows, execution_ready=False, realized_profit=None,
         scope='Observed prices only. Gross gaps exclude fees and full settlement states; they are not verified arbitrage or backtest returns.')
+    if schedule_status is not None:
+        summary['schedule_status']=schedule_status
     archive = write_archive(dict(evidence=evidence, summary=summary),directory=Path('.local/market-watch'))
     if publish:
         if 'kalshi' in selected:
@@ -775,8 +810,8 @@ def main():
     for sport in (['nfl','nba'] if args.sport=='both' else [args.sport]):
         try:
             summary,_ = asyncio.run(run(sport,args.daily_credit_limit,args.game_limit,args.publish,args.provider))
-            unavailable=not summary['sources'] or any(source['status'] not in ('observed','not_requested')
-                for source in summary['sources'].values())
+            unavailable=(not summary['sources'] or any(source['status'] not in ('observed','not_requested')
+                for source in summary['sources'].values()) or summary.get('schedule_status')=='unavailable')
             failed=failed or unavailable
             print(json.dumps(dict(sport=sport,status='degraded' if unavailable else 'observed',
                 sources=summary['sources'],comparisons=len(summary['comparisons']),execution_ready=False)))

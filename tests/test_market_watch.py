@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
@@ -273,6 +273,48 @@ async def test_cfb_collects_only_bounded_sportsbook_markets(monkeypatch,tmp_path
     for provider in ('public','kalshi','prizepicks'):
         with pytest.raises(ValueError,match='sportsbook game markets only'):
             await market_watch.run('cfb',25,1,False,provider)
+
+
+@pytest.mark.asyncio
+async def test_cfb_publish_caches_one_bounded_future_slate(monkeypatch,tmp_path):
+    from unittest.mock import AsyncMock
+    from sportsbet import market_watch
+    stored={};monkeypatch.chdir(tmp_path)
+    today=str(datetime.now(timezone.utc).astimezone(market_watch.ZoneInfo('America/New_York')).date())
+    future=datetime.now(timezone.utc)+timedelta(days=1)
+    games=[dict(provider_event_id=str(index),home_abbr='HOM',away_abbr='AWY',
+        home_name='Home',away_name='Away',date='20990101',label='Tomorrow',
+        game_time=(future+timedelta(minutes=index)).isoformat(),completed=False) for index in range(101)]
+    schedule=AsyncMock(return_value={'sport':'cfb','captured_at':NOW.isoformat(),
+        'as_of_date':today,'status':'complete','partial':False,'games':games,
+        'failures':[],'sources':['espn']})
+    monkeypatch.setattr(market_watch,'collect_schedule',schedule)
+    monkeypatch.setattr(market_watch,'load_snapshot',lambda key:None)
+    monkeypatch.setattr(market_watch,'publish_snapshot',lambda key,value:stored.update({key:value}))
+    monkeypatch.setattr(market_watch,'sportsbooks',AsyncMock(return_value={
+        'status':'budget_exhausted','events':[]}))
+    report,_=await market_watch.run('cfb',25,1,True,'sportsbook')
+    schedule.assert_awaited_once()
+    args,kwargs=schedule.await_args
+    assert args[0]=='cfb' and abs((args[1]-datetime.now(timezone.utc)).total_seconds())<30
+    assert kwargs=={'offsets':tuple(range(7))}
+    assert set(stored)=={'slate:cfb','markets:cfb'}
+    assert len(stored['slate:cfb']['games'])==100 and stored['slate:cfb']['status']=='partial'
+    assert report['schedule_status']=='partial'
+
+
+@pytest.mark.asyncio
+async def test_cfb_slate_cache_avoids_repeated_espn_requests(monkeypatch):
+    from unittest.mock import AsyncMock
+    from sportsbet import market_watch
+    now=datetime.now(timezone.utc)
+    schedule=AsyncMock();published=[]
+    monkeypatch.setattr(market_watch,'collect_schedule',schedule)
+    monkeypatch.setattr(market_watch,'load_snapshot',lambda key:{'captured_at':now.isoformat(),
+        'as_of_date':str(now.astimezone(market_watch.ZoneInfo('America/New_York')).date()),'status':'complete'})
+    monkeypatch.setattr(market_watch,'publish_snapshot',lambda key,value:published.append(key))
+    assert await market_watch.publish_cfb_slate(now)=='cached'
+    schedule.assert_not_called();assert published==[]
 
 
 @pytest.mark.parametrize('provider_status',['unavailable','budget_exhausted'])

@@ -15,7 +15,9 @@ export async function GET(request:Request) {
     const captured=scheduleSnapshot(values['slate:'+sport],sport,now,6);
     if(captured.status===200) result=captured;
   } catch { /* Provider-backed fixtures remain visible when worker metadata is unavailable. */ }
-  result ??=await liveSchedule(sport,now,6);
+  // CFB is populated by the serialized worker. Avoid a seven-request ESPN burst
+  // from every page view when the stored slate is absent or stale.
+  result ??=sport==='cfb' ? scheduleSnapshot(null,sport,now,6) : await liveSchedule(sport,now,6);
   if(result.status!==200) return Response.json(result.body,{status:503,headers:{'Cache-Control':'no-store'}});
   const games=sport==='cfb' ? result.body.games.filter(game=>Date.parse(game.game_time)>now && !game.completed)
     .map(game=>({...game,state:'Sportsbook market capture only'})) : slateReadiness(result.body.games,scan,now);

@@ -38,5 +38,7 @@ test('CFB schedules use the same fail-closed public contract',()=>{
   const data={sport:'cfb',status:'complete',partial:false,captured_at:'2026-09-11T17:59:00Z',
     as_of_date:'2026-09-11',games:[]};
   assert.equal(scheduleSnapshot(data,'cfb',now,6).status,200);
+  assert.equal(scheduleSnapshot({...data,captured_at:'2026-09-10T19:00:00Z'},'cfb',now,6).status,200);
+  assert.equal(scheduleSnapshot({...data,captured_at:'2026-09-10T17:59:59Z'},'cfb',now,6).status,503);
   assert.equal(scheduleSnapshot({...data,sport:'nfl'},'cfb',now,6).status,503);
 });
