@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import priorWeekOne from '../data/nfl-week1-2025-receptions.json' with {type:'json'};
+import priorWeekTwo from '../data/nfl-week2-2025-receptions.json' with {type:'json'};
 import weekOne from '../data/nfl-week1-2026.json' with {type:'json'};
 import {forecastChecks, forecastCohort, forecastEvidenceGate, forecastResult, highestConvictionForecast,
   publicForecastBenchmark} from '../lib/publicBenchmarks.ts';
@@ -31,6 +33,24 @@ test('fixed conviction filter reports every win and loss without changing the de
   assert.ok(highest.game_cluster_interval[1] < .85);
   assert.equal(forecastEvidenceGate(all),false);
   assert.equal(forecastEvidenceGate(highest),true);
+});
+
+test('the same conviction rule replicates across separate 2025 and 2026 reception cohorts', () => {
+  const prior=[priorWeekOne,priorWeekTwo].map(publicForecastBenchmark);
+  const current=publicForecastBenchmark(weekOne);
+  const historical=forecastCohort(prior.flatMap(bundle=>bundle.records)
+    .filter(highestConvictionForecast));
+  const holdout=forecastCohort(current.records
+    .filter(record=>record.prop_type==='receptions')
+    .filter(highestConvictionForecast));
+  assert.deepEqual({sample:historical.sample,correct:historical.correct,games:historical.game_count},
+    {sample:213,correct:180,games:26});
+  assert.deepEqual({sample:holdout.sample,correct:holdout.correct,games:holdout.game_count},
+    {sample:122,correct:100,games:15});
+  assert.ok(historical.game_cluster_interval[0]>.79);
+  assert.ok(holdout.game_cluster_interval[0]>.72);
+  assert.equal(forecastEvidenceGate(historical),true);
+  assert.equal(forecastEvidenceGate(holdout),true);
 });
 
 test('benchmark evidence binds each result to its threshold and ESPN source', () => {
