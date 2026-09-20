@@ -42,3 +42,15 @@ test('CFB schedules use the same fail-closed public contract',()=>{
   assert.equal(scheduleSnapshot({...data,captured_at:'2026-09-10T17:59:59Z'},'cfb',now,6).status,503);
   assert.equal(scheduleSnapshot({...data,sport:'nfl'},'cfb',now,6).status,503);
 });
+
+test('recent previous-day snapshots bridge Eastern midnight with rebased labels',()=>{
+  const now=Date.parse('2026-09-12T04:10:00Z');
+  const game={provider_event_id:'401',home_abbr:'CIN',away_abbr:'TB',home_name:'Cincinnati Bengals',
+    away_name:'Tampa Bay Buccaneers',date:'20260912',label:'Tomorrow',game_time:'2026-09-12T17:00:00Z',completed:false};
+  const data={sport:'nfl',status:'complete',partial:false,captured_at:'2026-09-12T03:59:00Z',
+    as_of_date:'2026-09-11',games:[game]};
+  const result=scheduleSnapshot(data,'nfl',now,6);
+  assert.equal(result.status,200);assert.equal(result.body.partial,true);
+  assert.equal(result.body.games[0].label,'Today');
+  assert.equal(scheduleSnapshot({...data,as_of_date:'2026-09-10'},'nfl',now,6).status,503);
+});

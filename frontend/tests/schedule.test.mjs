@@ -16,7 +16,14 @@ test('NFL schedule requests use football endpoint and numeric dates', async t =>
   const response=await GET(new Request('http://localhost/api/games?sport=nfl'));
   assert.equal(response.status,200);
   assert.equal((await response.json()).games.length,3);
-  assert.ok(requested.every(url => /football\/nfl\/scoreboard\?dates=\d{8}$/.test(url)));
+  assert.ok(requested.every(url => /cdn\.espn\.com\/core\/nfl\/scoreboard\?xhr=1&limit=100&dates=\d{8}$/.test(url)));
+});
+
+test('CDN scoreboard envelopes are validated before fixtures are exposed', async t => {
+  t.mock.method(globalThis,'fetch',async ()=>Response.json({content:{sbData:{events:[]}}}));
+  const response=await GET(new Request('http://localhost/api/games?sport=nfl'));
+  assert.equal(response.status,200);
+  assert.deepEqual((await response.json()).games,[]);
 });
 
 test('hosted snapshot lookup failures recover from validated public scoreboard responses',async t=>{

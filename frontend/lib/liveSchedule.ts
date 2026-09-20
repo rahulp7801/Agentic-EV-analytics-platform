@@ -1,10 +1,17 @@
 import {scheduleSnapshot} from './scheduleStatus.ts';
 import type {Sport} from './types';
 
-const SPORTS={nfl:'football/nfl',nba:'basketball/nba',cfb:'football/college-football'};
+const SPORTS={nfl:'nfl',nba:'nba',cfb:'college-football'};
 function row(value:unknown):Record<string,unknown> {
   if(!value || typeof value!=='object' || Array.isArray(value)) throw new Error('Invalid scoreboard');
   return value as Record<string,unknown>;
+}
+
+function scoreboardEvents(value:unknown) {
+  const root=row(value);
+  const events=root.events ?? row(row(root.content).sbData).events;
+  if(!Array.isArray(events) || events.length>100) throw new Error('Invalid scoreboard');
+  return events;
 }
 
 /** Free read-only recovery for a stale worker schedule; never supplies prices or picks. */
@@ -19,12 +26,11 @@ export async function liveSchedule(sport:Sport,now=Date.now(),lookahead:1|6=1) {
   const results=await Promise.allSettled(days.map(async ([offset,label])=>{
     const day=new Date(today+'T00:00:00Z');day.setUTCDate(day.getUTCDate()+offset);
     const date=day.toISOString().slice(0,10).replaceAll('-','');
-    const response=await fetch(`https://site.api.espn.com/apis/site/v2/sports/${SPORTS[sport]}/scoreboard?dates=${date}`,{
+    const response=await fetch(`https://cdn.espn.com/core/${SPORTS[sport]}/scoreboard?xhr=1&limit=100&dates=${date}`,{
       headers:{'User-Agent':'LineworkSports/1.0'},signal:AbortSignal.timeout(5000),redirect:'error',next:{revalidate:60}});
     if(!response.ok || Number(response.headers.get('content-length'))>2*1024*1024) throw new Error('Scoreboard unavailable');
     const text=await response.text();if(text.length>2*1024*1024) throw new Error('Scoreboard too large');
-    const events=row(JSON.parse(text)).events;
-    if(!Array.isArray(events) || events.length>100) throw new Error('Invalid scoreboard');
+    const events=scoreboardEvents(JSON.parse(text));
     // NFL scoreboards may include the entire week; only retain this requested Eastern day.
     const games=events.filter(value=>{
       const event=row(value),start=Date.parse(String(event.date));

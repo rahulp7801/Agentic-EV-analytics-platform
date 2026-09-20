@@ -33,10 +33,8 @@ function easternDay(value:number) {
   return ['year','month','day'].map(type=>parts.find(part=>part.type===type)?.value).join('');
 }
 
-function publicGames(value:unknown, asOfDate:string,lookahead:number) {
-  if (!Array.isArray(value) || value.length>100) throw new Error('Invalid schedule');
-  const base=new Date(`${asOfDate}T00:00:00Z`);
-  const labels=new Map<number,string>();
+function dateLabels(asOfDate:string,lookahead:number) {
+  const base=new Date(`${asOfDate}T00:00:00Z`),labels=new Map<number,string>();
   for (const [offset,label] of [[-1,'Yesterday'],[0,'Today'],[1,'Tomorrow']] as const) {
     const day=new Date(base);day.setUTCDate(day.getUTCDate()+offset);
     labels.set(Number(day.toISOString().slice(0,10).replaceAll('-','')),label);
@@ -45,19 +43,26 @@ function publicGames(value:unknown, asOfDate:string,lookahead:number) {
     const day=new Date(base);day.setUTCDate(day.getUTCDate()+offset);
     labels.set(Number(day.toISOString().slice(0,10).replaceAll('-','')),day.toISOString().slice(0,10));
   }
+  return labels;
+}
+
+function publicGames(value:unknown, asOfDate:string,lookahead:number,sourceDate=asOfDate) {
+  if (!Array.isArray(value) || value.length>100) throw new Error('Invalid schedule');
+  const labels=dateLabels(asOfDate,lookahead),sourceLabels=dateLabels(sourceDate,lookahead);
   const ids=new Set<string>();
   return value.map(item=>{
     if (!item || typeof item!=='object' || Array.isArray(item)) throw new Error('Invalid schedule');
     const game=item as Row, id=text(game.provider_event_id,64), date=calendar(game.date,true);
-    const expectedLabel=labels.get(Number(date)), start=timestamp(game.game_time);
-    if (ids.has(id) || !expectedLabel || game.label!==expectedLabel || typeof game.completed!=='boolean'
+    const expectedLabel=labels.get(Number(date)),sourceLabel=sourceLabels.get(Number(date)),start=timestamp(game.game_time);
+    if (ids.has(id) || !sourceLabel || game.label!==sourceLabel || typeof game.completed!=='boolean'
         || easternDay(Date.parse(start))!==date) throw new Error('Invalid schedule');
     ids.add(id);
+    if(!expectedLabel) return null;
     return {home_abbr:text(game.home_abbr,10),away_abbr:text(game.away_abbr,10),
       home_name:text(game.home_name,100),away_name:text(game.away_name,100),date,
       label:expectedLabel,game_time:start,
       ...(lookahead>1 ? {provider_event_id:id,completed:game.completed} : {})};
-  });
+  }).filter(item=>item!==null);
 }
 
 export function scheduleSnapshot(data: Row | null, sport:Sport, now=Date.now(),lookahead=1) {
@@ -66,15 +71,21 @@ export function scheduleSnapshot(data: Row | null, sport:Sport, now=Date.now(),l
   try {
     if(lookahead!==1 && lookahead!==6) throw new Error('Invalid schedule window');
     if (!data || data.sport!==sport || (data.status!=='complete' && data.status!=='partial')
-        || data.partial!==(data.status==='partial') || calendar(data.as_of_date)!==today) {
+        || data.partial!==(data.status==='partial')) {
       throw new Error('Invalid schedule');
     }
+    const sourceDate=calendar(data.as_of_date),previous=new Date(`${today}T00:00:00Z`);
+    previous.setUTCDate(previous.getUTCDate()-1);
+    const rollover=sourceDate!==today;
+    const rolloverWindow=4*60*60000;
+    if(rollover && (sourceDate!==previous.toISOString().slice(0,10)
+        || easternDay(now-rolloverWindow)!==sourceDate.replaceAll('-',''))) throw new Error('Invalid schedule');
     const captured=timestamp(data.captured_at), age=now-Date.parse(captured);
     // Schedules change far less often than prices. Keep a same-day snapshot usable
     // across ordinary GitHub Actions scheduling delays while prices retain tighter gates.
     const maximumAge=sport==='cfb' ? 24*60*60000 : 4*60*60000;
     if (!Number.isFinite(age) || age<0 || age>maximumAge) throw new Error('Invalid schedule');
-    return {status:200,body:{games:publicGames(data.games,today,lookahead),partial:data.status==='partial',
+    return {status:200,body:{games:publicGames(data.games,today,lookahead,sourceDate),partial:data.status==='partial'||rollover,
       captured_at:captured}};
   } catch {
     return {status:503,body:{games:[],partial:true,error:'Schedules are temporarily unavailable.'}};
