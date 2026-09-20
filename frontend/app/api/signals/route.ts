@@ -16,8 +16,8 @@ export async function GET(request:Request) {
     if(hosted) {
       const profileKeys=options.sport ? ['player-profiles:'+options.sport] : ['player-profiles:nfl','player-profiles:nba'];
       const result=await databaseQuery<{data:ForecastPageInput}>(FORECAST_PAGE_QUERY,
-        [options.sport ? `signals:${options.sport}:%` : 'signals:%',profileKeys,options.view==='qualified',
-          options.view==='qualified' ? 5001 : options.limit,options.offset]);
+        [options.sport ? `signals:${options.sport}:%` : 'signals:%',profileKeys,options.view,
+          options.view==='library' ? options.limit : 5001,options.offset]);
       data=result.rows[0].data;
     } else {
       const paths=[path.join(process.cwd(),'public','signals_cache.json'),
@@ -32,7 +32,7 @@ export async function GET(request:Request) {
       data={rows:signals.slice(options.offset,options.offset+options.limit).map((signal:unknown)=>
         ({payload:{...snapshot,signals:[signal]}})),profiles:{},total_count:signals.length,
         revision:createHash('sha256').update(raw).digest('hex'),metadata:{...snapshot,signals:[],games:[]},invalid_envelopes:0,window_complete:true};
-      if(options.view==='qualified') data.rows=signals.map((signal:unknown)=>({payload:{...snapshot,signals:[signal]}}));
+      if(options.view!=='library') data.rows=signals.map((signal:unknown)=>({payload:{...snapshot,signals:[signal]}}));
     }
     if(options.revision && options.revision!==data.revision) {
       return NextResponse.json({error:'Forecasts changed during browsing. Refresh to reload.'},{status:409,headers:{'Cache-Control':'no-store'}});

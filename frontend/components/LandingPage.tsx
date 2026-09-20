@@ -7,6 +7,8 @@ import { motion, useReducedMotion } from 'motion/react';
 import { marketFreshness, type MarketFreshness } from '@/lib/marketFreshness';
 import { replicatedReceptionEvidence } from '@/lib/publicBenchmarks';
 import HistoricalFlowDemo from './HistoricalFlowDemo';
+import ResponsibleUse from './ResponsibleUse';
+import ThemeToggle from './ThemeToggle';
 import styles from './LandingPage.module.css';
 
 type Pulse = {
@@ -181,7 +183,7 @@ export default function LandingPage() {
     <div className={styles.page} ref={root}>
       <header className={styles.nav}>
         <Link className={styles.brand} href="/"><span>L</span><strong>Linework</strong></Link>
-            <nav aria-label="Landing navigation"><a href="#results">Results</a><a href="#platform">Platform</a><a href="#demo">Demo</a><a href="#method">Method</a><Link href="/terminal" className={styles.navButton} aria-label="Open dashboard"><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
+            <nav aria-label="Landing navigation"><a href="#results">Results</a><a href="#platform">Platform</a><a href="#demo">Demo</a><a href="#method">Method</a><ThemeToggle /><Link href="/terminal" className={styles.navButton} aria-label="Open dashboard"><span>Open dashboard</span><ArrowUpRight size={15} /></Link></nav>
       </header>
 
       <main>
@@ -194,7 +196,7 @@ export default function LandingPage() {
             <div className={styles.heroActions}><a href="#demo" aria-label="Try the Week 1 demo"><span aria-hidden="true">▶</span> Try the demo <ArrowRight size={17} /></a><Link href="/terminal">Open dashboard <ArrowUpRight size={17} /></Link></div>
           </motion.div>
           <motion.div className={styles.heroPulse} initial={reduceMotion ? false : { opacity: 0, y: 35 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .28, duration: .8 }}><MarketPulse pulse={pulse} /></motion.div>
-          <div className={styles.heroFine}><span>NBA + NFL</span><span>Sportsbooks · Kalshi · PrizePicks</span><span>Read-only analysis</span></div>
+          <div className={styles.heroFine}><span>NBA + NFL + CFB</span><span>Sportsbooks · Kalshi · PrizePicks</span><span>Pregame research only</span></div>
         </section>
 
         <section className={styles.results} id="results" aria-labelledby="results-title">
@@ -268,6 +270,7 @@ export default function LandingPage() {
         </section>
       </main>
 
+      <ResponsibleUse />
       <footer className={styles.footer}><Link href="/" className={styles.brand}><span>L</span><strong>Linework</strong></Link><p>Sports market intelligence with source, time, and uncertainty attached.</p><span>Research only · {new Date().getFullYear()}</span></footer>
     </div>
   );

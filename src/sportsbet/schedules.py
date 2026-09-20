@@ -1,4 +1,6 @@
-"""Collect bounded ESPN schedules on the worker, preserving source failures."""
+"""Collect and publish bounded ESPN schedules, preserving source failures."""
+import argparse
+import asyncio
 from datetime import datetime, timedelta, timezone
 import re
 from zoneinfo import ZoneInfo
@@ -77,3 +79,45 @@ async def collect(sport: str, now: datetime | None = None, *, offsets: tuple[int
     return dict(sport=sport,captured_at=datetime.now(timezone.utc).isoformat(),as_of_date=str(today),
         status='complete' if not failures else 'unavailable' if len(failures)==len(offsets) else 'partial',
         games=games,partial=bool(failures),failures=failures,sources=sources)
+
+
+async def publish_slate(sport: str, now: datetime | None = None) -> str:
+    """Publish current and upcoming games; started games remain visibly locked."""
+    if sport not in SPORTS:
+        raise ValueError('Unsupported sport')
+    from sportsbet.dashboard import load_snapshot, publish_snapshot
+    now=now or datetime.now(timezone.utc)
+    today=str(now.astimezone(ZoneInfo('America/New_York')).date())
+    previous=load_snapshot('slate:'+sport) or {}
+    try:
+        age=now-datetime.fromisoformat(previous['captured_at'].replace('Z','+00:00'))
+        if (previous.get('as_of_date')==today and previous.get('status') in ('complete','partial')
+                and timedelta(0)<=age<=timedelta(minutes=10)):
+            return 'cached'
+    except (KeyError,ValueError,TypeError,AttributeError):
+        pass
+    slate=await collect(sport,now,offsets=tuple(range(7)))
+    games=sorted((game for game in slate.get('games',[]) if game.get('completed') is False),
+        key=lambda game:(datetime.fromisoformat(game['game_time']),game['provider_event_id']))
+    truncated=len(games)>100
+    status=slate['status']
+    if status=='complete' and truncated:
+        status='partial'
+    bounded={**slate,'games':games[:100],'partial':status=='partial','status':status}
+    if status in ('complete','partial'):
+        publish_snapshot('slate:'+sport,bounded)
+    return status
+
+
+def main() -> None:
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--sport',choices=sorted(SPORTS),required=True)
+    args=parser.parse_args()
+    try:
+        print(asyncio.run(publish_slate(args.sport)))
+    except Exception as exc:
+        raise SystemExit(f'Schedule publication unavailable ({type(exc).__name__})') from None
+
+
+if __name__=='__main__':
+    main()

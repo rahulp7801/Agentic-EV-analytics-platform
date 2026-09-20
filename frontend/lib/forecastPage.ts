@@ -1,5 +1,5 @@
 import {publicSignalSnapshots,publicPlayerProfile} from './signalMetrics.ts';
-import {bestPickOptions} from './bestPicks.ts';
+import {bestPickOptions,recentCandidateOptions} from './bestPicks.ts';
 import type {Sport} from './types';
 
 export const FORECAST_PAGE_SIZE=100;
@@ -11,20 +11,20 @@ export function forecastRequest(url:URL) {
   const offset=url.searchParams.get('offset') ?? '0';
   const limit=url.searchParams.get('limit') ?? String(FORECAST_PAGE_SIZE);
   const revision=url.searchParams.get('revision');
-  if((sport!==null && sport!=='nba' && sport!=='nfl' && sport!=='cfb') || !['library','qualified'].includes(view)
+  if((sport!==null && sport!=='nba' && sport!=='nfl' && sport!=='cfb') || !['library','qualified','candidates'].includes(view)
     // The public research window is deliberately capped at 1,000 rows. Larger
     // offsets add expensive cache keys without serving any product workflow.
     || !/^(0|[1-9][0-9]{0,3})$/.test(offset) || Number(offset)>=1000
     || !/^[1-9][0-9]{0,2}$/.test(limit) || Number(limit)>FORECAST_PAGE_SIZE
     || (revision!==null && !/^[a-f0-9]{64}$/.test(revision))
-    || (view==='qualified' && (Number(offset)!==0 || revision!==null))) throw new Error('Invalid forecast request');
+    || (view!=='library' && (Number(offset)!==0 || revision!==null))) throw new Error('Invalid forecast request');
   return {sport:sport as Sport|null,view,offset:Number(offset),limit:Number(limit),revision};
 }
 
 // Flatten before transfer; retain the previous latest-100-game archive window.
 export const FORECAST_PAGE_QUERY=`WITH latest AS MATERIALIZED (
   SELECT snapshot_key,payload,updated_at FROM dashboard_snapshots
-  WHERE snapshot_key LIKE $1 AND ($3::boolean=false OR updated_at>=now()-interval '6 minutes')
+  WHERE snapshot_key LIKE $1 AND ($3::text!='qualified' OR updated_at>=now()-interval '6 minutes')
   ORDER BY updated_at DESC,snapshot_key DESC LIMIT 100
 ), envelopes AS MATERIALIZED (
   SELECT snapshot_key,payload,updated_at,
@@ -38,17 +38,18 @@ export const FORECAST_PAGE_QUERY=`WITH latest AS MATERIALIZED (
 ), library_page AS (
   SELECT snapshot_key,payload->'generated_at' AS generated_at,signal,updated_at,ordinality
   FROM indexed CROSS JOIN LATERAL jsonb_array_elements(signals) WITH ORDINALITY AS items(signal,ordinality)
-  WHERE $3::boolean=false AND base_offset<$5::bigint+$4::bigint AND base_offset+signal_count>$5::bigint
+  WHERE $3::text='library' AND base_offset<$5::bigint+$4::bigint AND base_offset+signal_count>$5::bigint
     AND base_offset+ordinality>$5::bigint AND base_offset+ordinality<=$5::bigint+$4::bigint
-), qualified AS MATERIALIZED (
+), shortlist AS MATERIALIZED (
   SELECT snapshot_key,payload->'generated_at' AS generated_at,signal,updated_at,ordinality
   FROM envelopes CROSS JOIN LATERAL jsonb_array_elements(signals) WITH ORDINALITY AS items(signal,ordinality)
-  WHERE $3::boolean=true AND signal->>'gated'='false'
+  WHERE ($3::text='qualified' AND signal->>'gated'='false')
+     OR ($3::text='candidates' AND signal @? '$ ? (@.sample_size >= 20 && @.true_prob > @.implied_prob && @.ev_pct <= 0.150000000001)')
 ), page AS (
   SELECT * FROM (
     SELECT * FROM library_page
     UNION ALL
-    SELECT * FROM qualified
+    SELECT * FROM shortlist
   ) candidates ORDER BY updated_at DESC,snapshot_key DESC,ordinality LIMIT $4
 )
 SELECT jsonb_build_object(
@@ -57,9 +58,9 @@ SELECT jsonb_build_object(
     ORDER BY updated_at DESC,snapshot_key DESC,ordinality) FROM page),'[]'::jsonb),
   'profiles',COALESCE((SELECT jsonb_object_agg(snapshot_key,payload) FROM dashboard_snapshots
     WHERE snapshot_key=ANY($2::text[])),'{}'::jsonb),
-  'total_count',(CASE WHEN $3::boolean THEN (SELECT count(*) FROM qualified)
+  'total_count',(CASE WHEN $3::text!='library' THEN (SELECT count(*) FROM shortlist)
     ELSE (SELECT COALESCE(sum(signal_count),0) FROM indexed) END),
-  'window_complete',($3::boolean=false OR (SELECT count(*) FROM dashboard_snapshots
+  'window_complete',($3::text!='qualified' OR (SELECT count(*) FROM dashboard_snapshots
     WHERE snapshot_key LIKE $1 AND updated_at>=now()-interval '6 minutes')<=100),
   'revision',(SELECT encode(sha256(convert_to(COALESCE(string_agg(snapshot_key||':'||updated_at::text,','
     ORDER BY updated_at DESC,snapshot_key DESC),''),'UTF8')),'hex') FROM latest),
@@ -74,9 +75,10 @@ export type ForecastPageInput={rows:Array<{payload:unknown}>;profiles:Record<str
   total_count:number;revision:string;metadata:unknown;invalid_envelopes:number;window_complete:boolean};
 
 export function forecastPage(data:ForecastPageInput,request:ReturnType<typeof forecastRequest>,now=Date.now()) {
+  const shortlisted=request.view!=='library';
   if(data.invalid_envelopes!==0 || !Number.isSafeInteger(data.total_count) || data.total_count<0
     || data.total_count>50000 || !/^[a-f0-9]{64}$/.test(data.revision)
-    || !Array.isArray(data.rows) || data.rows.length>(request.view==='qualified' ? 5001 : request.limit)) {
+    || !Array.isArray(data.rows) || data.rows.length>(shortlisted ? 5001 : request.limit)) {
     throw new Error('Invalid forecast page');
   }
   if(request.revision && request.revision!==data.revision) throw new Error('Forecast revision changed');
@@ -84,7 +86,7 @@ export function forecastPage(data:ForecastPageInput,request:ReturnType<typeof fo
   const signals:typeof metadata.signals=[];
   const games=new Map<string,typeof metadata.games[number]>();
   let consumed=0,invalid=0,bytes=0;
-  for(const row of request.view==='qualified' ? data.rows.slice(0,5000) : data.rows) {
+  for(const row of shortlisted ? data.rows.slice(0,5000) : data.rows) {
     const result=publicSignalSnapshots([row.payload],now,request.sport ?? undefined);
     if(result.signals.length>1) throw new Error('Invalid forecast row');
     let signal=result.signals[0];
@@ -107,9 +109,10 @@ export function forecastPage(data:ForecastPageInput,request:ReturnType<typeof fo
   const complete=request.offset+consumed>=data.total_count
     && (!qualified || (data.total_count<=5000 && data.window_complete===true));
   // An incomplete candidate inspection cannot advertise the strongest picks.
-  const selected=qualified ? (complete ? bestPickOptions(signals,now) : []) : signals;
-  return {generated_at:metadata.generated_at,games:qualified ? [] : [...games.values()],signals:selected,
+  const selected=qualified ? (complete ? bestPickOptions(signals,now) : [])
+    : request.view==='candidates' ? recentCandidateOptions(signals,now) : signals;
+  return {generated_at:metadata.generated_at,games:shortlisted ? [] : [...games.values()],signals:selected,
     invalid_signals:invalid,total_count:data.total_count,
-    pagination:{offset:request.offset,next_offset:!qualified && !complete ? request.offset+consumed : null,
+    pagination:{offset:request.offset,next_offset:!shortlisted && !complete ? request.offset+consumed : null,
       revision:data.revision,complete},research_window:'Latest 100 published game snapshots'};
 }

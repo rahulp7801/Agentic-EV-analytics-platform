@@ -20,7 +20,8 @@ function input(values,total=values.length) {
 }
 test('forecast requests reject unbounded offsets, limits and unsupported views',()=>{
   for(const query of ['sport=mlb','offset=-1','offset=1000','offset=50001','offset=01','limit=101','limit=0',
-    'view=other','revision=bad','view=qualified&offset=1','view=qualified&revision='+ 'a'.repeat(64)]) {
+    'view=other','revision=bad','view=qualified&offset=1','view=qualified&revision='+ 'a'.repeat(64),
+    'view=candidates&offset=1','view=candidates&revision='+ 'a'.repeat(64)]) {
     assert.throws(()=>forecastRequest(new URL('https://example.test/api/signals?'+query)));
   }
 });
@@ -28,6 +29,19 @@ test('forecast requests reject unbounded offsets, limits and unsupported views',
 test('forecast requests accept the bounded CFB research library',()=>{
   assert.deepEqual(forecastRequest(new URL('https://example.test/api/signals?sport=cfb&view=library&offset=0&limit=36')),
     {sport:'cfb',view:'library',offset:0,limit:36,revision:null});
+});
+test('candidate view returns a bounded future watchlist without relabeling stale prices',async()=>{
+  const options=forecastRequest(new URL('https://example.test/api/signals?sport=nfl&view=candidates'));
+  const stale={...base,snapped_at:new Date(now-6*60000).toISOString()};
+  const started={...stale,id:'started',player:'Started',game_start_time:new Date(now-1).toISOString()};
+  const body=forecastPage(input([started,stale]),options,now);
+  assert.deepEqual(body.signals.map(signal=>signal.id),['A']);
+  assert.equal(body.signals[0].gated,true);assert.equal(body.signals[0].gate_reason,'stale_quote');
+  let calls=0;
+  const result=await fetchForecasts('nfl',undefined,'candidates',async()=>{
+    calls++;return {ok:true,json:async()=>body};
+  });
+  assert.equal(calls,1);assert.deepEqual(result.signals.map(signal=>signal.id),['A']);
 });
 test('an accumulated archive exceeding 5,000 records still yields a bounded usable page',()=>{
   const result=forecastPage(input(Array(100).fill(base),6000),request(),now);

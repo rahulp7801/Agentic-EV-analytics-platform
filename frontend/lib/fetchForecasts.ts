@@ -50,7 +50,7 @@ export async function fetchForecasts(sport:Sport,signal?:AbortSignal,view='libra
     // Rolling propagation may still serve the original, strictly validated deployment contract.
     if(pagination===undefined) {total=signals.length;complete=true;break;}
     total=body.total_count;revision=pagination.revision;complete=pagination.complete;
-    if(view==='qualified') break;
+    if(view!=='library') break;
     const next=pagination.next_offset;
     if(complete) {if(next!==null) throw new Error('Invalid forecast coverage');break;}
     if(!Number.isSafeInteger(next) || next<=offset || next>offset+100 || next>total) throw new Error('Invalid forecast cursor');

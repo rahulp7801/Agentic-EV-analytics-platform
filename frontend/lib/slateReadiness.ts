@@ -22,17 +22,18 @@ export function slateReadiness(games:SlateGame[],scan:Record<string,unknown>|nul
   const finished=scan?.finished_at ?? scan?.started_at;
   const scanFresh=stamp(finished) && now-Date.parse(finished as string)>=-60000 && now-Date.parse(finished as string)<=45*60000;
   const events=Array.isArray(scan?.events) && scan.events.length<=100 ? scan.events : [];
-  return games.filter(game=>Date.parse(game.game_time)>now && !game.completed).map(game=>{
+  return games.filter(game=>!game.completed).map(game=>{
+    const started=Date.parse(game.game_time)<=now;
     const matches=events.filter(value=>value && typeof value==='object' && !Array.isArray(value)
       && name(value.home_team) && name(value.away_team) && stamp(value.game_start_time)
       && value.home_team===game.home_name && value.away_team===game.away_name
       && Date.parse(value.game_start_time)===Date.parse(game.game_time));
     const event=matches.length===1 ? matches[0] as Record<string,unknown> : null;
-    let state=Date.parse(game.game_time)-now>48*3600000 ? 'Outside the 48-hour scan window' : 'Waiting for scan';
-    if(state==='Waiting for scan' && scanFresh && scan?.status==='blocked') state='Waiting for verified history';
-    if(state==='Waiting for scan' && scanFresh && scan?.status==='failed') state='Scan failed';
-    if(event && scanFresh) state=STATES[String(event.state)] ?? 'Coverage unavailable';
-    else if(event && !scanFresh) state='Scan evidence is stale';
+    let state=started ? 'Live · picks locked' : Date.parse(game.game_time)-now>48*3600000 ? 'Outside the 48-hour scan window' : 'Waiting for scan';
+    if(!started && state==='Waiting for scan' && scanFresh && scan?.status==='blocked') state='Waiting for verified history';
+    if(!started && state==='Waiting for scan' && scanFresh && scan?.status==='failed') state='Scan failed';
+    if(!started && event && scanFresh) state=STATES[String(event.state)] ?? 'Coverage unavailable';
+    else if(!started && event && !scanFresh) state='Scan evidence is stale';
     const coverage=event && scanFresh && scan?.coverage && typeof scan.coverage==='object'
       ? (scan.coverage as Record<string,unknown>)[String(event.game_id)] : null;
     const c=coverage && typeof coverage==='object' && !Array.isArray(coverage) ? coverage as Record<string,unknown> : {};
@@ -40,12 +41,12 @@ export function slateReadiness(games:SlateGame[],scan:Record<string,unknown>|nul
     const selections=count(c.selections),requests=count(c.model_requests),estimates=count(c.model_estimates);
     const accepted=count(counts.accepted);
     const valid=selections!==null && requests!==null && estimates!==null && estimates<=requests && requests<=selections;
-    if(state==='Evaluated') state=c.model_status==='no_quotes' ? 'No usable prop quotes'
+    if(!started && state==='Evaluated') state=c.model_status==='no_quotes' ? 'No usable prop quotes'
       : !valid ? 'Coverage unavailable' : estimates<selections ? 'Player/model coverage incomplete' : 'Evaluated';
-    return {...game,state,quotes:count(c.quotes),selections,model_estimates:valid ? estimates : null,
+    return {...game,state,locked:started,quotes:started ? null : count(c.quotes),selections:started ? null : selections,model_estimates:started ? null : valid ? estimates : null,
       unresolved_selections:valid ? selections-requests : null,
-      accepted_at_capture:valid && accepted!==null && accepted<=estimates ? accepted : null,
-      reasons:Object.entries(GATES).flatMap(([key,label])=>count(counts[key]) ? [{label,count:count(counts[key])!}] : []),
+      accepted_at_capture:!started && valid && accepted!==null && accepted<=estimates ? accepted : null,
+      reasons:started ? [] : Object.entries(GATES).flatMap(([key,label])=>count(counts[key]) ? [{label,count:count(counts[key])!}] : []),
       checked_at:stamp(finished) ? finished as string : null,
       next_refresh_at:event && stamp(event.next_refresh_at) && Date.parse(event.next_refresh_at as string)>now
         && Date.parse(event.next_refresh_at as string)<=now+48*3600000 ? event.next_refresh_at as string : null};

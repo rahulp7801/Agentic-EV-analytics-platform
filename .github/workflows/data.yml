@@ -15,6 +15,10 @@ on:
         type: choice
         options: [all, sportsbook, kalshi, prizepicks]
         default: all
+      event_ids:
+        description: 'Optional comma-separated exact provider event IDs for a targeted scan'
+        type: string
+        default: ''
   schedule:
     - cron: '17 13 * * *'
     - cron: '7,37 * * * *'
@@ -39,6 +43,7 @@ jobs:
       SPORT: ${{ inputs.sport || 'both' }}
       OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'daily' || 'monitor') }}
       PROVIDER: ${{ inputs.provider || 'all' }}
+      EVENT_IDS: ${{ inputs.event_ids || '' }}
       DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '25' }}
       ODDS_ROLLING_CREDIT_LIMIT: ${{ vars.ODDS_ROLLING_CREDIT_LIMIT || '450' }}
     steps:
@@ -62,6 +67,10 @@ jobs:
           }
           if [ "$PROVIDER" != all ] && [ "$OPERATION" != watch ]; then
             echo 'Provider selection is supported only for watch operations.'
+            exit 1
+          fi
+          if [ -n "$EVENT_IDS" ] && { [ "$OPERATION" != scan ] || [ "$SPORT" = both ]; }; then
+            echo 'Targeted events require a single-sport scan operation.'
             exit 1
           fi
           if [ "$SPORT" = cfb ] && [ "$OPERATION" != watch ] && [ "$OPERATION" != scan ] && [ "$OPERATION" != refresh ] && [ "$OPERATION" != backfill ]; then
@@ -90,7 +99,13 @@ jobs:
           set +e
           case "$OPERATION" in
             daily|monitor|public_daily|public_monitor) uv run --locked python -m sportsbet.daily --sport "$SPORT" --mode "$OPERATION" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
-            scan) uv run --locked python -m sportsbet.scan --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" ;;
+            scan)
+              target=()
+              if [ -n "$EVENT_IDS" ]; then
+                IFS=',' read -ra ids <<< "$EVENT_IDS"
+                for id in "${ids[@]}"; do target+=(--event-id "$id"); done
+              fi
+              uv run --locked python -m sportsbet.scan --sport "$SPORT" --daily-credit-limit "$DAILY_CREDIT_LIMIT" "${target[@]}" ;;
             watch) uv run --locked python -m sportsbet.market_watch --sport "$SPORT" --provider "$PROVIDER" --daily-credit-limit "$DAILY_CREDIT_LIMIT" --publish ;;
             refresh) uv run --locked python -m sportsbet.refresh --sport "$SPORT" ;;
             backfill) uv run --locked python -m sportsbet.refresh --sport "$SPORT" --backfill ;;

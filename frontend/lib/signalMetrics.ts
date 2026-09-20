@@ -19,7 +19,7 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
     && Number.isInteger(odds) && Math.abs(odds) >= 100 && (s.direction === 'over' || s.direction === 'under');
   const legacy = s.model_version !== CURRENT_MODEL_VERSION;
   const stale = !Number.isFinite(quoteTime) || now - quoteTime > 300000 || quoteTime > now + 60000;
-  const started = !Number.isFinite(start) || start <= now;
+  const missingStart = !Number.isFinite(start), started = Number.isFinite(start) && start <= now;
   const availability = s.availability as AvailabilityEvidence | undefined;
   const availabilityTime = Date.parse(availability?.captured_at ?? '');
   const availabilityReason = availability?.status !== 'observed' || !availability.roster_confirmed
@@ -35,7 +35,8 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
   const expectedReturn=p*b-(1-p-push);
   const cutoff=Number.isFinite(start) ? new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(start) : null;
   const reason = !valid ? 'invalid_metrics' : legacy ? 'legacy_model' : synthetic ? 'synthetic_price'
-    : stale ? 'stale_quote' : started ? 'missing_or_started_game' : (!Number.isFinite(sample) || sample < 20) ? 'insufficient_sample'
+    : missingStart ? 'missing_or_started_game' : started ? 'game_started' : stale ? 'stale_quote'
+    : (!Number.isFinite(sample) || sample < 20) ? 'insufficient_sample'
     : (!Number.isFinite(kelly) || kelly < 0 || kelly > 0.25) ? 'invalid_stake'
     : availabilityReason ? availabilityReason
     : s.gated!==false ? String(s.gate_reason ?? 'risk_gate')

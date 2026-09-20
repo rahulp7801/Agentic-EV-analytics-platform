@@ -17,6 +17,13 @@ test('seven-day fixtures are visible before the scan horizon and never claim eva
   assert.deepEqual(slateReadiness([{...game,completed:true}],scan,now),[]);
   assert.equal(slateReadiness([game],{...scan,events:[{...scan.events[0],game_start_time:'2026-09-20T18:00:00Z'}]},now)[0].state,'Outside the 48-hour scan window');
 });
+test('in-progress games stay visible but permanently lock every pick state',()=>{
+  const live={...game,game_time:new Date(now-1).toISOString(),date:'20260918'};
+  const result=slateReadiness([live],{...scan,events:[{...scan.events[0],game_start_time:live.game_time}]},now)[0];
+  assert.equal(result.state,'Live · picks locked');assert.equal(result.locked,true);
+  assert.equal(result.model_estimates,null);assert.equal(result.accepted_at_capture,null);
+  assert.deepEqual(result.reasons,[]);
+});
 test('exact game joins retain model gaps, risk reasons and acceptance at capture separately',()=>{
   const result=slateReadiness([game],scan,now)[0];
   assert.equal(result.state,'Player/model coverage incomplete');assert.equal(result.model_estimates,7);
