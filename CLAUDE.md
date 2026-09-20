@@ -1,5 +1,7 @@
 # Maintained implementation knowledge
 
+- The paid workflow's half-hour schedule must run the quota-aware `scan` operation whenever `DATA_PIPELINE_ENABLED=true`; provider-only `monitor` runs cannot keep five-minute recommendation prices current. `scan` already persists attempts, spaces requests by kickoff distance, prioritizes prior near-passes, retains credits for the last hour, coalesces concurrent refreshes, and permanently locks started games. When recommendation collection is disabled, the same schedule may fall back to `monitor`. Keep the configured daily and rolling credit ceilings below provider allowance; caching prevents duplicate work but cannot turn an old quote into a current recommendation.
+
 ## Working agreement
 
 - PR119 merged at `8135fbc` from checked head `9578a86`; PR CI `35031354338`, PR CodeQL `35031352961`, protected-master CI/deploy `35031489454`, and master CodeQL `35031489275` passed. The immutable prediction payload now retains exact home/away identity. Current-model rows missing that identity fail the settlement evidence contract and are excluded from metrics. Post-deploy public daily run `35031755971` passed schema, production readiness, evidence-secret scan, and artifact retention; production metrics now truthfully report 0 eligible, 0 pending, 708 excluded, and null performance statistics.

@@ -35,12 +35,17 @@ def test_paid_and_public_schedules_are_isolated() -> None:
     assert "vars.PAID_MONITOR_ENABLED == 'true'" in paid
     assert "github.event.schedule == '17 13 * * *'" in paid
     assert "github.event.schedule == '7,37 * * * *'" in paid
+    assert "vars.DATA_PIPELINE_ENABLED == 'true' && 'scan' || 'monitor'" in paid
     assert "PUBLIC_DATA_PIPELINE_ENABLED" not in paid
     assert "vars.PUBLIC_DATA_PIPELINE_ENABLED == 'true'" in public
     assert "vars.DATA_PIPELINE_ENABLED" not in public
     assert "ODDS_API_KEY" not in public
     assert "group: market-data" in paid
     assert "group: public-market-data" in public
+
+    paid_operation = next(line for line in paid.splitlines() if line.startswith("      OPERATION:"))
+    assert "github.event.schedule == '17 13 * * *' && 'daily'" in paid_operation
+    assert "vars.DATA_PIPELINE_ENABLED == 'true' && 'scan' || 'monitor'" in paid_operation
 
     operation = next(line for line in public.splitlines() if line.startswith("      OPERATION:"))
     public_daily = (
