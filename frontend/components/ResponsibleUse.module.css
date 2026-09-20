@@ -1,0 +1,5 @@
+.notice, .compact { color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+.notice { padding: 22px max(6vw, 20px); border-top: 1px solid var(--border-dim); background: var(--bg-surface); }
+.compact { flex: 0 0 auto; padding: 9px 24px 10px; border-top: 1px solid var(--border-dim); background: color-mix(in srgb, var(--bg-surface) 92%, transparent); }
+.notice strong, .compact strong { color: var(--text-primary); }
+@media (max-width:720px) { .compact { padding: 8px 16px 10px; font-size: 9px; } }

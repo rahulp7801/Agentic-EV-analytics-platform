@@ -1,0 +1,4 @@
+.toggle { width: 40px; height: 40px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border-mid, rgba(22,22,24,.13)); border-radius: 12px; background: var(--bg-surface, rgba(255,255,255,.78)); color: var(--text-secondary, #555761); cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease; }
+.toggle:hover { background: var(--bg-hover, #eceef5); color: var(--text-primary, #17171a); transform: translateY(-1px); }
+.toggle svg { width: 17px; height: 17px; stroke-width: 1.8; }
+@media (prefers-reduced-motion: reduce) { .toggle { transition: none; } }

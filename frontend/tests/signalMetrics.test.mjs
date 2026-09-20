@@ -94,6 +94,10 @@ test('legacy, stale, synthetic, malformed and gated estimates cannot recommend s
     assert.equal(s.gated,true,JSON.stringify(patch)); assert.equal(s.kelly_fraction,0);
   }
 });
+test('kickoff permanently overrides quote freshness',()=>{
+  const started=signalMetrics({...quote,snapped_at:new Date(now-3600000).toISOString(),game_start_time:new Date(now).toISOString()},now);
+  assert.equal(started.gated,true);assert.equal(started.gate_reason,'game_started');assert.equal(started.kelly_fraction,0);
+});
 test('uncertainty must come from a valid reported interval', () => {
   assert.equal(signalMetrics({...quote, confidence_interval:[.9,.2]},now).confidence_interval,null);
   assert.deepEqual(signalMetrics({...quote, confidence_interval:[.4,.8]},now).confidence_interval,[.4,.8]);

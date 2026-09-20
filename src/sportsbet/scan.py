@@ -330,9 +330,12 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             model_concurrency_limit=MAX_MODEL_CONCURRENCY,counts=dict(counts)),games=[dict(game_id=event['id'],
         home_team=event['home_team'],away_team=event['away_team'],date=game_date.strftime('%Y%m%d'),sport=sport)])
 
-async def run(sports: list[str], daily_credit_limit: int):
+async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[str] | None = None):
     if not sports or len(sports)!=len(set(sports)) or any(s not in MODEL_SPORTS for s in sports) or daily_credit_limit<1:
         raise ValueError('Invalid scan scope or budget')
+    if event_ids is not None and (len(sports)!=1 or not event_ids or len(event_ids)>10
+            or any(not isinstance(value,str) or not value or len(value)>100 for value in event_ids)):
+        raise ValueError('Invalid targeted scan')
     if not settings.odds_api_key or not settings.analytics_database_url:
         raise ValueError('Worker credentials are not configured')
     ledger=Ledger()
@@ -359,6 +362,11 @@ async def run(sports: list[str], daily_credit_limit: int):
                 try:
                     discovered=await discover_events(client,cache,sport,scan_id,now)
                     events=[e for e in discovered if now < timestamp(e['commence_time']) <= now+timedelta(hours=FORECAST_HORIZON_HOURS)]
+                    if event_ids is not None:
+                        available={event['id'] for event in events}
+                        if missing:=event_ids-available:
+                            raise ValueError(f'Targeted events are unavailable or outside the pregame horizon: {len(missing)}')
+                        events=[event for event in events if event['id'] in event_ids]
                     report['eligible_events']=len(events)
                     report['events']=[dict(game_id=e['id'],home_team=e['home_team'],
                         away_team=e['away_team'],game_start_time=e['commence_time'],state='waiting_quotes')
@@ -392,7 +400,7 @@ async def run(sports: list[str], daily_credit_limit: int):
                         report['coalesced_events']=report.get('coalesced_events',0)+1
                         continue
                 check=next_quote_check(event,report['attempts'].get(event['id']),datetime.now(timezone.utc))
-                if quoted is None and check>datetime.now(timezone.utc):
+                if quoted is None and event_ids is None and check>datetime.now(timezone.utc):
                     event_state.update(state='scheduled',next_refresh_at=check.isoformat())
                     report['cadence_deferred_events']+=1
                     if not report['next_refresh_at'] or check<timestamp(report['next_refresh_at']):
@@ -509,9 +517,11 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport',choices=['nba','nfl','cfb','both'],default='both')
     parser.add_argument('--daily-credit-limit',type=int,default=25)
+    parser.add_argument('--event-id',action='append',default=[],help='Refresh only this discovered pregame event; repeat at most ten times')
     args=parser.parse_args()
     try:
-        reports=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.daily_credit_limit))
+        reports=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.daily_credit_limit,
+            frozenset(args.event_id) if args.event_id else None))
         print(json.dumps({s:{k:v for k,v in r.items() if k not in ('attempts','coverage')} for s,r in reports.items()}))
         if not reports or any(r['status'] not in ('complete','scheduled') for r in reports.values()):
             raise SystemExit(2)

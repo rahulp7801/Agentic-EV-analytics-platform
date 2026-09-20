@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock
 import httpx
 import pytest
 from sportsbet import schedules
@@ -76,6 +77,23 @@ async def test_cfb_schedule_uses_college_football_scoreboard(monkeypatch):
     monkeypatch.setattr(schedules.httpx,'AsyncClient',lambda **kwargs:client(transport=httpx.MockTransport(respond),**kwargs))
     result=await schedules.collect('cfb',datetime(2026,9,11,18,tzinfo=timezone.utc),offsets=(0,))
     assert result['sport']=='cfb' and result['status']=='complete' and len(result['games'])==1
+
+
+@pytest.mark.asyncio
+async def test_published_slate_keeps_live_games_and_bounds_refresh(monkeypatch):
+    now=datetime(2026,9,19,20,tzinfo=timezone.utc);stored={}
+    live={**schedules.parse_day({**board(),'events':[{**board()['events'][0],
+        'date':'2026-09-19T19:00:00Z','status':{'type':{'completed':False}}}]},'20260919','Today')[0]}
+    future={**live,'provider_event_id':'future','game_time':'2026-09-20T17:00:00+00:00',
+        'date':'20260920','label':'Tomorrow'}
+    monkeypatch.setattr(schedules,'collect',AsyncMock(return_value={
+        'sport':'cfb','captured_at':now.isoformat(),'as_of_date':'2026-09-19','status':'complete',
+        'partial':False,'games':[live,future],'failures':[],'sources':['espn']}))
+    # Imports are intentionally local inside publish_slate; patch the source module instead.
+    monkeypatch.setattr('sportsbet.dashboard.load_snapshot',lambda key:None)
+    monkeypatch.setattr('sportsbet.dashboard.publish_snapshot',lambda key,value:stored.update({key:value}))
+    assert await schedules.publish_slate('cfb',now)=='complete'
+    assert [game['provider_event_id'] for game in stored['slate:cfb']['games']]==['event','future']
 
 
 @pytest.mark.asyncio

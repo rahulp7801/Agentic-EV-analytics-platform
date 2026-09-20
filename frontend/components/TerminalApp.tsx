@@ -12,6 +12,7 @@ import KellyCalc from '@/components/KellyCalc';
 import BacktestLab from '@/components/BacktestLab';
 import type { EVSignal, Sport } from '@/lib/types';
 import { parseTerminalHash, terminalHash, type TerminalView } from '@/lib/terminalRoute';
+import ResponsibleUse from './ResponsibleUse';
 
 export default function TerminalApp() {
   const [view, setView] = useState<TerminalView>('dashboard');
@@ -83,6 +84,7 @@ export default function TerminalApp() {
             )}
             {view === 'kelly' && <KellyCalc />}
           </div>
+          <ResponsibleUse compact />
         </main>
       </div>
     </div>

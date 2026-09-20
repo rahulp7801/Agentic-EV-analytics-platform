@@ -241,6 +241,28 @@ async def test_repeated_monitor_defers_network_requests_without_relabeling_old_q
 
 
 @pytest.mark.asyncio
+async def test_targeted_operator_scan_refreshes_one_exact_event_without_loosening_budget(monkeypatch,worker):
+    stored,events,evaluated,_=worker
+    requests=[]
+    def handle(request):
+        requests.append(request.url.path)
+        if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nba'])
+        return httpx.Response(200,json=next(e for e in events['nba'] if e['id'] in request.url.path))
+    transport(monkeypatch,handle)
+    await scan.run(['nba'],25)
+    report=(await scan.run(['nba'],25,frozenset({'nba1'})))['nba']
+    assert evaluated==['nba0','nba1','nba1']
+    assert requests.count('/v4/sports/basketball_nba/events/nba1/odds')==2
+    assert report['eligible_events']==report['attempted_events']==report['completed_events']==1
+    assert report['cadence_deferred_events']==report['budget_skipped_events']==0
+    with pytest.raises(ValueError,match='targeted'):
+        await scan.run(['nfl','nba'],25,frozenset({'nba1'}))
+    missing=(await scan.run(['nba'],25,frozenset({'missing'})))['nba']
+    assert missing['status']=='degraded' and missing['eligible_events'] is None
+    assert missing['failures']==[{'stage':'event_discovery','error_type':'ValueError'}]
+
+
+@pytest.mark.asyncio
 async def test_scan_preserves_last_credits_for_last_hour_checks(monkeypatch,worker):
     stored,events,evaluated,pool=worker
     assert scan.Ledger().reserve_api_credits(17,25)

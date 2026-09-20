@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -21,7 +20,7 @@ from sportsbet.ingestion.kalshi_history import SERIES as KALSHI_PROP_SERIES
 from sportsbet.ingestion.prizepicks import PrizePicksUnavailable, capture as capture_projections
 from sportsbet.ledger import Ledger
 from sportsbet.scan import SPORT_KEYS, timestamp
-from sportsbet.schedules import collect as collect_schedule
+from sportsbet.schedules import publish_slate
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.arbitrage.kalshi_fees import fee_terms, taker_buy_cost, taker_depth_cost
 
@@ -709,28 +708,7 @@ def price_row(kind, identity, title, legs, reasons):
 
 
 async def publish_cfb_slate(now: datetime) -> str:
-    """Publish one bounded daily FBS slate instead of querying ESPN per page view."""
-    today=str(now.astimezone(ZoneInfo('America/New_York')).date())
-    previous=load_snapshot('slate:cfb') or {}
-    try:
-        age=now-timestamp(previous['captured_at'])
-        if (previous.get('as_of_date')==today and previous.get('status') in ('complete','partial')
-                and timedelta(0)<=age<=timedelta(hours=24)):
-            return 'cached'
-    except (KeyError,ValueError,TypeError,AttributeError):
-        pass
-    slate=await collect_schedule('cfb',now,offsets=tuple(range(7)))
-    games=sorted((game for game in slate.get('games',[])
-        if game.get('completed') is False and timestamp(game['game_time'])>now),
-        key=lambda game:(timestamp(game['game_time']),game['provider_event_id']))
-    truncated=len(games)>100
-    status=slate['status']
-    if status=='complete' and truncated:
-        status='partial'
-    bounded={**slate,'games':games[:100],'partial':status=='partial','status':status}
-    if status in ('complete','partial'):
-        publish_snapshot('slate:cfb',bounded)
-    return status
+    return await publish_slate('cfb',now)
 
 
 async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: bool, provider: str='all', *, credit_holdback: int = 0, sportsbook_cadence_hours: int = 0):

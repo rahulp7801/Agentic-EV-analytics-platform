@@ -66,6 +66,10 @@ export function recentCandidateGroups(value:unknown,now=Date.now(),maximum=3):Pi
   }).slice(0,maximum);
 }
 
+export function recentCandidateOptions(value:unknown,now=Date.now()) {
+  return recentCandidateGroups(value,now).flatMap(group=>[group.pick,...group.alternatives]);
+}
+
 /** Transport primaries with their alternatives; consumers can render or collapse them. */
 export function bestPickOptions(value:unknown,now=Date.now()) {
   return bestPickGroups(value,now).flatMap(group=>[group.pick,...group.alternatives]);

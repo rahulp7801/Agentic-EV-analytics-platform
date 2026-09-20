@@ -25,13 +25,14 @@ def test_forecast_pages_remain_bounded_with_large_history_and_exclude_old_candid
             ) ON COMMIT DROP'''))
             for game in range(13):
                 payload = dict(generated_at='2026-09-10T12:00:00Z', games=[], signals=[
-                    dict(id=f'{game}-{row}', gated=False) for row in range(500)
+                    dict(id=f'{game}-{row}', gated=False, sample_size=20,
+                         true_prob=0.55, implied_prob=0.5, ev_pct=0.05) for row in range(500)
                 ])
                 connection.execute(sa.text('''INSERT INTO dashboard_snapshots VALUES
                     (:key,CAST(:payload AS jsonb),now()-CAST(:age AS interval))'''),
                     dict(key=f'signals:nfl:{game:02}', payload=json.dumps(payload),
                          age='1 day' if game == 0 else '0 seconds'))
-            values=dict(p1='signals:nfl:%',p2=['player-profiles:nfl'],p3=False,p4=100,p5=0)
+            values=dict(p1='signals:nfl:%',p2=['player-profiles:nfl'],p3='library',p4=100,p5=0)
             first=connection.execute(sa.text(query),values).scalar_one()
             assert first['total_count']==6500 and len(first['rows'])==100
             # A row carries one signal only. Repeating the snapshot's entire
@@ -43,11 +44,14 @@ def test_forecast_pages_remain_bounded_with_large_history_and_exclude_old_candid
             second_ids={row['payload']['signals'][0]['id'] for row in second['rows']}
             assert first_ids.isdisjoint(second_ids)
             assert first['invalid_envelopes']==0
-            candidates=connection.execute(sa.text(query),{**values,'p3':True,'p4':5001}).scalar_one()
-            assert candidates['total_count']==6000 and len(candidates['rows'])==5001
-            assert candidates['window_complete'] is True
+            qualified=connection.execute(sa.text(query),{**values,'p3':'qualified','p4':5001}).scalar_one()
+            assert qualified['total_count']==6000 and len(qualified['rows'])==5001
+            assert qualified['window_complete'] is True
             assert all(not row['payload']['signals'][0]['id'].startswith('0-')
-                       for row in candidates['rows'])
+                       for row in qualified['rows'])
+            candidates=connection.execute(sa.text(query),{**values,'p3':'candidates','p4':5001}).scalar_one()
+            assert candidates['total_count']==6500 and len(candidates['rows'])==5001
+            assert candidates['window_complete'] is True
             connection.execute(sa.text("UPDATE dashboard_snapshots SET updated_at=updated_at+interval '1 second' WHERE snapshot_key='signals:nfl:12'"))
             changed=connection.execute(sa.text(query),values).scalar_one()
             assert changed['revision']!=first['revision']
@@ -55,7 +59,7 @@ def test_forecast_pages_remain_bounded_with_large_history_and_exclude_old_candid
                 connection.execute(sa.text('''INSERT INTO dashboard_snapshots VALUES
                     (:key,'{"generated_at":"2026-09-10T12:00:00Z","signals":[],"games":[]}'::jsonb,now())'''),
                     dict(key=f'signals:nfl:overflow:{index}'))
-            overflow=connection.execute(sa.text(query),{**values,'p3':True,'p4':5001}).scalar_one()
+            overflow=connection.execute(sa.text(query),{**values,'p3':'qualified','p4':5001}).scalar_one()
             assert overflow['window_complete'] is False
     finally:
         engine.dispose()
