@@ -1,6 +1,7 @@
 # Maintained implementation knowledge
 
 - The paid workflow's half-hour schedule must run the quota-aware `scan` operation whenever `DATA_PIPELINE_ENABLED=true`; provider-only `monitor` runs cannot keep five-minute recommendation prices current. `scan` already persists attempts, spaces requests by kickoff distance, prioritizes prior near-passes, retains credits for the last hour, coalesces concurrent refreshes, and permanently locks started games. When recommendation collection is disabled, the same schedule may fall back to `monitor`. Keep the configured daily and rolling credit ceilings below provider allowance; caching prevents duplicate work but cannot turn an old quote into a current recommendation.
+- Targeted prop scans must retain cadence attempts for every still-active discovered event, not only the requested subset. When older runs have lost an attempt, an exact current-model signal snapshot with matching sport/game identity and a bounded generated time restores the attempt timestamp. This recovery only defers duplicate provider collection; it never extends quote eligibility or makes a stored price fresh.
 
 ## Working agreement
 

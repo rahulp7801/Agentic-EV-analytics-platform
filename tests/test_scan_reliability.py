@@ -297,11 +297,32 @@ async def test_targeted_operator_scan_refreshes_one_exact_event_without_loosenin
     assert requests.count('/v4/sports/basketball_nba/events/nba1/odds')==2
     assert report['eligible_events']==report['attempted_events']==report['completed_events']==1
     assert report['cadence_deferred_events']==report['budget_skipped_events']==0
+    assert set(report['attempts'])=={'nba0','nba1'}
     with pytest.raises(ValueError,match='targeted'):
         await scan.run(['nfl','nba'],25,frozenset({'nba1'}))
     missing=(await scan.run(['nba'],25,frozenset({'missing'})))['nba']
     assert missing['status']=='degraded' and missing['eligible_events'] is None
     assert missing['failures']==[{'stage':'event_discovery','error_type':'ValueError'}]
+
+
+@pytest.mark.asyncio
+async def test_signal_snapshot_restores_lost_cadence_without_spending_again(monkeypatch,worker):
+    stored,events,evaluated,_=worker
+    now=datetime.now(timezone.utc)
+    stored['signals:nba:nba0']={
+        'generated_at':now.isoformat(),
+        'signals':[],
+        'games':[{'game_id':'nba0','sport':'nba'}],
+    }
+    def handle(request):
+        if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nba'])
+        return httpx.Response(200,json=next(e for e in events['nba'] if e['id'] in request.url.path))
+    transport(monkeypatch,handle)
+    report=(await scan.run(['nba'],25))['nba']
+    assert evaluated==['nba1']
+    assert report['attempted_events']==report['completed_events']==1
+    assert report['cadence_deferred_events']==1
+    assert report['attempts']['nba0']==now.isoformat()
 
 
 @pytest.mark.asyncio
