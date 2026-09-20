@@ -9,7 +9,7 @@ test('displayed bet returns equal an independent win/loss/refund payout calculat
     const quote={...base,american_odds:odds,push_probability:push,true_prob:win,direction,confidence_interval:[win-.025,win+.025]};
     const terms=pickTerms(quote,now);
     const breakEven=(1-push)/(1+net),expected=win*(net*100)+(1-win-push)*(-100)+push*0;
-    const shouldQualify=win-breakEven<=.15+1e-12 && win-.025>breakEven;
+    const shouldQualify=win-.025>breakEven;
     assert.equal(Boolean(terms),shouldQualify);
     if(!terms) continue;
     checked++;assert.ok(Math.abs(terms.expectedPer100-expected)<1e-9);

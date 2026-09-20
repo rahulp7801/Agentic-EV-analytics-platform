@@ -17,6 +17,14 @@ BASES = {'nfl': 'https://site.api.espn.com/apis/site/v2/sports/football/nfl',
          'nba': 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba',
          'cfb': 'https://site.api.espn.com/apis/site/v2/sports/football/college-football'}
 NFL_PLAYER_IDS_URL = 'https://github.com/nflverse/nflverse-data/releases/download/players/players.csv'
+BLOCKING_TEAMMATE_STATUSES = frozenset({'out', 'inactive', 'doubtful'})
+
+
+def blocks_unadjusted_teammate_context(report: dict) -> bool:
+    """Return whether a confirmed acute teammate absence blocks the baseline."""
+    relationship = report.get('relationship')
+    status = str(report.get('status', '')).strip().lower()
+    return relationship in (None, 'teammate') and status in BLOCKING_TEAMMATE_STATUSES
 
 
 async def nfl_player_identities(client: httpx.AsyncClient, roster_ids: set[str], now: datetime) -> tuple[dict, dict, dict]:
@@ -258,7 +266,8 @@ def player_availability(context: dict | None, player: str, now: datetime, *, pla
                 identity_source_url=identity_source['url'],
                 identity_source_sha256=identity_source['source_sha256'])
         reason = 'player_availability_risk' if (subject and status != 'Active') or roster_status!='Active' else (
-            'teammate_availability_unmodeled' if any(row['status'] != 'Active' for row in teammates) else None)
+            'teammate_availability_unmodeled' if any(blocks_unadjusted_teammate_context(row)
+                for row in teammates) else None)
         return evidence, reason
     except (ValueError, KeyError, TypeError, AttributeError):
         return unavailable, 'availability_unavailable'

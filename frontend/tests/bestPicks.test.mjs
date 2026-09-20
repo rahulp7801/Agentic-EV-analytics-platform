@@ -7,14 +7,18 @@ test('lower raw edge can outrank a less supported high point estimate',()=>{
   const stronger={...base,id:'B',player:'B',true_prob:.6,confidence_interval:[.56,.64]};
   assert.deepEqual(bestPicks([base,stronger],now).map(p=>p.id),['B','A']);
 });
-test('the shortlist cannot manufacture picks from stale, uncertain, injured, capped or blocked evidence',()=>{
+test('the shortlist cannot manufacture picks from stale, uncertain, injured or blocked evidence',()=>{
   for(const patch of [{confidence_interval:null},{confidence_interval:[.49,.8]},
     {confidence_interval:[.7,.8]},{push_probability:.1,confidence_interval:[.52,.95]},{gated:true},
-    {true_prob:.8},{true_prob:.650000001},{snapped_at:new Date(now-300001).toISOString()},{sample_size:19},
+    {true_prob:.8},{snapped_at:new Date(now-300001).toISOString()},{sample_size:19},
     {availability:{...base.availability,teammates:[{player:'T',status:'Out',position:'WR',reported_at:new Date(now).toISOString()}]}}]) {
     assert.deepEqual(bestPicks([{...base,...patch}],now),[]);
   }
   assert.deepEqual(bestPicks([],now),[]);
+});
+test('a large exact-line disagreement remains eligible when its confidence floor clears the price',()=>{
+  const supported={...base,true_prob:.8,confidence_interval:[.65,.9]};
+  assert.deepEqual(bestPicks([supported],now).map(pick=>pick.id),[base.id]);
 });
 test('deduplicates player/game exposure, caps three and does not pad smaller supported sets',()=>{
   const candidates=Array.from({length:8},(_,i)=>({...base,id:String(i),player:'Player '+i}));

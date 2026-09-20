@@ -33,7 +33,7 @@ async def test_strongest_uncertainty_margin_gets_correlated_risk_slot_first(tmp_
     assert len(accepted)==1 and accepted[0]['line']==21.5 and accepted[0]['true_prob']==.6
     assert next(s for s in output['signals'] if s['line']==20.5)['gate_reason']=='correlated_exposure'
     assert len(ledger.predictions())==2  # Retain both immutable measured forecasts.
-    assert all(p['recommendation_policy_version']=='lower-bound-margin-v1' for p in ledger.predictions())
+    assert all(p['recommendation_policy_version']=='confidence-floor-v2' for p in ledger.predictions())
     assert recommendation_quality(None)==(Decimal('-Infinity'),0)
     inconsistent=EVSignal(ev_percentage=Decimal('.1'),true_probability=Decimal('.6'),implied_probability=Decimal('.5'),
         kelly_fraction=Decimal('.01'),confidence_interval=(Decimal('.7'),Decimal('.8')),trade_plan=[],market_type='player_pass_yds')
@@ -207,7 +207,7 @@ async def test_irrelevant_defensive_teammate_does_not_block_offensive_forecast(t
     assert all(signal['availability']['teammates']==[] and not signal['gated'] for signal in result['signals'])
 
 
-async def test_relevant_opposing_defender_blocks_unadjusted_forecast(tmp_path):
+async def test_relevant_opposing_defender_is_disclosed_without_erasing_current_price_comparison(tmp_path):
     conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'00-0037248'}]
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
     pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
@@ -224,8 +224,8 @@ async def test_relevant_opposing_defender_blocks_unadjusted_forecast(tmp_path):
     with patch('sportsbet.prop.agents.run_prop_query',AsyncMock(return_value=model)),patch.object(
             ledger,'reserve',return_value=(True,'accepted')) as reserve:
         result=await evaluate_event(pool,event('nfl'),'nfl',ledger,'scan',availability)
-    reserve.assert_not_called()
-    assert all(signal['gate_reason']=='teammate_availability_unmodeled' and
+    assert reserve.call_count==2
+    assert all(not signal['gated'] and
         signal['availability']['teammates'][0]['relationship']=='opponent' for signal in result['signals'])
 
 

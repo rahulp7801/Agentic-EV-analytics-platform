@@ -4,7 +4,8 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from sportsbet.prop.availability import fetch_event_availability, player_availability
+from sportsbet.prop.availability import (blocks_unadjusted_teammate_context,
+                                         fetch_event_availability, player_availability)
 
 
 def context():
@@ -34,6 +35,15 @@ def test_availability_never_infers_healthy_or_boosts_probability():
     data['teams'].append(dict(abbreviation='OTHER',roster_names=['Opponent'],injury_coverage='unavailable'))
     assert player_availability(data,'Player',now)[1] is None
     assert player_availability(data,'Opponent',now)[1]=='availability_unavailable'
+
+
+def test_only_confirmed_acute_teammate_absences_block_the_baseline():
+    assert blocks_unadjusted_teammate_context({'status':'Out'})
+    assert blocks_unadjusted_teammate_context({'status':'Inactive','relationship':'teammate'})
+    assert blocks_unadjusted_teammate_context({'status':'Doubtful','relationship':'teammate'})
+    assert not blocks_unadjusted_teammate_context({'status':'Questionable','relationship':'teammate'})
+    assert not blocks_unadjusted_teammate_context({'status':'Injured Reserve','relationship':'teammate'})
+    assert not blocks_unadjusted_teammate_context({'status':'Out','relationship':'opponent'})
 
 
 @pytest.mark.parametrize('sport,missing_team',[('nfl',False),('nba',False),('nba',True),('cfb',False),('cfb',True)])
@@ -112,7 +122,7 @@ async def test_roster_injuries_cover_omitted_reports_without_inventing_healthy_l
         result = await fetch_event_availability(dict(id='event', home_team='Home', away_team='Away'), sport)
     assert result['status']=='observed'
     evidence, reason = player_availability(result, 'Player', datetime.now(timezone.utc))
-    assert reason=='teammate_availability_unmodeled'
+    assert reason is None  # Questionable is disclosed context, not a confirmed absence.
     if league_mode!='observed':
         assert evidence['source_url']==evidence['roster_source_url']
         assert evidence['source_sha256']==evidence['roster_source_sha256']

@@ -36,12 +36,6 @@ log = structlog.get_logger()
 
 _NO_SIGNAL: dict[str, Any] = {"ev_signal": None, "pending_signals": []}
 
-# EV ceiling: any signal above this is almost certainly a model artifact
-# (NormalDist overconfidence vs. easy/goblin lines, or stale season-avg).
-# Real exploitable edges in liquid prop markets are typically 1–8%.
-# 15% is a hard upper bound — if the model claims more, suppress the signal.
-_EV_CAP: Decimal = Decimal("0.15")
-
 # Alias map: PropParams Literal shorthand -> Odds API market key format.
 # Used by prop_arbitrage_agent to match state["prop_type"] against
 # PlayerPropSnapshotCreate.prop_type (which stores raw Odds API market keys).
@@ -320,22 +314,6 @@ def make_prop_arbitrage_agent(
             return {**_NO_SIGNAL, "gate_reason": "uncertainty_unavailable"}
         if confidence_interval[0] <= implied_prob:
             return {**_NO_SIGNAL, "gate_reason": "edge_not_confident"}
-
-        # EV ceiling guard: suppress signals the model can't reliably produce.
-        # Real prop edges are 1–8%; anything above _EV_CAP (15%) is almost
-        # certainly NormalDist overconfidence vs. an easy/goblin line, not a
-        # genuine market inefficiency. Log the suppression so it is auditable.
-        if ev_pct > _EV_CAP:
-            log.warning(
-                "prop_arbitrage_agent.ev_cap_exceeded",
-                sport=resolved_sport,
-                market_type=market_type,
-                ev_pct=str(ev_pct),
-                true_prob=str(true_prob),
-                implied_prob=str(implied_prob),
-                reason="ev_pct > _EV_CAP — likely model overconfidence or easy/goblin line",
-            )
-            return {**_NO_SIGNAL, "gate_reason": "edge_review_limit"}
 
         # Kelly sizing — Decimal(str(...)) pattern locked in Phase 2
         kelly_frac = fractional_kelly(

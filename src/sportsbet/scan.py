@@ -18,7 +18,8 @@ from sportsbet.ingestion.prop_odds import PlayerPropSnapshotCreate, parse_event_
 from sportsbet.ledger import Ledger
 from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.prop.agents import make_prop_quant_agent
-from sportsbet.prop.availability import fetch_event_availability, player_availability
+from sportsbet.prop.availability import (blocks_unadjusted_teammate_context,
+                                         fetch_event_availability, player_availability)
 from sportsbet.prop.injury_context import historical_availability_splits, relevant_availability_reports
 from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
 from sportsbet.prop.nba_agents import make_nba_quant_agent
@@ -34,7 +35,7 @@ SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl','cfb':'america
 MODEL_SPORTS = frozenset({'nba','nfl','cfb'})
 MAX_MODEL_CONCURRENCY = 8
 FORECAST_HORIZON_HOURS = 48
-RECOMMENDATION_POLICY_VERSION = 'lower-bound-margin-v1'
+RECOMMENDATION_POLICY_VERSION = 'confidence-floor-v2'
 PROVIDER_CACHE_TTL = timedelta(minutes=5)
 PRIORITY_NEAR_PASS_FLOOR = -0.03
 MAX_PRIORITY_SIGNALS = 5000
@@ -87,7 +88,7 @@ def prior_event_evidence(sport: str, event_id: str, now: datetime | None = None)
             sample=signal.get('sample_size')
             if (not isinstance(availability,dict) or availability.get('status')!='observed'
                     or availability.get('roster_confirmed') is not True
-                    or signal.get('gate_reason') not in ('accepted','edge_not_confident','stale_quote')
+                    or signal.get('gate_reason') not in ('accepted','edge_not_confident','edge_review_limit','stale_quote')
                     or not isinstance(signal.get('sportsbook'),str) or not signal['sportsbook']
                     or isinstance(signal.get('american_odds'),bool)
                     or not isinstance(signal.get('american_odds'),int) or abs(signal['american_odds'])<100
@@ -100,7 +101,7 @@ def prior_event_evidence(sport: str, event_id: str, now: datetime | None = None)
             if (not all(isfinite(value) for value in (*values,lower,upper))
                     or not 0<=implied<=1 or not 0<=push<1
                     or not 0<=lower<=probability<=upper<=1-push
-                    or probability<=implied or edge<=0 or edge>0.15
+                    or probability<=implied or edge<=0
                     or abs(edge-(probability-implied))>1e-6):
                 continue
             margin=lower-implied
@@ -328,7 +329,9 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 availability_evidence['team'],availability_evidence.get('roster_player_name',player),sport)
             availability_evidence['teammates']=relevant_reports
             if availability_reason in (None,'teammate_availability_unmodeled'):
-                availability_reason='teammate_availability_unmodeled' if relevant_reports else None
+                availability_reason=('teammate_availability_unmodeled'
+                    if any(blocks_unadjusted_teammate_context(report) for report in relevant_reports)
+                    else None)
         # The sorted first selection is the same strongest per-player exposure
         # the public desk can surface. Avoid multiplying up to eight split
         # queries across every alternate threshold for that player.

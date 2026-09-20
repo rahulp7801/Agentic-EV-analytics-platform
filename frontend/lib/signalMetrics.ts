@@ -26,7 +26,11 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
     || !Array.isArray(availability.teammates) || !Number.isFinite(availabilityTime) || now-availabilityTime>3600000 || availabilityTime>now+60000
     ? 'availability_unavailable'
     : !['Active','Not listed on injury report'].includes(availability.subject_status) ? 'player_availability_risk'
-    : availability.teammates.some(row=>row.status!=='Active') ? 'teammate_availability_unmodeled' : null;
+    : availability.teammates.some(row=>{
+      const status=row.status.trim().toLowerCase();
+      return (row.relationship===undefined || row.relationship==='teammate')
+        && ['out','inactive','doubtful'].includes(status);
+    }) ? 'teammate_availability_unmodeled' : null;
   const b = odds < 0 ? 100 / -odds : odds / 100;
   const ci = s.confidence_interval;
   const interval = !legacy && Array.isArray(ci) && ci.length === 2 && ci.every(x => typeof x === 'number' && Number.isFinite(x))
@@ -42,7 +46,6 @@ export function signalMetrics(s: Record<string, unknown>, now = Date.now()) {
     : s.gated!==false ? String(s.gate_reason ?? 'risk_gate')
     : s.forecast_cutoff!==cutoff ? 'missing_prediction_cutoff'
     : !interval || interval[0]>p || interval[1]<p || interval[1]>1-push+1e-12 ? 'uncertainty_unavailable'
-    : p-breakEven>.15+1e-12 ? 'edge_review_limit'
     : expectedReturn<=0 ? 'no_positive_edge'
     : interval[0]<=breakEven ? 'edge_not_confident' : null;
   return {...s, implied_prob: valid && !synthetic ? breakEven : s.implied_prob,

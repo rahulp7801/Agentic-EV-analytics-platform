@@ -44,7 +44,7 @@ export const FORECAST_PAGE_QUERY=`WITH latest AS MATERIALIZED (
   SELECT snapshot_key,payload->'generated_at' AS generated_at,signal,updated_at,ordinality
   FROM envelopes CROSS JOIN LATERAL jsonb_array_elements(signals) WITH ORDINALITY AS items(signal,ordinality)
   WHERE ($3::text='qualified' AND signal->>'gated'='false')
-     OR ($3::text='candidates' AND signal @? '$ ? (@.sample_size >= 20 && @.true_prob > @.implied_prob && @.ev_pct <= 0.150000000001)')
+     OR ($3::text='candidates' AND signal @? '$ ? (@.sample_size >= 20 && @.true_prob > @.implied_prob)')
 ), page AS (
   SELECT * FROM (
     SELECT * FROM library_page

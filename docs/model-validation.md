@@ -31,6 +31,12 @@ Missing, non-finite, out-of-range, or overlapping bounds return an audited gate
 reason and no signal. Every evaluated selection retains its sample size and
 directional interval in the prediction ledger, including rejected estimates.
 
+The interval rule is the model-confidence guard. A large difference between the
+point estimate and an exact observed price is not rejected by a second arbitrary
+point-edge ceiling: doing so can make the 95% interval rule mathematically
+impossible to pass at the supported 20-40 game sample sizes. Exact player, market,
+line, side, price, game, time, and provenance matching remain mandatory.
+
 For Under, the Over interval `[lo, hi]` is complemented within non-push mass as
 `[1 - push - hi, 1 - push - lo]`. This retains `Over + Under + push = 1` even on
 integer lines. Fractional Kelly sizing uses the admitted side's lower bound,
@@ -38,6 +44,14 @@ conditional on a decided result, rather than the point estimate. The displayed
 expected return continues to use the point estimate and is not a guaranteed
 return. Interval admission is a conservative uncertainty screen; it does not
 establish calibration, independence, market-rule equivalence, fills, or profit.
+
+Current availability evidence is also required. A confirmed subject-player risk
+blocks admission. A confirmed acute teammate absence (`Out`, `Inactive`, or
+`Doubtful`) blocks the unadjusted baseline because the production model does not
+yet estimate its effect. Questionable designations, season-long injured-reserve
+listings, and opposing-player reports remain visible context but do not erase an
+otherwise valid current-price comparison. Historical on/off splits are descriptive
+and never modify probability without separate walk-forward validation.
 
 ## Public signal boundary
 

@@ -33,8 +33,7 @@ export function groupAlternateLines(signals:EVSignal[],alternativeLimit=10):Pick
 
 function eligible(value:unknown,now:number) {
   return publicSignals(value,now).signals.filter(signal=>!signal.gated
-    // Decimal-backed 15pp edges can become 0.15000000000000002 in the browser.
-    && signal.kelly_fraction>0 && signal.ev_pct<=.15+1e-12 && (signal.expected_return ?? 0)>0
+    && signal.kelly_fraction>0 && (signal.expected_return ?? 0)>0
     && (conservativeMargin(signal) ?? 0)>0).sort(compareQuality);
 }
 
@@ -55,9 +54,8 @@ export function recentCandidateGroups(value:unknown,now=Date.now(),maximum=3):Pi
     && Date.parse(signal.game_start_time ?? '')>now && Date.parse(signal.snapped_at)<=now+60000
     && signal.sample_size!==undefined && signal.sample_size>=20
     && signal.availability?.status==='observed' && signal.availability.roster_confirmed
-    && signal.confidence_interval!==null && signal.expected_return!==null
-    && (signal.expected_return ?? 0)>0 && signal.true_prob>signal.implied_prob
-    && signal.ev_pct<=.15+1e-12).sort(compareQuality);
+    && conservativeMargin(signal)!==null && signal.expected_return!==null
+    && (signal.expected_return ?? 0)>0 && signal.true_prob>signal.implied_prob).sort(compareQuality);
   const players=new Set<string>();
   return groupAlternateLines(ranked).filter(group=>{
     const key=`${group.pick.game_id}:${group.pick.player}`;
