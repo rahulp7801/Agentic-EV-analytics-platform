@@ -141,6 +141,18 @@ test('verified injury context retains exact on off cohorts and strips internal i
   }
 });
 
+test('relevant current reports retain team relationship and unit context',()=>{
+  const report={player:'Defender',status:'Questionable',position:'CB',reported_at:new Date(now).toISOString(),
+    team:'LV',relationship:'opponent',unit:'defense',source_url:quote.availability.source_url,source_sha256:'a'.repeat(64)};
+  const result=publicSignals([{...publicQuote,availability:{...quote.availability,teammates:[report]}}],now).signals[0];
+  assert.deepEqual(result.availability.teammates,[report]);
+  assert.equal(result.gate_reason,'teammate_availability_unmodeled');
+  for(const broken of [{...report,relationship:'spectator'},{...report,team:'TOO-LONG'}]) {
+    const projected=publicSignals([{...publicQuote,availability:{...quote.availability,teammates:[broken]}}],now).signals[0];
+    assert.equal(projected.availability,undefined);assert.equal(projected.gated,true);
+  }
+});
+
 test('forecast windows change at kickoff',()=>{
   assert.equal(forecastWindow(quote,now),'upcoming');
   assert.equal(forecastWindow(quote,now+3600000),'archive');

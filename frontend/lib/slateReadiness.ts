@@ -6,7 +6,7 @@ const STATES:Record<string,string>={waiting_quotes:'Waiting for odds',scheduled:
 const GATES:Record<string,string>={unknown_or_ambiguous_player:'Player history identity not resolved',
   missing_model_estimate:'Model estimate unavailable',insufficient_sample:'Too few prior games',
   availability_unavailable:'Injury evidence unavailable',roster_unconfirmed:'Roster identity not confirmed',
-  teammate_availability_unmodeled:'Teammate risk not modeled',player_availability_risk:'Player availability risk',
+  teammate_availability_unmodeled:'Relevant injury context not modeled',player_availability_risk:'Player availability risk',
   edge_not_confident:'Uncertainty does not support the edge',no_positive_edge:'No supported positive edge',
   uncertainty_unavailable:'Uncertainty unavailable',edge_review_limit:'Edge exceeds the model-review ceiling',
   missing_matching_prop_quote:'No matching observed price',model_error:'Model evaluation failed',

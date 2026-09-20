@@ -2,7 +2,8 @@ from datetime import date
 
 import pytest
 
-from sportsbet.prop.injury_context import _nba_split, _nfl_split, current_contexts
+from sportsbet.prop.injury_context import (_nba_split, _nfl_split, current_contexts,
+    relevant_availability_reports)
 
 
 def test_contexts_require_relevant_unit_and_exact_nfl_identity():
@@ -18,6 +19,28 @@ def test_contexts_require_relevant_unit_and_exact_nfl_identity():
     assert [(row['player'],row['relationship'],row['unit'],row['participant_id']) for row in rows]==[
         ('Receiver','teammate','offense','ReceDa00'),
         ('Defender','opponent','defense','DefeDa00')]
+
+
+def test_relevant_reports_exclude_same_team_defense_and_opponent_offense_without_requiring_crosswalk():
+    context={'status':'observed','teams':[
+        {'abbreviation':'NE','reports':[
+            {'player':'Receiver','position':'WR','status':'Out','reported_at':'2026-09-20T00:00:00Z'},
+            {'player':'Corner teammate','position':'CB','status':'Out','reported_at':'2026-09-20T00:00:00Z'}]},
+        {'abbreviation':'NYJ','reports':[
+            {'player':'Defender','position':'CB','status':'Questionable','reported_at':'2026-09-20T00:00:00Z'},
+            {'player':'Quarterback','position':'QB','status':'Out','reported_at':'2026-09-20T00:00:00Z'}]}]}
+    rows=relevant_availability_reports(context,'NE','Target','nfl')
+    assert [(row['player'],row['relationship'],row['unit']) for row in rows]==[
+        ('Receiver','teammate','offense'),('Defender','opponent','defense')]
+
+
+def test_nba_reports_treat_teammates_and_opponents_as_relevant_lineup_context():
+    context={'status':'observed','teams':[
+        {'abbreviation':'BOS','reports':[{'player':'Guard','position':'PG','status':'Out'}]},
+        {'abbreviation':'NY','reports':[{'player':'Center','position':'C','status':'Questionable'}]}]}
+    rows=relevant_availability_reports(context,'BOS','Target','nba')
+    assert [(row['player'],row['relationship'],row['unit']) for row in rows]==[
+        ('Guard','teammate','offense'),('Center','opponent','defense')]
 
 
 @pytest.mark.asyncio
