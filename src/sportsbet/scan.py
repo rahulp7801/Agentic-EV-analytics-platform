@@ -56,13 +56,28 @@ def recommendation_quality(signal):
     return (margin, signal.sample_size or 0) if margin.is_finite() else (Decimal('-Infinity'),0)
 
 
-def prior_event_quality(sport: str, event_id: str) -> tuple[float, int] | None:
-    """Use a bounded prior near-miss only to choose which event gets refreshed first."""
+def prior_event_evidence(sport: str, event_id: str, now: datetime | None = None) -> tuple[tuple[float, int] | None,str | None]:
+    """Read prior ranking and cadence evidence from one validated snapshot."""
+    quality=None
+    attempt=None
     try:
         snapshot=load_snapshot(f'signals:{sport}:{event_id}')
+        if not isinstance(snapshot,dict):
+            return None,None
+        if now is not None:
+            try:
+                generated=timestamp(snapshot['generated_at'])
+                games=snapshot.get('games')
+                age=now-generated
+                if (timedelta(minutes=-1)<=age<=timedelta(hours=FORECAST_HORIZON_HOURS)
+                        and isinstance(games,list) and len(games)==1 and isinstance(games[0],dict)
+                        and games[0].get('game_id')==event_id and games[0].get('sport')==sport):
+                    attempt=generated.isoformat()
+            except (KeyError,ValueError,TypeError,AttributeError):
+                pass
         signals=snapshot.get('signals') if isinstance(snapshot,dict) else None
         if not isinstance(signals,list) or len(signals)>MAX_PRIORITY_SIGNALS:
-            return None
+            return None,attempt
         best=None
         for signal in signals:
             if not isinstance(signal,dict) or signal.get('sport')!=sport or signal.get('game_id')!=event_id:
@@ -94,9 +109,15 @@ def prior_event_quality(sport: str, event_id: str) -> tuple[float, int] | None:
             candidate=(margin,sample)
             if best is None or candidate>best:
                 best=candidate
-        return best
+        quality=best
     except Exception:
-        return None
+        pass
+    return quality,attempt
+
+
+def prior_event_quality(sport: str, event_id: str) -> tuple[float, int] | None:
+    """Use a bounded prior near-miss only to choose which event gets refreshed first."""
+    return prior_event_evidence(sport,event_id)[0]
 
 
 def prior_quality_sort(quality: tuple[float, int] | None) -> tuple[bool, float, int]:
@@ -422,17 +443,22 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                 try:
                     discovered=await discover_events(client,cache,sport,scan_id,now)
                     events=[e for e in discovered if now < timestamp(e['commence_time']) <= now+timedelta(hours=FORECAST_HORIZON_HOURS)]
+                    active_ids={event['id'] for event in events}
+                    report['attempts']={identity:attempt for identity,attempt in report['attempts'].items()
+                        if identity in active_ids}
+                    evidence={event['id']:prior_event_evidence(sport,event['id'],now) for event in events}
+                    for identity,(_,attempt) in evidence.items():
+                        if identity not in report['attempts'] and attempt is not None:
+                            report['attempts'][identity]=attempt
                     if event_ids is not None:
-                        available={event['id'] for event in events}
-                        if missing:=event_ids-available:
+                        if missing:=event_ids-active_ids:
                             raise ValueError(f'Targeted events are unavailable or outside the pregame horizon: {len(missing)}')
                         events=[event for event in events if event['id'] in event_ids]
                     report['eligible_events']=len(events)
                     report['events']=[dict(game_id=e['id'],home_team=e['home_team'],
                         away_team=e['away_team'],game_start_time=e['commence_time'],state='waiting_quotes')
                         for e in events]
-                    report['attempts']={e['id']:report['attempts'][e['id']] for e in events if e['id'] in report['attempts']}
-                    priorities={event['id']:prior_event_quality(sport,event['id']) for event in events}
+                    priorities={event['id']:evidence[event['id']][0] for event in events}
                     queues[sport]=sorted(events,key=lambda e:(timestamp(e['commence_time'])>now+timedelta(hours=1),
                         *prior_quality_sort(priorities[e['id']]),
                         report['attempts'].get(e['id'],''),timestamp(e['commence_time']),e['id']))
