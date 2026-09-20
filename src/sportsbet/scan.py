@@ -7,6 +7,7 @@ import uuid
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from math import isfinite
 from zoneinfo import ZoneInfo
 import httpx
 from sportsbet.config import settings
@@ -35,6 +36,8 @@ MAX_MODEL_CONCURRENCY = 8
 FORECAST_HORIZON_HOURS = 48
 RECOMMENDATION_POLICY_VERSION = 'lower-bound-margin-v1'
 PROVIDER_CACHE_TTL = timedelta(minutes=5)
+PRIORITY_NEAR_PASS_FLOOR = -0.03
+MAX_PRIORITY_SIGNALS = 5000
 
 
 class ProviderRefreshInProgress(RuntimeError):
@@ -51,6 +54,55 @@ def recommendation_quality(signal):
         return Decimal('-Infinity'),0
     margin=signal.confidence_interval[0]-signal.implied_probability
     return (margin, signal.sample_size or 0) if margin.is_finite() else (Decimal('-Infinity'),0)
+
+
+def prior_event_quality(sport: str, event_id: str) -> tuple[float, int] | None:
+    """Use a bounded prior near-miss only to choose which event gets refreshed first."""
+    try:
+        snapshot=load_snapshot(f'signals:{sport}:{event_id}')
+        signals=snapshot.get('signals') if isinstance(snapshot,dict) else None
+        if not isinstance(signals,list) or len(signals)>MAX_PRIORITY_SIGNALS:
+            return None
+        best=None
+        for signal in signals:
+            if not isinstance(signal,dict) or signal.get('sport')!=sport or signal.get('game_id')!=event_id:
+                continue
+            availability=signal.get('availability')
+            interval=signal.get('confidence_interval')
+            sample=signal.get('sample_size')
+            if (not isinstance(availability,dict) or availability.get('status')!='observed'
+                    or availability.get('roster_confirmed') is not True
+                    or signal.get('gate_reason') not in ('accepted','edge_not_confident','stale_quote')
+                    or not isinstance(signal.get('sportsbook'),str) or not signal['sportsbook']
+                    or isinstance(signal.get('american_odds'),bool)
+                    or not isinstance(signal.get('american_odds'),int) or abs(signal['american_odds'])<100
+                    or isinstance(sample,bool) or not isinstance(sample,int) or sample<20
+                    or not isinstance(interval,list) or len(interval)!=2):
+                continue
+            values=tuple(float(signal[key]) for key in ('true_prob','implied_prob','ev_pct','push_probability'))
+            lower,upper=(float(value) for value in interval)
+            probability,implied,edge,push=values
+            if (not all(isfinite(value) for value in (*values,lower,upper))
+                    or not 0<=implied<=1 or not 0<=push<1
+                    or not 0<=lower<=probability<=upper<=1-push
+                    or probability<=implied or edge<=0 or edge>0.15
+                    or abs(edge-(probability-implied))>1e-6):
+                continue
+            margin=lower-implied
+            if margin<PRIORITY_NEAR_PASS_FLOOR:
+                continue
+            candidate=(margin,sample)
+            if best is None or candidate>best:
+                best=candidate
+        return best
+    except Exception:
+        return None
+
+
+def prior_quality_sort(quality: tuple[float, int] | None) -> tuple[bool, float, int]:
+    if quality is None:
+        return True,0,0
+    return False,-quality[0],-quality[1]
 
 def timestamp(value: str) -> datetime:
     result=datetime.fromisoformat(value.replace('Z','+00:00'))
@@ -372,7 +424,9 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                         away_team=e['away_team'],game_start_time=e['commence_time'],state='waiting_quotes')
                         for e in events]
                     report['attempts']={e['id']:report['attempts'][e['id']] for e in events if e['id'] in report['attempts']}
+                    priorities={event['id']:prior_event_quality(sport,event['id']) for event in events}
                     queues[sport]=sorted(events,key=lambda e:(timestamp(e['commence_time'])>now+timedelta(hours=1),
+                        *prior_quality_sort(priorities[e['id']]),
                         report['attempts'].get(e['id'],''),timestamp(e['commence_time']),e['id']))
                 except Exception as exc:
                     report['failures'].append(dict(stage='event_discovery',error_type=type(exc).__name__))

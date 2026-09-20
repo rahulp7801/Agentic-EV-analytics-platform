@@ -112,6 +112,48 @@ async def test_budget_rotation_covers_both_leagues_and_unseen_events(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_scarce_budget_refreshes_best_prior_near_pass_first(monkeypatch,worker):
+    stored,events,evaluated,_=worker
+    now=datetime.now(timezone.utc)
+    for event in events['nba']:
+        event['commence_time']=(now+timedelta(hours=2)).isoformat()
+    candidate=dict(sample_size=30,true_prob=.62,implied_prob=.55,ev_pct=.07,push_probability=0,
+        gate_reason='stale_quote',sportsbook='book',american_odds=-110,
+        availability={'status':'observed','roster_confirmed':True})
+    stored['signals:nba:nba0']={'signals':[candidate | dict(sport='nba',game_id='nba0',
+        confidence_interval=[.525,.70])]}
+    stored['signals:nba:nba1']={'signals':[candidate | dict(sport='nba',game_id='nba1',
+        confidence_interval=[.54,.70])]}
+    def handle(request):
+        if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nba'])
+        identity=request.url.path.split('/')[-2]
+        return httpx.Response(200,json=next(event for event in events['nba'] if event['id']==identity))
+    transport(monkeypatch,handle)
+    report=(await scan.run(['nba'],len(scan.MARKETS['nba'])))['nba']
+    assert evaluated==['nba1']
+    assert {event['game_id']:event['state'] for event in report['events']}=={
+        'nba0':'api_budget','nba1':'evaluated'}
+
+
+def test_prior_event_quality_rejects_malformed_and_weak_snapshots(monkeypatch):
+    valid=dict(sport='nfl',game_id='event',sample_size=30,true_prob=.62,implied_prob=.55,
+        ev_pct=.07,push_probability=0,confidence_interval=[.54,.70],
+        gate_reason='stale_quote',sportsbook='book',american_odds=-110,
+        availability={'status':'observed','roster_confirmed':True})
+    snapshots={
+        'signals:nfl:event':{'signals':[valid,valid | {'confidence_interval':[float('nan'),.7]}]},
+        'signals:nfl:weak':{'signals':[valid | {'game_id':'weak','confidence_interval':[.50,.7]}]},
+        'signals:nfl:huge':{'signals':[valid]*5001},
+    }
+    monkeypatch.setattr(scan,'load_snapshot',lambda key:deepcopy(snapshots.get(key)))
+    assert scan.prior_event_quality('nfl','event')==pytest.approx((-.01,30))
+    assert scan.prior_event_quality('nfl','weak') is None
+    assert scan.prior_event_quality('nfl','huge') is None
+    monkeypatch.setattr(scan,'load_snapshot',lambda key:(_ for _ in ()).throw(RuntimeError('offline')))
+    assert scan.prior_event_quality('nfl','event') is None
+
+
+@pytest.mark.asyncio
 async def test_league_failure_does_not_stop_other_league_or_leak_provider_key(monkeypatch,worker):
     stored,events,evaluated,pool=worker
     def handle(request):
