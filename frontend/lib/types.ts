@@ -35,7 +35,9 @@ export interface AvailabilityEvidence {
   roster_player_name?: string;
   identity_source_url?: string;
   identity_source_sha256?: string;
-  teammates: Array<{player:string; status:string; position:string; reported_at:string}>;
+  teammates: Array<{player:string; status:string; position:string; reported_at:string;
+    team?:string; relationship?:'teammate'|'opponent'; unit?:'offense'|'defense';
+    source_url?:string; source_sha256?:string}>;
   context_splits?: AvailabilityContextSplit[];
 }
 

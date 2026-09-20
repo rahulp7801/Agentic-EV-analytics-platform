@@ -19,7 +19,7 @@ from sportsbet.ledger import Ledger
 from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.availability import fetch_event_availability, player_availability
-from sportsbet.prop.injury_context import historical_availability_splits
+from sportsbet.prop.injury_context import historical_availability_splits, relevant_availability_reports
 from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
@@ -301,6 +301,13 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         now=datetime.now(timezone.utc)
         availability_evidence, availability_reason=player_availability(availability,player,now,
             player_id=player_id if sport=='nfl' else None)
+        relevant_reports=[]
+        if sport in ('nba','nfl') and availability_evidence['status']=='observed':
+            relevant_reports=relevant_availability_reports(availability,
+                availability_evidence['team'],availability_evidence.get('roster_player_name',player),sport)
+            availability_evidence['teammates']=relevant_reports
+            if availability_reason in (None,'teammate_availability_unmodeled'):
+                availability_reason='teammate_availability_unmodeled' if relevant_reports else None
         # The sorted first selection is the same strongest per-player exposure
         # the public desk can surface. Avoid multiplying up to eight split
         # queries across every alternate threshold for that player.
@@ -353,6 +360,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             if availability_evidence['status']=='observed':
                 split_count=len(availability_evidence.get('context_splits',[]))
                 trade_plan[-1]=(f"Availability: {availability_evidence['subject_status']}; "
+                    f"{len(relevant_reports)} relevant current report{'s' if len(relevant_reports) != 1 else ''}; "
                     f"{split_count} exact historical on/off comparison{'s' if split_count != 1 else ''} retained. "
                     'Current reports screen eligibility; descriptive splits do not change the probability.')
             public_signal=dict(player=player,sport=sport,

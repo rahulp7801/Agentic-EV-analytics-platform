@@ -12,44 +12,62 @@ from sportsbet.schedules import STAT_TEAM_ALIASES
 
 OFFENSE = frozenset({'QB','RB','FB','WR','TE','C','G','OG','OT','T','OL'})
 DEFENSE = frozenset({'DE','DT','DL','NT','LB','ILB','OLB','CB','DB','S','FS','SS'})
+BASKETBALL = frozenset({'PG','SG','SF','PF','C','G','F','G-F','F-G','F-C','C-F'})
 RISK = frozenset({'out','inactive','injured reserve','doubtful','questionable'})
 
 
-def current_contexts(context: dict | None, subject_team: str, subject_player: str, sport: str) -> list[dict]:
-    """Return only relevant, exactly identified injury-report participants."""
+def relevant_availability_reports(context: dict | None, subject_team: str,
+                                  subject_player: str, sport: str) -> list[dict]:
+    """Return reported offensive teammates and opposing defenders that can affect the subject."""
     if not context or context.get('status') not in ('observed','partial'):
         return []
     candidates = []
-    pfr = context.get('pfr_player_identities', {})
     for team in context.get('teams', []):
         relation = 'teammate' if team.get('abbreviation') == subject_team else 'opponent'
-        roster_ids = {name: identity for identity,name in team.get('roster_ids', {}).items()}
         for report in team.get('reports', []):
             if relation == 'teammate' and report.get('player') == subject_player:
                 continue
             position = str(report.get('position','')).upper()
-            unit = 'offense' if position in OFFENSE else 'defense' if position in DEFENSE else None
+            unit = (('offense' if relation=='teammate' else 'defense') if sport=='nba' and position in BASKETBALL
+                    else 'offense' if position in OFFENSE else 'defense' if position in DEFENSE else None)
             if str(report.get('status','')).strip().lower() not in RISK:
                 continue
             if (relation,unit) not in (('teammate','offense'),('opponent','defense')):
                 continue
             row = dict(player=report['player'],status=report['status'],position=position,
-                       team=team['abbreviation'],relationship=relation,unit=unit)
-            if sport == 'nfl':
-                espn_id = roster_ids.get(report['player'])
-                player_id = pfr.get(espn_id) if espn_id else None
-                if not player_id:
-                    continue
-                row['participant_id'] = player_id
-                row['stat_team'] = STAT_TEAM_ALIASES['nfl'].get(row['team'],row['team'])
-            else:
-                try:
-                    row['stat_team'] = nba_team_abbreviation(team['name'])
-                except ValueError:
-                    continue
+                       team=team['abbreviation'],relationship=relation,unit=unit,
+                       reported_at=report.get('reported_at'),source_url=team.get('injury_source_url'),
+                       source_sha256=team.get('injury_source_sha256'))
             candidates.append(row)
     priority = {'out':0,'inactive':0,'injured reserve':0,'doubtful':1,'questionable':2}
     return sorted(candidates,key=lambda row:(priority.get(row['status'].lower(),3),row['relationship'],row['player']))[:8]
+
+
+def current_contexts(context: dict | None, subject_team: str, subject_player: str, sport: str) -> list[dict]:
+    """Return relevant injury-report participants with exact identities for historical splits."""
+    candidates = []
+    pfr = context.get('pfr_player_identities', {}) if context else {}
+    teams = context.get('teams', []) if context else []
+    for row in relevant_availability_reports(context,subject_team,subject_player,sport):
+        team=next((team for team in teams if team.get('abbreviation')==row['team']),None)
+        if not team:
+            continue
+        row=dict(row)
+        if sport == 'nfl':
+            roster_ids = {name: identity for identity,name in team.get('roster_ids', {}).items()}
+            espn_id = roster_ids.get(row['player'])
+            player_id = pfr.get(espn_id) if espn_id else None
+            if not player_id:
+                continue
+            row['participant_id'] = player_id
+            row['stat_team'] = STAT_TEAM_ALIASES['nfl'].get(row['team'],row['team'])
+        else:
+            try:
+                row['stat_team'] = nba_team_abbreviation(team['name'])
+            except ValueError:
+                continue
+        candidates.append(row)
+    return candidates
 
 
 def _summary(games: int, mean: object, hits: int) -> dict:

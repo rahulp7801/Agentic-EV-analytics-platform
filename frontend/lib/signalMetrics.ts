@@ -110,7 +110,16 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     const row=value as Record<string,unknown>;
     if(!bounded(row.player,100) || !bounded(row.status,100) || !bounded(row.position,10)
       || !timestamp(row.reported_at) || Date.parse(row.reported_at)>Date.parse(a.captured_at)+60000) return undefined;
-    teammates.push({player:row.player,status:row.status,position:row.position,reported_at:row.reported_at});
+    const contextFields=[row.team,row.relationship,row.unit,row.source_url,row.source_sha256];
+    const hasContext=contextFields.some(item=>item!==undefined);
+    if(hasContext && (!bounded(row.team,5) || !['teammate','opponent'].includes(String(row.relationship))
+      || !['offense','defense'].includes(String(row.unit))
+      || !(row.source_url===url || rosterSource(row.source_url,sport))
+      || !bounded(row.source_sha256,64) || !/^[a-f0-9]{64}$/.test(row.source_sha256))) return undefined;
+    teammates.push({player:row.player,status:row.status,position:row.position,reported_at:row.reported_at,
+      ...(hasContext ? {team:row.team as string,relationship:row.relationship as 'teammate'|'opponent',
+        unit:row.unit as 'offense'|'defense',source_url:row.source_url as string,
+        source_sha256:row.source_sha256 as string} : {})});
   }
   if(a.context_splits!==undefined) {
     if(sport==='cfb') return undefined;

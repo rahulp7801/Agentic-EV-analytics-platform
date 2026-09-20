@@ -188,6 +188,47 @@ async def test_availability_really_controls_daily_recommendations(tmp_path,injur
         assert reserve.call_count==2 and all(not s['gated'] for s in result['signals'])
 
 
+async def test_irrelevant_defensive_teammate_does_not_block_offensive_forecast(tmp_path):
+    conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'00-0037248'}]
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    now=datetime.now(timezone.utc)
+    availability=dict(status='observed',captured_at=now.isoformat(),source_url='source',source_sha256='a'*64,
+        teams=[dict(abbreviation='KC',roster_names=['Player','Corner'],roster_ids={},
+        roster_statuses={'Player':'Active','Corner':'Active'},roster_source_url='roster',roster_source_sha256='b'*64,
+        reports=[dict(player='Corner',status='Out',position='CB',reported_at=now.isoformat())])])
+    model=PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24'),
+        confidence_interval=(Decimal('.55'),Decimal('.65')))
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    with patch('sportsbet.prop.agents.run_prop_query',AsyncMock(return_value=model)),patch.object(
+            ledger,'reserve',return_value=(True,'accepted')) as reserve:
+        result=await evaluate_event(pool,event('nfl'),'nfl',ledger,'scan',availability)
+    assert reserve.call_count==2
+    assert all(signal['availability']['teammates']==[] and not signal['gated'] for signal in result['signals'])
+
+
+async def test_relevant_opposing_defender_blocks_unadjusted_forecast(tmp_path):
+    conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'00-0037248'}]
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    now=datetime.now(timezone.utc)
+    report=dict(player='Defender',status='Out',position='CB',reported_at=now.isoformat())
+    availability=dict(status='observed',captured_at=now.isoformat(),source_url='source',source_sha256='a'*64,
+        teams=[dict(abbreviation='KC',roster_names=['Player'],roster_ids={},roster_statuses={'Player':'Active'},
+            roster_source_url='roster',roster_source_sha256='b'*64,reports=[]),
+        dict(abbreviation='LV',roster_names=['Defender'],roster_ids={},roster_statuses={'Defender':'Active'},
+            roster_source_url='roster2',roster_source_sha256='c'*64,reports=[report])])
+    model=PropResult(true_probability=Decimal('.6'),sample_size=40,mean_stat=Decimal('24'),
+        confidence_interval=(Decimal('.55'),Decimal('.65')))
+    ledger=Ledger(tmp_path/'audit.sqlite')
+    with patch('sportsbet.prop.agents.run_prop_query',AsyncMock(return_value=model)),patch.object(
+            ledger,'reserve',return_value=(True,'accepted')) as reserve:
+        result=await evaluate_event(pool,event('nfl'),'nfl',ledger,'scan',availability)
+    reserve.assert_not_called()
+    assert all(signal['gate_reason']=='teammate_availability_unmodeled' and
+        signal['availability']['teammates'][0]['relationship']=='opponent' for signal in result['signals'])
+
+
 async def test_non_recommended_forecast_is_not_silently_discarded(tmp_path):
     conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'1'}]
     pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
