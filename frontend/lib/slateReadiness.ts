@@ -8,7 +8,7 @@ const GATES:Record<string,string>={unknown_or_ambiguous_player:'Player history i
   availability_unavailable:'Injury evidence unavailable',roster_unconfirmed:'Roster identity not confirmed',
   teammate_availability_unmodeled:'Relevant injury context not modeled',player_availability_risk:'Player availability risk',
   edge_not_confident:'Uncertainty does not support the edge',no_positive_edge:'No supported positive edge',
-  uncertainty_unavailable:'Uncertainty unavailable',edge_review_limit:'Edge exceeds the model-review ceiling',
+  uncertainty_unavailable:'Uncertainty unavailable',edge_review_limit:'Legacy policy; waiting for a fresh scan',
   missing_matching_prop_quote:'No matching observed price',model_error:'Model evaluation failed',
   incompatible_prediction_target:'Forecast target does not match this market',synthetic_price:'Price is synthetic',
   correlated_exposure:'Correlated player exposure',daily_exposure_limit:'Daily research exposure limit',

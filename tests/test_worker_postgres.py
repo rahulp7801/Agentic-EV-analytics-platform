@@ -322,7 +322,7 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
             assert predictions[0]['gate_reason'] == 'edge_not_confident'
         else:
             assert lower > .5
-            assert predictions[0]['gate_reason'] == 'edge_review_limit'
+            assert predictions[0]['gate_reason'] == 'availability_unavailable'
         event['bookmakers'][0]['markets'][0]['outcomes'][0]['point'] = 20
         await evaluate_event(pool,event,sport,ledger,identity+'integer')
         integer = next(p for p in ledger.predictions() if p['line'] == 20)

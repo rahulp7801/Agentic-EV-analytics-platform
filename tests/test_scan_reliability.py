@@ -149,6 +149,8 @@ def test_prior_event_quality_rejects_malformed_and_weak_snapshots(monkeypatch):
     assert scan.prior_event_quality('nfl','event')==pytest.approx((-.01,30))
     assert scan.prior_event_quality('nfl','weak') is None
     assert scan.prior_event_quality('nfl','huge') is None
+    snapshots['signals:nfl:event']['signals'][0]['gate_reason']='edge_review_limit'
+    assert scan.prior_event_quality('nfl','event')==pytest.approx((-.01,30))
     monkeypatch.setattr(scan,'load_snapshot',lambda key:(_ for _ in ()).throw(RuntimeError('offline')))
     assert scan.prior_event_quality('nfl','event') is None
 

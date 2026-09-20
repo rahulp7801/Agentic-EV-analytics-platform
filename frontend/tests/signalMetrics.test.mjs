@@ -107,7 +107,7 @@ test('availability screens recommendations without changing model probabilities'
   for(const availability of [undefined,{...quote.availability,status:'unavailable'},
     {...quote.availability,subject_status:'Out'},
     {...quote.availability,captured_at:new Date(now-3600001).toISOString()},
-    {...quote.availability,teammates:[{player:'Teammate',status:'Questionable',position:'WR',reported_at:new Date(now).toISOString()}]}]) {
+    {...quote.availability,teammates:[{player:'Teammate',status:'Out',position:'WR',reported_at:new Date(now).toISOString()}]}]) {
     const result=publicSignals([{...publicQuote,availability}],now).signals[0];
     assert.equal(result.gated,true);assert.equal(result.kelly_fraction,0);assert.equal(result.true_prob,.6);
   }
@@ -115,6 +115,15 @@ test('availability screens recommendations without changing model probabilities'
   assert.equal(result.availability,undefined);assert.equal(result.gated,true);
   const projected=publicSignals([{...publicQuote,availability:{...quote.availability,private:'internal'}}],now).signals[0];
   assert.equal('private' in projected.availability,false);assert.equal(projected.gated,false);
+  for(const context of [
+    {player:'Teammate',status:'Questionable',position:'WR',reported_at:new Date(now).toISOString()},
+    {player:'Teammate',status:'Injured Reserve',position:'WR',reported_at:new Date(now).toISOString()},
+    {player:'Defender',status:'Out',position:'CB',reported_at:new Date(now).toISOString(),
+      relationship:'opponent',team:'LV',unit:'defense',source_url:quote.availability.source_url,source_sha256:'a'.repeat(64)},
+  ]) {
+    const reviewed=publicSignals([{...publicQuote,availability:{...quote.availability,teammates:[context]}}],now).signals[0];
+    assert.equal(reviewed.gated,false);assert.equal(reviewed.availability.teammates[0].status,context.status);
+  }
   for(const patch of [{probability_adjusted:true},{roster_source_url:'https://evil.example/roster'},
     {roster_source_url:'https://site.api.espn.com.evil.example/apis/site/v2/sports/football/nfl/teams/12/roster'},
     {roster_source_url:'https://user:password@site.api.espn.com/apis/site/v2/sports/football/nfl/teams/12/roster'},
@@ -146,7 +155,7 @@ test('relevant current reports retain team relationship and unit context',()=>{
     team:'LV',relationship:'opponent',unit:'defense',source_url:quote.availability.source_url,source_sha256:'a'.repeat(64)};
   const result=publicSignals([{...publicQuote,availability:{...quote.availability,teammates:[report]}}],now).signals[0];
   assert.deepEqual(result.availability.teammates,[report]);
-  assert.equal(result.gate_reason,'teammate_availability_unmodeled');
+  assert.equal(result.gated,false);
   for(const broken of [{...report,relationship:'spectator'},{...report,team:'TOO-LONG'}]) {
     const projected=publicSignals([{...publicQuote,availability:{...quote.availability,teammates:[broken]}}],now).signals[0];
     assert.equal(projected.availability,undefined);assert.equal(projected.gated,true);
@@ -185,8 +194,8 @@ test('roster injury sources require the exact committed roster URL and hash',()=
   const project=a=>publicSignals([{...publicQuote,availability:a}],now).signals[0];
   const result=project(availability);
   assert.equal(result.availability.source_url,availability.roster_source_url);
-  assert.equal(result.gate_reason,'teammate_availability_unmodeled');
-  assert.equal(result.true_prob,.6);assert.equal(result.kelly_fraction,0);
+  assert.equal(result.gated,false);
+  assert.equal(result.true_prob,.6);assert.equal(result.kelly_fraction,.04);
   for(const patch of [{source_sha256:'c'.repeat(64)},
     {source_url:availability.source_url.replace('/12/','/13/')},
     {source_url:availability.source_url+'?redirect=evil'},

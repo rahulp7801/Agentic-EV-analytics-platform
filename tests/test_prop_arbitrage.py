@@ -316,6 +316,19 @@ class TestProp06EVSignalProduced:
         assert signal is not None
         assert float(signal.kelly_fraction) == pytest.approx(0.00275)
 
+    def test_large_exact_line_disagreement_uses_the_same_confidence_gate(self) -> None:
+        """A stale point-edge ceiling cannot cancel every finite-sample interval pass."""
+        result = PropResult(
+            true_probability=Decimal("0.83"),
+            sample_size=25,
+            confidence_interval=(Decimal("0.65"), Decimal("0.94")),
+            data_source="postgresql",
+        )
+        update = asyncio.run(make_prop_arbitrage_agent(sport="nfl")(
+            _make_nfl_state(prop_result=result)))
+        assert update["ev_signal"] is not None
+        assert update["ev_signal"].confidence_interval[0] > update["ev_signal"].implied_probability
+
 
 # ---------------------------------------------------------------------------
 # PROP-07 tests — CorrelationGuard extension
