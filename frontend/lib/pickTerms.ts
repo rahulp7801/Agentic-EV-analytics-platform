@@ -2,6 +2,9 @@ import {bestPicks,conservativeMargin} from './bestPicks.ts';
 import {publicSignals} from './signalMetrics.ts';
 import type {EVSignal,PropType} from './types';
 export const PROP_LABELS:Record<PropType,string>={points:'points',rebounds:'rebounds',assists:'assists',threes:'three-pointers',pra:'points + rebounds + assists',steals:'steals',blocks:'blocks',pass_yds:'passing yards',pass_tds:'passing touchdowns',rush_yds:'rushing yards',rec_yds:'receiving yards',receptions:'receptions'};
+const SPORTSBOOK_LABELS:Record<string,string>={betonlineag:'BetOnline',draftkings:'DraftKings',fanduel:'FanDuel',
+  betmgm:'BetMGM',caesars:'Caesars',betrivers:'BetRivers',fanatics:'Fanatics'};
+export function sportsbookLabel(value:string){return SPORTSBOOK_LABELS[value.toLowerCase()] ?? value;}
 /** Revalidate at display/copy time; no stale or unapproved record can produce bet terms. */
 export function pickTerms(value:EVSignal,now=Date.now()) {
   const signal=bestPicks([value],now)[0];

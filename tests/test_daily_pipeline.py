@@ -18,6 +18,7 @@ def schedule_source(monkeypatch):
         def report(self,recommendations_only=False,model_version=None,sport=None):
             return {'cohort':'recommendations' if recommendations_only else 'all_predictions',
                 'model_version':model_version,'sport':sport or 'all'}
+        def predictions(self): return []
     monkeypatch.setattr(daily,'Ledger',Audit)
     monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:{
         'sport':sport,'status':'complete','candidates':0,'settled':0,'pending':0,
@@ -105,6 +106,7 @@ async def test_daily_settles_observed_stats_before_scanning_new_props(monkeypatc
     assert stored['metrics:recommendations']['cohort']=='recommendations'
     assert stored['metrics:all:nba']['sport']=='nba'
     assert stored['metrics:recommendations:nba']['sport']=='nba'
+    assert stored['picks:nba']['selection_policy_version']=='pregame-t60-v1'
     assert stored['metrics:all']['model_version']==stored['metrics:recommendations']['model_version']=='empirical-jeffreys-v4'
 
 

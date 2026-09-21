@@ -11,6 +11,8 @@ test('terminal locations round trip for shareable dashboard state', () => {
   assert.deepEqual(parseTerminalHash('#cfb/dashboard'), { sport: 'cfb', view: 'dashboard' });
   assert.deepEqual(parseTerminalHash('#cfb/props'), { sport: 'cfb', view: 'props' });
   assert.deepEqual(parseTerminalHash('#cfb/arbitrage'), { sport: 'cfb', view: 'arbitrage' });
+  assert.deepEqual(parseTerminalHash('#nfl/results'), { sport: 'nfl', view: 'results' });
+  assert.deepEqual(parseTerminalHash('#cfb/results'), { sport: 'cfb', view: 'results' });
 });
 
 test('terminal locations reject unsupported leagues and views', () => {
