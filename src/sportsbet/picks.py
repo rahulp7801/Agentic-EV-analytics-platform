@@ -20,6 +20,8 @@ def _accepted(row: dict, sport: str) -> bool:
         probability = Decimal(str(row['model_probability']))
         push = Decimal(str(row.get('push_probability', 0)))
         interval = tuple(Decimal(str(value)) for value in row['model_confidence_interval'])
+        mean = (Decimal(str(row['model_mean_stat']))
+            if row.get('model_mean_stat') is not None else None)
         captured = utc_timestamp(row['captured_at'])
         quote_time = utc_timestamp(row['quote_time'])
         start = utc_timestamp(row['game_start_time'])
@@ -30,6 +32,8 @@ def _accepted(row: dict, sport: str) -> bool:
             and row.get('recommendation_policy_version') == 'confidence-floor-v2'
             and Decimal('0') < stake <= Decimal('.05')
             and Decimal('0') <= probability <= Decimal('1')-push
+            and (mean is None or (mean.is_finite()
+                and Decimal('0') <= mean <= Decimal('99999.99')))
             and len(interval) == 2 and Decimal('0') <= interval[0] <= probability <= interval[1] <= Decimal('1')-push
             and interval[0] > quote_terms(row['american_odds'], Decimal(0))[0] * (Decimal('1')-push)
             and compute_expected_return(probability, payout, push) > 0
@@ -53,7 +57,9 @@ def _signal(row: dict, state: str, lock_at: datetime) -> dict:
         ev_pct=float(probability-implied*(Decimal('1')-push)),
         expected_return=float(compute_expected_return(probability, payout, push)),
         push_probability=float(push), confidence_interval=[float(value) for value in row['model_confidence_interval']],
-        sample_size=row['model_sample_size'], mean_stat=None, model_version=row['model_version'],
+        sample_size=row['model_sample_size'],
+        mean_stat=float(row['model_mean_stat']) if row.get('model_mean_stat') is not None else None,
+        model_version=row['model_version'],
         kelly_fraction=float(row['stake_fraction']), gated=False, gate_reason='accepted',
         snapped_at=utc_timestamp(row['quote_time']).isoformat(),
         captured_at=utc_timestamp(row['captured_at']).isoformat(),

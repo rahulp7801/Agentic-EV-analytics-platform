@@ -8,6 +8,7 @@ def row(identity: str, captured: datetime, start: datetime, *, probability=.7, o
         game_date=start.date().isoformat(),home_team='Home',away_team='Away',prop_type='pass_yds',
         direction='over',line=250.5,sportsbook='book',american_odds=-110,
         model_probability=probability,push_probability=0,model_sample_size=40,
+        model_mean_stat=260.25,
         model_confidence_interval=[.55,.8],captured_at=captured.isoformat(),
         game_start_time=start.isoformat(),quote_time=captured.isoformat(),model_generated_at=captured.isoformat(),
         quote_source_provider='the_odds_api',quote_source_sha256='a'*64,
@@ -31,7 +32,17 @@ def test_board_uses_latest_approved_capture_before_fixed_lock(monkeypatch):
     assert board['current'][0]['prediction_id']=='b'*64
     assert board['current'][0]['board_state']=='locked'
     assert board['current'][0]['lock_at']==(start-timedelta(minutes=60)).isoformat()
+    assert board['current'][0]['mean_stat']==260.25
     assert board['selection_policy_version']=='pregame-t60-v1'
+
+
+def test_board_rejects_invalid_retained_mean(monkeypatch):
+    start=datetime(2026,9,20,20,tzinfo=timezone.utc)
+    invalid=row('a',start-timedelta(hours=2),start)
+    invalid['model_mean_stat']='NaN'
+    monkeypatch.setattr('sportsbet.picks.quote_evidence_valid',lambda value:True)
+    monkeypatch.setattr('sportsbet.picks.settlement_identity_valid',lambda value:True)
+    assert build_pick_board([invalid],'nfl',start-timedelta(hours=1,minutes=30))['current']==[]
 
 
 def test_board_never_grades_without_reproducible_settlement(monkeypatch):

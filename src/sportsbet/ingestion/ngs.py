@@ -5,6 +5,7 @@ import hashlib
 import io
 import math
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -32,6 +33,8 @@ TRUSTED_HOSTS = {
     "release-assets.githubusercontent.com",
     "objects.githubusercontent.com",
 }
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+MAX_DOWNLOAD_ATTEMPTS = 3
 
 IDENTITY_COLUMNS = (
     "season", "week", "player_gsis_id", "team_abbr", "player_position",
@@ -74,7 +77,9 @@ def asset_url(stat_type: str) -> str:
 
 def _download(client: httpx.Client, url: str) -> bytes:
     target = httpx.URL(url)
-    for _ in range(4):
+    redirects = 0
+    attempts = 0
+    while redirects < 4:
         if (
             target.scheme != "https"
             or target.host not in TRUSTED_HOSTS
@@ -82,31 +87,44 @@ def _download(client: httpx.Client, url: str) -> bytes:
             or target.userinfo
         ):
             raise ValueError("Untrusted NGS asset URL")
-        with client.stream("GET", target) as response:
-            if response.is_redirect:
-                location = response.headers.get("location")
-                if not location:
-                    raise ValueError("Invalid NGS asset redirect")
-                target = target.join(location)
-                continue
-            response.raise_for_status()
-            try:
-                announced = int(response.headers.get("content-length", "0"))
-            except ValueError:
-                raise ValueError("Invalid NGS asset length") from None
-            if response.status_code != 200 or not 0 <= announced <= MAX_ASSET_BYTES:
-                raise ValueError("Invalid NGS asset response")
-            chunks: list[bytes] = []
-            size = 0
-            for chunk in response.iter_bytes():
-                size += len(chunk)
-                if size > MAX_ASSET_BYTES:
+        try:
+            with client.stream("GET", target) as response:
+                if response.status_code in RETRYABLE_STATUS_CODES:
+                    if attempts + 1 >= MAX_DOWNLOAD_ATTEMPTS:
+                        response.raise_for_status()
+                    attempts += 1
+                    time.sleep(0.25 * 2 ** (attempts - 1))
+                    continue
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        raise ValueError("Invalid NGS asset redirect")
+                    target = target.join(location)
+                    redirects += 1
+                    continue
+                response.raise_for_status()
+                try:
+                    announced = int(response.headers.get("content-length", "0"))
+                except ValueError:
+                    raise ValueError("Invalid NGS asset length") from None
+                if response.status_code != 200 or not 0 <= announced <= MAX_ASSET_BYTES:
                     raise ValueError("Invalid NGS asset response")
-                chunks.append(chunk)
-            payload = b"".join(chunks)
-            if not payload:
-                raise ValueError("Invalid NGS asset response")
-            return payload
+                chunks: list[bytes] = []
+                size = 0
+                for chunk in response.iter_bytes():
+                    size += len(chunk)
+                    if size > MAX_ASSET_BYTES:
+                        raise ValueError("Invalid NGS asset response")
+                    chunks.append(chunk)
+                payload = b"".join(chunks)
+                if not payload:
+                    raise ValueError("Invalid NGS asset response")
+                return payload
+        except httpx.TransportError:
+            if attempts + 1 >= MAX_DOWNLOAD_ATTEMPTS:
+                raise
+            attempts += 1
+            time.sleep(0.25 * 2 ** (attempts - 1))
     raise ValueError("Too many NGS asset redirects")
 
 
