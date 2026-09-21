@@ -15,6 +15,7 @@ Design: both models use strict=True (ConfigDict). No imports from graph/.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Optional
 
@@ -63,5 +64,10 @@ class KinematicAnalysis(BaseModel):
     press_man_rate: Optional[Decimal] = None        # ALWAYS None — forward-compat placeholder
     geometric_mismatch_flag: bool = False           # True if avg_separation >= threshold
     signal_description: Optional[str] = None
-    data_source: str = "ngs_stats"
+    weeks_sampled: int = 0
+    source_provider: Optional[str] = None
+    source_url: Optional[str] = None
+    source_sha256: Optional[str] = None
+    source_observed_at: Optional[datetime] = None
+    data_source: str = "nflverse_next_gen_stats"
     ngs_available: bool = True

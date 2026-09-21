@@ -188,6 +188,11 @@ async def test_matchup_query_returns_ngs_fields() -> None:
     params = KinematicParams(season=2024, week=5, receiver_gsis_id="00-0034796")
     analysis = await run_matchup_query(mock_pool, params)
 
+    query, player_id, season, cutoff_week = mock_conn.fetchrow.await_args.args
+    assert "r.week            < $3" in query
+    assert "week < $3" in query
+    assert (player_id, season, cutoff_week) == ("00-0034796", 2024, 5)
+
     assert isinstance(analysis, KinematicAnalysis), "Must return KinematicAnalysis"
     assert analysis.avg_separation == Decimal("2.3"), (
         f"avg_separation must be Decimal('2.3'), got {analysis.avg_separation}"

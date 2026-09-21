@@ -1,72 +1,51 @@
-# Free NFL Next Gen Stats plan
+# Free NFL Next Gen Stats evidence contract
 
 ## Decision
 
-Use the free nflverse Next Gen Stats release through `nflreadpy`. The upstream
-project publishes passing, receiving, and rushing files sourced from NFL Next Gen
+Use the free nflverse Next Gen Stats release assets directly. The upstream project
+publishes passing, receiving, and rushing parquet files sourced from NFL Next Gen
 Stats, and polls the data daily during the NFL season. No API key is required.
 
 - [nflverse data automation and licensing](https://github.com/nflverse/nflverse-data)
 - [nflverse NGS collection project](https://github.com/nflverse/ngs-data)
-- [`nflreadpy.load_nextgen_stats`](https://github.com/nflverse/nflreadpy/blob/main/src/nflreadpy/load_nextgen_stats.py)
 
 This source applies to NFL players only. It does not provide NBA or CFB tracking
 data and must not be presented as coverage for those leagues.
 
-## Current code and release blocker
+## Implemented data boundary
 
-The repository already contains `sportsbet.ingestion.ngs`, the `ngs_stats` table,
-and a kinematic graph node. They are not production-ready:
+Migration 0029 replaces unverifiable legacy rows with a private evidence table.
+The worker downloads the three bounded nflverse parquet assets over allowlisted
+HTTPS redirects, caches their raw bytes for 20 hours, and stores the exact asset
+SHA-256 plus a normalized row SHA-256. Every documented source column is required;
+invalid schemas, duplicate weekly identities, non-finite metrics, invalid counts,
+season summaries, and unidentified players fail closed.
 
-- ingestion appends every download, so retries can duplicate player/week rows;
-- the table retains no source URL, retrieval time, release digest, or row digest;
-- sparse upstream schemas are silently accepted;
-- the scheduled refresh does not load NGS data;
-- `run_matchup_query` accepts a target week but averages the entire season;
-- the optional receiving adjustment adds a fixed five percentage points from a
-  hard-coded separation threshold and discards its uncertainty interval.
+Refreshes are idempotent on `(player_gsis_id, season, week, stat_type)`. An unchanged
+asset and exact normalized row-hash set causes no writes. Daily NFL history refreshes load the
+current and prior season; a backfill loads its full requested window while still
+downloading each stat-type asset only once. NGS is optional context, so an upstream
+failure is recorded without disabling the independently sourced base model.
 
-The season-wide query is future-data leakage for any forecast before the end of
-that season. `EXPERIMENTAL_PROBABILITY_ADJUSTMENTS` must remain disabled until the
-query and evaluation contract below are complete.
+The former season-wide matchup query now filters both receiver and quarterback rows
+to `week < target_week`. Published evidence independently resolves the exact target
+week from the schedule and uses at most the eight latest weekly rows from the target
+and prior season. It is joined only by exact GSIS player ID.
 
-## Next release scope
+## Published evidence
 
-### 1. Reproducible ingestion
-
-Add a migration with a unique key on
-`(player_gsis_id, season, week, stat_type)`, then replace append-only writes with
-an idempotent upsert. Require identity, season, week, stat type, and the documented
-metric columns for each stat type. Reject duplicate keys, non-finite values, and
-out-of-range weeks before writing.
-
-Retain the provider, canonical release URL, retrieval timestamp, raw file SHA-256,
-and normalized row SHA-256. Cache the nflverse files on the worker filesystem so a
-daily retry does not redownload an unchanged release. Refresh the current and prior
-season during the NFL history job; historical backfills remain manual.
-
-### 2. Pregame evidence boundary
-
-Every query must filter to rows known before the target game's kickoff. For a
-regular-season Week N forecast, aggregate only weeks `< N`; postseason handling
-must use an ordered game timestamp rather than assuming a week number is unique.
-Exclude upstream `week == 0` season summaries because they incorporate the full
-regular season.
-
-Join by verified GSIS ID. Missing or ambiguous identity yields no NGS evidence.
-The public response may expose only the whitelisted metric, sample weeks, cutoff,
-source URL, capture time, and digest. It must not expose database keys or raw
-provider payloads.
-
-The first release should show these as sourced context:
+The public response exposes only the whitelisted metrics, sample weeks, exclusive
+cutoff, source URL, capture time, and digest. Browser validation strips malformed
+or unexpected fields. The explanation panel shows:
 
 - passing: average time to throw, intended/completed air yards, aggressiveness;
 - receiving: average separation, cushion, YAC over expected;
 - rushing: efficiency, box rate, rush yards over expected, time to line of scrimmage.
 
-No metric changes a pick probability in this stage.
+Every response carries `probability_adjusted: false`. No metric changes a pick
+probability or recommendation gate in this stage.
 
-### 3. Validation before model use
+## Required validation before model use
 
 Build an expanding-window comparison using the same game-time cutoff as the live
 scanner. Compare the existing model with candidate NGS features on untouched game
@@ -79,12 +58,12 @@ Remove the fixed separation threshold and fixed probability boost. If no candida
 passes the evaluation contract, retain NGS as explanatory evidence only. Do not
 claim a win-rate, ROI, or pricing improvement from tracking metrics alone.
 
-### 4. Operations and scale
+## Operations and scale
 
-The daily job should download each stat-type asset at most once, hash it, and skip
-unchanged content. Batch one transaction per stat type, publish counts and coverage,
-and fail the NGS portion closed without blocking the base model. Alert on upstream
-schema changes, digest changes with zero rows, duplicate keys, and current-week lag.
+The daily job downloads each stat-type asset at most once per cache window, hashes
+it, skips unchanged database content, and writes each season/stat type in one
+transaction. Coverage reports include rows, skipped identities, cache state, source
+URL, and hashes. No new environment secret or paid API is required.
 
 ## Release acceptance
 
@@ -92,7 +71,7 @@ schema changes, digest changes with zero rows, duplicate keys, and current-week 
 - a Week N query cannot read Week N or later rows;
 - season-summary rows cannot enter a pregame feature;
 - a bad schema or ambiguous player ID produces no evidence;
-- the live dashboard labels the source, cutoff, sample, and freshness;
+- the dashboard labels the source, cutoff, sample, and capture time;
 - base recommendations are unchanged while the feature is evidence-only;
 - PostgreSQL integration, frontend contract, security, and production browser
   checks pass before the release is tagged.

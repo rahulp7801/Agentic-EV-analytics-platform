@@ -192,17 +192,31 @@ class NgsStats(Base):
     # Passing fields
     avg_time_to_throw: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     avg_completed_air_yards: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
+    avg_intended_air_yards: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 3))
     aggressiveness: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
+    passer_rating: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2))
+    attempts: Mapped[Optional[int]] = mapped_column(SmallInteger)
     # Receiving fields
     avg_separation: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     avg_cushion: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
+    avg_yac: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 3))
     avg_yac_above_expectation: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
+    catch_percentage: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2))
+    targets: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    receptions: Mapped[Optional[int]] = mapped_column(SmallInteger)
     # Rushing fields
     efficiency: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     rush_yards_over_expected: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     avg_time_to_los: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
+    percent_attempts_gte_eight_defenders: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2))
+    rush_attempts: Mapped[Optional[int]] = mapped_column(SmallInteger)
     # Forward-compatible Phase 6 column (RESEARCH.md open question — nullable)
     press_man_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
+    source_provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_url: Mapped[str] = mapped_column(String, nullable=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_record_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_observed_at: Mapped[datetime] = mapped_column(TIMESTAMPTZ(timezone=True), nullable=False)
 
     __table_args__ = (
         UniqueConstraint(

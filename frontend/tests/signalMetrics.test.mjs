@@ -14,6 +14,22 @@ const publicQuote={...quote,id:'prediction',player:'Player',team:'',opponent:'',
   home_team:'Home',away_team:'Away',game_id:'game',sport:'nfl',prop_type:'pass_yds',line:249.5,
   mean_stat:260,confidence_interval:[.55,.7],trade_plan:[],injury_flags:{},
   market_type:'player_pass_yds',strength:'unrated'};
+test('Next Gen Stats context is source-bound, pregame-only, and never changes probability',()=>{
+  const evidence={status:'observed',stat_type:'passing',sample_weeks:8,cutoff_season:2026,
+    cutoff_week:3,cutoff_exclusive:true,metrics:{avg_time_to_throw:2.71,aggressiveness:13.4},
+    source_provider:'nflverse_ngs',
+    source_url:'https://github.com/nflverse/nflverse-data/releases/download/nextgen_stats/ngs_passing.parquet',
+    source_sha256:'c'.repeat(64),source_observed_at:new Date(now).toISOString(),probability_adjusted:false};
+  const result=publicSignals([{...publicQuote,next_gen_stats:{...evidence,private:'secret'}}],now).signals[0];
+  assert.equal(result.next_gen_stats.sample_weeks,8);assert.equal(result.true_prob,publicQuote.true_prob);
+  assert.equal(result.next_gen_stats.private,undefined);assert.equal(result.next_gen_stats.probability_adjusted,false);
+  for(const patch of [{source_url:'https://evil.example/ngs'},{probability_adjusted:true},
+    {cutoff_exclusive:false},{sample_weeks:9},{metrics:{unknown:1}},{stat_type:'rushing'}]) {
+    const projected=publicSignals([{...publicQuote,next_gen_stats:{...evidence,...patch}}],now).signals[0];
+    assert.equal(projected.next_gen_stats,undefined);
+    assert.equal(projected.true_prob,publicQuote.true_prob);
+  }
+});
 test('full legitimate NFL/NBA/CFB team names survive both public forecast boundaries',()=>{
   for(const [sport,home,away] of [['nfl','Washington Commanders','Tampa Bay Buccaneers'],
     ['cfb','Ohio State Buckeyes','Texas Longhorns'],

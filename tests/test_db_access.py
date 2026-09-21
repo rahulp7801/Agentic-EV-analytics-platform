@@ -128,6 +128,16 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
                 assert worker.execute("""UPDATE provider_response_cache
                     SET lease_until=NOW()+INTERVAL '2 minutes'
                     WHERE cache_key='odds:event:nfl:test'""").rowcount == 1
+                ngs_id = worker.execute("""INSERT INTO ngs_stats
+                    (player_gsis_id,season,week,stat_type,team_abbr,player_position,
+                     avg_time_to_throw,source_provider,source_url,source_sha256,
+                     source_record_sha256,source_observed_at)
+                    VALUES ('00-0000001',2026,1,'passing','SEA','QB',2.5,'nflverse_ngs',
+                            'https://github.com/nflverse/nflverse-data/releases/download/nextgen_stats/ngs_passing.parquet',
+                            %s,%s,NOW()) RETURNING id""", ('c'*64, 'd'*64)).fetchone()[0]
+                assert worker.execute('UPDATE ngs_stats SET avg_time_to_throw=2.6 WHERE id=%s',
+                                      (ngs_id,)).rowcount == 1
+                assert worker.execute('DELETE FROM ngs_stats WHERE id=%s', (ngs_id,)).rowcount == 1
             for statement in ('DELETE FROM dashboard_snapshots WHERE false',
                               'UPDATE public.alembic_version SET version_num=version_num',
                               'UPDATE player_prop_snapshots SET line=line WHERE false',
@@ -149,6 +159,10 @@ def test_reader_cannot_write_or_read_audits_and_worker_cannot_rewrite_prediction
                                       ('public.'+table,)).fetchone()[0]
                 assert not worker.execute("SELECT has_table_privilege(current_user,%s,'DELETE,TRUNCATE')",
                                           ('public.'+table,)).fetchone()[0]
+            assert worker.execute("SELECT has_table_privilege(current_user,'public.ngs_stats',"
+                                  "'SELECT,INSERT,UPDATE,DELETE')").fetchone()[0]
+            assert worker.execute("SELECT has_sequence_privilege(current_user,"
+                                  "pg_get_serial_sequence('public.ngs_stats','id'),'USAGE')").fetchone()[0]
             for column in ('outcome','outcome_source','outcome_ref','outcome_observed_at','actual_value',
                            'outcome_evidence'):
                 assert worker.execute("SELECT has_column_privilege(current_user,'analytics.predictions',%s,'UPDATE')",(column,)).fetchone()[0]

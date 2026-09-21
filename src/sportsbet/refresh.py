@@ -11,6 +11,7 @@ from sportsbet.ingestion.cfb_gamelogs import ingest_cfb_gamelogs_season
 from sportsbet.ingestion.nba_gamelogs import ingest_nba_gamelogs_season
 from sportsbet.ingestion.player_stats import ingest_player_stats_seasons
 from sportsbet.ingestion.snap_counts import ingest_snap_counts_seasons
+from sportsbet.ingestion.ngs import ingest_ngs_seasons
 
 
 def refresh(sport: str, today: date, backfill: bool = False):
@@ -21,11 +22,20 @@ def refresh(sport: str, today: date, backfill: bool = False):
     # NFL requires multiple seasons to reach the minimum sample; NBA prior season covers opening night.
     years = list(range(start-(2 if sport in ('nfl','cfb') else 1), start+1)) if backfill else [start]
     engine = get_sync_engine()
+    ngs: dict = {}
     try:
         if sport == 'nfl':
             ingest_games_seasons(years, engine)
             ingest_player_stats_seasons(years, engine)
             ingest_snap_counts_seasons(years, engine)
+            ngs_years=sorted(set(years+[start-1]))
+            try:
+                ngs=ingest_ngs_seasons(ngs_years,engine)
+                ngs['status']='complete'
+            except Exception as exc:
+                # Optional tracking context cannot make the source-backed base
+                # history/model unavailable and does not alter probabilities.
+                ngs={'status':'failed','error_type':type(exc).__name__}
         elif sport == 'nba':
             for season in years:
                 try:
@@ -38,7 +48,9 @@ def refresh(sport: str, today: date, backfill: bool = False):
         else:
             coverage=[ingest_cfb_gamelogs_season(season,engine) for season in years]
             return {'provider':'sportsdataverse_espn','seasons':coverage}
-        return {'provider':'nba' if sport=='nba' else 'nflverse'}
+        if sport=='nfl':
+            return {'provider':'nflverse','next_gen_stats':ngs}
+        return {'provider':'nba'}
     finally:
         engine.dispose()
 
