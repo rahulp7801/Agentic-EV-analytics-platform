@@ -92,6 +92,41 @@ def test_browser_role_migration_closes_owner_view_and_preserves_data():
 
 
 @pytest.mark.serial
+@pytest.mark.skipif(not os.environ.get('SPORTSBET_TEST_DATABASE_URL'), reason='Disposable database required')
+def test_ngs_migration_replaces_preexisting_worker_policy():
+    url = os.environ['SPORTSBET_TEST_DATABASE_URL']
+    cfg = get_alembic_cfg(url)
+    alembic.command.upgrade(cfg, '0028_cfb_player_gamelogs')
+    engine = sa.create_engine(url)
+    created_role = False
+    try:
+        with engine.begin() as conn:
+            if not conn.execute(sa.text(
+                "SELECT 1 FROM pg_roles WHERE rolname='sportsbet_worker'"
+            )).first():
+                conn.execute(sa.text('CREATE ROLE sportsbet_worker NOLOGIN'))
+                created_role = True
+            conn.execute(sa.text('ALTER TABLE ngs_stats ENABLE ROW LEVEL SECURITY'))
+            conn.execute(sa.text("""CREATE POLICY sportsbet_worker_read ON ngs_stats
+                FOR SELECT TO sportsbet_worker USING (true)"""))
+        alembic.command.upgrade(cfg, 'head')
+        with engine.connect() as conn:
+            policies = conn.execute(sa.text("""SELECT policyname FROM pg_policies
+                WHERE schemaname='public' AND tablename='ngs_stats'
+                  AND policyname LIKE 'sportsbet_worker_%'""")).scalars().all()
+        assert set(policies) == {
+            'sportsbet_worker_read', 'sportsbet_worker_insert',
+            'sportsbet_worker_update', 'sportsbet_worker_delete',
+        }
+    finally:
+        alembic.command.downgrade(cfg, 'base')
+        if created_role:
+            with engine.begin() as conn:
+                conn.execute(sa.text('DROP ROLE sportsbet_worker'))
+        engine.dispose()
+
+
+@pytest.mark.serial
 @pytest.mark.skipif(
     not os.environ.get("SPORTSBET_TEST_DATABASE_URL"),
     reason="SPORTSBET_TEST_DATABASE_URL not set",
