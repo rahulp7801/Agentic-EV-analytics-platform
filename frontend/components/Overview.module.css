@@ -117,3 +117,71 @@
 @media(max-width:900px) { .skeletonGrid { grid-template-columns:1fr; }.skeletonCard:nth-child(n+2) { display:none; } }
 @media(max-width:900px) { .recentGrid { grid-template-columns:1fr; }.recentReason { min-height:0; } }
 @media(prefers-reduced-motion:reduce) { .skeletonCard span { animation:none; } }
+
+/* The pick board keeps live prices visually distinct from recorded evidence. */
+.shortlist[data-state='recorded'] .qualified { color:var(--accent-amber);background:color-mix(in srgb,var(--accent-amber) 12%,var(--bg-surface)); }
+.shortlist[data-state='empty'] .qualified { color:var(--text-secondary);background:var(--bg-raised); }
+.boardNotice { display:flex;align-items:flex-start;gap:10px;margin:18px 0 0!important;padding:13px 15px;border:1px solid color-mix(in srgb,var(--accent-amber) 22%,transparent);background:color-mix(in srgb,var(--accent-amber) 8%,var(--bg-base)); }
+.boardNotice strong { flex:0 0 auto;color:var(--accent-amber);font-size:11px; }
+.boardNotice span { color:var(--text-secondary);font-size:11px;line-height:1.55; }
+.betGrid { align-items:start; }
+.betCard { position:relative;overflow:hidden;padding:0 22px 22px;border-color:var(--border-dim);background:var(--bg-surface);box-shadow:var(--shadow-sm);transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease; }
+.pickEnter { animation:pickEnter .28s ease-out both; }
+.betGrid>.pickEnter:nth-child(2) { animation-delay:.05s; }
+.betGrid>.pickEnter:nth-child(3) { animation-delay:.1s; }
+.betCard:hover { transform:translateY(-2px);border-color:var(--border-mid);box-shadow:var(--shadow-md); }
+.betCard[data-rank='1'] { border-color:color-mix(in srgb,var(--accent) 42%,var(--border-dim));box-shadow:0 12px 32px color-mix(in srgb,var(--accent) 9%,transparent); }
+.betCard[data-state='recorded'],.betCard[data-state='locked'] { background:color-mix(in srgb,var(--bg-raised) 40%,var(--bg-surface)); }
+.betCard[data-state='recorded'][data-rank='1'],.betCard[data-state='locked'][data-rank='1'] { border-color:color-mix(in srgb,var(--accent-amber) 38%,var(--border-dim));box-shadow:var(--shadow-sm); }
+.pickRank { min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-inline:-22px;padding:0 22px;border-bottom:1px solid var(--border-dim);background:var(--bg-base); }
+.pickRank span { color:var(--text-secondary);font-size:10px;font-weight:700;letter-spacing:.035em;text-transform:uppercase; }
+.pickRank strong { display:inline-flex;align-items:center;gap:6px;color:var(--accent-mint);font-size:10px;font-weight:700; }
+.betCard[data-state='recorded'] .pickRank strong,.betCard[data-state='locked'] .pickRank strong { color:var(--accent-amber); }
+.betCard header { margin:14px 0 15px; }
+.betCard header h3 { font-size:17px; }
+.betCard header p { margin:3px 0 0;font-size:10px; }
+.pickCall { margin:18px 0 0; }
+.pickCall>span { color:var(--text-muted);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase; }
+.betCard .pickCall h4 { display:flex;flex-direction:column;gap:3px;margin:8px 0 0;line-height:1; }
+.pickCall h4 strong { font-size:clamp(27px,2.25vw,34px);letter-spacing:-.055em;text-transform:uppercase; }
+.pickCall h4 small { color:var(--text-secondary);font-size:12px;font-weight:600;letter-spacing:.01em;text-transform:uppercase; }
+.betPrice { min-height:62px;padding:11px 13px;border:1px solid var(--border-dim);border-radius:14px;background:var(--bg-base); }
+.betPrice>span { display:flex;flex-direction:column;gap:3px; }
+.betPrice small { color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:.045em; }
+.betPrice strong { font-size:13px; }
+.betPrice b { font-size:24px; }
+.gameLine { min-height:43px;margin:12px 1px!important; }
+.gameLine time { color:var(--text-muted); }
+.betMetrics { margin:15px 0;padding:14px 0; }
+.betReason { min-height:62px; }
+.priceNote { min-height:38px; }
+.betActions { display:grid;grid-template-columns:1fr 1fr;margin-top:17px; }
+.betActions button { display:inline-flex;align-items:center;justify-content:center;gap:6px;padding-inline:12px; }
+.copyNotice { min-height:0!important;margin:7px 0 0!important; }
+@media(max-width:720px) {
+  .overview { padding-top:12px; }
+  .hero { padding-bottom:10px; }
+  .hero .kicker { display:none; }
+  .hero h1 { font-size:30px; }
+  .hero p { max-width:520px;font-size:12px;line-height:1.55; }
+  .hero .heroActions { grid-template-columns:1fr 1fr;gap:8px; }
+  .shortlist { margin-top:10px; }
+  .shortlist>.comparisonHeading { padding-bottom:12px; }
+  .shortlist>.comparisonHeading p { margin-top:7px;font-size:11px;line-height:1.5; }
+  .shortlist[data-state='recorded']>.comparisonHeading p { display:none; }
+  .boardNotice { display:grid;gap:3px;padding:10px 12px; }
+  .betGrid { margin-top:12px; }
+  .betCard { padding:0 18px 18px; }
+  .pickRank { margin-inline:-18px;padding-inline:18px; }
+  .pickCall { margin-top:15px; }
+  .pickCall h4 strong { font-size:30px; }
+  .betCard header { margin:12px 0; }
+  .betCard:hover { transform:none; }
+  .betReason,.priceNote { min-height:0; }
+}
+@media(max-width:400px) {
+  .shortlist { padding:15px; }
+  .betActions { grid-template-columns:1fr; }
+}
+@keyframes pickEnter { from { opacity:0;transform:translateY(10px); } to { opacity:1;transform:translateY(0); } }
+@media(prefers-reduced-motion:reduce) { .betCard { transition:none; }.betCard:hover { transform:none; }.pickEnter { animation:none; } }
