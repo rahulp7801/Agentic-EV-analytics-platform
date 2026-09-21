@@ -1,4 +1,4 @@
-import type {AvailabilityContextSplit,AvailabilityEvidence,EVSignal,ModelSport,PlayerProfile,PropType,Sport} from './types';
+import type {AvailabilityContextSplit,AvailabilityEvidence,EVSignal,ModelSport,NextGenMetric,NextGenStatsEvidence,PlayerProfile,PropType,Sport} from './types';
 
 const CURRENT_MODEL_VERSION = 'empirical-jeffreys-v4';
 
@@ -162,6 +162,40 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     teammates,...(contextSplits.length ? {context_splits:contextSplits} : {}),probability_adjusted:false};
 }
 
+function publicNextGenStats(value:unknown,sport:Sport,prop:PropType):NextGenStatsEvidence|undefined {
+  if(sport!=='nfl' || !value || typeof value!=='object' || Array.isArray(value)) return undefined;
+  const evidence=value as Record<string,unknown>;
+  const expected:Partial<Record<PropType,NextGenStatsEvidence['stat_type']>>={
+    pass_yds:'passing',pass_tds:'passing',rush_yds:'rushing',rec_yds:'receiving',receptions:'receiving'};
+  const statType=expected[prop];
+  const columns:Record<NextGenStatsEvidence['stat_type'],Set<NextGenMetric>>={
+    passing:new Set(['avg_time_to_throw','avg_completed_air_yards','avg_intended_air_yards','aggressiveness']),
+    receiving:new Set(['avg_separation','avg_cushion','avg_yac_above_expectation']),
+    rushing:new Set(['efficiency','percent_attempts_gte_eight_defenders','rush_yards_over_expected','avg_time_to_los']),
+  };
+  const metrics=evidence.metrics;
+  if(!statType || evidence.status!=='observed' || evidence.stat_type!==statType
+    || evidence.source_provider!=='nflverse_ngs' || evidence.probability_adjusted!==false
+    || evidence.cutoff_exclusive!==true || !Number.isSafeInteger(evidence.sample_weeks)
+    || Number(evidence.sample_weeks)<1 || Number(evidence.sample_weeks)>8
+    || !Number.isSafeInteger(evidence.cutoff_season) || Number(evidence.cutoff_season)<2016
+    || Number(evidence.cutoff_season)>2100 || !Number.isSafeInteger(evidence.cutoff_week)
+    || Number(evidence.cutoff_week)<1 || Number(evidence.cutoff_week)>22
+    || evidence.source_url!==`https://github.com/nflverse/nflverse-data/releases/download/nextgen_stats/ngs_${statType}.parquet`
+    || !bounded(evidence.source_sha256,64) || !/^[a-f0-9]{64}$/.test(evidence.source_sha256)
+    || !timestamp(evidence.source_observed_at) || !metrics || typeof metrics!=='object'
+    || Array.isArray(metrics)) return undefined;
+  const entries=Object.entries(metrics);
+  if(!entries.length || entries.some(([key,item])=>!columns[statType].has(key as NextGenMetric)
+    || !finite(item) || Math.abs(item)>10000)) return undefined;
+  return {status:'observed',stat_type:statType,sample_weeks:evidence.sample_weeks as number,
+    cutoff_season:evidence.cutoff_season as number,cutoff_week:evidence.cutoff_week as number,
+    cutoff_exclusive:true,metrics:{...metrics} as Partial<Record<NextGenMetric,number>>,
+    source_provider:'nflverse_ngs',source_url:evidence.source_url,
+    source_sha256:evidence.source_sha256,source_observed_at:evidence.source_observed_at,
+    probability_adjusted:false};
+}
+
 /** Current identity metadata never supplies historical availability or eligibility. */
 export function publicPlayerProfile(value:unknown,sport:Sport,player:string,now=Date.now()):PlayerProfile|undefined {
   if(!value || typeof value!=='object' || Array.isArray(value)) return undefined;
@@ -220,6 +254,7 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
         ([key,item])=>!bounded(key,64) || !bounded(item,300,true))
       || !bounded(s.market_type,100)) return null;
   const availability=publicAvailability(s.availability,sport);
+  const nextGenStats=publicNextGenStats(s.next_gen_stats,sport,prop);
   const playerProfile=publicPlayerProfile(s.player_profile,sport,s.player,now);
   const metrics=signalMetrics({...s,availability},now);
   if (!finite(metrics.implied_prob) || !finite(metrics.ev_pct)
@@ -237,6 +272,7 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
     gated:metrics.gated as boolean,...(gateReason ? {gate_reason:gateReason} : {}),
     sample_size:s.sample_size,mean_stat:mean as number|null,game_id:s.game_id,
     ...(availability ? {availability} : {}),
+    ...(nextGenStats ? {next_gen_stats:nextGenStats} : {}),
     ...(playerProfile ? {player_profile:playerProfile} : {}),
     ...(bounded(s.forecast_cutoff,10) && /^\d{4}-\d{2}-\d{2}$/.test(s.forecast_cutoff)
       && Number.isFinite(Date.parse(s.forecast_cutoff)) ? {forecast_cutoff:s.forecast_cutoff} : {})};

@@ -309,6 +309,13 @@
 .evidenceMetrics div { padding: 15px; border: 1px solid var(--border-dim); border-radius: 12px; }
 .evidenceMetrics span,.evidenceMetrics small { display: block; font-size: 11px; }
 .evidenceMetrics strong { display: block; margin: 5px 0; color: var(--text-primary); font-size: 24px; letter-spacing: -.03em; }
+.ngsEvidence { margin: 0 0 24px; padding: 18px; border: 1px solid var(--border-dim); border-radius: 14px; background: var(--bg-base); }
+.ngsEvidence > div > small { color: var(--accent); text-transform: uppercase; letter-spacing: .08em; }
+.ngsEvidence > div > p { max-width: 760px; }
+.ngsEvidence dl { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 8px; margin: 14px 0; }
+.ngsEvidence dl div { display: block; margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--bg-surface); }
+.ngsEvidence dt { font-size: 10px; color: var(--text-secondary); }
+.ngsEvidence dd { margin-top: 3px; color: var(--text-primary); font-weight: 600; }
 .evidenceColumns { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
 .predictionEvidence dl div { display: flex; gap: 12px; margin: 5px 0; }
 .predictionEvidence dd { margin: 0; }

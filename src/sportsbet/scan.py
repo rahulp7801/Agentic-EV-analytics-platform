@@ -21,6 +21,7 @@ from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.availability import (blocks_unadjusted_teammate_context,
                                          fetch_event_availability, player_availability)
 from sportsbet.prop.injury_context import historical_availability_splits, relevant_availability_reports
+from sportsbet.prop.ngs_evidence import load_ngs_evidence
 from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
 from sportsbet.prop.nba_agents import make_nba_quant_agent
 from sportsbet.prop.nba_context_producer import make_nba_context_signals_producer
@@ -307,6 +308,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     # stronger qualified estimate. Keep all forecasts; retain every existing gate.
     modeled.sort(key=lambda candidate:recommendation_quality(candidate[1].get('ev_signal')),reverse=True)
     explained_contexts=set()
+    ngs_contexts={}
     for selection,state in modeled:
         player,market,line,side,quote,player_id=selection
         prop=state.get('nba_prop_result' if sport=='nba' else 'prop_result')
@@ -344,6 +346,18 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 prop_type=MARKETS[sport][market],line=float(line),direction=side.lower())
             if splits:
                 availability_evidence['context_splits']=splits
+        ngs_evidence=None
+        if sport=='nfl' and availability_evidence['status']=='observed':
+            ngs_key=(player_id,MARKETS[sport][market])
+            if ngs_key not in ngs_contexts:
+                try:
+                    ngs_contexts[ngs_key]=await load_ngs_evidence(pool,
+                        player_gsis_id=player_id,season=season,game_date=game_date,
+                        team=availability_evidence.get('team',''),prop_type=MARKETS[sport][market])
+                except Exception as exc:
+                    log.warning('ngs_evidence_unavailable',error_type=type(exc).__name__)
+                    ngs_contexts[ngs_key]=None
+            ngs_evidence=ngs_contexts[ngs_key]
         if signal:
             if now >= start: reason='game_started'
             elif not -60 <= (now-quote.snapped_at).total_seconds() <= 300: reason='stale_quote'
@@ -397,9 +411,11 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 game_start_time=start.isoformat(),sample_size=prop.sample_size,mean_stat=float(prop.mean_stat) if prop.mean_stat is not None else None,
                 confidence_interval=[float(x) for x in model_interval] if model_interval else None,
                 model_version=MODEL_VERSION,strength='unrated',trade_plan=trade_plan,injury_flags={},market_type=market,
-                availability=availability_evidence,forecast_cutoff=game_date.isoformat())
+                availability=availability_evidence,forecast_cutoff=game_date.isoformat(),
+                **({'next_gen_stats':ngs_evidence} if ngs_evidence else {}))
             payload.update(availability=availability_evidence,trade_plan=trade_plan,
-                           forecast_cutoff=game_date.isoformat())
+                           forecast_cutoff=game_date.isoformat(),
+                           **({'next_gen_stats':ngs_evidence} if ngs_evidence else {}))
         audited.append((payload,public_signal))
     prediction_ids=ledger.record_many(scan_id,[payload for payload,_ in audited])
     for prediction_id,(_,public_signal) in zip(prediction_ids,audited,strict=True):

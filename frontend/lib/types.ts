@@ -41,6 +41,26 @@ export interface AvailabilityEvidence {
   context_splits?: AvailabilityContextSplit[];
 }
 
+export type NextGenMetric = 'avg_time_to_throw' | 'avg_completed_air_yards' |
+  'avg_intended_air_yards' | 'aggressiveness' | 'avg_separation' | 'avg_cushion' |
+  'avg_yac_above_expectation' | 'efficiency' |
+  'percent_attempts_gte_eight_defenders' | 'rush_yards_over_expected' | 'avg_time_to_los';
+
+export interface NextGenStatsEvidence {
+  status: 'observed';
+  stat_type: 'passing' | 'receiving' | 'rushing';
+  sample_weeks: number;
+  cutoff_season: number;
+  cutoff_week: number;
+  cutoff_exclusive: true;
+  metrics: Partial<Record<NextGenMetric,number>>;
+  source_provider: 'nflverse_ngs';
+  source_url: string;
+  source_sha256: string;
+  source_observed_at: string;
+  probability_adjusted: false;
+}
+
 export interface EVSignal {
   player_profile?: PlayerProfile;
   id: string;
@@ -83,6 +103,7 @@ export interface EVSignal {
   // Multi-game cache field — set by scan_game_ev.py
   game_id?: string;
   availability?: AvailabilityEvidence;
+  next_gen_stats?: NextGenStatsEvidence;
   forecast_cutoff?: string;
 }
 

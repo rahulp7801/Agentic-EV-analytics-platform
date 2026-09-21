@@ -17,7 +17,8 @@ WORKER = 'sportsbet_worker'
 READ_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'cfb_player_gamelogs', 'nba_player_gamelogs', 'nba_player_stats',
                'play_by_play', 'ngs_stats', 'injury_reports', 'odds_snapshots',
                'player_prop_snapshots', 'dashboard_snapshots')
-WRITE_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'cfb_player_gamelogs', 'nba_player_gamelogs', 'dashboard_snapshots')
+WRITE_TABLES = ('games', 'player_stats', 'nfl_snap_counts', 'cfb_player_gamelogs',
+                'nba_player_gamelogs', 'ngs_stats', 'dashboard_snapshots')
 APPEND_TABLES = ('odds_snapshots', 'player_prop_snapshots')
 CACHE_TABLES = ('provider_response_cache',)
 ANALYTICS_TABLES = ('predictions', 'exposure', 'quotes', 'api_usage')
@@ -25,10 +26,11 @@ ANALYTICS_TABLES = ('predictions', 'exposure', 'quotes', 'api_usage')
 
 def deny_browser_roles(conn):
     """Supabase defaults can grant named browser roles independently of PUBLIC/RLS."""
-    targets = [sql.Identifier('public', table) for table in
-               (*READ_TABLES, *CACHE_TABLES, 'alembic_version', 'ev_signals', 'dashboard_gamelogs')]
+    targets: list[sql.Composable] = [sql.Identifier('public', table) for table in
+                                     (*READ_TABLES, *CACHE_TABLES, 'alembic_version',
+                                      'ev_signals', 'dashboard_gamelogs')]
     targets.extend(sql.Identifier('analytics', table) for table in ANALYTICS_TABLES)
-    grantees = [sql.SQL('PUBLIC')]
+    grantees: list[sql.Composable] = [sql.SQL('PUBLIC')]
     for role in ('anon', 'authenticated'):
         if conn.execute('SELECT 1 FROM pg_roles WHERE rolname=%s', (role,)).fetchone():
             grantees.append(sql.Identifier(role))
@@ -76,6 +78,12 @@ def apply_access(conn):
             conn.execute(sql.SQL('DROP POLICY IF EXISTS {} ON {}').format(policy, target))
             clause = sql.SQL('WITH CHECK (true)' if command == 'INSERT' else 'USING (true) WITH CHECK (true)')
             conn.execute(sql.SQL('CREATE POLICY {} ON {} FOR {} TO {} {}').format(policy, target, sql.SQL(command), sql.Identifier(WORKER), clause))
+    # NGS refreshes replace one season/stat partition atomically so rows removed
+    # by the upstream release cannot remain in the evidence table.
+    conn.execute(sql.SQL('GRANT DELETE ON public.ngs_stats TO {}').format(sql.Identifier(WORKER)))
+    conn.execute('DROP POLICY IF EXISTS sportsbet_worker_delete ON public.ngs_stats')
+    conn.execute(sql.SQL('CREATE POLICY sportsbet_worker_delete ON public.ngs_stats '
+                         'FOR DELETE TO {} USING (true)').format(sql.Identifier(WORKER)))
     for table in APPEND_TABLES:
         target = sql.Identifier('public', table)
         conn.execute(sql.SQL('GRANT INSERT ON {} TO {}').format(target, sql.Identifier(WORKER)))

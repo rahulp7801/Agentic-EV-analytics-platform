@@ -51,7 +51,7 @@ def test_browser_role_migration_closes_owner_view_and_preserves_data():
             assert conn.execute(sa.text("SELECT count(*) FROM dashboard_snapshots WHERE snapshot_key='acl-proof'")).scalar_one() == 1
             for role in ('anon', 'authenticated'):
                 for table in ('public.dashboard_snapshots', 'public.dashboard_gamelogs',
-                              'public.provider_response_cache'):
+                              'public.provider_response_cache', 'public.ngs_stats'):
                     assert not conn.execute(sa.text("SELECT has_table_privilege(:role,:table,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')"),
                                             {'role': role, 'table': table}).scalar_one()
         for role in ('anon', 'authenticated'):
@@ -118,6 +118,11 @@ def test_alembic_upgrade_clean() -> None:
     assert "nba_player_stats" in tables, "nba_player_stats table missing after upgrade head"
     assert "provider_response_cache" in tables, "provider response cache missing after upgrade head"
     assert "cfb_player_gamelogs" in tables, "CFB player game logs missing after upgrade head"
+    ngs_columns = {column['name'] for column in sa.inspect(engine).get_columns('ngs_stats')}
+    assert {'avg_intended_air_yards','passer_rating','attempts','avg_yac','catch_percentage',
+            'targets','receptions','percent_attempts_gte_eight_defenders','rush_attempts',
+            'source_provider','source_url','source_sha256','source_record_sha256',
+            'source_observed_at'} <= ngs_columns
     # Cleanup — leave DB clean for next test run
     alembic.command.downgrade(cfg, "base")
 

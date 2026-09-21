@@ -42,6 +42,10 @@ _SEPARATION_QUERY = """
         AVG(r.avg_separation)             AS season_avg_separation,
         AVG(r.avg_cushion)                AS season_avg_cushion,
         COUNT(*)                          AS weeks_sampled,
+        MAX(r.source_provider)            AS source_provider,
+        MAX(r.source_url)                 AS source_url,
+        MAX(r.source_sha256)              AS source_sha256,
+        MAX(r.source_observed_at)         AS source_observed_at,
         qb.season_avg_time_to_throw       AS avg_time_to_throw
     FROM ngs_stats r
     LEFT JOIN (
@@ -52,6 +56,8 @@ _SEPARATION_QUERY = """
         FROM ngs_stats
         WHERE stat_type = 'passing'
           AND season = $2
+          AND week >= 1
+          AND week < $3
           AND avg_time_to_throw IS NOT NULL
         GROUP BY team_abbr, season
     ) qb
@@ -59,6 +65,8 @@ _SEPARATION_QUERY = """
         AND qb.season    = r.season
     WHERE r.player_gsis_id = $1
       AND r.season          = $2
+      AND r.week           >= 1
+      AND r.week            < $3
       AND r.stat_type       = 'receiving'
       AND r.avg_separation IS NOT NULL
     GROUP BY r.player_gsis_id, r.season, qb.season_avg_time_to_throw
@@ -96,7 +104,9 @@ async def run_matchup_query(pool: asyncpg.Pool, params: KinematicParams) -> Kine
     )
 
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(_SEPARATION_QUERY, params.receiver_gsis_id, params.season)
+        row = await conn.fetchrow(
+            _SEPARATION_QUERY, params.receiver_gsis_id, params.season, params.week
+        )
 
     # No data for this receiver/season — return with all Decimal fields=None
     if row is None or row["weeks_sampled"] is None:
@@ -159,5 +169,10 @@ async def run_matchup_query(pool: asyncpg.Pool, params: KinematicParams) -> Kine
         press_man_rate=None,   # ALWAYS None — forward-compat placeholder
         geometric_mismatch_flag=mismatch_flag,
         signal_description=signal_desc,
+        weeks_sampled=int(row["weeks_sampled"]),
+        source_provider=row.get("source_provider"),
+        source_url=row.get("source_url"),
+        source_sha256=row.get("source_sha256"),
+        source_observed_at=row.get("source_observed_at"),
         ngs_available=True,
     )

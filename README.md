@@ -60,7 +60,7 @@ The public website only reads results. It cannot start scans or spend provider c
 ## Model and metric contract
 
 - The current `empirical-jeffreys-v4` cohort uses one shared NBA/NFL/CFB finite-sample estimator for per-game prop outcomes. It preserves observed push mass and uses a fixed Jeffreys half-count for decided Over/Under outcomes, preventing exact 0%/100% forecasts from finite histories. NBA matchup/availability cohorts below the 20-observation signal gate fall back to the same cutoff-safe rolling window. See [model and validation details](docs/model-validation.md).
-- Free NFL Next Gen Stats support is planned as provenance-backed, pregame-only evidence before any feature can affect a probability. The existing experimental fixed boost remains disabled. See the [Next Gen Stats release plan](docs/next-gen-stats-plan.md).
+- Free NFL Next Gen Stats are ingested from nflverse with raw-file and row commitments, an exclusive pregame cutoff, and a bounded local cache. Valid tracking metrics appear as explanatory evidence only; the existing experimental probability adjustment remains disabled. See the [Next Gen Stats evidence contract](docs/next-gen-stats-plan.md).
 - Target-date queries use only earlier game dates; the most recent 40 qualifying games are selected after filters. Missing or ambiguous player identities are skipped.
 - Quotes must match player, event, market, line and Over/Under side. Synthetic PrizePicks payouts are not treated as bookmaker prices.
 - `ev_pct` is probability edge, displayed in percentage points. `expected_return` is expected net return per unit stake at the quoted payout, including push refunds. Dollar expected profit is stake times expected return.

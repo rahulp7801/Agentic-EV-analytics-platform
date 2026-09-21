@@ -36,6 +36,15 @@ function cohort(label:string,value:{games:number;mean:number|null;hit_rate:numbe
   return <div><dt>{label}</dt><dd>{value.games ? <><strong>{(value.hit_rate!*100).toFixed(0)}%</strong> hit rate · {value.games} game{value.games===1?'':'s'} · mean {value.mean!.toFixed(1)}</> : 'No verified games'}</dd></div>;
 }
 
+const NGS_LABELS:Record<string,[string,string]>={
+  avg_time_to_throw:['Time to throw','s'],avg_completed_air_yards:['Completed air yards','yd'],
+  avg_intended_air_yards:['Intended air yards','yd'],aggressiveness:['Aggressiveness','%'],
+  avg_separation:['Separation','yd'],avg_cushion:['Cushion','yd'],
+  avg_yac_above_expectation:['YAC over expected','yd'],efficiency:['Rush efficiency',''],
+  percent_attempts_gte_eight_defenders:['8+ defenders in box','%'],
+  rush_yards_over_expected:['Rush yards over expected','yd'],avg_time_to_los:['Time to line','s'],
+};
+
 export default function PredictionEvidence({signal,onClose}:{signal:EVSignal;onClose:()=>void}) {
   const availability=signal.availability;
   const panel=useRef<HTMLElement>(null);
@@ -51,6 +60,11 @@ export default function PredictionEvidence({signal,onClose}:{signal:EVSignal;onC
       <div><span>Price break-even</span><strong>{(signal.implied_prob*100).toFixed(1)}%</strong><small>{signal.sportsbook} · {signal.american_odds>0?'+':''}{signal.american_odds}</small></div>
       <div><span>Historical sample</span><strong>{signal.sample_size ?? '—'} games</strong><small>Mean {signal.mean_stat?.toFixed(1) ?? 'unavailable'} · before {signal.forecast_cutoff ?? 'recorded target game'}</small></div>
     </div>
+    {signal.next_gen_stats && <section className={styles.ngsEvidence} aria-label="NFL Next Gen Stats context">
+      <div><small>NFL tracking context</small><h3>What the player was doing before this game</h3><p>Average of the latest {signal.next_gen_stats.sample_weeks} available weekly records before Week {signal.next_gen_stats.cutoff_week}. These measurements explain style and usage; they do not change the forecast probability.</p></div>
+      <dl>{Object.entries(signal.next_gen_stats.metrics).map(([key,value])=>{const label=NGS_LABELS[key];return label && value!==undefined ? <div key={key}><dt>{label[0]}</dt><dd>{value.toFixed(2)}{label[1]}</dd></div>:null;})}</dl>
+      <small><a href={signal.next_gen_stats.source_url} target="_blank" rel="noreferrer">nflverse Next Gen Stats source</a> &middot; captured {time(signal.next_gen_stats.source_observed_at)} &middot; exclusive pregame cutoff</small>
+    </section>}
     <div className={styles.evidenceColumns}>
       <div><h3>Why this estimate</h3>
         {signal.trade_plan.length ? <ul>{signal.trade_plan.map((bullet,index)=><li key={index}>{bullet}</li>)}</ul>
