@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+import json
 from unittest.mock import AsyncMock
 
 import httpx
@@ -37,6 +38,9 @@ def worker(monkeypatch,tmp_path):
     monkeypatch.setattr(scan,'Ledger',lambda:ledger)
     monkeypatch.setattr(scan,'load_snapshot',lambda key:deepcopy(stored.get(key)))
     monkeypatch.setattr(scan,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    async def prior_batch(pool,sport,event_ids,now):
+        return {event_id:scan.prior_event_evidence(sport,event_id,now) for event_id in event_ids}
+    monkeypatch.setattr(scan,'prior_event_evidence_batch',prior_batch)
     pool=AsyncMock()
     pool.provider_cache=cache
     monkeypatch.setattr(scan,'create_async_pool',AsyncMock(return_value=pool))
@@ -153,6 +157,36 @@ def test_prior_event_quality_rejects_malformed_and_weak_snapshots(monkeypatch):
     assert scan.prior_event_quality('nfl','event')==pytest.approx((-.01,30))
     monkeypatch.setattr(scan,'load_snapshot',lambda key:(_ for _ in ()).throw(RuntimeError('offline')))
     assert scan.prior_event_quality('nfl','event') is None
+
+
+@pytest.mark.asyncio
+async def test_prior_event_batch_projects_bounded_fields_in_one_query():
+    now=datetime.now(timezone.utc)
+    valid=dict(sport='nfl',game_id='event',sample_size=30,true_prob=.62,implied_prob=.55,
+        ev_pct=.07,push_probability=0,confidence_interval=[.54,.70],
+        gate_reason='stale_quote',sportsbook='book',american_odds=-110,
+        availability={'status':'observed','roster_confirmed':True})
+    class Connection:
+        async def fetch(self,sql,*args):
+            assert 'jsonb_build_object' in sql and 'trade_plan' not in sql
+            assert args==(['signals:nfl:event'],scan.MAX_PRIORITY_SIGNALS)
+            return [dict(snapshot_key='signals:nfl:event',payload=json.dumps(dict(
+                generated_at=now.isoformat(),games=[{'game_id':'event','sport':'nfl'}],
+                signal_count=1,signals=[valid])))]
+        async def __aenter__(self): return self
+        async def __aexit__(self,*args): pass
+    class Pool:
+        def acquire(self): return Connection()
+    result=await scan.prior_event_evidence_batch(Pool(),'nfl',['event'],now)
+    quality,attempt=result['event']
+    assert quality==pytest.approx((-.01,30)),result
+    assert attempt==now.isoformat()
+
+    class OfflineConnection(Connection):
+        async def fetch(self,*args): raise RuntimeError('offline')
+    class OfflinePool:
+        def acquire(self): return OfflineConnection()
+    assert await scan.prior_event_evidence_batch(OfflinePool(),'nfl',['event'],now)=={'event':(None,None)}
 
 
 @pytest.mark.asyncio

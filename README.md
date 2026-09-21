@@ -233,6 +233,16 @@ flag to stop the public schedule.
 Collection credentials are step-scoped: checkout, tool setup, deployed-readiness,
 secret-scanning, and artifact-upload steps do not receive database or provider
 secrets.
+
+Public API success responses keep `Cache-Control: no-store` for browsers while
+using a Vercel-only CDN lifetime: 30 seconds for actionable prices, 60 seconds for
+pipeline/schedule status, five minutes for recorded research, and 15 minutes for
+metrics and game logs. A separate 60-second Next server-data cache coalesces
+database misses across requests. Error and rejected-input responses are never
+cached. UI polling refreshes the live shortlist without reloading the larger
+research archive; the Players archive refreshes every ten minutes or on demand.
+These controls reduce future Supabase database egress but do not reset usage that
+has already accrued in the current billing cycle.
 Clean evidence passes the credential/secret scan before public artifact upload.
 GitHub's periodic schedule remains unsuitable for continuous or low-latency arbitrage monitoring;
 the dashboard continues to identify stale quotes between captures.

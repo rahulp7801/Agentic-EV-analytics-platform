@@ -44,9 +44,10 @@ async def test_scheduled_profile_refresh_uses_recorded_slate_without_new_quotes(
         async def fetch(self,sql,*args):
             if 'dashboard_snapshots' in sql:
                 assert args==('signals:nfl:%',)
-                return [dict(payload=dict(signals=[dict(player='Player',game_id='game',home_team='Home',away_team='Away')]))]
-            assert args==('Player',)
-            return [dict(player_id='00-0037248')]
+                assert "jsonb_array_elements" in sql and "payload->'signals'" in sql
+                return [dict(player='Player',game_id='game',home_team='Home',away_team='Away')]
+            assert args==(['player'],)
+            return [dict(player_name='player',player_ids=['00-0037248'])]
         async def __aenter__(self): return self
         async def __aexit__(self,*args): pass
     class Pool:

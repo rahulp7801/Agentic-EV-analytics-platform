@@ -91,7 +91,7 @@ function useMarketPulse() {
       });
     };
     load();
-    const timer = window.setInterval(load, 60_000);
+    const timer = window.setInterval(load, 120_000);
     return () => { controller.abort(); window.clearInterval(timer); };
   }, []);
 
