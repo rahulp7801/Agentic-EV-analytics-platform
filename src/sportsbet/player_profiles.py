@@ -7,6 +7,23 @@ from sportsbet.db.connection import create_async_pool
 from sportsbet.dashboard import publish_snapshot
 from sportsbet.prop.availability import fetch_event_availability, player_availability
 
+SIGNAL_IDENTITIES_QUERY = '''WITH latest AS MATERIALIZED (
+    SELECT payload FROM dashboard_snapshots
+    WHERE snapshot_key LIKE $1 AND updated_at > NOW() - INTERVAL '14 days'
+    ORDER BY updated_at DESC LIMIT 6
+), bounded AS MATERIALIZED (
+    SELECT payload->'signals' AS signals FROM latest
+    WHERE jsonb_typeof(payload->'signals')='array'
+      AND jsonb_array_length(payload->'signals')<=500
+)
+SELECT DISTINCT signal->>'player' AS player,signal->>'game_id' AS game_id,
+    signal->>'home_team' AS home_team,signal->>'away_team' AS away_team
+FROM bounded CROSS JOIN LATERAL jsonb_array_elements(signals) AS signal
+WHERE jsonb_typeof(signal)='object'
+  AND signal->>'player' IS NOT NULL AND signal->>'game_id' IS NOT NULL
+  AND signal->>'home_team' IS NOT NULL AND signal->>'away_team' IS NOT NULL
+ORDER BY game_id,player LIMIT 1000'''
+
 
 def profile(context, player, player_id, now):
     evidence, _ = player_availability(context, player, now, player_id=player_id)
@@ -26,24 +43,28 @@ async def run(sports):
     try:
         for sport in sports:
             async with pool.acquire() as conn:
-                rows = await conn.fetch('SELECT payload FROM dashboard_snapshots WHERE snapshot_key LIKE $1 '
-                    'AND updated_at > NOW() - INTERVAL \'14 days\' ORDER BY updated_at DESC LIMIT 6', f'signals:{sport}:%')
+                rows = await conn.fetch(SIGNAL_IDENTITIES_QUERY, f'signals:{sport}:%')
+                player_ids = {}
+                if sport == 'nfl' and rows:
+                    names=sorted({row['player'].lower() for row in rows})
+                    ids=await conn.fetch('SELECT lower(player_name) AS player_name,'
+                        'array_agg(DISTINCT player_id::text) AS player_ids FROM player_stats '
+                        'WHERE lower(player_name)=ANY($1::text[]) GROUP BY lower(player_name)',names)
+                    player_ids={row['player_name']:row['player_ids'] for row in ids}
             profiles = {}
             failures = 0
+            events={}
             for row in rows:
-                payload = row['payload']
-                if isinstance(payload,str): payload=json.loads(payload)
-                signals = payload.get('signals',[])
-                if not signals: continue
-                players = {s['player'] for s in signals}
-                event = dict(id=signals[0]['game_id'],home_team=signals[0]['home_team'],away_team=signals[0]['away_team'])
+                identity=(row['game_id'],row['home_team'],row['away_team'])
+                events.setdefault(identity,set()).add(row['player'])
+            for (game_id,home_team,away_team),players in events.items():
+                event=dict(id=game_id,home_team=home_team,away_team=away_team)
                 context = await fetch_event_availability(event,sport,player_names=players)
                 for player in sorted(players):
                     player_id = None
                     if sport=='nfl':
-                        async with pool.acquire() as conn:
-                            ids=await conn.fetch('SELECT DISTINCT player_id FROM player_stats WHERE LOWER(player_name)=LOWER($1)',player)
-                        if len(ids)==1: player_id=str(ids[0]['player_id'])
+                        matches=player_ids.get(player.lower(),[])
+                        if len(matches)==1: player_id=matches[0]
                     value=profile(context,player,player_id,datetime.now(timezone.utc))
                     if value: profiles.setdefault(player,value)
                     else: failures+=1

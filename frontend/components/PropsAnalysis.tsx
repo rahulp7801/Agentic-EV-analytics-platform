@@ -130,9 +130,8 @@ export default function PropsAnalysis({ sport,initialPlayer='' }: PropsAnalysisP
       }
     };
     const initial=window.setTimeout(load,0);
-    const poll=window.setInterval(load,60_000);
-    document.addEventListener('visibilitychange',load);
-    return () => {window.clearTimeout(initial);window.clearInterval(poll);document.removeEventListener('visibilitychange',load);controller.abort();};
+    const poll=window.setInterval(load,600_000);
+    return () => {window.clearTimeout(initial);window.clearInterval(poll);controller.abort();};
   }, [sport,refresh]);
 
   async function loadMore() {

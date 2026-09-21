@@ -41,6 +41,22 @@ RECOMMENDATION_POLICY_VERSION = 'confidence-floor-v2'
 PROVIDER_CACHE_TTL = timedelta(minutes=5)
 PRIORITY_NEAR_PASS_FLOOR = -0.03
 MAX_PRIORITY_SIGNALS = 5000
+PRIOR_EVENT_EVIDENCE_QUERY = '''SELECT snapshot_key,jsonb_build_object(
+    'generated_at',payload->'generated_at','games',payload->'games',
+    'signal_count',CASE WHEN jsonb_typeof(payload->'signals')='array'
+        THEN jsonb_array_length(payload->'signals') ELSE -1 END,
+    'signals',COALESCE((SELECT jsonb_agg(jsonb_build_object(
+        'sport',signal->'sport','game_id',signal->'game_id','sample_size',signal->'sample_size',
+        'true_prob',signal->'true_prob','implied_prob',signal->'implied_prob','ev_pct',signal->'ev_pct',
+        'push_probability',signal->'push_probability','confidence_interval',signal->'confidence_interval',
+        'gate_reason',signal->'gate_reason','sportsbook',signal->'sportsbook',
+        'american_odds',signal->'american_odds','availability',jsonb_build_object(
+            'status',signal#>'{availability,status}',
+            'roster_confirmed',signal#>'{availability,roster_confirmed}')))
+      FROM jsonb_array_elements(CASE WHEN jsonb_typeof(payload->'signals')='array'
+        AND jsonb_array_length(payload->'signals')<=$2 THEN payload->'signals' ELSE '[]'::jsonb END) signal),
+      '[]'::jsonb)) AS payload
+FROM dashboard_snapshots WHERE snapshot_key=ANY($1::text[])'''
 
 
 class ProviderRefreshInProgress(RuntimeError):
@@ -59,12 +75,11 @@ def recommendation_quality(signal):
     return (margin, signal.sample_size or 0) if margin.is_finite() else (Decimal('-Infinity'),0)
 
 
-def prior_event_evidence(sport: str, event_id: str, now: datetime | None = None) -> tuple[tuple[float, int] | None,str | None]:
-    """Read prior ranking and cadence evidence from one validated snapshot."""
+def _prior_event_evidence(snapshot: object,sport: str,event_id: str,
+                          now: datetime | None = None) -> tuple[tuple[float, int] | None,str | None]:
     quality=None
     attempt=None
     try:
-        snapshot=load_snapshot(f'signals:{sport}:{event_id}')
         if not isinstance(snapshot,dict):
             return None,None
         if now is not None:
@@ -78,8 +93,11 @@ def prior_event_evidence(sport: str, event_id: str, now: datetime | None = None)
                     attempt=generated.isoformat()
             except (KeyError,ValueError,TypeError,AttributeError):
                 pass
-        signals=snapshot.get('signals') if isinstance(snapshot,dict) else None
-        if not isinstance(signals,list) or len(signals)>MAX_PRIORITY_SIGNALS:
+        signals=snapshot.get('signals')
+        signal_count=snapshot.get('signal_count',len(signals) if isinstance(signals,list) else -1)
+        if (isinstance(signal_count,bool) or not isinstance(signal_count,int)
+                or signal_count<0 or signal_count>MAX_PRIORITY_SIGNALS
+                or not isinstance(signals,list) or len(signals)!=signal_count):
             return None,attempt
         best=None
         for signal in signals:
@@ -116,6 +134,40 @@ def prior_event_evidence(sport: str, event_id: str, now: datetime | None = None)
     except Exception:
         pass
     return quality,attempt
+
+
+def prior_event_evidence(sport: str, event_id: str, now: datetime | None = None) -> tuple[tuple[float, int] | None,str | None]:
+    """Read prior ranking and cadence evidence from one validated snapshot."""
+    try:
+        return _prior_event_evidence(load_snapshot(f'signals:{sport}:{event_id}'),sport,event_id,now)
+    except Exception:
+        return None,None
+
+
+async def prior_event_evidence_batch(pool,sport: str,event_ids: list[str],now: datetime):
+    """Project and load only fields used for refresh priority, in one database read."""
+    evidence={event_id:(None,None) for event_id in event_ids}
+    if not event_ids:
+        return evidence
+    keys=[f'signals:{sport}:{event_id}' for event_id in event_ids]
+    try:
+        async with pool.acquire() as conn:
+            rows=await conn.fetch(PRIOR_EVENT_EVIDENCE_QUERY,keys,MAX_PRIORITY_SIGNALS)
+    except Exception:
+        return evidence
+    identities={key:event_id for key,event_id in zip(keys,event_ids,strict=True)}
+    for row in rows:
+        try:
+            event_id=identities.get(row['snapshot_key'])
+            payload=row['payload']
+            if event_id is None:
+                continue
+            if isinstance(payload,str):
+                payload=json.loads(payload)
+            evidence[event_id]=_prior_event_evidence(payload,sport,event_id,now)
+        except (KeyError,TypeError,json.JSONDecodeError):
+            continue
+    return evidence
 
 
 def prior_event_quality(sport: str, event_id: str) -> tuple[float, int] | None:
@@ -467,7 +519,7 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                     active_ids={event['id'] for event in events}
                     report['attempts']={identity:attempt for identity,attempt in report['attempts'].items()
                         if identity in active_ids}
-                    evidence={event['id']:prior_event_evidence(sport,event['id'],now) for event in events}
+                    evidence=await prior_event_evidence_batch(pool,sport,[event['id'] for event in events],now)
                     for identity,(_,attempt) in evidence.items():
                         if identity not in report['attempts'] and attempt is not None:
                             report['attempts'][identity]=attempt

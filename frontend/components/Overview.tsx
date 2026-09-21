@@ -21,30 +21,48 @@ export default function Overview({sport,onOpenMarkets,onOpenSlip,onOpenPlayers}:
   const [errors,setErrors]=useState<string[]>([]),[now,setNow]=useState(0),[checked,setChecked]=useState(0);
   const [selected,setSelected]=useState<string|null>(null),[showSchedule,setShowSchedule]=useState(false),[showStatus,setShowStatus]=useState(false);
   const request=useRef<AbortController|null>(null),busy=useRef(false);
-  const load=useCallback(async()=>{
+  const load=useCallback(async(full=true)=>{
     if(busy.current || document.visibilityState==='hidden') return;
-    busy.current=true;setRefreshing(true);
+    busy.current=true;if(full)setRefreshing(true);
     const controller=new AbortController();request.current=controller;
     const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(15_000)]);
     try {
-      const results=await Promise.allSettled([fetchForecasts(sport,signal,'qualified',fetch,1000,undefined,true),fetchForecasts(sport,signal,'candidates',fetch,1000),fetchForecasts(sport,signal,'library',fetch,36),fetch(`/api/picks?sport=${sport}`,{cache:'no-store',signal}).then(async response=>{if(!response.ok) throw new Error('Pick board unavailable');return response.json() as Promise<PickBoard>;})]);
-      if(controller.signal.aborted) return;
+      const current=fetchForecasts(sport,signal,'qualified',fetch,1000,undefined,true);
+      const picks=fetch(`/api/picks?sport=${sport}`,{cache:'no-store',signal}).then(async response=>{if(!response.ok) throw new Error('Pick board unavailable');return response.json() as Promise<PickBoard>;});
       const failures:string[]=[];
-      if(results[0].status==='fulfilled' && results[0].value.complete) setQualified(results[0].value.signals);
-      else {setQualified([]);failures.push('Current picks could not be fully checked.');}
-      if(results[1].status==='fulfilled') setWatchlist(results[1].value.signals);
-      else {setWatchlist([]);failures.push('Recorded watchlist could not be refreshed.');}
-      if(results[2].status==='fulfilled') {setForecasts(results[2].value.signals);setTotal(results[2].value.total_count);setComplete(results[2].value.complete);}
-      else failures.push('Player history refresh is unavailable.');
-      if(results[3].status==='fulfilled') setBoard(results[3].value); else {setBoard(null);failures.push('Recorded pick board could not be refreshed.');}
+      const updateCurrent=(result:PromiseSettledResult<Awaited<ReturnType<typeof fetchForecasts>>>)=>{
+        if(result.status==='fulfilled' && result.value.complete) setQualified(result.value.signals);
+        else {setQualified([]);failures.push('Current picks could not be fully checked.');}
+      };
+      const updateBoard=(result:PromiseSettledResult<PickBoard>)=>{
+        if(result.status==='fulfilled') setBoard(result.value);
+        else {setBoard(null);failures.push('Recorded pick board could not be refreshed.');}
+      };
+      if(full) {
+        const [currentResult,watchResult,forecastResult,boardResult]=await Promise.allSettled([
+          current,fetchForecasts(sport,signal,'candidates',fetch,1000),
+          fetchForecasts(sport,signal,'library',fetch,36),picks] as const);
+        if(controller.signal.aborted) return;
+        updateCurrent(currentResult);
+        if(watchResult.status==='fulfilled') setWatchlist(watchResult.value.signals);
+        else {setWatchlist([]);failures.push('Recorded watchlist could not be refreshed.');}
+        if(forecastResult.status==='fulfilled') {setForecasts(forecastResult.value.signals);setTotal(forecastResult.value.total_count);setComplete(forecastResult.value.complete);}
+        else failures.push('Player history refresh is unavailable.');
+        updateBoard(boardResult);
+      } else {
+        const [currentResult,boardResult]=await Promise.allSettled([current,picks] as const);
+        if(controller.signal.aborted) return;
+        updateCurrent(currentResult);updateBoard(boardResult);
+      }
       setErrors(failures);setChecked(Date.now());setNow(Date.now());setLoading(false);
-    } finally {busy.current=false;if(!controller.signal.aborted)setRefreshing(false);}
+    } finally {busy.current=false;if(full && !controller.signal.aborted)setRefreshing(false);}
   },[sport]);
   useEffect(()=>{
-    const initial=window.setTimeout(()=>void load(),0),poll=window.setInterval(()=>void load(),60_000);
+    const initial=window.setTimeout(()=>void load(true),0),poll=window.setInterval(()=>void load(false),60_000);
     const clock=window.setInterval(()=>setNow(Date.now()),5_000);
-    document.addEventListener('visibilitychange',load);
-    return()=>{request.current?.abort();window.clearTimeout(initial);window.clearInterval(poll);window.clearInterval(clock);document.removeEventListener('visibilitychange',load);};
+    const visible=()=>{if(document.visibilityState==='visible')void load(false);};
+    document.addEventListener('visibilitychange',visible);
+    return()=>{request.current?.abort();window.clearTimeout(initial);window.clearInterval(poll);window.clearInterval(clock);document.removeEventListener('visibilitychange',visible);};
   },[load]);
   const liveGroups=bestPickGroups(qualified,now),retained=(board?.current ?? []).slice(0,3);
   const pickGroups=liveGroups.length ? liveGroups : retained.map(pick=>({pick,alternatives:[]}));
@@ -59,7 +77,7 @@ export default function Overview({sport,onOpenMarkets,onOpenSlip,onOpenPlayers}:
   const latestQuote=latestRecordedQuote(watchRecords,now);
   const horizon=`${sport.toUpperCase()} slate`;
   return <section className={styles.overview} aria-label={`${sport.toUpperCase()} decision desk`}>
-    <header className={styles.hero}><div><span className={styles.kicker}>{sport.toUpperCase()} / PREGAME PLAYER PROP DESK</span><h1>Pregame picks, ranked.</h1><p>Strongest qualified line first. Recorded prices stay visible for context and always require repricing. Picks lock one hour before kickoff; live games never enter the board.</p></div><div className={styles.heroActions}><button type="button" className={styles.slipAction} onClick={onOpenSlip}>Build a slip <ArrowUpRight size={15}/></button><button type="button" className={styles.refresh} disabled={refreshing} onClick={()=>void load()}><RefreshCw size={16} className={refreshing ? styles.spinning : undefined} />Refresh</button><span>{checked ? `Checked ${new Date(checked).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}` : 'Checking published data'}</span></div></header>
+    <header className={styles.hero}><div><span className={styles.kicker}>{sport.toUpperCase()} / PREGAME PLAYER PROP DESK</span><h1>Pregame picks, ranked.</h1><p>Strongest qualified line first. Recorded prices stay visible for context and always require repricing. Picks lock one hour before kickoff; live games never enter the board.</p></div><div className={styles.heroActions}><button type="button" className={styles.slipAction} onClick={onOpenSlip}>Build a slip <ArrowUpRight size={15}/></button><button type="button" className={styles.refresh} disabled={refreshing} onClick={()=>void load(true)}><RefreshCw size={16} className={refreshing ? styles.spinning : undefined} />Refresh</button><span>{checked ? `Checked ${new Date(checked).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}` : 'Checking published data'}</span></div></header>
     {errors.length>0 && !board?.current.length && <p className={styles.partialNotice} role="status">{errors.join(' ')} Refresh to try again.</p>}
     <section className={styles.shortlist} data-state={loading ? 'loading' : shortlist.state} aria-label="Pregame pick board" aria-live="polite"><div className={styles.comparisonHeading}><div><span>{loading ? 'Checking prices' : shortlist.eyebrow}</span><h2>{loading ? 'Finding the strongest picks' : shortlist.title}</h2><p>{loading ? 'Checking price, model, roster, injury and risk gates.' : shortlist.description}</p></div><span className={styles.qualified}>{loading ? 'Checking' : shortlist.count}</span></div>
       {loading ? <PickSkeleton /> : picks.length ? <>{retainedBoard && <div className={styles.boardNotice} role="status"><strong>Reprice before use.</strong><span>No fresh price passed. Confirm the latest line and odds before use.</span></div>}<div className={styles.betGrid}>{pickGroups.map((group,index)=><PickCard key={group.pick.id} signal={group.pick} alternatives={group.alternatives} now={now} rank={index+1} onExplain={pick=>setSelected(pick.id)} onOpenMarkets={onOpenMarkets} />)}</div></> : <><div className={styles.noPicks}><span className={styles.noPicksStatus}>No approved pick recorded</span><h3>{errors[0]?.startsWith('Current picks') ? 'The live shortlist could not be checked.' : 'No line has cleared every gate yet.'}</h3><p>{errors[0]?.startsWith('Current picks') ? 'The evidence service did not return a complete shortlist, so the dashboard is withholding picks.' : 'The board records only source-backed recommendations that pass the model, uncertainty, roster, price and risk checks. It freezes the latest approved capture exactly one hour before kickoff and never admits an in-game line.'}</p>{latestQuote && <p>Newest research quote: <time dateTime={latestQuote.observed_at}>{new Date(latestQuote.observed_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}</time>. {latestQuote.expired ? 'It is retained for research, but its price has expired.' : 'It still needs to clear every decision gate.'}</p>}</div>{recentGroups.length>0 && <section className={styles.recentShelf} aria-label={`${horizon} watchlist`}><div><span>{horizon} watchlist · reprice required</span><h3>Strongest recorded model leans</h3><p>These are real captured lines for future games, ranked by evidence. They are visible context, not current recommendations; confirm the latest line, price, roster, and injury report before any decision.</p></div><div className={styles.recentGrid}>{recentGroups.map(group=><RecentCandidateCard key={group.pick.id} group={group} now={now} onExplain={signal=>setSelected(signal.id)} />)}</div></section>}<button type="button" className={styles.reviewForecasts} onClick={()=>onOpenPlayers()}>Review all recorded forecasts <ArrowUpRight size={16} /></button></>}

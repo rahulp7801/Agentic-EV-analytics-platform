@@ -45,7 +45,7 @@ export default function ScanStatus({sport}:{sport?:Sport}) {
       }
     }
     void load();
-    const timer = setInterval(() => void load(), 30_000);
+    const timer = setInterval(() => void load(), 60_000);
     return () => {
       controller.abort();
       clearInterval(timer);

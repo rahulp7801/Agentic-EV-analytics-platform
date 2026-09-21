@@ -106,7 +106,7 @@ export default function MarketWatch({ sport }: { sport: Sport }) {
     void load();
     void loadProps();
     void loadSlate();
-    const timer = setInterval(() => { void load(); void loadProps(); void loadSlate(); }, 30_000);
+    const timer = setInterval(() => { void load(); void loadProps(); void loadSlate(); }, 60_000);
     return () => { controller.abort(); clearInterval(timer); };
   }, [sport]);
 

@@ -69,7 +69,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: uv run --locked python -m sportsbet.schedules --sport cfb
       - name: Update source-backed player profiles
-        if: env.SPORT != 'cfb'
+        if: env.SPORT != 'cfb' && env.OPERATION == 'public_daily'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
