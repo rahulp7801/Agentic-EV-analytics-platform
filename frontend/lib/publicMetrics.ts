@@ -19,6 +19,11 @@ const CLUSTER_METHOD = '95% game-cluster robust t interval; requires at least tw
 const CLOSING_LINE_NOTE = 'CLV is same-line raw implied-probability movement; requires entry < close < start.';
 const SELECTION_POLICY = 'Earliest eligible prediction per game/player/market/side/line within the selected cohort.';
 const PROFIT_SCOPE = 'Hypothetical recorded-stake replay, not executed bets or realized account profit.';
+const FLOAT_TOLERANCE = 1e-12;
+
+function outsideInterval(value: number, range: [number, number]) {
+  return value < range[0] - FLOAT_TOLERANCE || value > range[1] + FLOAT_TOLERANCE;
+}
 
 function record(value: unknown): JsonRecord {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid metrics');
@@ -84,7 +89,7 @@ function calibration(value: unknown) {
     if (lower >= upper || binCount === 0) throw new Error('Invalid metrics');
     const observed = requiredMetric(bin.observed, 0, 1);
     const observedInterval = interval(bin.observed_interval, 0, 1);
-    if (observedInterval === null || observed < observedInterval[0] || observed > observedInterval[1]) {
+    if (observedInterval === null || outsideInterval(observed, observedInterval)) {
       throw new Error('Invalid metrics');
     }
     return {lower, upper, count: binCount, predicted: requiredMetric(bin.predicted, 0, 1),
@@ -155,7 +160,7 @@ export function publicMetrics(value: unknown, expected: MetricCohort, expectedSp
     throw new Error('Invalid metrics');
   }
   if (hitRate !== null && hitRateInterval !== null
-      && (hitRate < hitRateInterval[0] || hitRate > hitRateInterval[1])) throw new Error('Invalid metrics');
+      && outsideInterval(hitRate, hitRateInterval)) throw new Error('Invalid metrics');
   const clvCount = count(data.clv_count);
   const clvMean = metric(data.clv_mean, -1, 1);
   if (clvCount > sampleSize || (clvCount === 0) !== (clvMean === null)) throw new Error('Invalid metrics');
@@ -193,7 +198,7 @@ export function publicMetrics(value: unknown, expected: MetricCohort, expectedSp
       [brierScore, clusters.brier_score_game_cluster_interval],
       [logLoss, clusters.log_loss_game_cluster_interval],
       [clvMean, clusters.clv_mean_game_cluster_interval]] as const) {
-      if (point !== null && range !== null && (point < range[0] || point > range[1])) {
+      if (point !== null && range !== null && outsideInterval(point, range)) {
         throw new Error('Invalid metrics');
       }
     }
