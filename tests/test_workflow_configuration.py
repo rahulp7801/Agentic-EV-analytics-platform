@@ -66,6 +66,10 @@ def test_hosted_schema_is_migrated_after_ci_and_checked_before_collection_and_de
     schema_job = ci[ci.index("  production-schema:"):ci.index("  deploy:")]
     assert "needs: [secrets, backend, frontend, postgres, worker-image]" in schema_job
     assert schema_job.index("uv run --locked alembic upgrade head") < schema_job.index(check)
+    migration_step = _step(schema_job, "Apply reviewed migrations to the hosted database")
+    verification_step = _step(schema_job, "Verify hosted schema is at the application head")
+    assert "secrets.DATABASE_MIGRATION_URL" in migration_step
+    assert "secrets.DATABASE_MIGRATION_URL" not in verification_step
     assert "needs: [secrets, backend, frontend, postgres, worker-image, production-schema]" in ci
 
 
