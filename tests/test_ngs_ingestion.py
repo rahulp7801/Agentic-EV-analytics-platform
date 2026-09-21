@@ -113,3 +113,37 @@ def test_ngs_asset_download_is_bounded_and_cached(tmp_path) -> None:
     )), follow_redirects=False) as client:
         with pytest.raises(ValueError, match="Untrusted"):
             load_asset(client, "receiving", cache_dir=tmp_path, now=now)
+
+
+def test_ngs_asset_download_retries_only_transient_failures(tmp_path, monkeypatch) -> None:
+    payload = parquet(passing_rows())
+    statuses = iter((503, 302, 200))
+    calls = []
+
+    def transient(request: httpx.Request) -> httpx.Response:
+        status = next(statuses)
+        calls.append((status, request.url.host))
+        if status == 302:
+            return httpx.Response(status, headers={
+                "location": "https://release-assets.githubusercontent.com/ngs",
+            })
+        return httpx.Response(status, content=payload if status == 200 else b"")
+
+    monkeypatch.setattr("sportsbet.ingestion.ngs.time.sleep", lambda _: None)
+    with httpx.Client(
+        transport=httpx.MockTransport(transient), follow_redirects=False
+    ) as client:
+        result, _, cache_hit = load_asset(
+            client, "passing", cache_dir=tmp_path,
+            now=datetime.now(timezone.utc),
+        )
+    assert result == payload and cache_hit is False
+    assert calls == [(503, "github.com"), (302, "github.com"),
+                     (200, "release-assets.githubusercontent.com")]
+
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(404)
+    ), follow_redirects=False) as client:
+        with pytest.raises(httpx.HTTPStatusError):
+            load_asset(client, "receiving", cache_dir=tmp_path / "missing",
+                       now=datetime.now(timezone.utc))

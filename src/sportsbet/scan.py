@@ -370,6 +370,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
             sportsbook=quote.sportsbook,american_odds=quote.price,model_probability=float(probability),
             push_probability=float(prop.push_probability),model_sample_size=prop.sample_size,
+            model_mean_stat=float(prop.mean_stat) if prop.mean_stat is not None else None,
             model_confidence_interval=[float(x) for x in model_interval] if model_interval else None,
             captured_at=now.isoformat(),game_start_time=start.isoformat(),
             quote_time=quote.snapped_at.isoformat(),model_generated_at=now.isoformat(),

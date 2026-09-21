@@ -7,6 +7,7 @@ PUBLIC_WORKFLOW = Path(__file__).parents[1] / ".github" / "workflows" / "public-
 CI_WORKFLOW = Path(__file__).parents[1] / ".github" / "workflows" / "ci.yml"
 SUPPLEMENTAL_PUBLIC_SCHEDULE = "22,52 * * * *"
 PUBLIC_DAILY_RECOVERY_SCHEDULE = "47 13 * * *"
+NFL_HISTORY_RECOVERY_SCHEDULE = "29 10,22 * * *"
 
 
 def _schedules(source: str) -> set[str]:
@@ -23,7 +24,9 @@ def test_paid_and_public_schedules_are_isolated() -> None:
     paid = WORKFLOW.read_text(encoding="utf-8")
     public = PUBLIC_WORKFLOW.read_text(encoding="utf-8")
 
-    assert _schedules(paid) == {"17 13 * * *", "7,37 * * * *"}
+    assert _schedules(paid) == {
+        "17 13 * * *", "7,37 * * * *", NFL_HISTORY_RECOVERY_SCHEDULE,
+    }
     assert _schedules(public) == {
         "17 13 * * *",
         "7,37 * * * *",
@@ -35,6 +38,7 @@ def test_paid_and_public_schedules_are_isolated() -> None:
     assert "vars.PAID_MONITOR_ENABLED == 'true'" in paid
     assert "github.event.schedule == '17 13 * * *'" in paid
     assert "github.event.schedule == '7,37 * * * *'" in paid
+    assert f"github.event.schedule == '{NFL_HISTORY_RECOVERY_SCHEDULE}'" in paid
     assert "vars.DATA_PIPELINE_ENABLED == 'true' && 'scan' || 'monitor'" in paid
     assert "PUBLIC_DATA_PIPELINE_ENABLED" not in paid
     assert "vars.PUBLIC_DATA_PIPELINE_ENABLED == 'true'" in public
@@ -45,7 +49,9 @@ def test_paid_and_public_schedules_are_isolated() -> None:
 
     paid_operation = next(line for line in paid.splitlines() if line.startswith("      OPERATION:"))
     assert "github.event.schedule == '17 13 * * *' && 'daily'" in paid_operation
+    assert f"github.event.schedule == '{NFL_HISTORY_RECOVERY_SCHEDULE}' && 'refresh'" in paid_operation
     assert "vars.DATA_PIPELINE_ENABLED == 'true' && 'scan' || 'monitor'" in paid_operation
+    assert f"github.event.schedule == '{NFL_HISTORY_RECOVERY_SCHEDULE}' && 'nfl'" in paid
 
     operation = next(line for line in public.splitlines() if line.startswith("      OPERATION:"))
     public_daily = (
@@ -109,6 +115,8 @@ def test_provider_credentials_are_scoped_to_the_steps_that_need_them() -> None:
 
     assert "secrets." not in _step(public, "Verify deployed public readiness")
     assert "secrets.ODDS_API_KEY" in _step(paid, "Collect live market data")
+    assert "env.OPERATION == 'scan'" in _step(paid, "Collect live market data")
+    assert "github.event_name == 'schedule'" not in _step(paid, "Collect live market data")
     assert "ODDS_API_KEY" not in public
 
 
@@ -132,4 +140,5 @@ def test_cfb_watch_and_history_are_manual_and_cannot_increase_scheduled_usage() 
     assert '[ "$SPORT" = cfb ] && [ "$OPERATION" != watch ] && [ "$OPERATION" != scan ] && [ "$OPERATION" != refresh ] && [ "$OPERATION" != backfill ]' in configuration
     assert '[ "$SPORT" = cfb ] && [ "$PROVIDER" != sportsbook ] && [ "$PROVIDER" != all ]' in configuration
     assert "if: env.SPORT != 'cfb'" in profiles
-    assert "SPORT: ${{ inputs.sport || 'both' }}" in paid
+    assert "SPORT: ${{ inputs.sport || (github.event.schedule == " in paid
+    assert f"github.event.schedule == '{NFL_HISTORY_RECOVERY_SCHEDULE}' && 'nfl'" in paid

@@ -22,6 +22,8 @@ on:
   schedule:
     - cron: '17 13 * * *'
     - cron: '7,37 * * * *'
+    # Free NFL history/NGS recovery after nflverse's documented 07:00 UTC poll.
+    - cron: '29 10,22 * * *'
 permissions:
   contents: read
 concurrency:
@@ -34,6 +36,7 @@ jobs:
       github.ref == 'refs/heads/master' && (
         github.event_name == 'workflow_dispatch' ||
         (github.event.schedule == '17 13 * * *' && vars.DATA_PIPELINE_ENABLED == 'true') ||
+        github.event.schedule == '29 10,22 * * *' ||
         (github.event.schedule == '7,37 * * * *' && (
           vars.DATA_PIPELINE_ENABLED == 'true' || vars.PAID_MONITOR_ENABLED == 'true'
         ))
@@ -42,11 +45,11 @@ jobs:
     timeout-minutes: 20
     environment: production
     env:
-      SPORT: ${{ inputs.sport || 'both' }}
+      SPORT: ${{ inputs.sport || (github.event.schedule == '29 10,22 * * *' && 'nfl' || 'both') }}
       # The daily run refreshes history and settlements. Half-hour runs use the
       # quota-aware prop scanner when recommendations are enabled; otherwise
       # they retain the lower-cost provider monitor.
-      OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'daily' || (vars.DATA_PIPELINE_ENABLED == 'true' && 'scan' || 'monitor')) }}
+      OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'daily' || github.event.schedule == '29 10,22 * * *' && 'refresh' || (vars.DATA_PIPELINE_ENABLED == 'true' && 'scan' || 'monitor')) }}
       PROVIDER: ${{ inputs.provider || 'all' }}
       EVENT_IDS: ${{ inputs.event_ids || '' }}
       DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '25' }}
@@ -64,7 +67,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
-          ODDS_API_KEY: ${{ (github.event_name == 'schedule' || inputs.operation == 'daily' || inputs.operation == 'monitor' || inputs.operation == 'scan' || (inputs.operation == 'watch' && (inputs.provider == 'all' || inputs.provider == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'scan' || (env.OPERATION == 'watch' && (env.PROVIDER == 'all' || env.PROVIDER == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
         run: |
           test -n "$DATABASE_URL" && test -n "$DATABASE_URL_ASYNC" || {
             echo 'Configure the database repository secrets before running market updates.'
@@ -99,7 +102,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
           ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          ODDS_API_KEY: ${{ (github.event_name == 'schedule' || inputs.operation == 'daily' || inputs.operation == 'monitor' || inputs.operation == 'scan' || (inputs.operation == 'watch' && (inputs.provider == 'all' || inputs.provider == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'scan' || (env.OPERATION == 'watch' && (env.PROVIDER == 'all' || env.PROVIDER == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
         run: |
           set +e
           case "$OPERATION" in
@@ -141,7 +144,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
           ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          ODDS_API_KEY: ${{ (github.event_name == 'schedule' || inputs.operation == 'daily' || inputs.operation == 'monitor' || inputs.operation == 'scan' || (inputs.operation == 'watch' && (inputs.provider == 'all' || inputs.provider == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
+          ODDS_API_KEY: ${{ (env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'scan' || (env.OPERATION == 'watch' && (env.PROVIDER == 'all' || env.PROVIDER == 'sportsbook'))) && secrets.ODDS_API_KEY || '' }}
         run: uv run --locked python -m sportsbet.ingestion.public_artifacts --output "$RUNNER_TEMP/public-evidence"
       - name: Install checksum-pinned secret scanner
         if: always() && steps.evidence.outcome == 'success'
