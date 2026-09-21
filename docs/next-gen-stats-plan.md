@@ -47,16 +47,35 @@ probability or recommendation gate in this stage.
 
 ## Required validation before model use
 
-Build an expanding-window comparison using the same game-time cutoff as the live
-scanner. Compare the existing model with candidate NGS features on untouched game
-clusters. Report coverage, missingness, Brier score, log loss, calibration error,
-and their game-cluster intervals. A feature can affect probability only when it
-improves Brier score and log loss without degrading calibration on an untouched
-evaluation season.
+Build a fixed-fit walk-forward comparison using the same game-time cutoff and
+rolling history limits as the live scanner. Compare the existing model with
+candidate NGS features on untouched game clusters. Report coverage, missingness,
+Brier score, log loss, calibration error, and their game-cluster intervals. A
+feature can affect probability only when it improves Brier score and log loss
+without degrading calibration on an untouched evaluation season.
 
 Remove the fixed separation threshold and fixed probability boost. If no candidate
 passes the evaluation contract, retain NGS as explanatory evidence only. Do not
 claim a win-rate, ROI, or pricing improvement from tracking metrics alone.
+
+The reproducible evaluator is `python -m sportsbet.quant.ngs_ablation`. It builds
+the same 20-to-40-game Jeffreys baseline at an exclusive game cutoff, derives a
+half-point rolling-median research threshold without using a historical price, and
+adds at most eight prior NGS weeks. Candidate coefficients and standardization are
+fit on the training season only. The following season remains untouched until the
+single final comparison. Promotion additionally requires the paired 95% whole-game
+cluster intervals for Brier score and log loss to be below zero and calibration not
+to worsen. The command never changes the live model flag.
+
+The first completed evaluation is recorded in
+[`verification/ngs-ablation-2025.md`](verification/ngs-ablation-2025.md).
+
+Example:
+
+```powershell
+uv run python -m sportsbet.quant.ngs_ablation --train-season 2024 `
+  --evaluation-season 2025 --output .local/ngs-ablation-2025.json
+```
 
 ## Operations and scale
 
