@@ -55,7 +55,7 @@ def test_paid_and_public_schedules_are_isolated() -> None:
     assert public_daily in operation
 
 
-def test_hosted_schema_must_match_before_collection_and_deploy() -> None:
+def test_hosted_schema_is_migrated_after_ci_and_checked_before_collection_and_deploy() -> None:
     data = WORKFLOW.read_text(encoding="utf-8")
     public = PUBLIC_WORKFLOW.read_text(encoding="utf-8")
     ci = CI_WORKFLOW.read_text(encoding="utf-8")
@@ -63,6 +63,9 @@ def test_hosted_schema_must_match_before_collection_and_deploy() -> None:
     assert data.index(check) < data.index("name: Collect live market data")
     assert public.index(check) < public.index("name: Update public market data")
     assert ci.count(check) == 1
+    schema_job = ci[ci.index("  production-schema:"):ci.index("  deploy:")]
+    assert "needs: [secrets, backend, frontend, postgres, worker-image]" in schema_job
+    assert schema_job.index("uv run --locked alembic upgrade head") < schema_job.index(check)
     assert "needs: [secrets, backend, frontend, postgres, worker-image, production-schema]" in ci
 
 

@@ -141,6 +141,7 @@ jobs:
             sportsbet-worker:test python /checks/smoke.py
   production-schema:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [secrets, backend, frontend, postgres, worker-image]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
@@ -155,6 +156,8 @@ jobs:
           python-version: '3.12'
       - run: pip install uv==0.11.32
       - run: uv sync --locked
+      - name: Apply reviewed migrations to the hosted database
+        run: uv run --locked alembic upgrade head
       - name: Verify hosted schema is at the application head
         run: uv run --locked alembic current --check-heads
   deploy:

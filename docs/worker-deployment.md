@@ -32,7 +32,7 @@ Provision the private evidence directory for UID/GID `10001` before starting the
 
 No Odds API or Kalshi trading credential is required for public-only operation. Do not supply the development owner credentials. The previously exposed Odds key must remain unused; full-provider activation requires verified replacement and provider readiness.
 
-Apply Alembic migrations with a separate owner/DDL connection before deploying a worker revision. The worker receives read-only access to `public.alembic_version` so it can run `alembic current --check-heads`; it has no schema-change privilege. GitHub collection and the protected-`master` Vercel deployment both stop before application work when that check fails.
+Protected-`master` CI applies reviewed Alembic migrations with the separate owner/DDL connection only after its test, security, PostgreSQL, and worker-image gates pass. It verifies the exact head before deploying Vercel. The worker receives read-only access to `public.alembic_version` so scheduled collection can run `alembic current --check-heads`; it has no schema-change privilege and stops before application work when that check fails.
 
 ## Scheduled commands and cutover
 
