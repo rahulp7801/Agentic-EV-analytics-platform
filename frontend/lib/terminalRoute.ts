@@ -1,11 +1,11 @@
 import type { Sport } from './types';
 
 export const TERMINAL_VIEWS = [
-  'dashboard', 'props', 'gamelogs', 'arbitrage', 'backtest', 'parlay', 'kelly',
+  'dashboard', 'results', 'props', 'gamelogs', 'arbitrage', 'backtest', 'parlay', 'kelly',
 ] as const;
 
 export type TerminalView = typeof TERMINAL_VIEWS[number];
-const CFB_VIEWS=new Set<TerminalView>(['dashboard','props','arbitrage']);
+const CFB_VIEWS=new Set<TerminalView>(['dashboard','results','props','arbitrage']);
 
 export function parseTerminalHash(hash: string): { sport: Sport; view: TerminalView } | null {
   const [sport, view] = hash.replace(/^#/, '').split('/');

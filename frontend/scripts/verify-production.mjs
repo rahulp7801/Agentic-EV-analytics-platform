@@ -7,6 +7,8 @@ export const paidPipelinePaths = [
   '/api/signals?sport=nba&limit=12',
   '/api/signals?sport=nfl&view=qualified',
   '/api/signals?sport=nba&view=qualified',
+  '/api/picks?sport=nfl',
+  '/api/picks?sport=nba',
   '/api/metrics',
   '/api/metrics?cohort=recommendations',
   '/api/scans',
@@ -48,6 +50,7 @@ export const publicSecurityProbes = [
   { path: '/api/scans', statuses: [403], options: { headers: { origin: 'https://attacker.invalid' } } },
   { path: '/api/signals?sport=nfl&offset=1000', statuses: [400] },
   { path: '/api/gamelogs?sport=nfl&player=%25', statuses: [400] },
+  { path: '/api/picks?sport=mlb', statuses: [400] },
 ];
 
 export function readinessStatuses(path, { paidEnabled, publicEnabled }) {

@@ -28,6 +28,7 @@ from sportsbet.prop.nba_context_producer import make_nba_context_signals_produce
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.prop.cross_venue import PROP_MARKETS, screen as screen_cross_venue, screen_sportsbooks
 from sportsbet.prop.probability import outcome_interval_for_side
+from sportsbet.picks import build_pick_board
 from sportsbet.provider_cache import CachedResponse, ProviderResponseCache
 from sportsbet.quant.vig import american_to_raw_prob
 
@@ -611,10 +612,12 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                     comparisons=comparisons,execution_ready=False))
         publish_snapshot('metrics:all',ledger.report(model_version=MODEL_VERSION))
         publish_snapshot('metrics:recommendations',ledger.report(True,model_version=MODEL_VERSION))
+        prediction_rows=ledger.predictions()
         for sport in sports:
             publish_snapshot(f'metrics:all:{sport}',ledger.report(model_version=MODEL_VERSION,sport=sport))
             publish_snapshot(f'metrics:recommendations:{sport}',
                 ledger.report(True,model_version=MODEL_VERSION,sport=sport))
+            publish_snapshot(f'picks:{sport}',build_pick_board(prediction_rows,sport))
         return reports
     finally:
         cache.close()

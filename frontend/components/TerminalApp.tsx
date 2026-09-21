@@ -10,6 +10,7 @@ import MarketWatch from '@/components/MarketWatch';
 import ParlayBuilder from '@/components/ParlayBuilder';
 import KellyCalc from '@/components/KellyCalc';
 import BacktestLab from '@/components/BacktestLab';
+import PickResults from '@/components/PickResults';
 import type { EVSignal, Sport } from '@/lib/types';
 import { parseTerminalHash, terminalHash, type TerminalView } from '@/lib/terminalRoute';
 import ResponsibleUse from './ResponsibleUse';
@@ -46,7 +47,7 @@ export default function TerminalApp() {
   const changeSport = (nextSport: Sport) => {
     setPlayer('');
     setSport(nextSport);
-    const nextView=nextSport==='cfb' && !['dashboard','props','arbitrage'].includes(view) ? 'dashboard' : view;
+    const nextView=nextSport==='cfb' && !['dashboard','results','props','arbitrage'].includes(view) ? 'dashboard' : view;
     setView(nextView);
     window.location.hash = terminalHash(nextSport, nextView);
   };
@@ -65,12 +66,13 @@ export default function TerminalApp() {
           <div className="terminal-breadcrumb" aria-label="Current workspace">
             <span>{sport.toUpperCase()}</span>
             <span aria-hidden="true">/</span>
-            <strong>{{dashboard:'Picks',props:'Players',arbitrage:'Markets',backtest:'Backtesting',gamelogs:'Game logs',parlay:'Scenario lab',kelly:'Stake calculator'}[view]}</strong>
+            <strong>{{dashboard:'Picks',results:'Past results',props:'Players',arbitrage:'Markets',backtest:'Backtesting',gamelogs:'Game logs',parlay:'Scenario lab',kelly:'Stake calculator'}[view]}</strong>
           </div>
           <div className="terminal-view" ref={viewport}>
             {view === 'dashboard' && (
               <Overview key={sport} sport={sport} onOpenMarkets={() => changeView('arbitrage')} onOpenPlayers={name=>{changeView('props');setPlayer(name ?? '');}} />
             )}
+            {view === 'results' && <PickResults key={sport} sport={sport} />}
             {view === 'props' && <PropsAnalysis key={sport+player} sport={sport} initialPlayer={player} />}
             {view === 'gamelogs' && <GameLogs key={sport} sport={sport} />}
             {view === 'arbitrage' && <MarketWatch sport={sport} />}

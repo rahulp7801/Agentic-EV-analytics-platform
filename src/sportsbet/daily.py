@@ -14,6 +14,7 @@ from sportsbet.dashboard import load_snapshot, publish_snapshot
 from sportsbet.market_watch import run as watch, DEFAULT_GAME_LIMIT
 from sportsbet.ledger import Ledger
 from sportsbet.model_contract import MODEL_VERSION
+from sportsbet.picks import build_pick_board
 from sportsbet.refresh import refresh_history
 from sportsbet.scan import run as scan, timestamp, prop_credit_holdback, MARKETS
 from sportsbet.schedules import collect as collect_schedule
@@ -175,10 +176,12 @@ def create_daily_graph():
         try:
             publish_snapshot('metrics:all',ledger.report(model_version=MODEL_VERSION))
             publish_snapshot('metrics:recommendations',ledger.report(True,model_version=MODEL_VERSION))
+            prediction_rows=ledger.predictions()
             for sport in state['sports']:
                 publish_snapshot(f'metrics:all:{sport}',ledger.report(model_version=MODEL_VERSION,sport=sport))
                 publish_snapshot(f'metrics:recommendations:{sport}',
                     ledger.report(True,model_version=MODEL_VERSION,sport=sport))
+                publish_snapshot(f'picks:{sport}',build_pick_board(prediction_rows,sport))
         except Exception as exc:
             for result in results.values():
                 if result['status']=='complete':
