@@ -62,6 +62,12 @@ def upgrade():
       END IF;
     END $$""")
     op.execute('ALTER TABLE ngs_stats ENABLE ROW LEVEL SECURITY')
+    # Role provisioning may already have installed the read policy before this
+    # migration exists. Replace the complete worker policy set deterministically.
+    op.execute('DROP POLICY IF EXISTS sportsbet_worker_delete ON ngs_stats')
+    op.execute('DROP POLICY IF EXISTS sportsbet_worker_update ON ngs_stats')
+    op.execute('DROP POLICY IF EXISTS sportsbet_worker_insert ON ngs_stats')
+    op.execute('DROP POLICY IF EXISTS sportsbet_worker_read ON ngs_stats')
     op.execute("""DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='sportsbet_worker') THEN
         EXECUTE 'GRANT SELECT,INSERT,UPDATE,DELETE ON ngs_stats TO sportsbet_worker';
         EXECUTE 'GRANT USAGE,SELECT ON SEQUENCE ngs_stats_id_seq TO sportsbet_worker';
