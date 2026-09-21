@@ -156,7 +156,13 @@ jobs:
           python-version: '3.12'
       - run: pip install uv==0.11.32
       - run: uv sync --locked
+      - name: Verify owner migration credential is configured
+        env:
+          DATABASE_MIGRATION_URL: ${{ secrets.DATABASE_MIGRATION_URL }}
+        run: test -n "$DATABASE_MIGRATION_URL"
       - name: Apply reviewed migrations to the hosted database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_MIGRATION_URL }}
         run: uv run --locked alembic upgrade head
       - name: Verify hosted schema is at the application head
         run: uv run --locked alembic current --check-heads
