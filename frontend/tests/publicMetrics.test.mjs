@@ -38,6 +38,16 @@ test('public metrics binds league snapshots to the requested league', () => {
   assert.throws(()=>publicMetrics(value,'all','nba'));
 });
 
+test('public metrics tolerates interval endpoint roundoff but rejects material misses', () => {
+  const rounded=report();
+  rounded.calibration[0].observed_interval=[0.1,0.5-Number.EPSILON];
+  assert.equal(publicMetrics(rounded,'all').calibration[0].observed,0.5);
+
+  const invalid=report();
+  invalid.calibration[0].observed_interval=[0.1,0.49];
+  assert.throws(()=>publicMetrics(invalid,'all'));
+});
+
 test('public metrics accepts the pre-cluster empty snapshot during rollout', () => {
   const value=report();
   Object.assign(value,{model_version:null,available_model_versions:[],sample_size:0,settled_count:0,
