@@ -64,6 +64,38 @@ verified. There is one selected candidate offer, so no meaningful selected
 strategy ROI, calibration against offered prices, CLV, or game/player-cluster
 interval can be estimated from these replay cohorts.
 
+## Reproducible priced research report
+
+The compact generated result is
+[`2026-09-22-reception-priced-report.json`](2026-09-22-reception-priced-report.json).
+It includes input SHA-256 hashes, per-cohort coverage reasons, the two evaluated
+candidate price comparisons, and explicit nulls for strategy ROI, calibration
+against offers, CLV, and game/player-cluster intervals. The full local output
+lists every evaluated replay row, its offer status, and all observed offers for
+that player at the matching kickoff. Regenerate both with:
+
+```powershell
+python src/sportsbet/quant/reception_offer_audit.py --database `
+  --output .local/reception-offer-audit.json `
+  --summary-output docs/verification/2026-09-22-reception-priced-report.json
+python -m pytest tests/test_reception_offer_audit.py -q
+```
+
+The 4.5 half-line cannot push for an integer reception count. At Waddle's
+candidate +105 quote, the retrospective 60.9375% Under probability mechanically
+implies +0.2492 net per unit staked, and his observed one reception would pay
+1.05 net units **if** the quote were fillable and the book settled it as an
+active player. Always Under selects the identical side and receives the same
+illustrative payout. These are payout scenarios, not verified strategy ROI.
+
+The other evaluated candidate is Travis Kelce Over 4.5 at +124, but his 54.41%
+called-side confidence fails the published 60% selection rule. He had three
+receptions, so the model's illustrative Over loses while an Under at the paired
+same-book -161 quote wins. The latest archived same-book observations are more
+than two hours before kickoff; the report records their raw implied-probability
+movement but does not call them closing lines. One selected candidate in one
+game supplies no useful priced game or player uncertainty interval.
+
 ## Reproduction boundary
 
 The replay files and their source/dataset commitments are tracked in the repo.
