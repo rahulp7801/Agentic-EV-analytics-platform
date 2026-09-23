@@ -128,7 +128,7 @@ def _actual(db, prediction: dict, sport: str, day: str, game: dict):
             WHERE athlete_id=? AND game_id=?'''
         # ESPN's slate date is in Eastern time; the source row can use the UTC date.
         # Exact event and athlete IDs carry identity across that midnight boundary.
-        rows=db.execute(query,(int(player_id),int(event_id))).fetchall()
+        rows=db.execute(query,(int(player_id),event_id)).fetchall()
     else:
         if not player_id.strip() or len(player_id)>20:
             raise ValueError('Invalid player identity')
@@ -144,8 +144,16 @@ def _actual(db, prediction: dict, sport: str, day: str, game: dict):
     if len(rows)!=1:
         return None
     record=dict(zip(fields,rows[0][:len(fields)],strict=True))
-    if sport=='cfb' and type(record['is_home']) is int and record['is_home'] in (0,1):
-        record['is_home']=bool(record['is_home'])
+    if sport=='cfb':
+        # Storage uses VARCHAR; ingestion commits the numeric ESPN event ID.
+        stored_event=record['game_id']
+        if (type(stored_event) not in (str,int) or not str(stored_event).isascii()
+                or not str(stored_event).isdigit() or str(int(stored_event))!=str(stored_event)
+                or str(stored_event)!=game['provider_event_id']):
+            raise StatProvenanceError('Invalid stored CFB game identity')
+        record['game_id']=int(stored_event)
+        if type(record['is_home']) is int and record['is_home'] in (0,1):
+            record['is_home']=bool(record['is_home'])
     team_field='team_abbreviation' if sport in ('nba','cfb') else 'team'
     if record[team_field] not in scheduled_stat_teams(sport,game):
         return None

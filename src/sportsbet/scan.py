@@ -10,6 +10,7 @@ from decimal import Decimal
 from math import isfinite
 from zoneinfo import ZoneInfo
 import httpx
+import structlog
 from sportsbet.config import settings
 from sportsbet.dashboard import publish_snapshot, load_snapshot
 from sportsbet.db.connection import create_async_pool
@@ -32,6 +33,8 @@ from sportsbet.picks import build_pick_board
 from sportsbet.provider_cache import CachedResponse, ProviderResponseCache
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.quant.market_baseline import paired_market_baseline
+
+log = structlog.get_logger()
 
 MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl','cfb':'americanfootball_ncaaf'}
@@ -349,15 +352,25 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     async def model(selection):
         player,market,line,side,quote,player_id=selection
         async with limiter:
-            state=await graph.ainvoke(dict(session_id=scan_id,request_type='nba_prop_analysis' if sport=='nba' else 'prop_analysis',
-            game_id=event['id'],home_team=event['home_team'],away_team=event['away_team'],season=season-2,week=1,
-            receiver_gsis_id=player_id,player_name=player,sport=sport,prop_type=MARKETS[sport][market],
-            prop_line=line,prop_side=side.lower(),as_of_date=game_date,last_n_games=40,player_prop_snapshots=[quote]))
+            try:
+                state=await graph.ainvoke(dict(session_id=scan_id,request_type='nba_prop_analysis' if sport=='nba' else 'prop_analysis',
+                game_id=event['id'],home_team=event['home_team'],away_team=event['away_team'],season=season-2,week=1,
+                receiver_gsis_id=player_id,player_name=player,sport=sport,prop_type=MARKETS[sport][market],
+                prop_line=line,prop_side=side.lower(),as_of_date=game_date,last_n_games=40,player_prop_snapshots=[quote]))
+            except Exception as exc:
+                log.warning('selection_model_failed',sport=sport,error_type=type(exc).__name__)
+                state={'error':'model_evaluation_failed'}
         return selection,state
 
     modeled=await asyncio.gather(*(model(selection) for selection in prepared))
-    if any(state.get('error') for _,state in modeled):
+    failures=sum(bool(state.get('error')) for _,state in modeled)
+    if failures and failures==len(modeled):
         raise RuntimeError('Model evaluation failed')
+    if failures:
+        counts['model_evaluation_failed']=failures
+        modeled=[item for item in modeled if not item[1].get('error')]
+    # Successful selections retain every gate. A failed neighbor cannot erase
+    # them; requested-versus-estimated counts publish honest partial coverage.
     # Alphabetical/line order must not consume a player's risk slot ahead of a
     # stronger qualified estimate. Keep all forecasts; retain every existing gate.
     modeled.sort(key=lambda candidate:recommendation_quality(candidate[1].get('ev_signal')),reverse=True)

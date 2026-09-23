@@ -358,3 +358,45 @@ async def test_scan_graph_runs_real_sql_and_excludes_target_game(sport, tmp_path
             if sport == 'nfl':
                 await conn.execute('DELETE FROM games WHERE game_id LIKE $1',identity+'%')
         await pool.close()
+
+
+def test_cfb_final_settlement_preserves_varchar_event_and_numeric_stat_commitment():
+    """Exercise the deployed VARCHAR schema, not SQLite's permissive affinity."""
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];ledger=Ledger(database_url=url)
+    identity=uuid.uuid4().hex[:16];event=str(uuid.uuid4().int%900000000+100000000)
+    player=int(uuid.uuid4().int%900000000)+1
+    now=datetime.now(timezone.utc);day=(now-timedelta(days=1)).date()
+    payload=dict(game_id=identity,player='CFB Settlement Fixture',player_id=str(player),sport='cfb',
+        game_date=day.isoformat(),home_team='Home',away_team='Away',prop_type='rec_yds',direction='over',
+        line=39.5,sportsbook='book',american_odds=100,model_probability=.6,
+        captured_at=(now-timedelta(days=1,hours=3)).isoformat(),
+        game_start_time=(now-timedelta(days=1,hours=2)).isoformat(),model_version=identity)
+    stat=dict(game_id=int(event),athlete_id=player,player_name=payload['player'],team_id=7,
+        passing_yards=None,rushing_yards=None,receiving_yards=45,receptions=4,
+        season=2026,week=4,game_date=day,is_home=True,team_name='Home',team_abbreviation='TAMU',
+        opponent_id=9,opponent_name='Away',opponent_abbreviation='BAMA')
+    digest=stat_row_sha256('cfb',stat)
+    stored=stat|dict(game_id=event,source_provider='sportsdataverse_espn',source_sha256='a'*64,
+        source_player_sha256='b'*64,source_schedule_sha256='c'*64,
+        source_record_sha256=digest,source_observed_at=now)
+    engine=sa.create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(sa.text('INSERT INTO cfb_player_gamelogs ('+','.join(stored)+') VALUES ('+
+                ','.join(':'+key for key in stored)+')'),stored)
+        key=ledger.record(identity,payload)
+        schedule=dict(status='complete',captured_at=now.isoformat(),games=[dict(
+            provider_event_id=event,date=day.isoformat(),home_name='Home',away_name='Away',
+            home_abbr='TAMU',away_abbr='BAMA',completed=True,game_time=payload['game_start_time'])])
+        assert settle_final_props(ledger,'cfb',schedule)['settled']==1
+        row=next(item for item in ledger.predictions() if item['prediction_id']==key)
+        assert row['outcome'] is True and row['actual_value']==45
+        assert row['outcome_evidence']['stat_record_sha256']==digest
+        assert ledger.report(model_version=identity)['settled_count']==1
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text('DELETE FROM cfb_player_gamelogs WHERE athlete_id=:player AND game_id=:event'),
+                dict(player=player,event=event))
+            conn.execute(sa.text('DELETE FROM analytics.predictions WHERE scan_id=:id'),{'id':identity})
+            conn.execute(sa.text('DELETE FROM analytics.quotes WHERE identity=:id'),{'id':ledger.quote_identity(payload)})
+        engine.dispose()

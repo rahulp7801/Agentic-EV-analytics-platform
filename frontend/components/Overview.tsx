@@ -69,7 +69,7 @@ export default function Overview({sport,onOpenMarkets,onOpenSlip,onOpenPlayers}:
     document.addEventListener('visibilitychange',visible);
     return()=>{request.current?.abort();window.clearTimeout(initial);window.clearInterval(poll);window.clearInterval(clock);document.removeEventListener('visibilitychange',visible);};
   },[load]);
-  const liveGroups=bestPickGroups(qualified,now),retained=(board?.current ?? []).slice(0,3);
+  const liveGroups=bestPickGroups(qualified,now),retained=(board?.current ?? []).filter(pick=>Date.parse(pick.game_start_time ?? '')>now).slice(0,3);
   const pickGroups=liveGroups.length ? liveGroups : retained.map(pick=>({pick,alternatives:[]}));
   const picks=pickGroups.map(group=>group.pick),records=publicSignals(forecasts,now).signals;
   const retainedBoard=!liveGroups.length && retained.length>0;
