@@ -500,7 +500,8 @@ def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_pa
     monkeypatch.chdir(tmp_path)
     body=response()
     template=body['resultSets'][0]['rowSet']
-    body['resultSets'][0]['rowSet']=[[101+i,*template[i%2][1:]] for i in range(row_count)]
+    body['resultSets'][0]['rowSet']=[[101+i%64,template[i%2][1],
+        f'00225{i//64+1:05d}',*template[i%2][3:]] for i in range(row_count)]
     text=json.dumps(body);observed=datetime.now(timezone.utc)
     rows=official_rows(text,2025,observed);table=NBAPlayerGameLog.__table__
     schema='nba_recovery_'+uuid.uuid4().hex
@@ -540,7 +541,7 @@ def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_pa
                 return [node.get('Index Cond','')]+[value for child in node.get('Plans',[])
                     for value in index_conditions(child)]
             assert any('player_id =' in value and 'game_id' in value
-                for value in index_conditions(plans[0][0]['Plan']))
+                for value in index_conditions(plans[0][0]['Plan'])),plans
         with engine.begin() as conn:
             retained=[dict(row) for row in conn.execute(sa.select(table)).mappings()]
             conn.exec_driver_sql(f'ALTER TABLE {schema}.nba_player_gamelogs '
