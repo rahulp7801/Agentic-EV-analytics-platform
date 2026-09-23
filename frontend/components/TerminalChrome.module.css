@@ -31,3 +31,10 @@
 :global(html[data-theme='dark']) .terminalBrand>span { background:#f4f5f7;color:#111318; }
 :global(html[data-theme='dark']) .scanCard { background:rgba(23,26,32,.82); }
 :global(html[data-theme='dark']) .scanWarning { background:rgba(83,57,16,.35); }
+
+/* The selected league's collection state stays visible beside the pick board. */
+.scanRail[data-single-league] { padding:0; background:transparent; flex-wrap:wrap; }
+.scanRail[data-single-league] .scanCard { flex:1; min-width:0; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+.scanRail[data-single-league] .scanIdentity { grid-column:1; grid-row:1; flex-wrap:wrap; gap:5px; }
+.scanRail[data-single-league] .scanMetrics { grid-column:1 / -1; grid-row:2; flex-wrap:wrap; }
+.scanRail[data-single-league] .scanCard time { grid-column:2; grid-row:1; }

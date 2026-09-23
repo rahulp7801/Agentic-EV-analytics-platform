@@ -34,7 +34,7 @@ export function shortlistPresentation(liveCount:number,retainedCount:number) {
     count:`0 live · ${retainedCount} to reprice`,
   };
   return {
-    state:'empty' as const,eyebrow:'Suggested picks',title:'No suggested pick passes now',
-    description:'The board stays empty until a line clears every evidence and price gate.',count:'0 live',
+    state:'empty' as const,eyebrow:'Suggested picks',title:'No current suggested pick available',
+    description:'Collection status and evidence checks determine when a current pick can be shown.',count:'0 live',
   };
 }
