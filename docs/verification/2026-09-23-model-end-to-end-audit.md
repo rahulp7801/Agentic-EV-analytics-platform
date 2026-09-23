@@ -100,4 +100,4 @@ Use the existing [prospective edge protocol](2026-09-23-prospective-edge-protoco
 
 ## Verification
 
-Focused backend regression suites passed: 49 scan/history tests and 45 settlement/provenance/history tests. All 159 frontend tests passed; ESLint and TypeScript checks passed. Full backend and hosted PostgreSQL/build/security CI results are recorded in the associated pull request. No live picks were manufactured to validate the UI.
+Focused backend regression suites passed: 49 scan/history tests and 45 settlement/provenance/history tests. All 159 frontend tests passed; ESLint and TypeScript checks passed. The complete local backend suite passed with 799 tests and 33 environment-dependent skips. PR #196 passed backend, frontend build, PostgreSQL (including the new CFB test), worker image, secret scanning, and CodeQL checks at implementation commit `e08b06c`. A read-only lookup against an existing hosted CFB row also reproduced the observed value and source commitment. No live picks were manufactured to validate the UI.
