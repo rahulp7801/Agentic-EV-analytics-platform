@@ -189,3 +189,14 @@ it remains retrospective research rather than a preregistered live trial. Neithe
 cohort contains archived sportsbook prices or recorded accept/reject decisions.
 It proves repeatable fixed-threshold directional accuracy for this narrow
 reception task; it does not prove a 60% priced-bet win rate or positive returns.
+
+## September 23 end-to-end tuning audit
+
+The [end-to-end audit](verification/2026-09-23-model-end-to-end-audit.md) evaluates
+154,121 historical rows using a frozen temporal protocol and compares the existing
+priced ledger with exact no-vig market baselines. Recent-history/workload corrections
+improve NBA points/rebounds/assists and NFL receiving-yards/receptions research
+scores sufficiently to freeze shadow candidates. No production probability change
+or market-edge claim follows from those unpriced retrospective tests. Coefficients,
+coverage, calibration, paired uncertainty, negative results, and promotion gates
+are retained in the linked aggregate artifacts.

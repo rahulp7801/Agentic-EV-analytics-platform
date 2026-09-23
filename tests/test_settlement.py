@@ -289,7 +289,8 @@ def test_pending_schedule_catchup_is_bounded_oldest_first(monkeypatch):
         pending_schedule_offsets(Audit(),'nba',datetime(2026,9,30))
 
 
-def test_cfb_settlement_uses_exact_espn_game_and_source_backed_stat(tmp_path):
+@pytest.mark.parametrize('game_id_type',['INTEGER','TEXT'])
+def test_cfb_settlement_uses_exact_espn_game_and_source_backed_stat(tmp_path,game_id_type):
     from sportsbet.ingestion.provenance import row_sha256
     ledger=Ledger(tmp_path/'cfb.sqlite')
     key,payload=prediction(ledger,sport='cfb',prop_type='rec_yds',player_id='12345',line=39.5)
@@ -303,8 +304,8 @@ def test_cfb_settlement_uses_exact_espn_game_and_source_backed_stat(tmp_path):
         opponent_name='Away',opponent_abbreviation='BAMA')
     assert stat_row_sha256('cfb',row)==row_sha256(row)
     with ledger.connect() as db:
-        db.execute('''CREATE TABLE cfb_player_gamelogs (
-            game_id INTEGER,athlete_id INTEGER,player_name TEXT,team_id INTEGER,
+        db.execute(f'''CREATE TABLE cfb_player_gamelogs (
+            game_id {game_id_type},athlete_id INTEGER,player_name TEXT,team_id INTEGER,
             passing_yards INTEGER,rushing_yards INTEGER,receiving_yards INTEGER,
             receptions INTEGER,season INTEGER,week INTEGER,game_date TEXT,is_home BOOLEAN,
             team_name TEXT,team_abbreviation TEXT,opponent_id INTEGER,opponent_name TEXT,

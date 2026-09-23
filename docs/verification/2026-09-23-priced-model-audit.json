@@ -1,0 +1,254 @@
+{
+  "all": {
+    "sport": "nfl",
+    "model_version": "empirical-jeffreys-v4",
+    "cohort": "all_predictions",
+    "selection_policy": "Earliest eligible prediction per game/player/market/side/line within the selected cohort.",
+    "profit_scope": "Hypothetical recorded-stake replay, not executed bets or realized account profit.",
+    "ledger_performance": {
+      "roi": -0.053120739929166653,
+      "roi_game_cluster_interval": [
+        -0.06100685295177415,
+        -0.045234626906559154
+      ],
+      "roi_game_cluster_count": 16,
+      "clv_mean": -0.0003245620093589981,
+      "clv_count": 2392,
+      "clv_mean_game_cluster_interval": [
+        -0.0005353110790336386,
+        -0.00011381293968435756
+      ],
+      "clv_game_cluster_count": 16,
+      "pending_count": 195,
+      "settled_count": 5208
+    },
+    "source_eligible": 11531,
+    "earliest_selections": 5403,
+    "decided": 5208,
+    "scored_decided": 5208,
+    "pushes": 0,
+    "pending": 195,
+    "settled_games": 16,
+    "model_brier": 0.2690978990326809,
+    "shadow_prior80_scored": 5208,
+    "shadow_prior80_brier": 0.24968302633004935,
+    "raw_implied_brier": 0.24704775886401825,
+    "hypothetical_flat_stake_roi": -0.053120739929166653,
+    "paired_decided": 4421,
+    "paired_games": 16,
+    "paired_model_brier": 0.2652781338071271,
+    "paired_market_no_vig_brier": 0.24502520211955062,
+    "paired_model_minus_market_brier": 0.020252931687576498,
+    "paired_shadow_prior80_count": 4421,
+    "paired_shadow_prior80_brier": 0.24890569065323562,
+    "paired_shadow_prior80_minus_market_brier": 0.0038804885336849943,
+    "market_model_leave_one_game_out_brier": 0.24635035610707856,
+    "leave_one_game_out_weight_range": [
+      0.0,
+      0.1584006396013015
+    ],
+    "leave_one_game_out_positive_weights": 11,
+    "game_cluster_bootstrap_95": [
+      0.004568465403169636,
+      0.039177557991117606
+    ],
+    "bootstrap_samples": 2000,
+    "bootstrap_seed": 20260922,
+    "shadow_prior80_game_cluster_bootstrap_95": [
+      -0.0007656327213895253,
+      0.008664790498825674
+    ]
+  },
+  "recommendations": {
+    "sport": "nfl",
+    "model_version": "empirical-jeffreys-v4",
+    "cohort": "recommendations",
+    "selection_policy": "Earliest eligible prediction per game/player/market/side/line within the selected cohort.",
+    "profit_scope": "Hypothetical recorded-stake replay, not executed bets or realized account profit.",
+    "ledger_performance": {
+      "roi": -0.550901820350132,
+      "roi_game_cluster_interval": null,
+      "roi_game_cluster_count": 1,
+      "clv_mean": 3.3306690738754696e-16,
+      "clv_count": 1,
+      "clv_mean_game_cluster_interval": null,
+      "clv_game_cluster_count": 1,
+      "pending_count": 0,
+      "settled_count": 3
+    },
+    "source_eligible": 7,
+    "earliest_selections": 3,
+    "decided": 3,
+    "scored_decided": 3,
+    "pushes": 0,
+    "pending": 0,
+    "settled_games": 1,
+    "model_brier": 0.41995737321666665,
+    "shadow_prior80_scored": 3,
+    "shadow_prior80_brier": 0.2842807265582071,
+    "raw_implied_brier": 0.2946897684235703,
+    "hypothetical_flat_stake_roi": -0.20000000000000004,
+    "paired_decided": 0,
+    "paired_games": 0,
+    "paired_model_brier": null,
+    "paired_market_no_vig_brier": null,
+    "paired_model_minus_market_brier": null,
+    "paired_shadow_prior80_count": 0,
+    "paired_shadow_prior80_brier": null,
+    "paired_shadow_prior80_minus_market_brier": null
+  },
+  "by_prop": {
+    "pass_yds": {
+      "source_eligible": 1974,
+      "earliest_selections": 1104,
+      "decided": 1090,
+      "scored_decided": 1090,
+      "pushes": 0,
+      "pending": 14,
+      "settled_games": 16,
+      "model_brier": 0.23912754791278165,
+      "shadow_prior80_scored": 1090,
+      "shadow_prior80_brier": 0.24382907967501818,
+      "raw_implied_brier": 0.24135742578499786,
+      "hypothetical_flat_stake_roi": -0.062526345974357,
+      "paired_decided": 1066,
+      "paired_games": 16,
+      "paired_model_brier": 0.23851420285191743,
+      "paired_market_no_vig_brier": 0.23996412453871085,
+      "paired_model_minus_market_brier": -0.0014499216867934186,
+      "paired_shadow_prior80_count": 1066,
+      "paired_shadow_prior80_brier": 0.24361076178516416,
+      "paired_shadow_prior80_minus_market_brier": 0.003646637246453287,
+      "market_model_leave_one_game_out_brier": 0.24921051670301955,
+      "leave_one_game_out_weight_range": [
+        0.24572064220507547,
+        0.8670437974433273
+      ],
+      "leave_one_game_out_positive_weights": 16,
+      "game_cluster_bootstrap_95": [
+        -0.03549268583499316,
+        0.030913834622008564
+      ],
+      "bootstrap_samples": 2000,
+      "bootstrap_seed": 20260922,
+      "shadow_prior80_game_cluster_bootstrap_95": [
+        -0.008525176640043467,
+        0.01621333877063897
+      ]
+    },
+    "rec_yds": {
+      "source_eligible": 5244,
+      "earliest_selections": 2496,
+      "decided": 2384,
+      "scored_decided": 2384,
+      "pushes": 0,
+      "pending": 112,
+      "settled_games": 16,
+      "model_brier": 0.2827465427252945,
+      "shadow_prior80_scored": 2384,
+      "shadow_prior80_brier": 0.25373845089275404,
+      "raw_implied_brier": 0.24714027356517432,
+      "hypothetical_flat_stake_roi": -0.05823632835762231,
+      "paired_decided": 2114,
+      "paired_games": 16,
+      "paired_model_brier": 0.28048355455306717,
+      "paired_market_no_vig_brier": 0.24548220854113353,
+      "paired_model_minus_market_brier": 0.03500134601193363,
+      "paired_shadow_prior80_count": 2114,
+      "paired_shadow_prior80_brier": 0.25321569274476724,
+      "paired_shadow_prior80_minus_market_brier": 0.00773348420363369,
+      "market_model_leave_one_game_out_brier": 0.24548220854113353,
+      "leave_one_game_out_weight_range": [
+        0.0,
+        0.0
+      ],
+      "leave_one_game_out_positive_weights": 0,
+      "game_cluster_bootstrap_95": [
+        0.010029621894948841,
+        0.05895149037493475
+      ],
+      "bootstrap_samples": 2000,
+      "bootstrap_seed": 20260922,
+      "shadow_prior80_game_cluster_bootstrap_95": [
+        0.0013935950130259818,
+        0.014825684668342606
+      ]
+    },
+    "receptions": {
+      "source_eligible": 1555,
+      "earliest_selections": 471,
+      "decided": 430,
+      "scored_decided": 430,
+      "pushes": 0,
+      "pending": 41,
+      "settled_games": 16,
+      "model_brier": 0.2842805503688372,
+      "shadow_prior80_scored": 430,
+      "shadow_prior80_brier": 0.2511834935083153,
+      "raw_implied_brier": 0.24526022248443904,
+      "hypothetical_flat_stake_roi": -0.03993622741264037,
+      "paired_decided": 79,
+      "paired_games": 13,
+      "paired_model_brier": 0.2101240191713291,
+      "paired_market_no_vig_brier": 0.22265971133866985,
+      "paired_model_minus_market_brier": -0.012535692167340736,
+      "paired_shadow_prior80_count": 79,
+      "paired_shadow_prior80_brier": 0.23447390316465028,
+      "paired_shadow_prior80_minus_market_brier": 0.011814191825980426,
+      "market_model_leave_one_game_out_brier": 0.2141853209077876,
+      "leave_one_game_out_weight_range": [
+        0.5949901068062764,
+        0.8967963762482192
+      ],
+      "leave_one_game_out_positive_weights": 13,
+      "game_cluster_bootstrap_95": [
+        -0.0508705592650637,
+        0.028274071501028415
+      ],
+      "bootstrap_samples": 2000,
+      "bootstrap_seed": 20260922,
+      "shadow_prior80_game_cluster_bootstrap_95": [
+        -0.007663161819495517,
+        0.029948961780490065
+      ]
+    },
+    "rush_yds": {
+      "source_eligible": 2758,
+      "earliest_selections": 1332,
+      "decided": 1304,
+      "scored_decided": 1304,
+      "pushes": 0,
+      "pending": 28,
+      "settled_games": 16,
+      "model_brier": 0.2641905187281963,
+      "shadow_prior80_scored": 1304,
+      "shadow_prior80_brier": 0.24666728155232057,
+      "raw_implied_brier": 0.2522245599773582,
+      "hypothetical_flat_stake_roi": -0.04025392012810114,
+      "paired_decided": 1162,
+      "paired_games": 16,
+      "paired_model_brier": 0.265917777522759,
+      "paired_market_no_vig_brier": 0.25035727690237203,
+      "paired_model_minus_market_brier": 0.015560500620387004,
+      "paired_shadow_prior80_count": 1162,
+      "paired_shadow_prior80_brier": 0.24690324742041686,
+      "paired_shadow_prior80_minus_market_brier": -0.0034540294819551806,
+      "market_model_leave_one_game_out_brier": 0.25902061507368884,
+      "leave_one_game_out_weight_range": [
+        0.002553828133175212,
+        0.38550770283371527
+      ],
+      "leave_one_game_out_positive_weights": 16,
+      "game_cluster_bootstrap_95": [
+        -0.025269304945808594,
+        0.05746531849674829
+      ],
+      "bootstrap_samples": 2000,
+      "bootstrap_seed": 20260922,
+      "shadow_prior80_game_cluster_bootstrap_95": [
+        -0.01622194575242541,
+        0.008857475557886085
+      ]
+    }
+  }
+}
