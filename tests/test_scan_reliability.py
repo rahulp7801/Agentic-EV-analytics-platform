@@ -362,9 +362,11 @@ async def test_signal_snapshot_restores_lost_cadence_without_spending_again(monk
 
 
 @pytest.mark.asyncio
-async def test_scan_preserves_last_credits_for_last_hour_checks(monkeypatch,worker):
+async def test_scan_splits_reserved_checks_before_board_lock_and_final_hour(monkeypatch,worker):
     stored,events,evaluated,pool=worker
     assert scan.Ledger().reserve_api_credits(17,25)
+    for event in events['nfl']:
+        event['commence_time']=(datetime.now(timezone.utc)+timedelta(hours=3)).isoformat()
     def handle(request):
         if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nfl'])
         return httpx.Response(200,json=next(e for e in events['nfl'] if e['id'] in request.url.path))
@@ -374,10 +376,20 @@ async def test_scan_preserves_last_credits_for_last_hour_checks(monkeypatch,work
     assert distant['budget_reasons']=={'pregame_credit_reserve':2}
     assert all(event['budget_reason']=='pregame_credit_reserve' for event in distant['events'])
     for event in events['nfl']:
+        event['commence_time']=(datetime.now(timezone.utc)+timedelta(minutes=90)).isoformat()
+    pool.provider_cache.records.pop('odds:events:nfl')
+    prelock=(await scan.run(['nfl'],25))['nfl']
+    assert prelock['completed_events']==1 and prelock['budget_skipped_events']==1
+    assert prelock['budget_reasons']=={'pregame_credit_reserve':1}
+    assert evaluated==['nfl0']
+    repeated=(await scan.run(['nfl'],25))['nfl']
+    assert repeated['attempted_events']==0 and evaluated==['nfl0']
+    for event in events['nfl']:
         event['commence_time']=(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat()
     pool.provider_cache.records.pop('odds:events:nfl')  # Provider schedule changed between synthetic runs.
     close=(await scan.run(['nfl'],25))['nfl']
-    assert close['completed_events']==2 and close['budget_skipped_events']==0
+    assert close['completed_events']==1 and close['budget_skipped_events']==0
+    assert close['cadence_deferred_events']==1  # The other event was just captured.
     assert close['budget_reasons']=={}
     assert evaluated==['nfl0','nfl1']
     assert not scan.Ledger().reserve_api_credits(1,25)
@@ -395,3 +407,38 @@ async def test_cfb_uses_its_own_manual_player_model_path(monkeypatch,worker):
     report=(await scan.run(['cfb'],25))['cfb']
     assert evaluated==['college1'] and report['completed_events']==1
     assert stored['signals:cfb:college1']['games']==[]
+
+
+@pytest.mark.asyncio
+async def test_prelock_event_precedes_distant_candidate_within_league(monkeypatch,worker):
+    stored,events,evaluated,_=worker
+    now=datetime.now(timezone.utc)
+    events['nfl'][0]['commence_time']=(now+timedelta(hours=3)).isoformat()
+    events['nfl'][1]['commence_time']=(now+timedelta(minutes=90)).isoformat()
+    async def evidence(pool,sport,identities,now):
+        return {'nfl0':((.2,40),None),'nfl1':(None,None)}
+    monkeypatch.setattr(scan,'prior_event_evidence_batch',evidence)
+    def handle(request):
+        if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nfl'])
+        assert '/nfl1/' in request.url.path
+        return httpx.Response(200,json=events['nfl'][1])
+    transport(monkeypatch,handle)
+    report=(await scan.run(['nfl'],4))['nfl']
+    assert evaluated==['nfl1']
+    assert report['completed_events']==report['budget_skipped_events']==1
+    assert report['budget_reasons']=={'daily_credit_limit':1}
+
+
+@pytest.mark.asyncio
+async def test_targeted_distant_scan_keeps_the_full_reserve(monkeypatch,worker):
+    _,events,evaluated,_=worker
+    for event in events['nfl']:
+        event['commence_time']=(datetime.now(timezone.utc)+timedelta(hours=3)).isoformat()
+    assert scan.Ledger().reserve_api_credits(11,20)
+    def handle(request):
+        assert request.url.path.endswith('/events')
+        return httpx.Response(200,json=events['nfl'])
+    transport(monkeypatch,handle)
+    report=(await scan.run(['nfl'],20,frozenset({'nfl0'})))['nfl']
+    assert report['budget_reasons']=={'pregame_credit_reserve':1}
+    assert report['attempted_events']==0 and not evaluated

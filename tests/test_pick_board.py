@@ -169,3 +169,32 @@ def test_published_fixture_matches_the_frontend_contract():
         record['outcome_ref'],record['outcome_observed_at'],record['actual_value'],record['outcome_evidence'])
     assert build_pick_board([record],record['sport'],datetime.fromisoformat(board['generated_at']))==board
     assert board['history'][0]['actual_value']==0
+
+
+def test_staged_reserve_can_capture_a_verified_pick_before_unchanged_board_lock(tmp_path):
+    import json
+    from pathlib import Path
+    from sportsbet.ledger import Ledger, quote_evidence_valid
+    from sportsbet.scan import event_credit_holdback, next_quote_check, prop_credit_holdback
+    fixture=json.loads(Path('tests/fixtures/pick_board_contract.json').read_text(encoding='utf-8'))
+    record=fixture['record']
+    captured=datetime.fromisoformat(record['captured_at'])
+    start=datetime.fromisoformat(record['game_start_time'])
+    event={'commence_time':start.isoformat()}
+    assert captured==start-timedelta(hours=2)
+    assert quote_evidence_valid(record)  # Real source commitment; no evidence validator is mocked.
+    assert next_quote_check(event,(captured-timedelta(minutes=30)).isoformat(),captured)==captured
+    ledger=Ledger(tmp_path/'prelock.sqlite')
+    assert ledger.reserve_api_credits(11,20)
+    held=prop_credit_holdback(['nfl'],20)
+    assert not ledger.reserve_api_credits(4,20,held)  # Previous all-or-nothing reserve blocks this capture.
+    assert ledger.reserve_api_credits(4,20,event_credit_holdback(event,held,captured))
+    board=build_pick_board([record],'nfl',start-timedelta(minutes=30))
+    assert len(board['current'])==1
+    assert board['current'][0]['prediction_id']==record['prediction_id']
+    assert board['current'][0]['board_state']=='locked'
+    assert board['selection_policy_version']=='pregame-t60-v1'
+    # One check remains protected before the lock, then fits within the same cap after it.
+    assert not ledger.reserve_api_credits(4,20,event_credit_holdback(event,held,captured))
+    assert ledger.reserve_api_credits(4,20,event_credit_holdback(event,held,start-timedelta(minutes=30)))
+    assert not ledger.reserve_api_credits(4,20)

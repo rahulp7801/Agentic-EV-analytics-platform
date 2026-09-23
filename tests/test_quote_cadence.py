@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import pytest
-from sportsbet.scan import next_quote_check, prop_credit_holdback
+from sportsbet.scan import next_quote_check, prop_credit_holdback, event_credit_holdback
 from sportsbet.ledger import Ledger
 
 NOW=datetime(2026,9,20,12,tzinfo=timezone.utc)
@@ -10,7 +10,7 @@ def test_quote_requests_are_spaced_by_kickoff_distance(hours,interval):
     event={'commence_time':(NOW+timedelta(hours=hours)).isoformat()}
     assert next_quote_check(event,NOW.isoformat(),NOW)==NOW+timedelta(minutes=interval)
 
-@pytest.mark.parametrize('hours',[6,1])
+@pytest.mark.parametrize('hours',[6,2,1])
 def test_entering_closer_kickoff_phase_requests_a_new_quote(hours):
     event={'commence_time':(NOW+timedelta(hours=hours)).isoformat()}
     assert next_quote_check(event,(NOW-timedelta(minutes=1)).isoformat(),NOW)==NOW
@@ -41,7 +41,6 @@ def test_rolling_budget_also_retains_pregame_credits(tmp_path,monkeypatch):
     assert ledger.reserve_api_credits(4,25,holdback=8)
     assert not ledger.reserve_api_credits(1,25,holdback=8)
     assert ledger.reserve_api_credits(8,25)
-
 
 
 @pytest.mark.parametrize('daily,older,rolling_limit,holdback,expected',[
@@ -85,3 +84,49 @@ def test_invalid_credit_requests_have_no_reservation(tmp_path,cost,limit,holdbac
     assert ledger.reserve_api_credits_with_reason(cost,limit,holdback)==(False,'invalid_credit_request')
     with ledger.connect() as db:
         assert db.execute('SELECT count(*) FROM api_usage').fetchone()[0]==0
+
+
+@pytest.mark.parametrize('sports,width', [(['nba'],3),(['nfl'],4),(['cfb'],4),(['nba','nfl','cfb'],4)])
+@pytest.mark.parametrize('minutes,fraction',[(121,2),(120,1),(90,1),(61,1),(60,0),(30,0)])
+def test_reserve_releases_one_check_before_board_lock(sports,width,minutes,fraction):
+    event={'commence_time':(NOW+timedelta(minutes=minutes)).isoformat()}
+    held=prop_credit_holdback(sports,20)
+    assert held==2*width
+    assert event_credit_holdback(event,held,NOW)==fraction*width
+    assert event_credit_holdback(event,0,NOW)==0
+
+
+def test_cadence_targets_prelock_transition_after_an_earlier_quote():
+    event={'commence_time':(NOW+timedelta(hours=3)).isoformat()}
+    assert next_quote_check(event,NOW.isoformat(),NOW)==NOW+timedelta(hours=1)
+    transition=NOW+timedelta(hours=1)
+    assert next_quote_check(event,NOW.isoformat(),transition)==transition
+    assert next_quote_check(event,transition.isoformat(),transition)==NOW+timedelta(hours=2)
+
+
+@pytest.mark.parametrize('delay',range(30))
+def test_half_hour_scheduler_has_time_to_capture_before_board_lock(delay):
+    from sportsbet.picks import LOCK_BEFORE_START
+    from sportsbet.scan import PRELOCK_QUOTE_WINDOW
+    start=NOW+timedelta(hours=4)
+    event={'commence_time':start.isoformat()}
+    tick=start-PRELOCK_QUOTE_WINDOW+timedelta(minutes=delay)
+    assert next_quote_check(event,NOW.isoformat(),tick)<=tick
+    assert event_credit_holdback(event,8,tick)==4
+    # Even a full 20-minute worker runtime fits before T-60 for each cron phase.
+    assert tick+timedelta(minutes=20)<start-LOCK_BEFORE_START
+
+
+@pytest.mark.parametrize('rolling_limit,older,expected',[(450,0,True),(18,0,False),(450,432,False)])
+def test_prelock_release_still_enforces_daily_and_rolling_reserves(tmp_path,monkeypatch,rolling_limit,older,expected):
+    from sportsbet.config import settings
+    monkeypatch.setattr(settings,'odds_rolling_credit_limit',rolling_limit)
+    ledger=Ledger(tmp_path/'staged.sqlite');today=datetime.now(timezone.utc).date()
+    with ledger.connect() as db:
+        db.execute('INSERT INTO api_usage VALUES (?,?)',(today.isoformat(),11))
+        db.execute('INSERT INTO api_usage VALUES (?,?)',((today-timedelta(days=1)).isoformat(),older))
+    event={'commence_time':(NOW+timedelta(minutes=90)).isoformat()}
+    held=event_credit_holdback(event,8,NOW)
+    assert ledger.reserve_api_credits(4,20,held)==expected
+    with ledger.connect() as db:
+        assert db.execute('SELECT credits FROM api_usage WHERE risk_day=?',(today.isoformat(),)).fetchone()[0]==11+4*expected
