@@ -1,0 +1,189 @@
+{
+  "apply": {
+    "accepted_forecasts": 0,
+    "applied_results": 201,
+    "bundle_sha256": "2bcdd084008be90e4e6197b55bd6b9df85555ee49bcfe82b9ef8c26200250f5a",
+    "did_not_play_pending": 12,
+    "mode": "applied",
+    "observed_at": "2026-09-23T22:20:23.501944+00:00",
+    "outcomes": {
+      "False": 101,
+      "True": 100
+    },
+    "players": {
+      "did_not_play": 2,
+      "verified_explicit_stats": 8
+    },
+    "proposed_results": 201,
+    "source_player_results": [
+      {
+        "espn_player_id": "3911853",
+        "event": "401872940",
+        "player_id": "00-0036422",
+        "stats": {
+          "passing_yards": null,
+          "player_id": "00-0036422",
+          "receiving_yards": 0,
+          "receptions": 0,
+          "rushing_yards": null,
+          "season": 2026,
+          "team": "DEN",
+          "week": 2
+        },
+        "status": "verified_explicit_stats"
+      },
+      {
+        "espn_player_id": "3127310",
+        "event": "401872934",
+        "player_id": "00-0035631",
+        "stats": {
+          "passing_yards": null,
+          "player_id": "00-0035631",
+          "receiving_yards": 0,
+          "receptions": 0,
+          "rushing_yards": null,
+          "season": 2026,
+          "team": "CIN",
+          "week": 2
+        },
+        "status": "verified_explicit_stats"
+      },
+      {
+        "espn_player_id": "4430834",
+        "event": "401872935",
+        "player_id": "00-0039855",
+        "stats": {
+          "passing_yards": null,
+          "player_id": "00-0039855",
+          "receiving_yards": 0,
+          "receptions": 0,
+          "rushing_yards": null,
+          "season": 2026,
+          "team": "TB",
+          "week": 2
+        },
+        "status": "verified_explicit_stats"
+      },
+      {
+        "espn_player_id": "3886598",
+        "event": "401872937",
+        "player_id": "00-0036259",
+        "stats": null,
+        "status": "did_not_play"
+      },
+      {
+        "espn_player_id": "3054212",
+        "event": "401872936",
+        "player_id": "00-0033858",
+        "stats": {
+          "passing_yards": null,
+          "player_id": "00-0033858",
+          "receiving_yards": 0,
+          "receptions": 0,
+          "rushing_yards": null,
+          "season": 2026,
+          "team": "GB",
+          "week": 2
+        },
+        "status": "verified_explicit_stats"
+      },
+      {
+        "espn_player_id": "4808766",
+        "event": "401872936",
+        "player_id": "00-0040736",
+        "stats": {
+          "passing_yards": null,
+          "player_id": "00-0040736",
+          "receiving_yards": 0,
+          "receptions": 0,
+          "rushing_yards": null,
+          "season": 2026,
+          "team": "NYJ",
+          "week": 2
+        },
+        "status": "verified_explicit_stats"
+      },
+      {
+        "espn_player_id": "3116164",
+        "event": "401872934",
+        "player_id": "00-0034829",
+        "stats": {
+          "passing_yards": null,
+          "player_id": "00-0034829",
+          "receiving_yards": 0,
+          "receptions": 0,
+          "rushing_yards": null,
+          "season": 2026,
+          "team": "CIN",
+          "week": 2
+        },
+        "status": "verified_explicit_stats"
+      },
+      {
+        "espn_player_id": "16733",
+        "event": "401872947",
+        "player_id": "00-0031235",
+        "stats": {
+          "passing_yards": null,
+          "player_id": "00-0031235",
+          "receiving_yards": 0,
+          "receptions": 0,
+          "rushing_yards": null,
+          "season": 2026,
+          "team": "NYG",
+          "week": 2
+        },
+        "status": "verified_explicit_stats"
+      },
+      {
+        "espn_player_id": "4426515",
+        "event": "401872947",
+        "player_id": "00-0039075",
+        "stats": null,
+        "status": "did_not_play"
+      },
+      {
+        "espn_player_id": "2573401",
+        "event": "401872947",
+        "player_id": "00-0033110",
+        "stats": {
+          "passing_yards": null,
+          "player_id": "00-0033110",
+          "receiving_yards": 0,
+          "receptions": 0,
+          "rushing_yards": null,
+          "season": 2026,
+          "team": "LA",
+          "week": 2
+        },
+        "status": "verified_explicit_stats"
+      }
+    ]
+  },
+  "verification": {
+    "verified_at": "2026-09-23T22:21:37.532809+00:00",
+    "saved_results": 201,
+    "valid_settlement_proofs": 201,
+    "independently_reproduced_from_archived_sources": 201,
+    "immutable_prediction_count": 11328,
+    "immutable_payloads_unchanged": true,
+    "nfl_history_rows": 56645,
+    "nfl_history_unchanged": true,
+    "remaining_pending_by_date": {
+      "2026-09-14": 708,
+      "2026-09-20": 4,
+      "2026-09-21": 8
+    }
+  },
+  "public_metrics": {
+    "sample_size": 5403,
+    "settled_count": 5284,
+    "pending_count": 119,
+    "unverified_settlements": 0,
+    "excluded_missing_metadata": 708,
+    "duplicate_predictions": 6128,
+    "model_version": "empirical-jeffreys-v4"
+  },
+  "production_ci_run": "https://github.com/rahulp7801/agentic-sports-forecaster/actions/runs/35927718999",
+  "production_commit": "692b92cced31370a0aeceaf352164f55275dc6cc"
+}
