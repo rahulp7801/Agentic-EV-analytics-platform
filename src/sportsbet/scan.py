@@ -20,7 +20,7 @@ from sportsbet.ledger import Ledger
 from sportsbet.model_contract import MODEL_VERSION
 from sportsbet.prop.agents import make_prop_quant_agent
 from sportsbet.prop.availability import (blocks_unadjusted_teammate_context,
-                                         fetch_event_availability, player_availability)
+                                         fetch_event_availability, player_availability, nfl_roster_history_bindings)
 from sportsbet.prop.injury_context import historical_availability_splits, relevant_availability_reports
 from sportsbet.prop.ngs_evidence import load_ngs_evidence
 from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
@@ -336,21 +336,39 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     identity_column='athlete_id' if sport=='cfb' else 'player_id'
     quoted_players=sorted({selection[0] for selection in selections})
     normalized_players=sorted({player.lower() for player in quoted_players})
+    bindings=nfl_roster_history_bindings(availability,event,datetime.now(timezone.utc)) if sport=='nfl' else {}
+    history_ids=sorted({bindings[player]['history_player_id'] for player in quoted_players if player in bindings})
+    identity_evidence={}
     if normalized_players:
         async with pool.acquire() as conn:
             rows=await conn.fetch(f'''SELECT LOWER(player_name) AS normalized_name,
                 {identity_column}::text AS player_id FROM {table}
-                WHERE LOWER(player_name)=ANY($1::text[])
-                GROUP BY LOWER(player_name),{identity_column}''',normalized_players)
+                WHERE LOWER(player_name)=ANY($1::text[]) OR {identity_column}::text=ANY($2::text[])
+                GROUP BY LOWER(player_name),{identity_column}''',normalized_players,history_ids)
         identities={name: set() for name in normalized_players}
+        observed_ids=set()
         for row in rows:
             name=row['normalized_name'];identity=row['player_id']
-            if name in identities and isinstance(identity,str) and identity:
-                identities[name].add(identity)
+            if isinstance(identity,str) and identity:
+                observed_ids.add(identity)
+                if name in identities:
+                    identities[name].add(identity)
         for player in quoted_players:
             matches=identities[player.lower()]
-            if len(matches)==1:
+            binding=bindings.get(player)
+            verified_id=binding['history_player_id'] if binding else None
+            if verified_id and verified_id in observed_ids:
+                if not matches or matches=={verified_id}:
+                    player_ids[player]=verified_id
+                    identity_evidence[player]=binding
+            elif len(matches)==1 and verified_id is None:
                 player_ids[player]=next(iter(matches))
+        # Distinct quoted names cannot acquire separate risk slots for one athlete.
+        repeated=Counter(player_ids.values())
+        for player,identity in list(player_ids.items()):
+            if repeated[identity]>1:
+                del player_ids[player]
+                identity_evidence.pop(player,None)
     prepared=[]
     selection_time=datetime.now(timezone.utc)
     for player,market,line,side in selections:
@@ -474,6 +492,8 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version=MODEL_VERSION,
             recommendation_policy_version=RECOMMENDATION_POLICY_VERSION,
             **paired_market_baseline(quote, quotes))
+        if player in identity_evidence:
+            payload['player_identity_evidence']=identity_evidence[player]
         counts[reason] += 1
         # Publish every measured forecast, including non-recommended estimates.
         # Availability screens eligibility; v4 remains an unchanged historical baseline.

@@ -8,7 +8,7 @@ import pytest
 from sportsbet.prop.availability import NFL_PLAYER_IDS_URL, fetch_event_availability, player_availability
 
 
-@pytest.mark.parametrize('defect', [None, 'duplicate_gsis', 'duplicate_espn', 'missing_columns', 'evil_redirect', 'http_redirect', 'credential_redirect', 'malformed_redirect', 'denied','not_requested'])
+@pytest.mark.parametrize('defect', [None, 'duplicate_gsis', 'duplicate_espn', 'missing_columns', 'evil_redirect', 'http_redirect', 'credential_redirect', 'malformed_redirect', 'denied','not_requested','exact_requested'])
 async def test_crosswalk_binds_exact_player_ids_and_unknown_identity_never_borrows_history(defect,tmp_path,monkeypatch):
     monkeypatch.chdir(tmp_path)
     now=datetime.now(timezone.utc)
@@ -41,10 +41,10 @@ async def test_crosswalk_binds_exact_player_ids_and_unknown_identity_never_borro
     with patch('sportsbet.prop.availability.httpx.AsyncClient',
         lambda **kwargs:original(**kwargs,transport=httpx.MockTransport(handle))):
         result=await fetch_event_availability(dict(id='event',home_team='Home',away_team='Away'),'nfl',
-            player_names={'James Cook III' if defect=='not_requested' else 'James Cook'})
+            player_names=None if defect=='not_requested' else {'James Cook III' if defect=='exact_requested' else 'James Cook'})
     assert result['status']=='observed'
     evidence,reason=player_availability(result,'James Cook',now,player_id='00-0037248')
-    if defect:
+    if defect and defect!='exact_requested':
         assert reason=='roster_unconfirmed' and evidence['status']=='unavailable'
         assert all(httpx.URL(url).host in ('github.com','site.api.espn.com') for url in requests)
         if defect=='not_requested':assert not any(httpx.URL(url).host=='github.com' for url in requests)
