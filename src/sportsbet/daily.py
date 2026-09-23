@@ -120,9 +120,10 @@ def create_daily_graph():
                 public_provider='public' if state['mode']=='public_daily' else 'kalshi'
                 summary,_=await watch(sport,state['daily_credit_limit'],DEFAULT_GAME_LIMIT,True,
                     **({'provider':public_provider} if public else {'credit_holdback':market_holdback,'sportsbook_cadence_hours':6}))
-                complete = bool(summary['sources']) and all(
+                requested=[source for source in summary['sources'].values() if source['status']!='not_requested']
+                complete = bool(requested) and all(
                     source['status']=='observed' and not source.get('partial_coverage',True)
-                    for source in summary['sources'].values()
+                    for source in requested
                 )
                 status='complete' if complete else 'degraded'
                 if public:
@@ -223,7 +224,7 @@ def create_daily_graph():
 
 
 async def run(sports: list[str], mode: str, daily_credit_limit: int):
-    if not sports or len(sports)!=len(set(sports)) or any(s not in ('nba','nfl') for s in sports) or mode not in MODES or daily_credit_limit<1:
+    if not sports or len(sports)!=len(set(sports)) or any(s not in ('nba','nfl','cfb') for s in sports) or mode not in MODES or daily_credit_limit<1 or (mode.startswith('public_') and 'cfb' in sports):
         raise ValueError('Invalid pipeline request')
     return (await create_daily_graph().ainvoke(dict(sports=sports,mode=mode,daily_credit_limit=daily_credit_limit)))['report']
 
@@ -238,13 +239,14 @@ def _write_report(path: str, report: dict) -> None:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--sport',choices=['nba','nfl','both'],default='both')
+    parser.add_argument('--sport',choices=['nba','nfl','cfb','both','all'],default='both')
     parser.add_argument('--mode',choices=MODES,default='daily')
     parser.add_argument('--daily-credit-limit',type=int,default=25)
     parser.add_argument('--report-output',help='Write the final machine-readable report to this file')
     args=parser.parse_args()
     try:
-        report=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.mode,args.daily_credit_limit))
+        sports=['nfl','nba'] if args.sport=='both' else ['nfl','nba','cfb'] if args.sport=='all' else [args.sport]
+        report=asyncio.run(run(sports,args.mode,args.daily_credit_limit))
         if args.report_output:
             _write_report(args.report_output,report)
         print(json.dumps(report))

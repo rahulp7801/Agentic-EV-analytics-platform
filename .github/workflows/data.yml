@@ -8,7 +8,7 @@ on:
         default: daily
       sport:
         type: choice
-        options: [both, nfl, nba, cfb]
+        options: [both, all, nfl, nba, cfb]
         default: both
       provider:
         description: 'Provider for watch only; leave all for other operations'
@@ -45,7 +45,7 @@ jobs:
     timeout-minutes: 20
     environment: production
     env:
-      SPORT: ${{ inputs.sport || (github.event.schedule == '29 10,22 * * *' && 'nfl' || 'both') }}
+      SPORT: ${{ inputs.sport || (github.event.schedule == '29 10,22 * * *' && 'nfl' || (github.event.schedule == '17 13 * * *' || vars.DATA_PIPELINE_ENABLED == 'true') && 'all' || 'both') }}
       # The daily run refreshes history and settlements. Half-hour runs use the
       # quota-aware prop scanner when recommendations are enabled; otherwise
       # they retain the lower-cost provider monitor.
@@ -77,12 +77,16 @@ jobs:
             echo 'Provider selection is supported only for watch operations.'
             exit 1
           fi
-          if [ -n "$EVENT_IDS" ] && { [ "$OPERATION" != scan ] || [ "$SPORT" = both ]; }; then
+          if [ -n "$EVENT_IDS" ] && { [ "$OPERATION" != scan ] || [ "$SPORT" = both ] || [ "$SPORT" = all ]; }; then
             echo 'Targeted events require a single-sport scan operation.'
             exit 1
           fi
-          if [ "$SPORT" = cfb ] && [ "$OPERATION" != watch ] && [ "$OPERATION" != scan ] && [ "$OPERATION" != refresh ] && [ "$OPERATION" != backfill ]; then
-            echo 'CFB currently supports manual sportsbook watch, scan, and source-backed history refresh operations.'
+          if [ "$SPORT" = cfb ] && [ "$OPERATION" != watch ] && [ "$OPERATION" != scan ] && [ "$OPERATION" != refresh ] && [ "$OPERATION" != backfill ] && [ "$OPERATION" != daily ] && [ "$OPERATION" != monitor ]; then
+            echo 'CFB supports paid daily, monitor, scan, watch, and history refresh operations.'
+            exit 1
+          fi
+          if [ "$SPORT" = all ] && [ "$OPERATION" != daily ] && [ "$OPERATION" != monitor ] && [ "$OPERATION" != scan ]; then
+            echo 'All-sport collection supports paid daily, monitor, and scan operations.'
             exit 1
           fi
           if [ "$SPORT" = cfb ] && [ "$PROVIDER" != sportsbook ] && [ "$PROVIDER" != all ]; then
@@ -136,9 +140,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
-        run: uv run --locked python -m sportsbet.player_profiles --sport "$SPORT"
+        run: |
+          profile_sport="$SPORT"
+          if [ "$SPORT" = all ]; then profile_sport=both; fi
+          uv run --locked python -m sportsbet.player_profiles --sport "$profile_sport"
       - name: Score prospective NFL market edge
-        if: env.OPERATION == 'daily' && (env.SPORT == 'both' || env.SPORT == 'nfl')
+        if: env.OPERATION == 'daily' && (env.SPORT == 'both' || env.SPORT == 'all' || env.SPORT == 'nfl')
         timeout-minutes: 10
         env:
           ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -187,7 +194,7 @@ jobs:
                             f'CLV observations: {performance.get("clv_count", 0)}.\n')
           PY
       - name: Retain prospective NFL edge checkpoint
-        if: always() && env.OPERATION == 'daily' && (env.SPORT == 'both' || env.SPORT == 'nfl')
+        if: always() && env.OPERATION == 'daily' && (env.SPORT == 'both' || env.SPORT == 'all' || env.SPORT == 'nfl')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nfl-edge-checkpoint-${{ github.run_id }}
