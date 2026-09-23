@@ -77,3 +77,13 @@ export function bestPickOptions(value:unknown,now=Date.now()) {
 export function bestPicks(value:unknown,now=Date.now()) {
   return bestPickGroups(value,now).map(group=>group.pick);
 }
+
+/** Preserve the first ranked record per player, including an already displayed watchlist. */
+export function researchPlayerPreview(ranked:EVSignal[],maximum=4):EVSignal[] {
+  const players=new Set<string>();
+  return ranked.filter(signal=>{
+    const key=`${signal.sport}:${signal.player}`;
+    if(players.has(key)) return false;
+    players.add(key);return true;
+  }).slice(0,maximum);
+}
