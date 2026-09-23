@@ -320,3 +320,31 @@ async def test_public_failure_is_visible_without_suppressing_other_stages(monkey
     assert set(result['schedules'])==set(result['histories'])=={'nfl','nba'}
     props.assert_not_called()
     assert stored['pipeline:public_daily']['status']=='degraded'
+
+
+@pytest.mark.asyncio
+async def test_paid_daily_cfb_refreshes_settles_and_scans_without_public_sources(monkeypatch):
+    calls=[]; stored={}
+    monkeypatch.setattr(daily,'publish_snapshot',lambda key,value:stored.update({key:deepcopy(value)}))
+    monkeypatch.setattr(daily,'refresh_history',lambda sport,day:(calls.append(('refresh',sport)) or {'status':'complete'}))
+    monkeypatch.setattr(daily,'settle_final_props',lambda ledger,sport,schedule:
+        (calls.append(('settle',sport)) or {'status':'complete','settled':0,'pending':0}))
+    async def watch(sport,limit,count,publish,**kwargs):
+        calls.append(('watch',sport))
+        return {'sources':{'sportsbook':{'status':'observed','partial_coverage':False},
+            'kalshi':{'status':'not_requested','partial_coverage':True},
+            'prizepicks':{'status':'not_requested','partial_coverage':True}},
+            'captured_at':datetime.now(timezone.utc).isoformat()},None
+    async def scan(sports,limit):
+        assert sports==['cfb'] and ('settle','cfb') in calls and ('watch','cfb') in calls
+        calls.append(('scan','cfb'))
+        return {'cfb':{'status':'complete'}}
+    monkeypatch.setattr(daily,'watch',watch)
+    monkeypatch.setattr(daily,'scan',scan)
+    report=await daily.run(['cfb'],'daily',25)
+    assert report['status']=='complete'
+    assert report['markets']['cfb']['status']=='complete'
+    assert stored['picks:cfb']['selection_policy_version']=='pregame-t60-v1'
+    assert calls.index(('refresh','cfb'))<calls.index(('settle','cfb'))<calls.index(('scan','cfb'))
+    with pytest.raises(ValueError):
+        await daily.run(['cfb'],'public_daily',25)

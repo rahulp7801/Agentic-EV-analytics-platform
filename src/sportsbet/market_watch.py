@@ -112,7 +112,7 @@ async def sportsbooks(sport: str, daily_credit_limit: int, credit_holdback: int 
         if response.status_code != 200:
             raise RuntimeError(f'Quote provider HTTP {response.status_code}')
     return dict(status='observed', received_at=datetime.now(timezone.utc).isoformat(),
-        events=response.json(), response_sha256=hashlib.sha256(response.content).hexdigest())
+        events=response.json(), partial_coverage=False, response_sha256=hashlib.sha256(response.content).hexdigest())
 
 
 async def discover_kalshi_games(reader: KalshiReader, sport: str, now: datetime):

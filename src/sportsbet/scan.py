@@ -680,12 +680,13 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--sport',choices=['nba','nfl','cfb','both'],default='both')
+    parser.add_argument('--sport',choices=['nba','nfl','cfb','both','all'],default='both')
     parser.add_argument('--daily-credit-limit',type=int,default=25)
     parser.add_argument('--event-id',action='append',default=[],help='Refresh only this discovered pregame event; repeat at most ten times')
     args=parser.parse_args()
     try:
-        reports=asyncio.run(run(['nfl','nba'] if args.sport=='both' else [args.sport],args.daily_credit_limit,
+        sports=['nfl','nba'] if args.sport=='both' else ['nfl','nba','cfb'] if args.sport=='all' else [args.sport]
+        reports=asyncio.run(run(sports,args.daily_credit_limit,
             frozenset(args.event_id) if args.event_id else None))
         print(json.dumps({s:{k:v for k,v in r.items() if k not in ('attempts','coverage')} for s,r in reports.items()}))
         if not reports or any(r['status'] not in ('complete','scheduled') for r in reports.values()):
