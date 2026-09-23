@@ -1,0 +1,139 @@
+{
+  "observed_at": "2026-09-23T21:00:57.798064+00:00",
+  "schedule_status": "complete",
+  "past_unsettled_forecasts": 921,
+  "accepted_forecasts": 0,
+  "reasons": {
+    "stat_not_found_or_ambiguous": 213,
+    "Invalid prediction game identity": 708
+  },
+  "by_date": {
+    "2026-09-14": 708,
+    "2026-09-20": 151,
+    "2026-09-21": 62
+  },
+  "missing_stat_players": [
+    {
+      "date": "2026-09-20",
+      "player": "Adam Trautman",
+      "player_id": "00-0036422",
+      "espn_event_id": "401872940",
+      "forecasts": 16,
+      "markets": [
+        "rec_yds",
+        "receptions"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "player": "Drew Sample",
+      "player_id": "00-0035631",
+      "espn_event_id": "401872934",
+      "forecasts": 10,
+      "markets": [
+        "rec_yds",
+        "receptions"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "player": "Jalen McMillan",
+      "player_id": "00-0039855",
+      "espn_event_id": "401872935",
+      "forecasts": 29,
+      "markets": [
+        "rec_yds",
+        "receptions"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "player": "Jauan Jennings",
+      "player_id": "00-0036259",
+      "espn_event_id": "401872937",
+      "forecasts": 4,
+      "markets": [
+        "rec_yds",
+        "receptions"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "player": "Jonnu Smith",
+      "player_id": "00-0033858",
+      "espn_event_id": "401872936",
+      "forecasts": 30,
+      "markets": [
+        "rec_yds",
+        "receptions"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "player": "Mason Taylor",
+      "player_id": "00-0040736",
+      "espn_event_id": "401872936",
+      "forecasts": 28,
+      "markets": [
+        "rec_yds",
+        "receptions"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "player": "Mike Gesicki",
+      "player_id": "00-0034829",
+      "espn_event_id": "401872934",
+      "forecasts": 34,
+      "markets": [
+        "rec_yds",
+        "receptions"
+      ]
+    },
+    {
+      "date": "2026-09-21",
+      "player": "Odell Beckham Jr.",
+      "player_id": "00-0031235",
+      "espn_event_id": "401872947",
+      "forecasts": 28,
+      "markets": [
+        "rec_yds",
+        "receptions"
+      ]
+    },
+    {
+      "date": "2026-09-21",
+      "player": "Puka Nacua",
+      "player_id": "00-0039075",
+      "espn_event_id": "401872947",
+      "forecasts": 8,
+      "markets": [
+        "receptions",
+        "rec_yds"
+      ]
+    },
+    {
+      "date": "2026-09-21",
+      "player": "Tyler Higbee",
+      "player_id": "00-0033110",
+      "espn_event_id": "401872947",
+      "forecasts": 26,
+      "markets": [
+        "receptions",
+        "rec_yds"
+      ]
+    }
+  ],
+  "catchup_check": {
+    "observed_at": "2026-09-23T21:07:23.082025+00:00",
+    "before_offsets": [
+      -9
+    ],
+    "after_offsets": [],
+    "source": "same read-only repeatable-read hosted ledger snapshot"
+  },
+  "local_evidence_hashes": {
+    "settlement-backlog-audit.json": "7efc77c07d7436953e715c2e1afcdc72bbbf209a19002b8fb04f157162f392ba",
+    "settlement-backlog-schedule.json": "48a71a68fce9b3b1439c918a7f8c2dd5a5e8f8fb73e7d2782f23c7756e10a90e"
+  }
+}
