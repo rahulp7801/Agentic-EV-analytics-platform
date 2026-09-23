@@ -1,0 +1,65 @@
+{
+  "checked_at": "2026-09-23T20:31:44.194176+00:00",
+  "mode": "read_only_expired_quote_replay",
+  "quote_captured_at": "2026-09-23T01:43:06.027840+00:00",
+  "source_payload_sha256": "9283b50a8379b55286e3291e8b398d02afe72424518f9bd7d7ca20ebaeb442be",
+  "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+  "cutoff": "2026-09-24",
+  "season_floor": 2024,
+  "quoted_players": 14,
+  "resolved_players": 14,
+  "originally_exact_name_players": 13,
+  "selections": 111,
+  "unique_model_queries": 56,
+  "query_seconds": 1.03,
+  "coverage": {
+    "below_sample_floor": 37,
+    "sample_floor_met": 74
+  },
+  "recovered_players": [
+    {
+      "player": "Brian Robinson Jr.",
+      "history_player_id": "00-0037746",
+      "source_binding": {
+        "method": "exact_roster_crosswalk",
+        "history_player_id": "00-0037746",
+        "roster_player_id": "4241474",
+        "roster_player_name": "Brian Robinson Jr.",
+        "team": "Atlanta Falcons",
+        "roster_source_url": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/1/roster",
+        "roster_source_sha256": "0d900dadf73ccd024f24147eccc07c069f30edd4fde9f2510a75fe7071ad12a1",
+        "identity_source_url": "https://github.com/nflverse/nflverse-data/releases/download/players/players.csv",
+        "identity_source_sha256": "4dd70f328f31b0bb7cbf043412298d5a325863e27b8f2eeea22c9e925c808dee",
+        "captured_at": "2026-09-23T20:31:38.779782+00:00",
+        "identity_retrieved_at": "2026-09-23T20:31:38.779782+00:00"
+      },
+      "models": [
+        {
+          "player": "Brian Robinson Jr.",
+          "market": "player_rush_yds",
+          "line": 22.5,
+          "sample_size": 33,
+          "estimate_available": true,
+          "error": null
+        },
+        {
+          "player": "Brian Robinson Jr.",
+          "market": "player_rush_yds",
+          "line": 23.5,
+          "sample_size": 33,
+          "estimate_available": true,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "published_forecasts": 0,
+  "provider_quote_requests": 0,
+  "budget_checkpoint": {
+    "daily_used": 11,
+    "daily_cap": 20,
+    "rolling_used": 310,
+    "rolling_cap": 450,
+    "read_only": true
+  }
+}
