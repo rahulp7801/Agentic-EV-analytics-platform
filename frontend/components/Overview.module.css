@@ -195,3 +195,5 @@
 .recentContext strong { display:block;font-size:11px; }
 .recentContext p { margin-top:5px;color:var(--text-secondary);font-size:10px;line-height:1.5; }
 .recentContext small { display:block;margin-top:7px;color:var(--text-muted);font-size:10px;line-height:1.5; }
+
+.slateActions { display:flex;flex-wrap:wrap;gap:10px;align-items:center; }
