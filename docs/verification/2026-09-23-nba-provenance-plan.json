@@ -1,0 +1,37 @@
+[
+  {
+    "season": 2024,
+    "stored_rows": 26306,
+    "official_rows": 26306,
+    "counts": {
+      "recoverable": 26306,
+      "name_updates": 198
+    },
+    "mismatch_fields": {},
+    "values_sha256": "255e27d335edb068aaeb61f779c5c69dab06332aeeea315c73bc57bf5b126433",
+    "normalized_source_sha256": "7ad9338f3e09787bc97888dd360e045a716b6c6e61ba73d29be4232653e94128",
+    "source_observed_at": "2026-09-23T18:53:09.649610+00:00",
+    "applied": false,
+    "updated_rows": 0,
+    "raw_response_sha256": "800998e6cf6918b64434fe24ec8ed5472092d71f755a4a5173d4752ed9f597a4",
+    "source_url": "https://stats.nba.com/stats/playergamelogs"
+  },
+  {
+    "season": 2025,
+    "stored_rows": 26651,
+    "official_rows": 26651,
+    "counts": {
+      "recoverable": 26651,
+      "timestamp_only_recovered": 26651,
+      "name_updates": 0
+    },
+    "mismatch_fields": {},
+    "values_sha256": "7ea05309dc6e26bd05a7a84cd2cb3d0db5e173e098f0b325fb5a3926aa443f37",
+    "normalized_source_sha256": "e23a2f2f77321bd7f92055818773b284e286cf5f0f89d3598000c7f484b25279",
+    "source_observed_at": "2026-09-23T18:51:38.400519+00:00",
+    "applied": false,
+    "updated_rows": 0,
+    "raw_response_sha256": "af8b582e0e2ee25ad659a0cc8abdc774c577cb474b531650293a4ac9d6ecc5de",
+    "source_url": "https://stats.nba.com/stats/playergamelogs"
+  }
+]
