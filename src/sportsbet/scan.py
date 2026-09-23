@@ -576,7 +576,11 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                         continue
                     cache_owned=True
                     close=timestamp(event['commence_time'])-datetime.now(timezone.utc)<=timedelta(hours=1)
-                    if not ledger.reserve_api_credits(len(MARKETS[sport]),daily_credit_limit,holdback=0 if close else held):
+                    # An explicit one-event operator scan may use today's unspent free credits.
+                    # The atomic daily and rolling ceilings still apply; automatic scans
+                    # retain the pregame reserve for later repricing.
+                    holdback=0 if close or event_ids is not None else held
+                    if not ledger.reserve_api_credits(len(MARKETS[sport]),daily_credit_limit,holdback=holdback):
                         cache.release(quote_key,'the_odds_api',sport,scan_id)
                         cache_owned=False
                         event_state['state']='api_budget'

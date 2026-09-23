@@ -342,6 +342,27 @@ async def test_targeted_operator_scan_refreshes_one_exact_event_without_loosenin
 
 
 @pytest.mark.asyncio
+async def test_targeted_scan_uses_unspent_credits_but_keeps_hard_daily_cap(monkeypatch,worker):
+    stored,events,evaluated,_=worker
+    assert scan.Ledger().reserve_api_credits(11,20)
+    requests=[]
+    def handle(request):
+        requests.append(request.url.path)
+        if request.url.path.endswith('/events'):return httpx.Response(200,json=events['nfl'])
+        return httpx.Response(200,json=next(e for e in events['nfl'] if e['id'] in request.url.path))
+    transport(monkeypatch,handle)
+    automatic=(await scan.run(['nfl'],20))['nfl']
+    assert automatic['budget_skipped_events']==2 and not evaluated
+    targeted=(await scan.run(['nfl'],20,frozenset({'nfl0'})))['nfl']
+    assert targeted['completed_events']==1 and targeted['budget_skipped_events']==0
+    assert evaluated==['nfl0']
+    assert requests.count('/v4/sports/americanfootball_nfl/events/nfl0/odds')==1
+    assert not scan.Ledger().reserve_api_credits(6,20)
+    assert scan.Ledger().reserve_api_credits(5,20)
+    assert not scan.Ledger().reserve_api_credits(1,20)
+
+
+@pytest.mark.asyncio
 async def test_signal_snapshot_restores_lost_cadence_without_spending_again(monkeypatch,worker):
     stored,events,evaluated,_=worker
     now=datetime.now(timezone.utc)
