@@ -20,6 +20,7 @@ from sportsbet.ledger import (
     verified_settlement_evidence,
 )
 from sportsbet.model_contract import QUOTE_PROVENANCE_MODEL_VERSIONS
+from sportsbet.quant.market_baseline import verified_recorded_market_baseline
 
 
 def _implied(odds: int) -> float:
@@ -111,9 +112,15 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
         flat_return.append((row["american_odds"]/100 if row["american_odds"] > 0 else 100/-row["american_odds"]) if y else -1)
         other = "under" if row["direction"] == "over" else "over"
         opposite_prices = quotes[_quote_key(row)].get(other, set())
-        if len(opposite_prices) != 1:
+        recorded = verified_recorded_market_baseline(row)
+        paired_price = (raw / (raw + _implied(next(iter(opposite_prices))))
+                        if len(opposite_prices) == 1 else None)
+        if (recorded is not None and paired_price is not None
+                and abs(recorded-paired_price) > 1e-10):
             continue
-        no_vig = raw / (raw + _implied(next(iter(opposite_prices))))
+        no_vig = recorded if recorded is not None else paired_price
+        if no_vig is None:
+            continue
         model_brier = (p-y)**2
         market_brier = (no_vig-y)**2
         paired.append((model_brier, market_brier))

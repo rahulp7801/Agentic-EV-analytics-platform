@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from sportsbet.ingestion.prop_odds import parse_event_quotes, prop_quote_record_sha256
-from sportsbet.quant.market_baseline import paired_market_baseline
+from sportsbet.quant.market_baseline import paired_market_baseline, verified_recorded_market_baseline
 
 
 def quotes():
@@ -32,3 +32,20 @@ def test_paired_market_baseline_requires_one_exact_opposite():
     later = under.model_copy(update={"snapped_at":under.snapped_at.replace(minute=1)})
     later = later.model_copy(update={"source_record_sha256":prop_quote_record_sha256(later)})
     assert paired_market_baseline(over, [over, later]) == {}
+
+
+def test_recorded_baseline_reproduces_opposite_quote_hash():
+    over, under = quotes()
+    payload = dict(sport=over.sport, game_id=over.game_id, player=over.player_name,
+                   prop_type='receptions', direction='over', line=float(over.line),
+                   sportsbook=over.sportsbook, american_odds=over.price,
+                   quote_time=over.snapped_at.isoformat(),
+                   game_start_time=over.game_start_time.isoformat(),
+                   quote_source_provider=over.source_provider,
+                   quote_source_sha256=over.source_sha256,
+                   **paired_market_baseline(over, [over, under]))
+    assert verified_recorded_market_baseline(payload) == pytest.approx(.5)
+    assert verified_recorded_market_baseline({**payload,
+        'market_opposite_american_odds': -105}) is None
+    assert verified_recorded_market_baseline({**payload,
+        'market_no_vig_probability': .6}) is None
