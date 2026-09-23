@@ -51,9 +51,13 @@ export default function Overview({sport,onOpenMarkets,onOpenSlip,onOpenPlayers}:
         else failures.push('Player history refresh is unavailable.');
         updateBoard(boardResult);
       } else {
-        const [currentResult,boardResult]=await Promise.allSettled([current,picks] as const);
+        const [currentResult,watchResult,boardResult]=await Promise.allSettled([
+          current,fetchForecasts(sport,signal,'candidates',fetch,1000),picks] as const);
         if(controller.signal.aborted) return;
-        updateCurrent(currentResult);updateBoard(boardResult);
+        updateCurrent(currentResult);
+        if(watchResult.status==='fulfilled') setWatchlist(watchResult.value.signals);
+        else {setWatchlist([]);failures.push('Recorded watchlist could not be refreshed.');}
+        updateBoard(boardResult);
       }
       setErrors(failures);setChecked(Date.now());setNow(Date.now());setLoading(false);
     } finally {busy.current=false;if(full && !controller.signal.aborted)setRefreshing(false);}
