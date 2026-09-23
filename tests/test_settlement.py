@@ -341,3 +341,28 @@ def test_cfb_settlement_rejects_wrong_game_or_team(tmp_path):
     assert settle_final_props(ledger,'cfb',game)['reasons']=={'stat_not_found_or_ambiguous':1}
     game['games'][0]['provider_event_id']='bad-game-id'
     assert settle_final_props(ledger,'cfb',game)['reasons']=={'invalid_prediction_or_evidence':1}
+
+
+def test_settlement_reuses_exact_stat_and_batches_duplicate_price_captures(tmp_path,monkeypatch):
+    from sportsbet import settlement
+    ledger=Ledger(tmp_path/'many.sqlite')
+    payloads=[prediction(ledger,sport='nba',prop_type='points',line=10.5+i)[1]
+        for i in range(12)]
+    with ledger.connect() as db:
+        create_nba_stats(db)
+        add_nba_stat(db,payloads[0],21)
+    actual=settlement._actual
+    settle=ledger.settle
+    reads=[];writes=[]
+    def read(*args):
+        reads.append(1)
+        return actual(*args)
+    def write(outcomes,**kwargs):
+        writes.append(len(outcomes))
+        return settle(outcomes,**kwargs)
+    monkeypatch.setattr(settlement,'_actual',read)
+    monkeypatch.setattr(ledger,'settle',write)
+    result=settle_final_props(ledger,'nba',schedule(payloads[0]))
+    assert result['settled']==12 and result['pending']==0
+    assert len(reads)==1 and writes==[12]
+    assert ledger.report(sport='nba')['settled_count']==12

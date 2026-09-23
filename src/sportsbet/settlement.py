@@ -203,7 +203,7 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
             continue
         recheckable.append((row,row_day))
     candidates=[row for row,row_day in recheckable if row_day in game_dates]
-    reasons=Counter();resolved=[]
+    reasons=Counter();resolved=[];stat_cache={}
     with ledger.connect() as db:
         for prediction in candidates:
             try:
@@ -212,7 +212,11 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
                     reasons['final_game_not_matched']+=1
                     continue
                 game,day,line=matched
-                observed=_actual(db,prediction,sport,day,game)
+                stat_key=(day,game['provider_event_id'],game['home_abbr'],game['away_abbr'],
+                    prediction.get('player_id'),prediction['prop_type'])
+                if stat_key not in stat_cache:
+                    stat_cache[stat_key]=_actual(db,prediction,sport,day,game)
+                observed=stat_cache[stat_key]
                 if observed is None:
                     reasons['stat_not_found_or_ambiguous']+=1
                     continue
@@ -227,6 +231,7 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
             except (KeyError,TypeError,ValueError,ArithmeticError):
                 reasons['invalid_prediction_or_evidence']+=1
     schedule_observed=utc_timestamp(schedule['captured_at'])
+    batches={}
     for prediction,game,outcome,actual,provenance in resolved:
         evidence=dict(schedule_identity_version=2,
             provider_event_id=game['provider_event_id'],date=_canonical_date(game['date']),
@@ -239,10 +244,17 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
             stat_observed_at=provenance['observed_at'].isoformat(),stat_row=provenance['record'])
         digest=hashlib.sha256(json.dumps(evidence,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         reference=f"espn_schedule+{provenance['provider']}:{game['provider_event_id']}:sha256:{digest}"
-        ledger.settle({prediction['prediction_id']:outcome},source=AUTO_SOURCE,source_ref=reference,
-            observed_at=max(schedule_observed,provenance['observed_at']),
-            actual_values={prediction['prediction_id']:actual},
-            evidence={prediction['prediction_id']:evidence})
+        observed_at=max(schedule_observed,provenance['observed_at'])
+        batch=batches.setdefault((reference,observed_at),
+            {'outcomes':{},'actual_values':{},'evidence':{}})
+        key=prediction['prediction_id']
+        batch['outcomes'][key]=outcome
+        batch['actual_values'][key]=actual
+        batch['evidence'][key]=evidence
+    for (reference,observed_at),batch in batches.items():
+        ledger.settle(batch['outcomes'],source=AUTO_SOURCE,source_ref=reference,
+            observed_at=observed_at,actual_values=batch['actual_values'],
+            evidence=batch['evidence'])
     recheckable_dates=sorted({row_day for _,row_day in recheckable})
     return dict(sport=sport,status='complete' if schedule.get('status')=='complete' else 'degraded',
         candidates=len(candidates),settled=len(resolved),pending=len(candidates)-len(resolved),
