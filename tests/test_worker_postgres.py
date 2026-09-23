@@ -588,3 +588,54 @@ def test_evidence_audit_snapshot_is_read_only_and_stable_across_concurrent_write
     finally:
         with writer.connect() as db:
             db.execute('DELETE FROM api_usage WHERE risk_day=?',(key,))
+
+@pytest.mark.parametrize('changed',['none','outcome','payload','conflicting_stat'])
+def test_explicit_final_recovery_is_atomic_and_preserves_original_predictions(changed,monkeypatch):
+    import json
+    import psycopg
+    from decimal import Decimal
+    from tests.test_nfl_final_evidence import bundle,prediction,NOW
+    from sportsbet.ingestion.nfl_final_evidence import inspect_bundle,plan_recovery
+    from sportsbet.quant.nfl_final_recovery import apply_plan,pending_rows
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];ledger=Ledger(database_url=url)
+    scan_id=uuid.uuid4().hex;keys=[]
+    try:
+        for direction in ('over','under'):
+            p=prediction(direction=direction,game_id=scan_id,model_version=scan_id)
+            p.pop('prediction_id');p.pop('outcome');keys.append(ledger.record(scan_id,p))
+        evidence=inspect_bundle(bundle(),now=NOW)
+        with ledger.connect() as db:
+            rows=[r for r in pending_rows(db,evidence) if r['prediction_id'] in keys]
+        plan=plan_recovery(rows,evidence);assert len(plan['updates'])==2
+        before={u['prediction_id']:u['payload'] for u in plan['updates']}
+        if changed=='outcome':ledger.settle({keys[0]:False},source='manual')
+        if changed=='payload':
+            with ledger.connect() as db:
+                raw=json.loads(db.execute('SELECT payload FROM predictions WHERE id=?',(keys[0],)).fetchone()[0])
+                raw['line']=2.5
+                db.execute('UPDATE predictions SET payload=? WHERE id=?',(json.dumps(raw),keys[0]))
+        if changed=='conflicting_stat':
+            monkeypatch.setattr('sportsbet.quant.nfl_final_recovery._actual',lambda *args:(Decimal(9),{}))
+        with psycopg.connect(url.replace('postgresql+psycopg://','postgresql://')) as conn:
+            conn.execute('SET LOCAL search_path TO analytics, public')
+            if changed=='none':assert apply_plan(conn,plan)==2
+            else:
+                with pytest.raises(ValueError):apply_plan(conn,plan)
+        with ledger.connect() as db:
+            retained=db.execute('SELECT id,payload,outcome FROM predictions WHERE id=ANY(?)',(keys,)).fetchall()
+        if changed=='none':
+            assert {json.loads(r[2]) for r in retained}=={False,True}
+            for key,payload,outcome in retained:
+                assert json.loads(payload)=={k:v for k,v in before[key].items() if k not in ('prediction_id','outcome')}
+            report=ledger.report(model_version=scan_id)
+            assert report['settled_count']==2 and report['unverified_settlements']==0
+            with ledger.connect() as db:
+                assert not [r for r in pending_rows(db,evidence) if r['prediction_id'] in keys]
+        else:
+            assert sum(r[2] is None for r in retained)==(1 if changed=='outcome' else 2)
+    finally:
+        with ledger.connect() as db:
+            db.execute('DELETE FROM predictions WHERE scan_id=?',(scan_id,))
+            for direction in ('over','under'):
+                p=prediction(direction=direction,game_id=scan_id)
+                db.execute('DELETE FROM quotes WHERE identity=?',(ledger.quote_identity(p),))
