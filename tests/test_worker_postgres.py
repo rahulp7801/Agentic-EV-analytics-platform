@@ -488,3 +488,33 @@ def test_postgres_shadow_retry_is_immutable_and_batch_conflicts_roll_back():
             db.execute('DELETE FROM predictions WHERE scan_id=?',(scan_id,))
             for item in (value,fresh):
                 db.execute('DELETE FROM quotes WHERE identity=?',(ledger.quote_identity(item),))
+
+
+
+def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_path,monkeypatch):
+    import json
+    from sportsbet.db.models import NBAPlayerGameLog
+    from sportsbet.ingestion.nba_provenance import official_rows,recover_response,value_digest
+    from test_nba_provenance import response
+    monkeypatch.chdir(tmp_path)
+    body=response();player_id=int(uuid.uuid4().int%900000000)+1
+    for i,row in enumerate(body['resultSets'][0]['rowSet']):row[0]=player_id+i
+    text=json.dumps(body);observed=datetime.now(timezone.utc)
+    rows=official_rows(text,2025,observed);table=NBAPlayerGameLog.__table__
+    engine=sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
+    try:
+        with engine.begin() as conn:
+            conn.execute(table.insert(),[dict(row,source_provider='nba') for row in rows])
+        before=recover_response(engine,text,2025,observed)
+        assert before['counts']['recoverable']==2 and before['updated_rows']==0
+        applied=recover_response(engine,text,2025,observed,apply=True)
+        assert applied['updated_rows']==2
+        with engine.connect() as conn:
+            retained=[dict(row) for row in conn.execute(sa.select(table).where(table.c.player_id.in_([player_id,player_id+1]))).mappings()]
+        assert value_digest(retained)==value_digest(rows)
+        assert all(row['source_record_sha256']==stat_row_sha256('nba',row) for row in retained)
+        assert recover_response(engine,text,2025,observed,apply=True)['updated_rows']==0
+    finally:
+        with engine.begin() as conn:
+            conn.execute(table.delete().where(table.c.player_id.in_([player_id,player_id+1]),table.c.game_id=='0022500001'))
+        engine.dispose()
