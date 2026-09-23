@@ -29,7 +29,7 @@ from sportsbet.prop.nba_context_producer import make_nba_context_signals_produce
 from sportsbet.prop.arbitrage import make_prop_arbitrage_agent
 from sportsbet.prop.cross_venue import PROP_MARKETS, screen as screen_cross_venue, screen_sportsbooks
 from sportsbet.prop.probability import outcome_interval_for_side
-from sportsbet.picks import build_pick_board
+from sportsbet.picks import LOCK_BEFORE_START, build_pick_board
 from sportsbet.provider_cache import CachedResponse, ProviderResponseCache
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.quant.market_baseline import paired_market_baseline
@@ -44,6 +44,8 @@ MAX_MODEL_CONCURRENCY = 8
 FORECAST_HORIZON_HOURS = 48
 RECOMMENDATION_POLICY_VERSION = 'confidence-floor-v2'
 PROVIDER_CACHE_TTL = timedelta(minutes=5)
+# Leave a full scheduler hour to capture before the immutable board locks.
+PRELOCK_QUOTE_WINDOW = LOCK_BEFORE_START + timedelta(hours=1)
 PRIORITY_NEAR_PASS_FLOOR = -0.03
 MAX_PRIORITY_SIGNALS = 5000
 PRIOR_EVENT_EVIDENCE_QUERY = '''SELECT snapshot_key,jsonb_build_object(
@@ -192,9 +194,20 @@ def timestamp(value: str) -> datetime:
     return result
 
 def prop_credit_holdback(sports: list[str], limit: int) -> int:
-    """Protect two full pregame checks when the configured budget supports them."""
+    """Protect one pre-lock and one final-hour check when the budget supports them."""
     width=max(len(MARKETS[sport]) for sport in sports)
     return 2*width if limit>=3*width else 0
+
+
+def event_credit_holdback(event: dict, reserved: int, now: datetime) -> int:
+    """Release one check before the board lock, retaining one for the final hour."""
+    remaining=timestamp(event['commence_time'])-now
+    if remaining<=LOCK_BEFORE_START:
+        return 0
+    if remaining<=PRELOCK_QUOTE_WINDOW:
+        return reserved//2
+    return reserved
+
 
 def next_quote_check(event: dict, attempted_at: str | None, now: datetime) -> datetime:
     """Cadence controls collection only, never extends quote eligibility."""
@@ -205,7 +218,7 @@ def next_quote_check(event: dict, attempted_at: str | None, now: datetime) -> da
     except (ValueError,TypeError,AttributeError):
         return now
     remaining=start-now
-    boundaries=[start-boundary for boundary in (timedelta(hours=6),timedelta(hours=1))]
+    boundaries=[start-boundary for boundary in (timedelta(hours=6),PRELOCK_QUOTE_WINDOW,LOCK_BEFORE_START)]
     if any(last<boundary<=now for boundary in boundaries):
         return now
     interval=timedelta(hours=12) if remaining>timedelta(hours=6) else (
@@ -574,7 +587,8 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                         away_team=e['away_team'],game_start_time=e['commence_time'],state='waiting_quotes')
                         for e in events]
                     priorities={event['id']:evidence[event['id']][0] for event in events}
-                    queues[sport]=sorted(events,key=lambda e:(timestamp(e['commence_time'])>now+timedelta(hours=1),
+                    queues[sport]=sorted(events,key=lambda e:(timestamp(e['commence_time'])>now+LOCK_BEFORE_START,
+                        timestamp(e['commence_time'])>now+PRELOCK_QUOTE_WINDOW,
                         *prior_quality_sort(priorities[e['id']]),
                         report['attempts'].get(e['id'],''),timestamp(e['commence_time']),e['id']))
                 except Exception as exc:
@@ -615,9 +629,9 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                         report['coalesced_events']=report.get('coalesced_events',0)+1
                         continue
                     cache_owned=True
-                    close=timestamp(event['commence_time'])-datetime.now(timezone.utc)<=timedelta(hours=1)
                     reserved,budget_reason=ledger.reserve_api_credits_with_reason(
-                        len(MARKETS[sport]),daily_credit_limit,holdback=0 if close else held)
+                        len(MARKETS[sport]),daily_credit_limit,
+                        holdback=event_credit_holdback(event,held,datetime.now(timezone.utc)))
                     if not reserved:
                         cache.release(quote_key,'the_odds_api',sport,scan_id)
                         cache_owned=False
