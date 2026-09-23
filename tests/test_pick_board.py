@@ -103,7 +103,7 @@ def test_board_totals_describe_only_bounded_public_records(monkeypatch):
     {'model_sample_size':19}, {'model_sample_size':True}, {'push_probability':-.1},
     {'quote_time':'2026-09-20T17:00:00+00:00'},
     {'model_generated_at':'2026-09-20T19:00:00+00:00'},
-    {'trade_plan':['x'*301]}, {'trade_plan':None},
+    {'trade_plan':['x'*301]}, {'trade_plan':None}, {'model_mean_stat':10001},
 ])
 def test_malformed_retained_pick_cannot_hide_valid_neighbor(monkeypatch,change):
     start=datetime(2026,9,20,20,tzinfo=timezone.utc)

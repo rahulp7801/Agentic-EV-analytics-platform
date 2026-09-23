@@ -49,7 +49,7 @@ def _accepted(row: dict, sport: str) -> bool:
             and Decimal('0') <= probability <= Decimal('1')-push
             and Decimal('0') <= Decimal(str(row['line'])) <= Decimal('10000')
             and (mean is None or (mean.is_finite()
-                and abs(mean) <= Decimal('10000')))
+                and Decimal('0') <= mean <= Decimal('10000')))
             and len(interval) == 2 and Decimal('0') <= interval[0] <= probability <= interval[1] <= Decimal('1')-push
             and interval[0] > quote_terms(row['american_odds'], Decimal(0))[0] * (Decimal('1')-push)
             and compute_expected_return(probability, payout, push) > 0
