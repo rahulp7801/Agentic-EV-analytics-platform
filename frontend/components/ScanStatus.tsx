@@ -4,24 +4,11 @@ import { useEffect, useState } from 'react';
 import type {Sport} from '@/lib/types';
 import styles from './TerminalChrome.module.css';
 
-type Status = {
-  state: string;
-  label: string;
-  updated_at: string | null;
-  next_refresh_at: string | null;
-  eligible: number | null;
-  completed: number | null;
-  deferred: number | null;
-  selections: number | null;
-  model_requests: number | null;
-  model_estimates: number | null;
-  unresolved_selections: number | null;
-  missing_estimates: number | null;
-};
+type Status = ReturnType<typeof import('@/lib/scanStatus').scanStatus>;
 
 function tone(state: string) {
   if (state === 'healthy' || state === 'complete') return styles.scanGood;
-  if (state === 'degraded' || state === 'stale') return styles.scanWarning;
+  if (['degraded','stale','overdue','interrupted','failed','blocked','unknown'].includes(state)) return styles.scanWarning;
   return styles.scanQuiet;
 }
 
@@ -33,7 +20,7 @@ export default function ScanStatus({sport}:{sport?:Sport}) {
     const controller = new AbortController();
     async function load() {
       try {
-        const response = await fetch('/api/scans', { cache: 'no-store', signal: controller.signal });
+        const response = await fetch('/api/scans', { cache: 'no-store', signal: AbortSignal.any([controller.signal,AbortSignal.timeout(15_000)]) });
         if (!response.ok) throw new Error('Daily scan status unavailable');
         setData(await response.json());
         setError('');
@@ -53,7 +40,7 @@ export default function ScanStatus({sport}:{sport?:Sport}) {
   }, []);
 
   return (
-    <div className={styles.scanRail} aria-live="polite" aria-label="Daily model pipeline status" tabIndex={0}>
+    <div className={styles.scanRail} data-single-league={sport ? true : undefined} aria-live="polite" aria-label="Daily model pipeline status" tabIndex={0}>
       <span className={styles.scanRailLabel}>Pipeline</span>
       {error ? (
         <div className={`${styles.scanCard} ${styles.scanWarning}`}><strong>{error}</strong></div>
@@ -70,7 +57,7 @@ export default function ScanStatus({sport}:{sport?:Sport}) {
               <span title="Game evaluations, not betting recommendations"><b>{status.completed}/{status.eligible}</b> games evaluated</span>
             )}
             {status.selections !== null && status.selections > 0 && (
-              <span><b>{status.model_estimates}/{status.selections}</b> modeled</span>
+              <span><b>{status.model_estimates ?? '?'}/{status.selections}</b> modeled</span>
             )}
             {status.unresolved_selections !== null && status.unresolved_selections > 0 && (
               <span><b>{status.unresolved_selections}</b> unmatched</span>
@@ -79,7 +66,7 @@ export default function ScanStatus({sport}:{sport?:Sport}) {
               <span><b>{status.missing_estimates}</b> unavailable</span>
             )}
           </div>
-          {status.next_refresh_at ? <time dateTime={status.next_refresh_at} title="Earliest quote check; actual collection depends on the scheduled worker and remaining credits">Due {new Date(status.next_refresh_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time> : status.updated_at && <time dateTime={status.updated_at} title="Last scan check">{new Date(status.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>}
+          {status.overdue_at ? <time dateTime={status.overdue_at} title="This quote check was due, but a newer completed scan has not been recorded">Due {new Date(status.overdue_at).toLocaleString([], { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" })}</time> : status.next_refresh_at ? <time dateTime={status.next_refresh_at} title="Earliest quote check; actual collection depends on the scheduled worker and remaining credits">Due {new Date(status.next_refresh_at).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</time> : status.updated_at && <time dateTime={status.updated_at} title="Last scan check">{new Date(status.updated_at).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</time>}
         </article>
       ))}
     </div>

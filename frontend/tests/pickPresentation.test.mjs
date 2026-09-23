@@ -30,5 +30,5 @@ test('shortlist copy states exactly whether prices are live or historical',()=>{
     description:'These exact captures passed every gate earlier. Prices shown are historical.',
     count:'0 live · 2 to reprice',
   });
-  assert.equal(shortlistPresentation(0,0).title,'No suggested pick passes now');
+  assert.equal(shortlistPresentation(0,0).title,'No current suggested pick available');
 });
