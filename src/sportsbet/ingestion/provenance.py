@@ -15,6 +15,9 @@ LEGACY_NFL_STAT_FIELDS=(
 STAT_FIELDS={
     'nba':('player_id','game_id','game_date','team_abbreviation','points','rebounds','assists'),
     'nfl':LEGACY_NFL_STAT_FIELDS+('receptions',),
+    'cfb':('game_id','athlete_id','player_name','team_id','passing_yards','rushing_yards',
+        'receiving_yards','receptions','season','week','game_date','is_home','team_name',
+        'team_abbreviation','opponent_id','opponent_name','opponent_abbreviation'),
 }
 
 
@@ -82,6 +85,17 @@ def stat_row_sha256(
     if sport=='nba':
         integers=('player_id','points','rebounds','assists')
         strings=('game_id','game_date','team_abbreviation')
+    elif sport=='cfb':
+        integers=('game_id','athlete_id','team_id','opponent_id','season','week',
+            'passing_yards','rushing_yards','receiving_yards','receptions')
+        strings=('player_name','team_name','team_abbreviation','opponent_name',
+            'opponent_abbreviation','game_date')
+        if type(normalized['is_home']) is not bool:
+            raise ValueError('Settlement stat evidence has invalid home identity')
+        try:
+            date.fromisoformat(normalized['game_date'])
+        except (TypeError,ValueError):
+            raise ValueError('Settlement stat evidence has invalid game date') from None
     else:
         integers=('season','week','passing_yards','rushing_yards','receiving_yards')
         if 'receptions' in selected:
@@ -90,7 +104,7 @@ def stat_row_sha256(
     if (any(normalized[key] is not None and type(normalized[key]) is not int for key in integers)
             or any(not isinstance(normalized[key],str) or not normalized[key].strip() for key in strings)):
         raise ValueError('Settlement stat evidence has invalid field types')
-    nonnegative_fields=integers if sport=='nba' else ('season','week')
+    nonnegative_fields=integers if sport=='nba' else ('game_id','athlete_id','team_id','opponent_id','season','week') if sport=='cfb' else ('season','week')
     if any(normalized[key] is not None and normalized[key] < 0 for key in nonnegative_fields):
         raise ValueError('Settlement stat evidence has negative values')
     return row_sha256(selected)

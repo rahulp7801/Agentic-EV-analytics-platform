@@ -18,7 +18,7 @@ DEFAULT_PATH = Path('.checkpoints/analytics.sqlite')
 MAX_RECOMMENDATION_FRACTION = Decimal('0.05')
 VERIFIED_SETTLEMENT_SOURCE = 'observed_final_stats'
 SETTLEMENT_REF = re.compile(
-    r'^espn_schedule\+(nba|espn|nflverse):([^:]{1,80}):sha256:([0-9a-f]{64})$')
+    r'^espn_schedule\+(nba|espn|nflverse|sportsdataverse_espn):([^:]{1,80}):sha256:([0-9a-f]{64})$')
 STAT_COLUMNS = {
     'nba': {'points': 'points', 'rebounds': 'rebounds', 'assists': 'assists'},
     'nfl': {'pass_yds': 'passing_yards', 'rush_yds': 'rushing_yards',
@@ -148,8 +148,11 @@ def verified_settlement_evidence(payload: dict, outcome, source, source_ref,
             return False
         if identity_version==2:
             from sportsbet.schedules import scheduled_stat_teams
-            team_field='team_abbreviation' if sport=='nba' else 'team'
+            team_field='team_abbreviation' if sport in ('nba','cfb') else 'team'
             if row.get(team_field) not in scheduled_stat_teams(sport,proof):
+                return False
+            if sport=='cfb' and (str(row.get('game_id'))!=proof['provider_event_id']
+                    or str(row.get('athlete_id'))!=str(payload['player_id'])):
                 return False
         from sportsbet.ingestion.provenance import stat_row_sha256
         if stat_row_sha256(sport, row) != proof['stat_record_sha256']:

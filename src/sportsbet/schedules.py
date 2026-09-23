@@ -18,7 +18,8 @@ def scheduled_stat_teams(sport: str, game: dict) -> frozenset[str]:
     values=[]
     for field in ('home_abbr','away_abbr'):
         value=game.get(field)
-        if not isinstance(value,str) or not re.fullmatch('[A-Z]{2,3}',value):
+        pattern='[A-Z0-9-]{2,8}' if sport=='cfb' else '[A-Z]{2,3}'
+        if not isinstance(value,str) or not re.fullmatch(pattern,value):
             raise ValueError('Invalid schedule team identity')
         values.append(STAT_TEAM_ALIASES[sport].get(value,value))
     if len(set(values))!=2:

@@ -287,3 +287,83 @@ def test_pending_schedule_catchup_is_bounded_oldest_first(monkeypatch):
     assert pending_schedule_offsets(StatusAudit(),'nba',now)==(-20,)
     with pytest.raises(ValueError,match='scope'):
         pending_schedule_offsets(Audit(),'nba',datetime(2026,9,30))
+
+
+def test_cfb_settlement_uses_exact_espn_game_and_source_backed_stat(tmp_path):
+    from sportsbet.ingestion.provenance import row_sha256
+    ledger=Ledger(tmp_path/'cfb.sqlite')
+    key,payload=prediction(ledger,sport='cfb',prop_type='rec_yds',player_id='12345',line=39.5)
+    game=schedule(payload,home_abbr='TAMU',away_abbr='BAMA')
+    game['games'][0]['provider_event_id']='401234567'
+    row=dict(game_id=401234567,athlete_id=12345,player_name='Player',team_id=7,
+        passing_yards=None,rushing_yards=None,receiving_yards=45,receptions=4,
+        season=2026,week=4,game_date=(date.fromisoformat(payload['game_date'])+timedelta(days=1)).isoformat(),
+        is_home=True,
+        team_name='Home',team_abbreviation='TAMU',opponent_id=9,
+        opponent_name='Away',opponent_abbreviation='BAMA')
+    assert stat_row_sha256('cfb',row)==row_sha256(row)
+    with ledger.connect() as db:
+        db.execute('''CREATE TABLE cfb_player_gamelogs (
+            game_id INTEGER,athlete_id INTEGER,player_name TEXT,team_id INTEGER,
+            passing_yards INTEGER,rushing_yards INTEGER,receiving_yards INTEGER,
+            receptions INTEGER,season INTEGER,week INTEGER,game_date TEXT,is_home BOOLEAN,
+            team_name TEXT,team_abbreviation TEXT,opponent_id INTEGER,opponent_name TEXT,
+            opponent_abbreviation TEXT,source_provider TEXT,source_sha256 TEXT,
+            source_record_sha256 TEXT,source_observed_at TEXT)''')
+        db.execute('INSERT INTO cfb_player_gamelogs VALUES ('+','.join('?' for _ in range(21))+')',
+            (*row.values(),'sportsdataverse_espn','a'*64,row_sha256(row),
+            datetime.now(timezone.utc).isoformat()))
+    result=settle_final_props(ledger,'cfb',game)
+    assert result['settled']==1 and result['pending']==0
+    settled=next(item for item in ledger.predictions() if item['prediction_id']==key)
+    assert settled['outcome'] is True and settled['actual_value']==45
+    assert settled['outcome_ref'].startswith('espn_schedule+sportsdataverse_espn:401234567:sha256:')
+    assert ledger.report(sport='cfb')['settled_count']==1
+    with ledger.connect() as db:
+        proof=settled['outcome_evidence']|{'provider_event_id':'401234568'}
+        db.execute('UPDATE predictions SET outcome_evidence=? WHERE id=?',
+            (json.dumps(proof,sort_keys=True,separators=(',',':')),key))
+    assert ledger.report(sport='cfb')['settled_count']==0
+
+
+def test_cfb_settlement_rejects_wrong_game_or_team(tmp_path):
+    ledger=Ledger(tmp_path/'cfb.sqlite')
+    _,payload=prediction(ledger,sport='cfb',prop_type='receptions',player_id='12345',line=3.5)
+    game=schedule(payload,home_abbr='TAMU',away_abbr='BAMA')
+    game['games'][0]['provider_event_id']='401234567'
+    with ledger.connect() as db:
+        db.execute('''CREATE TABLE cfb_player_gamelogs (
+            game_id INTEGER,athlete_id INTEGER,player_name TEXT,team_id INTEGER,
+            passing_yards INTEGER,rushing_yards INTEGER,receiving_yards INTEGER,
+            receptions INTEGER,season INTEGER,week INTEGER,game_date TEXT,is_home BOOLEAN,
+            team_name TEXT,team_abbreviation TEXT,opponent_id INTEGER,opponent_name TEXT,
+            opponent_abbreviation TEXT,source_provider TEXT,source_sha256 TEXT,
+            source_record_sha256 TEXT,source_observed_at TEXT)''')
+    assert settle_final_props(ledger,'cfb',game)['reasons']=={'stat_not_found_or_ambiguous':1}
+    game['games'][0]['provider_event_id']='bad-game-id'
+    assert settle_final_props(ledger,'cfb',game)['reasons']=={'invalid_prediction_or_evidence':1}
+
+
+def test_settlement_reuses_exact_stat_and_batches_duplicate_price_captures(tmp_path,monkeypatch):
+    from sportsbet import settlement
+    ledger=Ledger(tmp_path/'many.sqlite')
+    payloads=[prediction(ledger,sport='nba',prop_type='points',line=10.5+i)[1]
+        for i in range(12)]
+    with ledger.connect() as db:
+        create_nba_stats(db)
+        add_nba_stat(db,payloads[0],21)
+    actual=settlement._actual
+    settle=ledger.settle
+    reads=[];writes=[]
+    def read(*args):
+        reads.append(1)
+        return actual(*args)
+    def write(outcomes,**kwargs):
+        writes.append(len(outcomes))
+        return settle(outcomes,**kwargs)
+    monkeypatch.setattr(settlement,'_actual',read)
+    monkeypatch.setattr(ledger,'settle',write)
+    result=settle_final_props(ledger,'nba',schedule(payloads[0]))
+    assert result['settled']==12 and result['pending']==0
+    assert len(reads)==1 and writes==[12]
+    assert ledger.report(sport='nba')['settled_count']==12
