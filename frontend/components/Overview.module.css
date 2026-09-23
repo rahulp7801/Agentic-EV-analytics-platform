@@ -185,3 +185,8 @@
 }
 @keyframes pickEnter { from { opacity:0;transform:translateY(10px); } to { opacity:1;transform:translateY(0); } }
 @media(prefers-reduced-motion:reduce) { .betCard { transition:none; }.betCard:hover { transform:none; }.pickEnter { animation:none; } }
+
+.betContext { margin:14px 0;padding:13px 14px;border:1px solid var(--border-dim);border-radius:13px;background:var(--bg-base); }
+.betContext strong { display:block;color:var(--text-primary);font-size:11px; }
+.betContext p { margin:5px 0 0;color:var(--text-secondary);font-size:11px;line-height:1.45; }
+.betContext small { display:block;margin-top:8px;color:var(--text-muted);font-size:10px;line-height:1.5; }
