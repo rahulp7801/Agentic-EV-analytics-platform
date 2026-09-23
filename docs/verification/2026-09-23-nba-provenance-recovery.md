@@ -113,8 +113,9 @@ availability or prediction was invented. Both exact raw responses and write
 archives remain retained locally, and their hashes are committed in the plan.
 
 The aggregate application and independent check results are committed in
-`2026-09-23-nba-provenance-result.json`. Live API usage was not re-read because the
-separate analytics database is unavailable in the local environment. The recovery
+`2026-09-23-nba-provenance-result.json`. The initial verification did not re-read API usage because it queried the wrong
+schema. Follow-up inspection located `analytics.api_usage` in the configured
+database; a read-only check at 19:49 UTC confirmed 11 credits used for the day. The recovery
 issued zero provider quote requests and did not change credit limits.
 
 ## Next evidence checkpoint

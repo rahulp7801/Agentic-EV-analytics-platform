@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import random
 from collections import defaultdict
 from decimal import Decimal
@@ -22,6 +21,7 @@ from sportsbet.ledger import (
 from sportsbet.model_contract import QUOTE_PROVENANCE_MODEL_VERSIONS
 from sportsbet.quant.market_baseline import verified_recorded_market_baseline
 from sportsbet.quant.shadow_prior import prior80_conditional_probability
+from sportsbet.quant.audit_storage import ReadOnlyLedger,audit_database_url
 
 
 def _implied(odds: int) -> float:
@@ -271,18 +271,20 @@ def main() -> None:
     parser.add_argument("--model-version")
     parser.add_argument("--recommendations-only", action="store_true")
     parser.add_argument("--captured-after", help="UTC cutoff for a separately scored prospective cohort")
-    parser.add_argument("--database-env", default="ANALYTICS_DATABASE_URL",
-                        help="Environment variable containing a ledger database URL")
+    parser.add_argument("--database-env",
+                        help="Explicit hosted URL variable; default: ANALYTICS_DATABASE_URL, then DATABASE_URL")
     parser.add_argument("--bootstrap-samples", type=int, default=10_000)
     args = parser.parse_args()
-    database_url = os.environ.get(args.database_env)
-    ledger = Ledger(database_url=database_url) if database_url else Ledger()
-    print(json.dumps(audit_ledger(ledger, sport=args.sport,
-                                  model_version=args.model_version,
-                                  recommendations_only=args.recommendations_only,
-                                  captured_after=args.captured_after,
-                                  bootstrap_samples=args.bootstrap_samples),
-                     sort_keys=True, indent=2))
+    try:
+        ledger=ReadOnlyLedger(database_url=audit_database_url(args.database_env))
+        with ledger.snapshot():
+            result=audit_ledger(ledger,sport=args.sport,model_version=args.model_version,
+                recommendations_only=args.recommendations_only,captured_after=args.captured_after,
+                bootstrap_samples=args.bootstrap_samples)
+        print(json.dumps(result,sort_keys=True,indent=2,allow_nan=False))
+    except Exception as exc:
+        raise SystemExit(f'Priced audit unavailable: {type(exc).__name__}') from None
+
 
 
 if __name__ == "__main__":

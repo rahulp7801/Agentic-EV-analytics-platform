@@ -3,15 +3,14 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from contextlib import contextmanager
 from datetime import date, datetime, timezone
 import json
-import os
 from pathlib import Path
 
 import numpy as np
 
-from sportsbet.ledger import Ledger,utc_timestamp
+from sportsbet.ledger import utc_timestamp
+from sportsbet.quant.audit_storage import ReadOnlyLedger,audit_database_url
 from sportsbet.quant.history_shadow import (ARTIFACT_SHA256,FROZEN_AT,MARKETS,POLICY,VERSION,
     implementation_sha256,verified_recorded_shadow_probability as verified_shadow_probability)
 from sportsbet.quant.history_tuning import Example,compare,score
@@ -118,16 +117,6 @@ def publish_history_shadow(rows: list[dict], sport: str, publish) -> None:
         structlog.get_logger().warning('shadow_report_unavailable',sport=sport,error_type=type(exc).__name__)
 
 
-class ReadOnlyLedger(Ledger):
-    @contextmanager
-    def connect(self):
-        import psycopg
-        with psycopg.connect(self.database_url.replace('postgresql+psycopg://','postgresql://',1),
-                connect_timeout=15,options='-c default_transaction_read_only=on -c statement_timeout=120000') as conn:
-            conn.execute('SET LOCAL search_path TO analytics, public')
-            yield conn
-
-
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport',choices=['nba','nfl','cfb','all'],default='all')
@@ -136,7 +125,7 @@ def main():
     from dotenv import load_dotenv
     load_dotenv()
     try:
-        rows=ReadOnlyLedger(database_url=os.environ.get('ANALYTICS_DATABASE_URL') or os.environ['DATABASE_URL']).predictions()
+        rows=ReadOnlyLedger(database_url=audit_database_url()).predictions()
         sports=['nba','nfl','cfb'] if args.sport=='all' else [args.sport]
         result={sport:report_history_shadow(rows,sport) for sport in sports}
         args.output.parent.mkdir(parents=True,exist_ok=True)

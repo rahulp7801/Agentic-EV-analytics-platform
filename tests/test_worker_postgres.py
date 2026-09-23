@@ -555,3 +555,36 @@ def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_pa
         with engine.begin() as conn:
             conn.exec_driver_sql(f'DROP SCHEMA IF EXISTS {schema} CASCADE')
         engine.dispose()
+
+
+
+def test_evidence_audit_snapshot_is_read_only_and_stable_across_concurrent_writes():
+    import psycopg
+    from sportsbet.quant.audit_storage import ReadOnlyLedger
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL']
+    ledger=ReadOnlyLedger(database_url=url)
+    writer=Ledger(database_url=url)
+    # An isolated arbitrary key avoids today's real credit budget even in a test DB.
+    key='audit-fixture-'+uuid.uuid4().hex
+    try:
+        with writer.connect() as db:
+            db.execute('INSERT INTO api_usage(risk_day,credits) VALUES (?,?)',(key,1))
+        with ledger.snapshot():
+            with ledger.connect() as db:
+                assert db.execute('SHOW transaction_read_only').fetchone()[0]=='on'
+                assert db.execute('SHOW transaction_isolation').fetchone()[0]=='repeatable read'
+                assert db.execute('SELECT credits FROM api_usage WHERE risk_day=?',(key,)).fetchone()[0]==1
+            with writer.connect() as db:
+                db.execute('UPDATE api_usage SET credits=? WHERE risk_day=?',(2,key))
+            with ledger.connect() as db:
+                assert db.execute('SELECT credits FROM api_usage WHERE risk_day=?',(key,)).fetchone()[0]==1
+        with ledger.connect() as db:
+            assert db.execute('SELECT credits FROM api_usage WHERE risk_day=?',(key,)).fetchone()[0]==2
+        with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+            with ledger.connect() as db:
+                db.execute('UPDATE api_usage SET credits=? WHERE risk_day=?',(3,key))
+        with ledger.connect() as db:
+            assert db.execute('SELECT credits FROM api_usage WHERE risk_day=?',(key,)).fetchone()[0]==2
+    finally:
+        with writer.connect() as db:
+            db.execute('DELETE FROM api_usage WHERE risk_day=?',(key,))
