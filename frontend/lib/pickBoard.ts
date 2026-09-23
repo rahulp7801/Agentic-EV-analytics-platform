@@ -14,14 +14,14 @@ export type PickBoard={generated_at:string;lock_minutes:60;selection_policy_vers
 const stamp=(value:unknown)=>typeof value==='string' && /([zZ]|[+-]\d\d:\d\d)$/.test(value) && Number.isFinite(Date.parse(value));
 const count=(value:unknown)=>Number.isSafeInteger(value) && Number(value)>=0 && Number(value)<=500;
 
-function record(value:unknown,sport:Sport,profileValues:unknown,now:number,history:boolean):PickBoardRecord|null {
+function record(value:unknown,sport:Sport,profileValues:unknown,now:number,history:boolean,snapshotTime:number):PickBoardRecord|null {
   if(!value || typeof value!=='object' || Array.isArray(value)) return null;
   const raw=value as Record<string,unknown>,captured=Date.parse(String(raw.captured_at ?? ''));
   const lock=Date.parse(String(raw.lock_at ?? '')),start=Date.parse(String(raw.game_start_time ?? ''));
   if(!stamp(raw.captured_at) || !stamp(raw.lock_at) || raw.selection_policy_version!=='pregame-t60-v1'
     || raw.prediction_id!==raw.id || typeof raw.id!=='string' || raw.id.length!==64
     || !/^[a-f0-9]{64}$/.test(raw.id) || lock!==start-3600000 || captured>lock
-    || !['recorded','locked','final'].includes(String(raw.board_state))) return null;
+    || captured>snapshotTime || !['recorded','locked','final'].includes(String(raw.board_state))) return null;
   const signal=publicSignal(raw,captured);
   if(!signal || signal.sport!==sport || signal.gated || signal.kelly_fraction<=0) return null;
   let playerProfile=signal.player_profile;
@@ -41,7 +41,10 @@ function record(value:unknown,sport:Sport,profileValues:unknown,now:number,histo
         : ((actual>signal.line)===(signal.direction==='over') ? 'win' : 'loss');
       if(result!==reproduced || settled<start || settled>now+60000) return null;
     }
-  } else if(start<=now || (raw.board_state==='recorded')!==(now<lock)) return null;
+  } else if(!['recorded','locked'].includes(String(raw.board_state)) || start<=snapshotTime
+    || (raw.board_state==='recorded')!==(snapshotTime<lock)) return null;
+  // Validate the publisher's state at publication time. Elapsed wall time is not
+  // data corruption and cannot invalidate unrelated records on the same board.
   return {...signal,...(playerProfile ? {player_profile:playerProfile} : {}),
     prediction_id:raw.prediction_id as string,captured_at:raw.captured_at as string,lock_at:raw.lock_at as string,
     board_state:raw.board_state as PickBoardRecord['board_state'],selection_policy_version:'pregame-t60-v1',
@@ -59,8 +62,9 @@ export function publicPickBoard(value:unknown,profiles:unknown,sport:Sport,now=D
     || board.selection_policy_version!=='pregame-t60-v1' || !Array.isArray(board.current)
     || !Array.isArray(board.history) || board.current.length>100 || board.history.length>200 || !summary
     || !['current','settled','pending','wins','losses','pushes'].every(key=>count(summary[key]))) throw new Error('Invalid pick board');
-  const current=board.current.map(item=>record(item,sport,profileValues,now,false)).filter(Boolean) as PickBoardRecord[];
-  const history=board.history.map(item=>record(item,sport,profileValues,now,true)).filter(Boolean) as PickBoardRecord[];
+  const snapshotTime=Date.parse(board.generated_at as string);
+  const current=board.current.map(item=>record(item,sport,profileValues,now,false,snapshotTime)).filter(Boolean) as PickBoardRecord[];
+  const history=board.history.map(item=>record(item,sport,profileValues,now,true,snapshotTime)).filter(Boolean) as PickBoardRecord[];
   const identities=[...current,...history].map(item=>item.id);
   const playerGames=[...current,...history].map(item=>`${item.game_id}\u0000${item.player}`);
   if(current.length!==board.current.length || history.length!==board.history.length
@@ -74,8 +78,12 @@ export function publicPickBoard(value:unknown,profiles:unknown,sport:Sport,now=D
   const decisions=Number(summary.wins)+Number(summary.losses);
   if((rate===null)!==(decisions===0) || (rate!==null && (typeof rate!=='number' || !Number.isFinite(rate) || rate<0 || rate>1
     || Math.abs(rate-(Number(summary.wins)/decisions))>1e-9))) throw new Error('Invalid pick board rate');
+  // Never turn an old capture into a confirmed T-60 selection or invent a
+  // settlement. Keep recorded labels until the publisher confirms the lock,
+  // and remove started games from current output while awaiting its next update.
+  const upcoming=current.filter(item=>Date.parse(item.game_start_time!)>now);
   return {generated_at:board.generated_at as string,lock_minutes:60,selection_policy_version:'pregame-t60-v1',
-    current,history,summary:{current:Number(summary.current),settled:Number(summary.settled),pending:Number(summary.pending),
+    current:upcoming,history,summary:{current:upcoming.length,settled:Number(summary.settled),pending:Number(summary.pending),
       wins:Number(summary.wins),losses:Number(summary.losses),pushes:Number(summary.pushes),
       verified_win_rate:rate as number|null}};
 }

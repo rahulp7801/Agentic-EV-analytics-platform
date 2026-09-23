@@ -113,3 +113,16 @@ def test_temporal_partitions_and_legacy_provenance_are_explicit():
     result=source_summary(rows,'nba')
     assert result['provenance']=={'missing_row_commitment':1}
     assert result['workload_fields_covered_by_stat_commitment'] is False
+
+
+def test_cfb_provenance_normalizes_stored_numeric_event_identity():
+    from sportsbet.ingestion.provenance import stat_row_sha256
+    raw=dict(game_id=123,athlete_id=456,player_name='Player',team_id=1,
+        passing_yards=None,rushing_yards=1,receiving_yards=12,receptions=2,
+        season=2025,week=1,game_date=date(2025,9,1),is_home=True,team_name='Home',
+        team_abbreviation='H',opponent_id=2,opponent_name='Away',opponent_abbreviation='A')
+    digest=stat_row_sha256('cfb',raw)
+    stored=raw|{'game_id':'123','source_record_sha256':digest}
+    assert source_summary([stored],'cfb')['provenance']=={'verified_core_stat_commitment':1}
+    stored['receiving_yards']=99
+    assert source_summary([stored],'cfb')['provenance']=={'mismatched_core_stat_commitment':1}

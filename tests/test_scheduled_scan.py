@@ -240,3 +240,31 @@ async def test_non_recommended_forecast_is_not_silently_discarded(tmp_path):
         result=await evaluate_event(pool,event('nfl'),'nfl',Ledger(tmp_path/'audit.sqlite'),'scan')
     assert len(result['signals'])==2
     assert all(s['gated'] and s['trade_plan'] and s['kelly_fraction']==0 for s in result['signals'])
+
+
+@pytest.mark.parametrize('sport',['nba','nfl','cfb'])
+@pytest.mark.parametrize('failure',['state','exception'])
+async def test_one_failed_model_does_not_discard_valid_neighbor(sport,failure,tmp_path):
+    conn=AsyncMock();conn.fetch.return_value=[{'normalized_name':'player','player_id':'1'}]
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock(return_value=None)
+    result_key='nba_prop_result' if sport=='nba' else 'prop_result'
+    async def invoke(state):
+        if state['prop_line']==Decimal('21.5'):
+            if failure=='exception':raise RuntimeError('private driver details')
+            return {'error':'query_failed'}
+        return {result_key:PropResult(true_probability=Decimal('.6'),sample_size=40,
+            mean_stat=Decimal('24'),confidence_interval=(Decimal('.55'),Decimal('.65')))}
+    graph=MagicMock();graph.ainvoke=AsyncMock(side_effect=invoke)
+    ledger=Ledger(tmp_path/'partial.sqlite')
+    with patch('sportsbet.scan.create_graph',return_value=graph):
+        result=await evaluate_event(pool,event(sport),sport,ledger,'partial')
+    assert len(result['signals'])==len(ledger.predictions())==1
+    assert result['signals'][0]['line']==20.5
+    assert result['signals'][0]['gated'] is True
+    assert result['signals'][0]['kelly_fraction']==0
+    coverage=result['coverage']
+    assert coverage['model_requests']==2 and coverage['model_estimates']==1
+    assert coverage['model_status']=='partial'
+    assert coverage['counts']['model_evaluation_failed']==1
+    assert 'private driver details' not in str(result)

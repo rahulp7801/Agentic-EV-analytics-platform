@@ -298,7 +298,10 @@ def source_summary(rows: list[dict], sport: str) -> dict:
             counts['missing_row_commitment'] += 1
         else:
             try:
-                valid = stat_row_sha256(sport, row) == row['source_record_sha256']
+                # CFB ingestion commits numeric ESPN game IDs; PostgreSQL stores
+                # that identifier as text, as in the settlement verifier.
+                evidence = row | {'game_id': int(row['game_id'])} if sport == 'cfb' else row
+                valid = stat_row_sha256(sport, evidence) == row['source_record_sha256']
             except (TypeError, ValueError):
                 valid = False
             counts['verified_core_stat_commitment' if valid else 'mismatched_core_stat_commitment'] += 1

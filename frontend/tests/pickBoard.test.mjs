@@ -57,3 +57,35 @@ test('rejects tampered identity, lock, totals and result evidence',()=>{
   assert.throws(()=>publicPickBoard(board([],[wrongGrade],summary({current:0,settled:1,losses:1,
     verified_win_rate:0})),null,'nfl',Date.parse(start)+5*3600000));
 });
+
+
+test('elapsed lock and kickoff do not corrupt a previously valid board',()=>{
+  const stale=board();
+  const lockedTime=Date.parse(lock)+1000;
+  const atLock=publicPickBoard(stale,null,'nfl',lockedTime);
+  assert.equal(atLock.current.length,1);
+  assert.equal(atLock.current[0].board_state,'recorded'); // No invented lock confirmation.
+  const afterStart=publicPickBoard(stale,null,'nfl',Date.parse(start));
+  assert.equal(afterStart.current.length,0);
+  assert.equal(afterStart.summary.current,0);
+  assert.equal(afterStart.history.length,0); // No invented final selection or result.
+  assert.equal(afterStart.generated_at,stale.generated_at);
+});
+
+test('one started game cannot hide other upcoming picks',()=>{
+  const later={...signal,id:'b'.repeat(64),prediction_id:'b'.repeat(64),game_id:'later',
+    game_start_time:new Date(Date.parse(start)+3600000).toISOString(),
+    lock_at:new Date(Date.parse(lock)+3600000).toISOString()};
+  const result=publicPickBoard(board([signal,later],[],summary({current:2})),null,'nfl',Date.parse(start));
+  assert.deepEqual(result.current.map(item=>item.game_id),['later']);
+  assert.equal(result.summary.current,1);
+});
+
+test('publisher state and capture time must agree with snapshot time',()=>{
+  const atLock=Date.parse(lock)+1000;
+  assert.throws(()=>publicPickBoard({...board([{...signal,board_state:'final'}]),generated_at:new Date(atLock).toISOString()},null,'nfl',atLock));
+  assert.throws(()=>publicPickBoard(board([{...signal,board_state:'locked'}]),null,'nfl',now));
+  assert.throws(()=>publicPickBoard({...board(),generated_at:new Date(Date.parse(lock)+1000).toISOString()},
+    null,'nfl',Date.parse(lock)+2000));
+  assert.throws(()=>publicPickBoard(board([{...signal,captured_at:new Date(now+1000).toISOString()}]),null,'nfl',now));
+});
