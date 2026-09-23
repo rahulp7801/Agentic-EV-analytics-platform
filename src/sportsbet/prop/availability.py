@@ -201,7 +201,7 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
             # Injury-context evidence also needs exact PFR IDs for reported
             # offensive and defensive participants, even when display names match.
             has_reports = any(team['reports'] for team in result)
-            if sport=='nfl' and (unmatched or has_reports):
+            if sport=='nfl' and (player_names or unmatched or has_reports):
                 try:
                     identities, pfr_identities, identity_source = await nfl_player_identities(client,
                         {identity for team in result for identity in team['roster_ids']}, now)
@@ -220,6 +220,62 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
                         identity_source=identity_source)
         except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError, AttributeError, OSError):
             return dict(status='unavailable', captured_at=now.isoformat())
+
+
+def nfl_roster_history_bindings(context: dict | None, event: dict, now: datetime) -> dict[str, dict]:
+    """Bind exact quoted roster names to GSIS history through the observed crosswalk."""
+    try:
+        if not isinstance(context,dict) or context.get('status') not in ('observed','partial'):
+            return {}
+        fresh_timestamp(context['captured_at'],now)
+        source=context['identity_source']
+        fresh_timestamp(source['retrieved_at'],now)
+        if (source['url']!=NFL_PLAYER_IDS_URL
+                or not re.fullmatch('[0-9a-f]{64}',source['source_sha256'])):
+            return {}
+        teams=context['teams'];crosswalk=context['player_identities']
+        if (not isinstance(teams,list) or len(teams)!=2 or not isinstance(crosswalk,dict)
+                or len(crosswalk)>500 or event['home_team']==event['away_team']
+                or {team['name'] for team in teams}!={event['home_team'],event['away_team']}):
+            return {}
+        inverse={}
+        for gsis,espn in crosswalk.items():
+            if (not isinstance(gsis,str) or not re.fullmatch(r'00-[0-9]{7}',gsis)
+                    or not isinstance(espn,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',espn)
+                    or espn in inverse):
+                return {}
+            inverse[espn]=gsis
+        found={};seen_ids=set();duplicate_names=set()
+        for team in teams:
+            roster=team['roster_ids'];url=team['roster_source_url'];digest=team['roster_source_sha256']
+            if (not isinstance(roster,dict) or len(roster)>250
+                    or not isinstance(url,str) or not re.fullmatch(
+                        re.escape(BASES['nfl'])+r'/teams/[1-9][0-9]*/roster',url)
+                    or not re.fullmatch('[0-9a-f]{64}',digest)):
+                return {}
+            for espn,name in roster.items():
+                if (not isinstance(espn,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',espn)
+                        or espn in seen_ids or not isinstance(name,str) or not 0<len(name)<=100):
+                    return {}
+                seen_ids.add(espn)
+                if name in found:
+                    duplicate_names.add(name)
+                found.setdefault(name,[]).append((team,espn,url,digest))
+        bindings={}
+        for name,matches in found.items():
+            if name in duplicate_names or len(matches)!=1:
+                continue
+            team,espn,url,digest=matches[0]
+            if espn not in inverse:
+                continue
+            bindings[name]=dict(method='exact_roster_crosswalk',history_player_id=inverse[espn],
+                roster_player_id=espn,roster_player_name=name,team=team['name'],
+                roster_source_url=url,roster_source_sha256=digest,
+                identity_source_url=source['url'],identity_source_sha256=source['source_sha256'],
+                captured_at=context['captured_at'],identity_retrieved_at=source['retrieved_at'])
+        return bindings
+    except (ValueError,KeyError,TypeError,AttributeError):
+        return {}
 
 
 def player_availability(context: dict | None, player: str, now: datetime, *, player_id: str | None = None) -> tuple[dict, str | None]:
