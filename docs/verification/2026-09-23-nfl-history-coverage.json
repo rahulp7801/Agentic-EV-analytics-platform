@@ -1,0 +1,49 @@
+{
+  "observed_at": "2026-09-23T22:48:02.099189+00:00",
+  "audit_version": "nfl-participation-coverage-v1",
+  "cutoff": "2026-09-24",
+  "season_floor": 2024,
+  "input_sha256": "61a91836b77beae78229582b65f855b53239ccdc6aa31b023017927e63c6e84c",
+  "players": 24,
+  "current_quoted_players": 14,
+  "verified_stat_rows": 585,
+  "verified_offensive_rows": 627,
+  "zero_offense_rows_excluded": 3,
+  "missing_stat_games": 43,
+  "current_quoted_missing_stat_games": 12,
+  "current_quoted_players_with_missing": 4,
+  "affected_current_players": [
+    {
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "recorded_games": 31,
+      "verified_offensive_games": 36,
+      "missing_games": 5
+    },
+    {
+      "player": "Austin Hooper",
+      "player_id": "00-0032392",
+      "recorded_games": 31,
+      "verified_offensive_games": 35,
+      "missing_games": 4
+    },
+    {
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "recorded_games": 30,
+      "verified_offensive_games": 32,
+      "missing_games": 2
+    },
+    {
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "recorded_games": 26,
+      "verified_offensive_games": 27,
+      "missing_games": 1
+    }
+  ],
+  "interpretation": "Selected current quoted and known missing-result players, not a league-wide sample. Missing history rows remain unknown, not inferred zeroes.",
+  "source_limit": "Full input and detailed output were saved on the original D: workspace before that drive became unavailable; this file retains the verified aggregate tool output and input commitment.",
+  "invented_stat_rows": 0,
+  "published_forecasts": 0
+}
