@@ -103,6 +103,7 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
     flat_return = []
     paired = []
     game_deltas: dict[str, list[float]] = defaultdict(list)
+    game_blend_rows: dict[str, list[tuple[float, float, int]]] = defaultdict(list)
     for row in decided:
         y = int(row["outcome"])
         p = float(row["model_probability"])
@@ -124,7 +125,9 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
         model_brier = (p-y)**2
         market_brier = (no_vig-y)**2
         paired.append((model_brier, market_brier))
-        game_deltas[str(row["game_id"])].append(model_brier-market_brier)
+        game_id = str(row["game_id"])
+        game_deltas[game_id].append(model_brier-market_brier)
+        game_blend_rows[game_id].append((p, no_vig, y))
     result = {
         "source_eligible": len(rows), "earliest_selections": len(selected),
         "decided": len(decided), "pending_or_push": len(selected)-len(decided),
@@ -136,6 +139,21 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
         "paired_market_no_vig_brier": mean(x[1] for x in paired) if paired else None,
         "paired_model_minus_market_brier": mean(x[0]-x[1] for x in paired) if paired else None,
     }
+    if len(game_blend_rows) >= 2:
+        held_out_errors = []
+        blend_weights = []
+        for game_id, test_rows in sorted(game_blend_rows.items()):
+            train_rows = [item for other, values in game_blend_rows.items()
+                          if other != game_id for item in values]
+            denominator = sum((p-q)**2 for p, q, _ in train_rows)
+            weight = (sum((y-q)*(p-q) for p, q, y in train_rows) / denominator
+                      if denominator else 0.0)
+            weight = min(1.0, max(0.0, weight))
+            blend_weights.append(weight)
+            held_out_errors.extend((q+weight*(p-q)-y)**2 for p, q, y in test_rows)
+        result["market_model_leave_one_game_out_brier"] = mean(held_out_errors)
+        result["leave_one_game_out_weight_range"] = [min(blend_weights), max(blend_weights)]
+        result["leave_one_game_out_positive_weights"] = sum(w > 0 for w in blend_weights)
     if paired and bootstrap_samples:
         games = sorted(game_deltas)
         rng = random.Random(seed)

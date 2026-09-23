@@ -32,3 +32,7 @@ Run `python -m sportsbet.quant.priced_market_audit --sport nfl` with the ledger 
 Future scans now record `market_no_vig_probability` when the chosen side has exactly one opposite offer from the same sportsbook, line, quote timestamp, game and provider batch. They also retain the opposite American price and its source-record hash. Missing or ambiguous opposite quotes leave these optional fields absent. This is a contemporaneous benchmark and does not change the model estimate, recommendation gate, or stake.
 
 The priced audit verifies any retained opposite-side hash and recomputes the stored no-vig probability. When valid, that benchmark remains available even if the opposite side produced no model forecast. Altered prices or probabilities are ignored. The historical 2026-09-22 cohort and its 0.02063 Brier gap are unchanged by this support for future records.
+
+## Incremental signal check
+
+On the 2,598 exact quote pairs, a simple market-plus-model probability `q + w(p-q)` has an in-sample least-squares weight of only 0.0061 on the model. Refit a nonnegative weight on 15 game clusters and score the held-out game: the resulting leave-one-game-out Brier is **0.24617**, worse than the market-only **0.24514**. Nine of 16 fits assign the model a positive weight, with weights ranging from 0 to 0.1206. This is a diagnostic across one slate, not a chronological or prospective trading test. It gives no support for promoting a blend or a betting filter yet.
