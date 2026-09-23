@@ -357,7 +357,7 @@ async def test_shadow_report_failure_cannot_change_production_settlement(monkeyp
         if key.startswith('shadow-validation:'):raise RuntimeError('research storage unavailable')
         stored[key]=value
     monkeypatch.setattr(daily,'publish_snapshot',publish)
-    monkeypatch.setattr(daily,'watch',AsyncMock(return_value=({'sources':{'book':{'status':'observed'}},
+    monkeypatch.setattr(daily,'watch',AsyncMock(return_value=({'sources':{'book':{'status':'observed','partial_coverage':False}},
         'captured_at':datetime.now(timezone.utc).isoformat()},None)))
     monkeypatch.setattr(daily,'scan',AsyncMock(return_value={'nba':{'status':'complete'}}))
     result=await daily.run(['nba'],'monitor',25)
