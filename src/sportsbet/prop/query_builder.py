@@ -173,11 +173,16 @@ class PropQueryBuilder:
         """
         col: str = PROP_COLUMN_MAP[params.prop_type]  # allowlist substitution, not user input
         if params.sport=='cfb':
-            if (params.prop_type not in CFB_PROP_TYPES or not params.player_id.isdigit()
+            if (params.prop_type not in CFB_PROP_TYPES or not params.player_id.isascii()
+                    or not params.player_id.isdecimal() or len(params.player_id)>19
                     or params.as_of_date is None):
                 raise ValueError('CFB queries require an ESPN athlete ID and exclusive cutoff')
+            athlete_id=int(params.player_id)
+            if not 0<athlete_id<=2**63-1:
+                raise ValueError('CFB queries require an ESPN athlete ID and exclusive cutoff')
+            # asyncpg binds CAST($1 AS bigint) as int64; passing the string ID raises DataError.
             return _CFB_PROP_TEMPLATE.format(col=col),(
-                params.player_id,params.season,float(params.line),params.as_of_date,
+                athlete_id,params.season,float(params.line),params.as_of_date,
                 params.last_n_games or 40)
 
         # Substitute column name from static map — column name is NOT user data
