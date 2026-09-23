@@ -142,6 +142,8 @@ def recover_response(engine, response: str, season: int, observed: datetime, *, 
         if conn.dialect.name=='postgresql':
             conn.exec_driver_sql('SET LOCAL statement_timeout=60000')
             conn.exec_driver_sql('SET LOCAL lock_timeout=5000')
+            conn.exec_driver_sql('SET LOCAL idle_in_transaction_session_timeout=60000')
+            conn.exec_driver_sql("SET LOCAL application_name='sportsbet_nba_recovery'")
             if not apply:conn.exec_driver_sql('SET TRANSACTION READ ONLY')
         stored=[dict(row) for row in conn.execute(select(table).where(table.c.season==season)).mappings()]
         updates,report=recovery_plan(stored,source,season,observed)

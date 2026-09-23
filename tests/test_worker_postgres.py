@@ -528,6 +528,8 @@ def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_pa
         plans=[]
         def inspect_recovery_plan(conn,cursor,statement,parameters,context,executemany):
             if row_count>2 and not plans and statement.startswith('UPDATE nba_player_gamelogs'):
+                assert conn.exec_driver_sql("SELECT current_setting('idle_in_transaction_session_timeout')::interval = interval '60 seconds'").scalar_one()
+                assert conn.exec_driver_sql("SELECT current_setting('application_name')").scalar_one()=='sportsbet_nba_recovery'
                 plan=conn.exec_driver_sql('EXPLAIN (FORMAT JSON) '+statement,
                     parameters[0] if executemany else parameters).scalar_one()
                 plans.append(plan)

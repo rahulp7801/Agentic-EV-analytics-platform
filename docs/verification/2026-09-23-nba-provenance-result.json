@@ -1,0 +1,302 @@
+{
+  "application": [
+    {
+      "season": 2024,
+      "stored_rows": 26306,
+      "official_rows": 26306,
+      "counts": {
+        "recoverable": 26306,
+        "name_updates": 198
+      },
+      "mismatch_fields": {},
+      "values_sha256": "255e27d335edb068aaeb61f779c5c69dab06332aeeea315c73bc57bf5b126433",
+      "normalized_source_sha256": "7ad9338f3e09787bc97888dd360e045a716b6c6e61ba73d29be4232653e94128",
+      "source_observed_at": "2026-09-23T18:53:09.649610+00:00",
+      "applied": true,
+      "updated_rows": 26306,
+      "raw_response_sha256": "800998e6cf6918b64434fe24ec8ed5472092d71f755a4a5173d4752ed9f597a4",
+      "source_url": "https://stats.nba.com/stats/playergamelogs"
+    },
+    {
+      "season": 2025,
+      "stored_rows": 26651,
+      "official_rows": 26651,
+      "counts": {
+        "recoverable": 26651,
+        "timestamp_only_recovered": 26651,
+        "name_updates": 0
+      },
+      "mismatch_fields": {},
+      "values_sha256": "7ea05309dc6e26bd05a7a84cd2cb3d0db5e173e098f0b325fb5a3926aa443f37",
+      "normalized_source_sha256": "e23a2f2f77321bd7f92055818773b284e286cf5f0f89d3598000c7f484b25279",
+      "source_observed_at": "2026-09-23T18:51:38.400519+00:00",
+      "applied": true,
+      "updated_rows": 26651,
+      "raw_response_sha256": "af8b582e0e2ee25ad659a0cc8abdc774c577cb474b531650293a4ac9d6ecc5de",
+      "source_url": "https://stats.nba.com/stats/playergamelogs"
+    }
+  ],
+  "independent_verification": {
+    "verified_at": "2026-09-23T19:40:15.351147+00:00",
+    "seasons": [
+      {
+        "season": 2024,
+        "rows": 26306,
+        "checks": {
+          "row_count": true,
+          "unchanged_model_values": true,
+          "exact_official_values": true,
+          "source_provider": true,
+          "verified_record_hashes": true,
+          "exact_batch_hashes": true,
+          "exact_observation_times": true,
+          "recomputed_batch": true
+        },
+        "values_sha256": "255e27d335edb068aaeb61f779c5c69dab06332aeeea315c73bc57bf5b126433",
+        "verified_records": 26306
+      },
+      {
+        "season": 2025,
+        "rows": 26651,
+        "checks": {
+          "row_count": true,
+          "unchanged_model_values": true,
+          "exact_official_values": true,
+          "source_provider": true,
+          "verified_record_hashes": true,
+          "exact_batch_hashes": true,
+          "exact_observation_times": true,
+          "recomputed_batch": true
+        },
+        "values_sha256": "7ea05309dc6e26bd05a7a84cd2cb3d0db5e173e098f0b325fb5a3926aa443f37",
+        "verified_records": 26651
+      }
+    ],
+    "api_usage": {
+      "status": "not_checked",
+      "reason": "analytics_database_not_available_in_local_environment",
+      "repair_provider_quote_requests": 0
+    },
+    "passed": true
+  },
+  "collection_checkpoint": {
+    "observed_at": "2026-09-23T19:26:19.946531+00:00",
+    "snapshots": [
+      {
+        "key": "scan:nba",
+        "updated_at": "2026-09-23 18:08:41.538707+00:00",
+        "summary": {
+          "scan_id": "4fa570fa45d546ef994c8af718f9cd21",
+          "status": "complete",
+          "finished_at": "2026-09-23T18:08:40.694423+00:00",
+          "eligible_events": 0,
+          "attempted_events": 0,
+          "completed_events": 0,
+          "budget_skipped_events": 0,
+          "next_refresh_at": null,
+          "history_shadow": null,
+          "events": []
+        }
+      },
+      {
+        "key": "shadow-validation:nfl",
+        "updated_at": "2026-09-23 18:11:39.124727+00:00",
+        "summary": {
+          "scope": "Untraded prospective probability comparison; no candidate acceptance policy or ROI.",
+          "sport": "nfl",
+          "status": "collecting",
+          "markets": {
+            "rec_yds": {
+              "counts": {
+                "pending": 0,
+                "attempts": 0,
+                "unpaired": 0,
+                "unavailable": 0,
+                "paired_decided": 0,
+                "verified_decided": 0,
+                "valid_predictions": 0,
+                "paired_predictions": 0
+              },
+              "status": "insufficient_data",
+              "promote": false,
+              "paired_games": 0,
+              "paired_players": 0,
+              "unavailable_reasons": {}
+            },
+            "receptions": {
+              "counts": {
+                "pending": 0,
+                "attempts": 0,
+                "unpaired": 0,
+                "unavailable": 0,
+                "paired_decided": 0,
+                "verified_decided": 0,
+                "valid_predictions": 0,
+                "paired_predictions": 0
+              },
+              "status": "insufficient_data",
+              "promote": false,
+              "paired_games": 0,
+              "paired_players": 0,
+              "unavailable_reasons": {}
+            }
+          },
+          "promote": false,
+          "excluded": 0,
+          "frozen_at": "2026-09-23T15:36:55+00:00",
+          "generated_at": "2026-09-23T18:11:38.546639+00:00",
+          "model_version": "history-workload-shadow-v1",
+          "policy_version": "half-line-prior40-z8-v1",
+          "artifact_sha256": "0e31303402ec07c361e7906a6447f8d1e0e5a1d5643d5d59ad4b4399e445f7bc",
+          "earliest_attempts": 0,
+          "recorded_attempts": 0,
+          "duplicate_attempts": 0,
+          "minimum_paired_games": 50,
+          "implementation_sha256": "26cb92de2e1ece980dcbb80d43e3954544fc991cc61dd1eb4b256e94e0ecfbed"
+        }
+      },
+      {
+        "key": "scan:cfb",
+        "updated_at": "2026-09-23 18:08:43.481594+00:00",
+        "summary": {
+          "scan_id": "4fa570fa45d546ef994c8af718f9cd21",
+          "status": "degraded",
+          "finished_at": "2026-09-23T18:08:42.667554+00:00",
+          "eligible_events": 1,
+          "attempted_events": 0,
+          "completed_events": 0,
+          "budget_skipped_events": 1,
+          "next_refresh_at": null,
+          "history_shadow": null,
+          "events": [
+            {
+              "game_id": "9e0eaa3fed3125ec9629a777bf077185",
+              "game_start_time": "2026-09-24T23:30:00Z",
+              "state": "api_budget",
+              "next_refresh_at": null
+            }
+          ]
+        }
+      },
+      {
+        "key": "shadow-validation:cfb",
+        "updated_at": "2026-09-23 18:09:35.791616+00:00",
+        "summary": {
+          "scope": "Untraded prospective probability comparison; no candidate acceptance policy or ROI.",
+          "sport": "cfb",
+          "status": "no_frozen_candidate",
+          "markets": {},
+          "promote": false,
+          "excluded": 0,
+          "frozen_at": "2026-09-23T15:36:55+00:00",
+          "generated_at": "2026-09-23T18:09:34.955560+00:00",
+          "model_version": "history-workload-shadow-v1",
+          "policy_version": "half-line-prior40-z8-v1",
+          "artifact_sha256": "0e31303402ec07c361e7906a6447f8d1e0e5a1d5643d5d59ad4b4399e445f7bc",
+          "earliest_attempts": 0,
+          "recorded_attempts": 0,
+          "duplicate_attempts": 0,
+          "minimum_paired_games": 50,
+          "implementation_sha256": "26cb92de2e1ece980dcbb80d43e3954544fc991cc61dd1eb4b256e94e0ecfbed"
+        }
+      },
+      {
+        "key": "shadow-validation:nba",
+        "updated_at": "2026-09-23 18:11:46.027908+00:00",
+        "summary": {
+          "scope": "Untraded prospective probability comparison; no candidate acceptance policy or ROI.",
+          "sport": "nba",
+          "status": "collecting",
+          "markets": {
+            "points": {
+              "counts": {
+                "pending": 0,
+                "attempts": 0,
+                "unpaired": 0,
+                "unavailable": 0,
+                "paired_decided": 0,
+                "verified_decided": 0,
+                "valid_predictions": 0,
+                "paired_predictions": 0
+              },
+              "status": "insufficient_data",
+              "promote": false,
+              "paired_games": 0,
+              "paired_players": 0,
+              "unavailable_reasons": {}
+            },
+            "assists": {
+              "counts": {
+                "pending": 0,
+                "attempts": 0,
+                "unpaired": 0,
+                "unavailable": 0,
+                "paired_decided": 0,
+                "verified_decided": 0,
+                "valid_predictions": 0,
+                "paired_predictions": 0
+              },
+              "status": "insufficient_data",
+              "promote": false,
+              "paired_games": 0,
+              "paired_players": 0,
+              "unavailable_reasons": {}
+            },
+            "rebounds": {
+              "counts": {
+                "pending": 0,
+                "attempts": 0,
+                "unpaired": 0,
+                "unavailable": 0,
+                "paired_decided": 0,
+                "verified_decided": 0,
+                "valid_predictions": 0,
+                "paired_predictions": 0
+              },
+              "status": "insufficient_data",
+              "promote": false,
+              "paired_games": 0,
+              "paired_players": 0,
+              "unavailable_reasons": {}
+            }
+          },
+          "promote": false,
+          "excluded": 0,
+          "frozen_at": "2026-09-23T15:36:55+00:00",
+          "generated_at": "2026-09-23T18:11:45.462306+00:00",
+          "model_version": "history-workload-shadow-v1",
+          "policy_version": "half-line-prior40-z8-v1",
+          "artifact_sha256": "0e31303402ec07c361e7906a6447f8d1e0e5a1d5643d5d59ad4b4399e445f7bc",
+          "earliest_attempts": 0,
+          "recorded_attempts": 0,
+          "duplicate_attempts": 0,
+          "minimum_paired_games": 50,
+          "implementation_sha256": "26cb92de2e1ece980dcbb80d43e3954544fc991cc61dd1eb4b256e94e0ecfbed"
+        }
+      },
+      {
+        "key": "scan:nfl",
+        "updated_at": "2026-09-23 18:08:39.575509+00:00",
+        "summary": {
+          "scan_id": "4fa570fa45d546ef994c8af718f9cd21",
+          "status": "degraded",
+          "finished_at": "2026-09-23T18:08:38.765220+00:00",
+          "eligible_events": 1,
+          "attempted_events": 0,
+          "completed_events": 0,
+          "budget_skipped_events": 1,
+          "next_refresh_at": null,
+          "history_shadow": null,
+          "events": [
+            {
+              "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+              "game_start_time": "2026-09-25T00:15:00Z",
+              "state": "api_budget",
+              "next_refresh_at": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -75,6 +75,57 @@ The follow-up keeps every optimistic value/provenance comparison and uses equali
 only for the two non-null identities. A 2,048-row PostgreSQL case verifies the
 actual recovery UPDATE has indexed identity conditions, all values survive, the
 source constraint validates, and a repeat application is idempotent. The original
-two-row case remains. Recovery is pending verification of this follow-up. This work makes no provider quote
+two-row case remains. PR #205 passed its full gates and deployed in
+[35910139538](https://github.com/rahulp7801/agentic-sports-forecaster/actions/runs/35910139538).
+A read-only EXPLAIN of the exact revised UPDATE on production also selected
+`uq_nba_gamelog_player_game` (estimated cost 2.55).
+
+The next attempt returned PostgreSQL `55P03` (lock timeout). A read-only audit
+identified the first failed application's abandoned, idle transaction retaining
+row locks. Neither attempt had committed rows. After verifying the exact backend
+and transaction timestamps and unique recovery SQL, only that orphaned backend
+was terminated, rolling back its uncommitted work. The successful retry runner
+used an explicit application name and a 60-second idle-transaction timeout.
+
+The utility now sets those protections locally within every PostgreSQL recovery
+transaction. This bounds retained locks if a client disconnects without a clean
+rollback. The PostgreSQL scale regression verifies both settings during the real
+UPDATE, in addition to indexed execution and preserved values. This work makes no provider quote
 requests, changes no credit limits, and involves no purchase, card, subscription,
 bet, model/threshold change, frozen-cohort refit, or synthetic prediction.
+
+## Completed production recovery
+
+At 19:40 UTC, an independent read-only connection verified every committed row:
+
+| Season | Rows recovered and verified | Official name corrections |
+| --- | ---: | ---: |
+| 2024 | 26,306 | 198 |
+| 2025 | 26,651 | 0 |
+| Total | 52,957 | 198 |
+
+All stable identities, dates, teams/opponents, home/away flags, minutes, and count
+stats still match the pre-repair value digests and the retained official source.
+Every row commitment recomputes correctly; the full batch digests and actual
+September 23 source-observation timestamps match the reviewed plan. The 2025
+legacy timestamps were replaced only after exact matching; no historical source
+availability or prediction was invented. Both exact raw responses and write
+archives remain retained locally, and their hashes are committed in the plan.
+
+The aggregate application and independent check results are committed in
+`2026-09-23-nba-provenance-result.json`. Live API usage was not re-read because the
+separate analytics database is unavailable in the local environment. The recovery
+issued zero provider quote requests and did not change credit limits.
+
+## Next evidence checkpoint
+
+At 19:26 UTC, retained snapshots still showed zero prospective shadow attempts.
+The next stored CFB start is September 24 at 23:30 UTC, and NFL is September 25
+at 00:15 UTC. NBA has no eligible events. The snapshots describe the most recent
+stored scan, not a fresh provider observation. The existing two-hour autonomous
+follow-up checks collection and code health; pre-lock quote collection remains
+subject to the existing scheduler and credit limits.
+
+This repair removes the known NBA source-commitment gap for future forecasts.
+It does not establish a betting edge or create a qualified pick. New priced
+pregame forecasts and source-verified outcomes must satisfy the frozen protocols.
