@@ -297,7 +297,8 @@ def test_cfb_settlement_uses_exact_espn_game_and_source_backed_stat(tmp_path):
     game['games'][0]['provider_event_id']='401234567'
     row=dict(game_id=401234567,athlete_id=12345,player_name='Player',team_id=7,
         passing_yards=None,rushing_yards=None,receiving_yards=45,receptions=4,
-        season=2026,week=4,game_date=payload['game_date'],is_home=True,
+        season=2026,week=4,game_date=(date.fromisoformat(payload['game_date'])+timedelta(days=1)).isoformat(),
+        is_home=True,
         team_name='Home',team_abbreviation='TAMU',opponent_id=9,
         opponent_name='Away',opponent_abbreviation='BAMA')
     assert stat_row_sha256('cfb',row)==row_sha256(row)

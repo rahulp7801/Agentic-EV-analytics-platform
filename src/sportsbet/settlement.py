@@ -125,8 +125,10 @@ def _actual(db, prediction: dict, sport: str, day: str, game: dict):
         fields=STAT_FIELDS['cfb']
         query=f'''SELECT {','.join(fields)},source_provider,source_sha256,
             source_record_sha256,source_observed_at FROM cfb_player_gamelogs
-            WHERE athlete_id=? AND game_id=? AND game_date=?'''
-        rows=db.execute(query,(int(player_id),int(event_id),day)).fetchall()
+            WHERE athlete_id=? AND game_id=?'''
+        # ESPN's slate date is in Eastern time; the source row can use the UTC date.
+        # Exact event and athlete IDs carry identity across that midnight boundary.
+        rows=db.execute(query,(int(player_id),int(event_id))).fetchall()
     else:
         if not player_id.strip() or len(player_id)>20:
             raise ValueError('Invalid player identity')
