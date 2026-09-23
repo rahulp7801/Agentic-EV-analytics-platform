@@ -12,10 +12,14 @@ There were 198 name-label differences in 2024 across five stable IDs: accents in
 Jonas Valanciunas, Lester Quinones, and Vlatko Cancar; and Jr. suffixes for Bobby
 Portis and Brandon Boston. Their IDs and every model value matched.
 
-During the new tool's read-only audit, the 26,651 rows for 2025 already had
-provenance from another refresh. The planner protected those rows and proposed
-only 26,306 prior-season repairs, including the 198 official name labels.
-The exact plan and source hashes are in `2026-09-23-nba-provenance-plan.json`.
+An initial planner classified the 2025 rows as having existing provenance because
+they carried an observation timestamp. Independent verification found that all
+26,651 had a September 11 timestamp but neither source hash. That is not verified
+provenance. The corrected planner can recover timestamp-only rows, preserves any
+existing hashes, and refuses to replace a later observation with older evidence.
+The exact corrected plan and source hashes are in
+`2026-09-23-nba-provenance-plan.json`. All 52,957 rows remain in recovery scope,
+including the 198 official name labels.
 The source observation times are September 23, 2026; nothing is backdated to the
 historical games or original research period.
 
@@ -28,9 +32,10 @@ Its default mode is a read-only audit; `--apply` explicitly enables recovery.
   response size, unique player/game identities, dates, matchup, and valid stats.
 - Compare every stored model value to the normalized official response. Playing
   time uses PostgreSQL's existing one-decimal storage precision.
-- Update only rows from `nba` with all three provenance fields missing. Existing
-  or partial provenance, other providers, missing source rows, and changed model
-  values are excluded and counted.
+- Update only rows from `nba` with both source hashes missing. Existing or partial
+  hashes, later observations, other providers, missing source rows, and changed
+  model values are excluded and counted. A legacy timestamp without hashes is
+  replaced with the actual observation time of the matching official response.
 - Retain an exact source-response archive and its SHA-256 before writes. Store
   the same normalized batch and core-stat row commitments used by normal NBA
   ingestion, plus the actual present-day observation time.
@@ -47,9 +52,10 @@ retroactively prove what was available before the historical games.
 
 ## Verification
 
-39 focused parser, ingestion, and recovery tests passed locally, covering audit
+42 focused parser, ingestion, and recovery tests passed locally, covering audit
 no-writes, safe application, preserved zero values, canonical labels, idempotency,
-existing/partial provenance protection, mismatched stats/workload/identity,
+existing/partial hash protection, timestamp-only recovery, newer-observation
+protection, mismatched stats/workload/identity,
 malformed sources, and rollback after a concurrent change. A disposable PostgreSQL
 regression is part of the existing CI worker test gate.
 

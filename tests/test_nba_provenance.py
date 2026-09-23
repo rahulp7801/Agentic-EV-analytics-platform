@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 
 import pytest
@@ -72,7 +72,7 @@ def test_changed_model_values_are_excluded(engine,field,value,tmp_path,monkeypat
 
 
 @pytest.mark.parametrize('changes',[{'source_provider':'espn'},{'source_sha256':'a'*64},
-    {'source_record_sha256':'b'*64},{'source_observed_at':OBSERVED}])
+    {'source_record_sha256':'b'*64}])
 def test_existing_or_partial_provenance_is_never_replaced(engine,changes,tmp_path,monkeypatch):
     monkeypatch.chdir(tmp_path)
     with engine.begin() as conn:
@@ -82,17 +82,21 @@ def test_existing_or_partial_provenance_is_never_replaced(engine,changes,tmp_pat
     assert retained(engine)[0]==previous
 
 
-def test_a_concurrent_change_rolls_back_all_earlier_updates(engine):
+@pytest.mark.parametrize('field,value',[('points',31),('source_record_sha256','c'*64),
+    ('source_observed_at',OBSERVED+timedelta(seconds=1))])
+def test_a_concurrent_change_rolls_back_all_earlier_updates(engine,field,value):
     source=official_rows(json.dumps(response()),2025,OBSERVED)
     updates,_=recovery_plan(retained(engine),source,2025,OBSERVED)
     with engine.begin() as conn:
-        conn.execute(TABLE.update().where(TABLE.c.player_id==102).values(points=31))
+        conn.execute(TABLE.update().where(TABLE.c.player_id==102).values({field:value}))
     with pytest.raises(ValueError,match='changed during recovery'):
         with engine.begin() as conn:
             apply_plan(conn,updates)
     rows=retained(engine)
-    assert all(row['source_record_sha256'] is None for row in rows)
-    assert rows[0]['player_name']=='Player' and rows[1]['points']==31
+    assert rows[0]['source_record_sha256'] is None and rows[0]['player_name']=='Player'
+    actual=rows[1][field]
+    if isinstance(actual,datetime):actual=actual.replace(tzinfo=timezone.utc)
+    assert actual==value
 
 
 @pytest.mark.parametrize('defect',['wrong_season','playoffs','pergame','duplicate_table','duplicate_header',
@@ -117,3 +121,25 @@ def test_malformed_official_responses_are_rejected(defect):
     elif defect=='missing_player':row[0]=None
     elif defect=='oversized_name':row[1]='x'*101
     with pytest.raises(ValueError):official_rows(json.dumps(body),2025,OBSERVED)
+
+
+
+def test_a_timestamp_without_hashes_is_recovered_with_fresh_observation(engine,tmp_path,monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    previous=OBSERVED-timedelta(days=12)
+    with engine.begin() as conn:
+        conn.execute(TABLE.update().values(source_observed_at=previous))
+    report=recover_response(engine,json.dumps(response()),2025,OBSERVED,apply=True)
+    assert report['updated_rows']==report['counts']['timestamp_only_recovered']==2
+    for row in retained(engine):
+        assert row['source_record_sha256']==stat_row_sha256('nba',row)
+        assert row['source_observed_at'].replace(tzinfo=timezone.utc)==OBSERVED
+
+
+def test_a_later_observation_is_not_replaced_by_an_older_response(engine,tmp_path,monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with engine.begin() as conn:
+        conn.execute(TABLE.update().values(source_observed_at=OBSERVED+timedelta(days=1)))
+    report=recover_response(engine,json.dumps(response()),2025,OBSERVED,apply=True)
+    assert report['updated_rows']==0 and report['counts']['observation_after_source']==2
+    assert all(row['source_record_sha256'] is None for row in retained(engine))

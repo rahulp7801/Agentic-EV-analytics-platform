@@ -91,16 +91,23 @@ def recovery_plan(stored: list[dict], source: list[dict], season: int, observed:
     for previous in stored:
         current=index.get((previous['player_id'],previous['game_id']))
         if previous['source_provider']!='nba':counts['different_provider']+=1;continue
-        if any(previous.get(key) is not None for key in PROVENANCE):
+        if any(previous.get(key) is not None for key in PROVENANCE[:2]):
             counts['existing_provenance']+=1;continue
         if current is None:counts['missing_source']+=1;continue
+        prior_observed=previous.get('source_observed_at')
+        prior_utc=(prior_observed.replace(tzinfo=timezone.utc) if prior_observed.utcoffset() is None
+            else prior_observed.astimezone(timezone.utc)) if prior_observed else None
+        if prior_utc and prior_utc>observed:
+            counts['observation_after_source']+=1;continue
         different=[key for key in FIELDS if key!='player_name' and previous[key]!=current[key]]
         if different:
             counts['value_mismatch']+=1;mismatches.update(different);continue
         updates.append({**{'expected_'+key:previous[key] for key in FIELDS},
+            'expected_source_observed_at':prior_observed,
             'new_player_name':current['player_name'],'batch_digest':batch,
             'record_digest':stat_row_sha256('nba',current),'observed':observed})
         counts['recoverable']+=1
+        if prior_observed is not None:counts['timestamp_only_recovered']+=1
         counts['name_updates']+=previous['player_name']!=current['player_name']
     report=dict(season=season,stored_rows=len(stored),official_rows=len(source),counts=dict(counts),
         mismatch_fields=dict(mismatches),values_sha256=value_digest(stored),
@@ -112,7 +119,8 @@ def apply_plan(conn, updates: list[dict]) -> int:
     """Optimistic all-field comparison; any changed row aborts the outer transaction."""
     table=NBAPlayerGameLog.__table__
     statement=update(table).where(table.c.source_provider=='nba',
-        *(table.c[key].is_(None) for key in PROVENANCE),
+        *(table.c[key].is_(None) for key in PROVENANCE[:2]),
+        table.c.source_observed_at.is_not_distinct_from(bindparam('expected_source_observed_at')),
         *(table.c[key].is_not_distinct_from(bindparam('expected_'+key)) for key in FIELDS)).values(
         player_name=bindparam('new_player_name'),source_sha256=bindparam('batch_digest'),
         source_record_sha256=bindparam('record_digest'),source_observed_at=bindparam('observed'))

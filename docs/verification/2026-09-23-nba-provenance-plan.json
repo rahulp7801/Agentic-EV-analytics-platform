@@ -21,7 +21,9 @@
     "stored_rows": 26651,
     "official_rows": 26651,
     "counts": {
-      "existing_provenance": 26651
+      "recoverable": 26651,
+      "timestamp_only_recovered": 26651,
+      "name_updates": 0
     },
     "mismatch_fields": {},
     "values_sha256": "7ea05309dc6e26bd05a7a84cd2cb3d0db5e173e098f0b325fb5a3926aa443f37",

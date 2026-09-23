@@ -495,7 +495,7 @@ def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_pa
     import json
     from sportsbet.db.models import NBAPlayerGameLog
     from sportsbet.ingestion.nba_provenance import official_rows,recover_response,value_digest
-    from test_nba_provenance import response
+    from tests.test_nba_provenance import response
     monkeypatch.chdir(tmp_path)
     body=response();player_id=int(uuid.uuid4().int%900000000)+1
     for i,row in enumerate(body['resultSets'][0]['rowSet']):row[0]=player_id+i
@@ -504,7 +504,7 @@ def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_pa
     engine=sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'])
     try:
         with engine.begin() as conn:
-            conn.execute(table.insert(),[dict(row,source_provider='nba') for row in rows])
+            conn.execute(table.insert(),[dict(row,source_provider='nba',source_observed_at=observed-timedelta(days=1)) for row in rows])
         before=recover_response(engine,text,2025,observed)
         assert before['counts']['recoverable']==2 and before['updated_rows']==0
         applied=recover_response(engine,text,2025,observed,apply=True)
