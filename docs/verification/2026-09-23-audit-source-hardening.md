@@ -50,3 +50,18 @@ regression checks a concurrent writer is invisible inside the audit snapshot,
 visible after it ends, and a direct write through the audit adapter is rejected
 by PostgreSQL. Full CI gates release. This change makes no paid provider requests
 and authorizes no new quota, purchase, subscription, card use, or wager.
+
+
+## Direct hosted replay
+
+The corrected command completed against the real ledger with the frozen v4
+cutoff `2026-09-23T00:34:15Z` and the existing 10,000 bootstrap iterations. It
+reproduced 5,208 decided earliest selections across 16 games, including 4,421
+exact-price pairs. Brier scores remain 0.2652781338 for v4 and 0.2450252021 for the
+market. This matches the earlier audit; there was no scoring or model change.
+
+The prospective v4 slice contains **107 pending forecasts and zero decided
+outcomes**. This is separate from the later workload-shadow trial, whose cutoff
+is 15:36:55 UTC and still has no captured forecasts. The full aggregate output is
+`2026-09-23-readonly-priced-audit.json`. A populated prospective baseline is not a
+qualified-pick count or evidence of an edge.

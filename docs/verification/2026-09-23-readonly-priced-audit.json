@@ -1,0 +1,81 @@
+{
+  "bootstrap_samples": 10000,
+  "bootstrap_seed": 20260922,
+  "captured_after": "2026-09-23T00:34:15+00:00",
+  "cohort": "all_predictions",
+  "decided": 5208,
+  "earliest_selections": 5403,
+  "game_cluster_bootstrap_95": [
+    0.004153917165959622,
+    0.0388072541089142
+  ],
+  "hypothetical_flat_stake_roi": -0.053120739929166653,
+  "leave_one_game_out_positive_weights": 11,
+  "leave_one_game_out_weight_range": [
+    0.0,
+    0.1584006396013015
+  ],
+  "ledger_performance": {
+    "clv_count": 2392,
+    "clv_game_cluster_count": 16,
+    "clv_mean": -0.0003245620093589981,
+    "clv_mean_game_cluster_interval": [
+      -0.0005353110790336386,
+      -0.00011381293968435756
+    ],
+    "pending_count": 195,
+    "roi": -0.053120739929166653,
+    "roi_game_cluster_count": 16,
+    "roi_game_cluster_interval": [
+      -0.06100685295177415,
+      -0.045234626906559154
+    ],
+    "settled_count": 5208
+  },
+  "market_model_leave_one_game_out_brier": 0.24635035610707856,
+  "model_brier": 0.2690978990326809,
+  "model_version": "empirical-jeffreys-v4",
+  "paired_decided": 4421,
+  "paired_games": 16,
+  "paired_market_no_vig_brier": 0.24502520211955062,
+  "paired_model_brier": 0.2652781338071271,
+  "paired_model_minus_market_brier": 0.020252931687576498,
+  "paired_shadow_prior80_brier": 0.24890569065323562,
+  "paired_shadow_prior80_count": 4421,
+  "paired_shadow_prior80_minus_market_brier": 0.0038804885336849943,
+  "pending": 195,
+  "profit_scope": "Hypothetical recorded-stake replay, not executed bets or realized account profit.",
+  "prospective": {
+    "decided": 0,
+    "earliest_selections": 107,
+    "ledger_performance": {
+      "clv_count": 0,
+      "clv_game_cluster_count": 0,
+      "clv_mean": null,
+      "clv_mean_game_cluster_interval": null,
+      "pending_count": 107,
+      "roi": null,
+      "roi_game_cluster_count": 0,
+      "roi_game_cluster_interval": null,
+      "settled_count": 0
+    },
+    "paired_decided": 0,
+    "pending": 107,
+    "pushes": 0,
+    "scored_decided": 0,
+    "source_eligible": 107
+  },
+  "pushes": 0,
+  "raw_implied_brier": 0.24704775886401825,
+  "scored_decided": 5208,
+  "selection_policy": "Earliest eligible prediction per game/player/market/side/line within the selected cohort.",
+  "settled_games": 16,
+  "shadow_prior80_brier": 0.24968302633004935,
+  "shadow_prior80_game_cluster_bootstrap_95": [
+    -0.0009416941493572034,
+    0.008661352280621364
+  ],
+  "shadow_prior80_scored": 5208,
+  "source_eligible": 11531,
+  "sport": "nfl"
+}
