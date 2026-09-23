@@ -137,6 +137,48 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
         run: uv run --locked python -m sportsbet.player_profiles --sport "$SPORT"
+      - name: Score prospective NFL market edge
+        if: env.OPERATION == 'daily' && (env.SPORT == 'both' || env.SPORT == 'nfl')
+        timeout-minutes: 10
+        env:
+          ANALYTICS_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/edge-checkpoint"
+          uv run --locked python -m sportsbet.quant.priced_market_audit \
+            --sport nfl --model-version empirical-jeffreys-v4 \
+            --captured-after 2026-09-23T00:34:15+00:00 \
+            > "$RUNNER_TEMP/edge-checkpoint/all-forecasts.json"
+          uv run --locked python -m sportsbet.quant.priced_market_audit \
+            --sport nfl --model-version empirical-jeffreys-v4 \
+            --recommendations-only \
+            --captured-after 2026-09-23T00:34:15+00:00 \
+            > "$RUNNER_TEMP/edge-checkpoint/recommendations.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'edge-checkpoint'
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf8') as summary:
+              summary.write('### Prospective NFL prop edge checkpoint\n\n')
+              summary.write('| Cohort | Earliest | Decided | Games | Market pairs | Model minus market Brier |\n')
+              summary.write('| --- | ---: | ---: | ---: | ---: | ---: |\n')
+              for label, filename in (('All forecasts', 'all-forecasts.json'),
+                                      ('Recommendations', 'recommendations.json')):
+                  result = json.loads((root / filename).read_text(encoding='utf8'))['prospective']
+                  gap = result.get('paired_model_minus_market_brier')
+                  gap_text = f'{gap:.5f}' if gap is not None else 'pending'
+                  summary.write(f'| {label} | {result["earliest_selections"]} | '
+                                f'{result["decided"]} | {result.get("settled_games", 0)} | '
+                                f'{result["paired_decided"]} | {gap_text} |\n')
+          PY
+      - name: Retain prospective NFL edge checkpoint
+        if: always() && env.OPERATION == 'daily' && (env.SPORT == 'both' || env.SPORT == 'nfl')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nfl-edge-checkpoint-${{ github.run_id }}
+          path: ${{ runner.temp }}/edge-checkpoint/
+          retention-days: 90
+          if-no-files-found: warn
       - name: Stage public evidence without configured credentials
         if: always() && (env.OPERATION == 'watch' || env.OPERATION == 'daily' || env.OPERATION == 'monitor' || env.OPERATION == 'public_daily' || env.OPERATION == 'public_monitor' || env.OPERATION == 'refresh' || env.OPERATION == 'scan')
         id: evidence

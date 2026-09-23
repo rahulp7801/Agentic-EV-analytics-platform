@@ -181,6 +181,21 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
     return result
 
 
+PERFORMANCE_FIELDS = (
+    "roi", "roi_game_cluster_interval", "roi_game_cluster_count",
+    "clv_mean", "clv_count", "clv_mean_game_cluster_interval",
+    "clv_game_cluster_count", "pending_count", "settled_count",
+)
+
+
+def _check_against_ledger(result: dict, report: dict, eligible_count: int) -> None:
+    if (result["earliest_selections"] != report["sample_size"]
+            or result["decided"] != report["decided_count"]
+            or result["decided"]+result["pushes"] != report["settled_count"]
+            or eligible_count-result["earliest_selections"] != report["duplicate_predictions"]):
+        raise ValueError("Priced audit cohort diverged from Ledger.report")
+
+
 def audit_ledger(ledger: Ledger, *, sport: str = "nfl", model_version: str | None = None,
                  recommendations_only: bool = False, captured_after: str | None = None,
                  bootstrap_samples: int = 10_000) -> dict:
@@ -191,22 +206,29 @@ def audit_ledger(ledger: Ledger, *, sport: str = "nfl", model_version: str | Non
         if key is not None:
             valid.append((key, row))
     result = compare_eligible_rows([row for _, row in valid], bootstrap_samples=bootstrap_samples)
-    if (result["earliest_selections"] != report["sample_size"]
-            or result["decided"] != report["decided_count"]
-            or result["decided"]+result["pushes"] != report["settled_count"]
-            or len(valid)-result["earliest_selections"] != report["duplicate_predictions"]):
-        raise ValueError("Priced audit cohort diverged from Ledger.report")
+    _check_against_ledger(result, report, len(valid))
     output = {"sport": sport, "model_version": model_version,
               "cohort": "recommendations" if recommendations_only else "all_predictions",
               "selection_policy": report["selection_policy"],
-              "profit_scope": report["profit_scope"], **result}
+              "profit_scope": report["profit_scope"],
+              "ledger_performance": {key: report.get(key) for key in PERFORMANCE_FIELDS},
+              **result}
     if captured_after is not None:
         cutoff = utc_timestamp(captured_after)
         prospective = [row for _, row in valid
                        if utc_timestamp(row["captured_at"]) >= cutoff]
-        output["captured_after"] = cutoff.isoformat()
-        output["prospective"] = compare_eligible_rows(
+        prospective_result = compare_eligible_rows(
             prospective, bootstrap_samples=bootstrap_samples)
+        prospective_report = ledger.report(
+            recommendations_only, sport=sport, model_version=model_version,
+            captured_after=cutoff.isoformat())
+        _check_against_ledger(prospective_result, prospective_report, len(prospective))
+        output["captured_after"] = cutoff.isoformat()
+        output["prospective"] = {
+            **prospective_result,
+            "ledger_performance": {key: prospective_report.get(key)
+                                   for key in PERFORMANCE_FIELDS},
+        }
     return output
 
 

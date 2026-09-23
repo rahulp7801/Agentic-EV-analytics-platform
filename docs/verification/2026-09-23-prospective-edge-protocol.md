@@ -22,3 +22,5 @@ These sample requirements prevent alternate lines and both sides of one game fro
 ## Current state
 
 At protocol start there are zero forecasts in the post-merge cohort. The all-time recommendations cohort has three distinct picks and one verified decided outcome. Future scheduled scans are enabled; the daily pipeline refreshes source-backed histories and settlements. If a scheduled run is degraded, retain the status and wait for verified coverage rather than scoring uncertain outcomes.
+
+The scheduled `daily` NFL pipeline now writes separate all-forecast and recommendation checkpoint JSON artifacts after settlement, with a compact game-level summary in the workflow run. The canonical ledger report also accepts the same capture cutoff, so the prospective report carries verified recorded-stake ROI and closing-line value rather than mixing in earlier picks. Artifacts are retained for 90 days; the underlying append-only ledger supports later reproduction.
