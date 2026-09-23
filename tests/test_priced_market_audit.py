@@ -139,3 +139,23 @@ def test_all_push_model_mass_keeps_result_without_undefined_brier(monkeypatch):
     assert result["scored_decided"] == 0
     assert result["model_brier"] is None
     assert result["hypothetical_flat_stake_roi"] == -1
+
+
+def test_frozen_shadow_prior_is_scored_without_changing_selected_rows(monkeypatch):
+    monkeypatch.setattr(audit, "_verified_outcome", lambda value: value["outcome"])
+    over = row(prediction_id="over-shadow", direction="over", odds=-110,
+               captured="2026-09-20T10:00:00+00:00",
+               quote="2026-09-20T09:59:00+00:00", outcome=True,
+               probability=.738095)
+    under = row(prediction_id="under-shadow", direction="under", odds=-110,
+                captured="2026-09-20T10:00:01+00:00",
+                quote="2026-09-20T09:59:00+00:00", outcome=False,
+                probability=.261905)
+    for value in (over, under):
+        value.update(model_version="empirical-jeffreys-v4", model_sample_size=20,
+                     push_probability=0)
+    result = audit.compare_eligible_rows([over, under], bootstrap_samples=0)
+    assert result["earliest_selections"] == 2
+    assert result["paired_shadow_prior80_count"] == 2
+    assert result["paired_shadow_prior80_brier"] == pytest.approx(.2025)
+    assert result["paired_shadow_prior80_minus_market_brier"] == pytest.approx(-.0475)

@@ -21,6 +21,7 @@ from sportsbet.ledger import (
 )
 from sportsbet.model_contract import QUOTE_PROVENANCE_MODEL_VERSIONS
 from sportsbet.quant.market_baseline import verified_recorded_market_baseline
+from sportsbet.quant.shadow_prior import prior80_conditional_probability
 
 
 def _implied(odds: int) -> float:
@@ -107,10 +108,13 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
                 "decided": 0, "scored_decided": 0, "pushes": pushes,
                 "pending": len(selected)-pushes, "paired_decided": 0}
     model_error = []
+    shadow_error = []
     raw_error = []
     flat_return = []
     paired = []
+    shadow_paired = []
     game_deltas: dict[str, list[float]] = defaultdict(list)
+    shadow_game_deltas: dict[str, list[float]] = defaultdict(list)
     game_blend_rows: dict[str, list[tuple[float, float, int]]] = defaultdict(list)
     for row in decided:
         y = int(row["outcome"])
@@ -121,6 +125,9 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
         p = float(row["model_probability"]) / (1-push)
         raw = _implied(row["american_odds"])
         model_error.append((p-y)**2)
+        shadow = prior80_conditional_probability(row)
+        if shadow is not None:
+            shadow_error.append((shadow-y)**2)
         raw_error.append((raw-y)**2)
         other = "under" if row["direction"] == "over" else "over"
         opposite_prices = quotes[_quote_key(row)].get(other, set())
@@ -139,18 +146,28 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
         game_id = str(row["game_id"])
         game_deltas[game_id].append(model_brier-market_brier)
         game_blend_rows[game_id].append((p, no_vig, y))
+        if shadow is not None:
+            shadow_brier = (shadow-y)**2
+            shadow_paired.append((shadow_brier, market_brier))
+            shadow_game_deltas[game_id].append(shadow_brier-market_brier)
     result = {
         "source_eligible": len(rows), "earliest_selections": len(selected),
         "decided": len(decided), "scored_decided": len(model_error), "pushes": pushes,
         "pending": len(selected)-len(decided)-pushes,
         "settled_games": len({str(row["game_id"]) for row in decided}),
         "model_brier": mean(model_error) if model_error else None,
+        "shadow_prior80_scored": len(shadow_error),
+        "shadow_prior80_brier": mean(shadow_error) if shadow_error else None,
         "raw_implied_brier": mean(raw_error) if raw_error else None,
         "hypothetical_flat_stake_roi": sum(flat_return)/(len(decided)+pushes),
         "paired_decided": len(paired), "paired_games": len(game_deltas),
         "paired_model_brier": mean(x[0] for x in paired) if paired else None,
         "paired_market_no_vig_brier": mean(x[1] for x in paired) if paired else None,
         "paired_model_minus_market_brier": mean(x[0]-x[1] for x in paired) if paired else None,
+        "paired_shadow_prior80_count": len(shadow_paired),
+        "paired_shadow_prior80_brier": mean(x[0] for x in shadow_paired) if shadow_paired else None,
+        "paired_shadow_prior80_minus_market_brier": (
+            mean(x[0]-x[1] for x in shadow_paired) if shadow_paired else None),
     }
     if len(game_blend_rows) >= 2:
         held_out_errors = []
@@ -181,6 +198,19 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
         ]
         result["bootstrap_samples"] = bootstrap_samples
         result["bootstrap_seed"] = seed
+        if shadow_paired:
+            shadow_games = sorted(shadow_game_deltas)
+            shadow_rng = random.Random(seed + 1)
+            shadow_draws = []
+            for _ in range(bootstrap_samples):
+                sample = [shadow_game_deltas[shadow_rng.choice(shadow_games)]
+                          for _ in shadow_games]
+                shadow_draws.append(sum(map(sum, sample)) / sum(map(len, sample)))
+            shadow_draws.sort()
+            result["shadow_prior80_game_cluster_bootstrap_95"] = [
+                shadow_draws[int(.025*bootstrap_samples)],
+                shadow_draws[min(bootstrap_samples-1, int(.975*bootstrap_samples))],
+            ]
     return result
 
 
