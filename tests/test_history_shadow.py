@@ -266,3 +266,15 @@ async def test_scan_shadow_has_no_effect_on_primary_forecasts_or_exposure(tmp_pa
     assert all('history_shadow' not in item for item in candidate['signals'])
     with shadow_ledger.connect() as db:
         assert db.execute('SELECT count(*) FROM exposure').fetchone()[0]==0
+
+
+@pytest.mark.parametrize('features',[[],[0],[0]*8,[True]*7,[float('nan')]*7,'invalid'])
+def test_malformed_feature_arrays_cannot_break_record_verification(features):
+    p,rows,_=fixture();record=shadow.shadow_record(p,rows)
+    record['features']=features
+    if isinstance(features,list) and any(isinstance(v,float) and math.isnan(v) for v in features):
+        # Invalid JSON is rejected by the integrity check itself.
+        record['record_sha256']='a'*64
+    else:
+        record['record_sha256']=shadow.digest({k:v for k,v in record.items() if k!='record_sha256'})
+    assert shadow.verified_shadow_probability(p|{'history_shadow':record}) is None

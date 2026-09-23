@@ -228,7 +228,11 @@ def verified_shadow_probability(payload: dict) -> float | None:
                 or row['offer_sha256']!=offer_digest(payload)):
             return None
         _offer(payload)
-        if row['sample_size']!=payload['model_sample_size'] or not 20<=row['sample_size']<=40:
+        features=row.get('features')
+        if (not isinstance(features,list) or len(features)!=7
+                or any(type(value) not in (int,float) or not math.isfinite(value) for value in features)):
+            return None
+        if type(row['sample_size']) is not int or row['sample_size']!=payload['model_sample_size'] or not 20<=row['sample_size']<=40:
             return None
         base=float(payload['model_probability'])
         base=base if payload['direction']=='over' else 1-base

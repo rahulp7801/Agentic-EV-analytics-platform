@@ -19,6 +19,15 @@ from sportsbet.quant.market_baseline import verified_recorded_market_baseline
 from sportsbet.quant.priced_market_audit import _eligible,_verified_outcome
 
 
+UNAVAILABLE_REASONS = frozenset({
+    'unsupported_market','history_read_failed','shadow_evaluation_failed','invalid_or_late_recording',
+    'unsupported_line','unsupported_baseline','invalid_exact_offer','outside_prospective_quote_window',
+    'insufficient_history','duplicate_history_game','invalid_history_identity_or_cutoff',
+    'missing_or_invalid_history','invalid_history_value','future_source_observation',
+    'invalid_history_commitment','low_prior_workload','baseline_history_mismatch',
+    'nonmonotone_candidate','outside_frozen_feature_range','invalid_shadow_input'})
+
+
 def report_history_shadow(rows: list[dict], sport: str) -> dict:
     if sport not in ('nba','nfl','cfb'):
         raise ValueError('Invalid shadow sport')
@@ -53,7 +62,7 @@ def report_history_shadow(rows: list[dict], sport: str) -> dict:
                 counts['unavailable']+=1
                 # Only bounded internal reason codes are retained, never arbitrary messages.
                 reason=row['history_shadow'].get('reason','invalid_shadow_record')
-                if not isinstance(reason,str) or not reason.replace('_','').isalnum() or len(reason)>60:
+                if not isinstance(reason,str) or reason not in UNAVAILABLE_REASONS:
                     reason='invalid_shadow_record'
                 reasons[reason]+=1
                 continue
