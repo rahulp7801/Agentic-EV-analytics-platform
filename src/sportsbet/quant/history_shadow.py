@@ -108,7 +108,7 @@ async def load_histories(pool, sport: str, season: int, cutoff: date, requests: 
                         AND g.game_date < $4 AND ps.{stat} IS NOT NULL)
                         SELECT * FROM history WHERE rn<=40 ORDER BY player,day,game'''
                     ids=players
-                rows=await conn.fetch(query,ids,season-2,season,cutoff,timeout=15)
+                rows=await conn.fetch(query,ids,season-2,season,cutoff,timeout=4)
                 for row in rows:
                     record=dict(row);record.pop('rn',None)
                     if record['player'] not in players:
@@ -138,7 +138,8 @@ def _history(rows, payload, now):
             value=row.get(key)
             if isinstance(value,bool) or value is None or not math.isfinite(float(value)):
                 raise ValueError('missing_or_invalid_history')
-        if float(row[workload])<0 or (sport=='nba' and float(row[stat])<0):
+        if (not float(row[stat]).is_integer() or float(row[workload])<0
+                or (sport=='nba' and float(row[stat])<0)):
             raise ValueError('invalid_history_value')
         if row.get('source_observed_at') is not None and utc_timestamp(row['source_observed_at'])>now:
             raise ValueError('future_source_observation')
@@ -238,5 +239,19 @@ def verified_shadow_probability(payload: dict) -> float | None:
         if type(row['probability']) not in (int,float) or not math.isfinite(row['probability']) or abs(p-row['probability'])>1e-12:
             return None
         return p
+    except (KeyError,TypeError,ValueError,ArithmeticError):
+        return None
+
+
+
+def verified_recorded_shadow_probability(payload: dict) -> float | None:
+    """Require the ledger-assigned insertion timestamp as well as inference evidence."""
+    from sportsbet.ledger import utc_timestamp
+    try:
+        receipt=utc_timestamp(payload['history_shadow_recorded_at'])
+        if (not utc_timestamp(payload['captured_at'])<=receipt<utc_timestamp(payload['game_start_time'])
+                or not 0<=(receipt-utc_timestamp(payload['quote_time'])).total_seconds()<=300):
+            return None
+        return verified_shadow_probability(payload)
     except (KeyError,TypeError,ValueError,ArithmeticError):
         return None

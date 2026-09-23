@@ -13,7 +13,7 @@ import numpy as np
 
 from sportsbet.ledger import Ledger,utc_timestamp
 from sportsbet.quant.history_shadow import (ARTIFACT_SHA256,FROZEN_AT,MARKETS,POLICY,VERSION,
-    implementation_sha256,verified_shadow_probability)
+    implementation_sha256,verified_recorded_shadow_probability as verified_shadow_probability)
 from sportsbet.quant.history_tuning import Example,compare,score
 from sportsbet.quant.market_baseline import verified_recorded_market_baseline
 from sportsbet.quant.priced_market_audit import _eligible,_verified_outcome
@@ -94,6 +94,19 @@ def report_history_shadow(rows: list[dict], sport: str) -> dict:
     if sport not in MARKETS:
         report['status']='no_frozen_candidate'
     return report
+
+
+def publish_history_shadow(rows: list[dict], sport: str, publish) -> None:
+    """Research diagnostics cannot change the primary pipeline's success state."""
+    import structlog
+    try:
+        result=report_history_shadow(rows,sport)
+    except Exception as exc:
+        result=dict(status='unavailable',error_type=type(exc).__name__,promote=False)
+    try:
+        publish(f'shadow-validation:{sport}',result)
+    except Exception as exc:
+        structlog.get_logger().warning('shadow_report_unavailable',sport=sport,error_type=type(exc).__name__)
 
 
 class ReadOnlyLedger(Ledger):

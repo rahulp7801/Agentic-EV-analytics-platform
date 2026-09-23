@@ -200,3 +200,12 @@ scores sufficiently to freeze shadow candidates. No production probability chang
 or market-edge claim follows from those unpriced retrospective tests. Coefficients,
 coverage, calibration, paired uncertainty, negative results, and promotion gates
 are retained in the linked aggregate artifacts.
+
+### Frozen forward workload comparison
+
+The [prospective shadow implementation](verification/2026-09-23-history-shadow-implementation.md)
+records the five supported history/workload candidates alongside new exact offers,
+without changing consumer probabilities or stake decisions. It retains immutable
+input/model/offer commitments, skips unsupported inputs explicitly, and reports
+paired future outcomes against v4 and same-book no-vig market probabilities under
+the [frozen collection policy](verification/2026-09-23-history-shadow-protocol.md).

@@ -348,3 +348,18 @@ async def test_paid_daily_cfb_refreshes_settles_and_scans_without_public_sources
     assert calls.index(('refresh','cfb'))<calls.index(('settle','cfb'))<calls.index(('scan','cfb'))
     with pytest.raises(ValueError):
         await daily.run(['cfb'],'public_daily',25)
+
+
+async def test_shadow_report_failure_cannot_change_production_settlement(monkeypatch):
+    monkeypatch.setattr(daily,'load_snapshot',lambda key:dict(status='complete',finished_at=datetime.now(timezone.utc).isoformat()))
+    stored={}
+    def publish(key,value):
+        if key.startswith('shadow-validation:'):raise RuntimeError('research storage unavailable')
+        stored[key]=value
+    monkeypatch.setattr(daily,'publish_snapshot',publish)
+    monkeypatch.setattr(daily,'watch',AsyncMock(return_value=({'sources':{'book':{'status':'observed'}},
+        'captured_at':datetime.now(timezone.utc).isoformat()},None)))
+    monkeypatch.setattr(daily,'scan',AsyncMock(return_value={'nba':{'status':'complete'}}))
+    result=await daily.run(['nba'],'monitor',25)
+    assert result['status']=='complete' and result['settlements']['nba']['status']=='complete'
+    assert 'picks:nba' in stored and 'metrics:all:nba' in stored

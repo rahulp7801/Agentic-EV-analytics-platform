@@ -155,7 +155,9 @@ def test_immutable_storage_keeps_primary_values_and_rejects_late_shadow(tmp_path
     p,rows,_=fixture();original=deepcopy(p);p['history_shadow']=shadow.shadow_record(p,rows)
     ledger=Ledger(tmp_path/'shadow.sqlite');key=ledger.record('capture',p)
     stored=ledger.predictions()[0]
-    assert shadow.verified_shadow_probability(stored)==p['history_shadow']['probability']
+    assert shadow.verified_recorded_shadow_probability(stored)==p['history_shadow']['probability']
+    assert shadow.verified_recorded_shadow_probability(p) is None
+    assert datetime.fromisoformat(stored['history_shadow_recorded_at'])>=datetime.fromisoformat(p['captured_at'])
     assert all(stored[k]==v for k,v in original.items())
     assert ledger.record('capture',p)==key
     changed=deepcopy(p);changed['history_shadow']['probability']=.123
@@ -181,7 +183,7 @@ async def test_bounded_loader_uses_readonly_snapshot_and_bound_player_ids():
     args=conn.fetch.call_args
     assert args.args[1:]==(['00-1'],2024,2026,date.fromisoformat(p['game_date']))
     assert 'rn<=40' in args.args[0] and '00-1' not in args.args[0]
-    assert args.kwargs['timeout']==15
+    assert args.kwargs['timeout']==4
     assert await shadow.load_histories(pool,'cfb',2026,date.today(),{('1','rec_yds')})=={}
 
 
@@ -221,3 +223,46 @@ def test_pending_unpaired_and_cluster_support_never_produce_roi(monkeypatch):
     assert result['paired_games']==48 and result['status']=='insufficient_data'
     empty=audit.report_history_shadow([],'nba')['markets']['points']
     assert empty['counts']['attempts']==0 and 'candidate' not in empty
+
+
+@pytest.mark.parametrize('failed_read',[False,True])
+async def test_scan_shadow_has_no_effect_on_primary_forecasts_or_exposure(tmp_path,monkeypatch,failed_read):
+    from sportsbet import scan
+    from sportsbet.config import settings
+    from sportsbet.graph.models import PropResult
+    p,rows,event=fixture();now=datetime.fromisoformat(p['captured_at'])
+    class Clock(datetime):
+        @classmethod
+        def now(cls,tz=None):return now
+    monkeypatch.setattr(scan,'datetime',Clock)
+    conn=MagicMock();conn.fetch=AsyncMock(return_value=[{'normalized_name':'player','player_id':'00-1'}])
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    pool.acquire.return_value.__aexit__=AsyncMock()
+    monkeypatch.setattr(scan,'write_player_prop_snapshots',AsyncMock())
+    graph=MagicMock();graph.ainvoke=AsyncMock(return_value={'prop_result':PropResult(
+        true_probability=Decimal(str(p['model_probability'])),sample_size=40,
+        mean_stat=Decimal(str(p['model_mean_stat'])),
+        confidence_interval=(Decimal('.3'),Decimal('.7')))})
+    monkeypatch.setattr(scan,'create_graph',lambda **kwargs:graph)
+    load=AsyncMock(side_effect=RuntimeError('private database detail')) if failed_read else AsyncMock(
+        return_value={('00-1','rec_yds'):rows})
+    monkeypatch.setattr(scan,'load_histories',load)
+    baseline_ledger=Ledger(tmp_path/'baseline.sqlite');shadow_ledger=Ledger(tmp_path/'candidate.sqlite')
+    monkeypatch.setattr(settings,'history_shadow_enabled',False)
+    baseline=await scan.evaluate_event(pool,event,'nfl',baseline_ledger,'same')
+    load.assert_not_awaited()
+    monkeypatch.setattr(settings,'history_shadow_enabled',True)
+    candidate=await scan.evaluate_event(pool,event,'nfl',shadow_ledger,'same')
+    assert baseline['signals']==candidate['signals']
+    assert baseline['coverage']['counts']==candidate['coverage']['counts']
+    assert len(shadow_ledger.predictions())==2
+    for row in shadow_ledger.predictions():
+        if failed_read:
+            assert row['history_shadow']['reason']=='history_read_failed'
+            assert 'private database detail' not in str(row)
+        else:
+            assert shadow.verified_shadow_probability(row) is not None
+        assert row['accepted'] is False and row['stake_fraction']==0
+    assert all('history_shadow' not in item for item in candidate['signals'])
+    with shadow_ledger.connect() as db:
+        assert db.execute('SELECT count(*) FROM exposure').fetchone()[0]==0
