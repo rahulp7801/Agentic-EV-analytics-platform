@@ -371,11 +371,14 @@ async def test_scan_preserves_last_credits_for_last_hour_checks(monkeypatch,work
     transport(monkeypatch,handle)
     distant=(await scan.run(['nfl'],25))['nfl']
     assert distant['budget_skipped_events']==2 and not evaluated
+    assert distant['budget_reasons']=={'pregame_credit_reserve':2}
+    assert all(event['budget_reason']=='pregame_credit_reserve' for event in distant['events'])
     for event in events['nfl']:
         event['commence_time']=(datetime.now(timezone.utc)+timedelta(minutes=30)).isoformat()
     pool.provider_cache.records.pop('odds:events:nfl')  # Provider schedule changed between synthetic runs.
     close=(await scan.run(['nfl'],25))['nfl']
     assert close['completed_events']==2 and close['budget_skipped_events']==0
+    assert close['budget_reasons']=={}
     assert evaluated==['nfl0','nfl1']
     assert not scan.Ledger().reserve_api_credits(1,25)
 
