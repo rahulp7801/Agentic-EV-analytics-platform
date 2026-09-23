@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import {publicPickBoard} from '../lib/pickBoard.ts';
 
 const now=Date.parse('2026-09-20T12:00:00Z');
@@ -33,8 +34,8 @@ test('projects a source-bound recommendation and a verified final result',()=>{
   assert.equal('private_internal_count' in projected.summary,false);
   const final={...signal,board_state:'final',result:'win',result_verified:true,actual_value:220,
     settled_at:new Date(Date.parse(start)+4*3600000).toISOString()};
-  const result=publicPickBoard(board([],[final],summary({current:0,settled:1,wins:1,
-    verified_win_rate:1})),null,'nfl',Date.parse(start)+5*3600000);
+  const result=publicPickBoard({...board([],[final],summary({current:0,settled:1,wins:1,
+    verified_win_rate:1})),generated_at:final.settled_at},null,'nfl',Date.parse(start)+5*3600000);
   assert.equal(result.history[0].result,'win');
   assert.equal(result.summary.verified_win_rate,1);
 });
@@ -48,13 +49,15 @@ test('rejects tampered identity, lock, totals and result evidence',()=>{
   assert.throws(()=>publicPickBoard(board([signal],[],summary({current:2})),null,'nfl',now));
   assert.throws(()=>publicPickBoard(board([signal,{...signal,id:'b'.repeat(64),prediction_id:'b'.repeat(64)}],[],
     summary({current:2})),null,'nfl',now));
+  const historyBoard=(item,totals)=>({...board([], [item], totals),
+    generated_at:new Date(Date.parse(start)+5*3600000).toISOString()});
   const final={...signal,board_state:'final',result:'win',result_verified:false,actual_value:null,settled_at:null};
-  assert.throws(()=>publicPickBoard(board([],[final],summary({current:0,pending:1})),null,'nfl',Date.parse(start)+5*3600000));
+  assert.throws(()=>publicPickBoard(historyBoard(final,summary({current:0,pending:1})),null,'nfl',Date.parse(start)+5*3600000));
   const pending={...signal,board_state:'final',result:'pending',result_verified:false,actual_value:220,settled_at:null};
-  assert.throws(()=>publicPickBoard(board([],[pending],summary({current:0,pending:1})),null,'nfl',Date.parse(start)+5*3600000));
+  assert.throws(()=>publicPickBoard(historyBoard(pending,summary({current:0,pending:1})),null,'nfl',Date.parse(start)+5*3600000));
   const wrongGrade={...signal,board_state:'final',result:'loss',result_verified:true,actual_value:220,
     settled_at:new Date(Date.parse(start)+4*3600000).toISOString()};
-  assert.throws(()=>publicPickBoard(board([],[wrongGrade],summary({current:0,settled:1,losses:1,
+  assert.throws(()=>publicPickBoard(historyBoard(wrongGrade,summary({current:0,settled:1,losses:1,
     verified_win_rate:0})),null,'nfl',Date.parse(start)+5*3600000));
 });
 
@@ -88,4 +91,48 @@ test('publisher state and capture time must agree with snapshot time',()=>{
   assert.throws(()=>publicPickBoard({...board(),generated_at:new Date(Date.parse(lock)+1000).toISOString()},
     null,'nfl',Date.parse(lock)+2000));
   assert.throws(()=>publicPickBoard(board([{...signal,captured_at:new Date(now+1000).toISOString()}]),null,'nfl',now));
+});
+
+
+test('final records must have been known when their snapshot was published',()=>{
+  const viewed=Date.parse(start)+5*3600000;
+  const final={...signal,board_state:'final',result:'win',result_verified:true,actual_value:220,
+    settled_at:new Date(Date.parse(start)+4*3600000).toISOString()};
+  const value=board([],[final],summary({current:0,settled:1,wins:1,verified_win_rate:1}));
+  assert.throws(()=>publicPickBoard(value,null,'nfl',viewed));
+  assert.throws(()=>publicPickBoard({...value,generated_at:new Date(Date.parse(start)+3*3600000).toISOString()},
+    null,'nfl',viewed));
+  assert.equal(publicPickBoard({...value,generated_at:final.settled_at},null,'nfl',viewed).history[0].result,'win');
+  const pending=board([],[{...final,result:'pending',result_verified:false,actual_value:null,settled_at:null}],
+    summary({current:0,pending:1}));
+  assert.throws(()=>publicPickBoard(pending,null,'nfl',viewed));
+  assert.equal(publicPickBoard({...pending,generated_at:start},null,'nfl',viewed).history[0].result,'pending');
+});
+
+test('verified values require real finite numbers without coercion',()=>{
+  const viewed=Date.parse(start)+5*3600000;
+  for(const actual of [null,false,true,'','220',[],[220],{},NaN,Infinity]) {
+    const final={...signal,board_state:'final',result:'win',result_verified:true,actual_value:actual,
+      settled_at:new Date(Date.parse(start)+4*3600000).toISOString()};
+    const value={...board([],[final],summary({current:0,settled:1,wins:1,verified_win_rate:1})),
+      generated_at:new Date(viewed).toISOString()};
+    assert.throws(()=>publicPickBoard(value,null,'nfl',viewed),String(actual));
+  }
+});
+
+test('a pick cannot use a quote from after its capture or exceed the recorded stake cap',()=>{
+  assert.throws(()=>publicPickBoard(board([{...signal,snapped_at:new Date(Date.parse(captured)+1000).toISOString()}]),
+    null,'nfl',now));
+  for(const stake of [.050001,'0.04']) {
+    assert.throws(()=>publicPickBoard(board([{...signal,kelly_fraction:stake}]),null,'nfl',now));
+  }
+});
+
+
+test('accepts the exact Python publisher contract including a verified zero result',()=>{
+  const fixture=JSON.parse(readFileSync(new URL('../../tests/fixtures/pick_board_contract.json',import.meta.url),'utf8'));
+  const value=publicPickBoard(fixture.board,null,'nfl',Date.parse(fixture.board.generated_at));
+  assert.equal(value.history[0].result,'win');
+  assert.equal(value.history[0].actual_value,0);
+  assert.deepEqual(value.summary,fixture.board.summary);
 });

@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import re
 
 from sportsbet.arbitrage.ev import compute_expected_return, quote_terms
 from sportsbet.ledger import (quote_evidence_valid, settlement_identity_valid,
-                              utc_timestamp, verified_settlement_evidence)
+                              utc_timestamp, validated_selection, verified_settlement_evidence)
 from sportsbet.model_contract import MODEL_VERSION
 
 LOCK_BEFORE_START = timedelta(minutes=60)
@@ -17,6 +18,18 @@ MAX_HISTORY_PICKS = 200
 
 def _accepted(row: dict, sport: str) -> bool:
     try:
+        if not isinstance(row,dict):
+            return False
+        validated_selection(row)
+        identity=row.get('prediction_id')
+        sample=row.get('model_sample_size')
+        plan=row.get('trade_plan',[])
+        if (not isinstance(identity,str) or not re.fullmatch('[0-9a-f]{64}',identity)
+                or type(sample) is not int or not 20 <= sample <= 100000
+                or not isinstance(plan,list) or len(plan)>3
+                or any(not isinstance(item,str) or len(item)>300
+                    or any(ord(char)<32 for char in item) for item in plan)):
+            return False
         probability = Decimal(str(row['model_probability']))
         push = Decimal(str(row.get('push_probability', 0)))
         interval = tuple(Decimal(str(value)) for value in row['model_confidence_interval'])
@@ -25,19 +38,23 @@ def _accepted(row: dict, sport: str) -> bool:
         captured = utc_timestamp(row['captured_at'])
         quote_time = utc_timestamp(row['quote_time'])
         start = utc_timestamp(row['game_start_time'])
+        generated = utc_timestamp(row['model_generated_at'])
         stake = Decimal(str(row['stake_fraction']))
         _, payout = quote_terms(row['american_odds'], Decimal(0))
         return (row.get('sport') == sport and row.get('model_version') == MODEL_VERSION
             and row.get('accepted') is True and row.get('gate_reason') == 'accepted'
             and row.get('recommendation_policy_version') == 'confidence-floor-v2'
             and Decimal('0') < stake <= Decimal('.05')
+            and Decimal('0') <= push <= Decimal('1')
             and Decimal('0') <= probability <= Decimal('1')-push
+            and Decimal('0') <= Decimal(str(row['line'])) <= Decimal('10000')
             and (mean is None or (mean.is_finite()
-                and Decimal('0') <= mean <= Decimal('99999.99')))
+                and Decimal('0') <= mean <= Decimal('10000')))
             and len(interval) == 2 and Decimal('0') <= interval[0] <= probability <= interval[1] <= Decimal('1')-push
             and interval[0] > quote_terms(row['american_odds'], Decimal(0))[0] * (Decimal('1')-push)
             and compute_expected_return(probability, payout, push) > 0
-            and quote_time <= captured < start and start-captured <= timedelta(hours=48)
+            and quote_time <= captured < start and generated <= captured
+            and captured-quote_time <= timedelta(minutes=5) and start-captured <= timedelta(hours=48)
             and quote_evidence_valid(row) and settlement_identity_valid(row))
     except (ArithmeticError, KeyError, TypeError, ValueError):
         return False
@@ -77,8 +94,12 @@ def build_pick_board(rows: list[dict], sport: str, now: datetime | None = None) 
     """Select one prospective recommendation per player/game at the fixed T-60 cutoff."""
     if sport not in ('nfl', 'nba', 'cfb'):
         raise ValueError('Unsupported pick-board sport')
-    observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    accepted = [row for row in rows if _accepted(row, sport)]
+    observed = now or datetime.now(timezone.utc)
+    if observed.tzinfo is None or observed.utcoffset() is None:
+        raise ValueError('Pick-board publication time requires a timezone')
+    observed = observed.astimezone(timezone.utc)
+    accepted = [row for row in rows if _accepted(row, sport)
+        and utc_timestamp(row['captured_at']) <= observed]
     groups: dict[tuple[str, str], list[dict]] = {}
     for row in accepted:
         groups.setdefault((row['game_id'], str(row['player_id'])), []).append(row)
@@ -105,7 +126,17 @@ def build_pick_board(rows: list[dict], sport: str, now: datetime | None = None) 
         if observed < start:
             current.append(signal)
             continue
-        verified = selected.get('outcome') is not None and verified_settlement_evidence(
+        # A retained result may be valid today but unknown at this snapshot's
+        # publication time. Never move that future evidence into an earlier board.
+        try:
+            settled_at=utc_timestamp(selected.get('outcome_observed_at'))
+            actual=selected.get('actual_value')
+            known=(start <= settled_at <= observed
+                and type(actual) in (int,float) and Decimal(str(actual)).is_finite()
+                and (type(selected.get('outcome')) is bool or selected.get('outcome')=='push'))
+        except (TypeError,ValueError):
+            known=False
+        verified = known and verified_settlement_evidence(
             selected,selected.get('outcome'),selected.get('outcome_source'),selected.get('outcome_ref'),
             selected.get('outcome_observed_at'),selected.get('actual_value'),selected.get('outcome_evidence'))
         signal.update(result=('win' if selected['outcome'] is True else 'loss' if selected['outcome'] is False
