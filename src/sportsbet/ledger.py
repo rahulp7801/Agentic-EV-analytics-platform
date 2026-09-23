@@ -383,11 +383,12 @@ class Ledger:
         return result
 
     def report(self, recommendations_only: bool = False, model_version: str | None = None,
-               sport: str | None = None) -> dict:
+               sport: str | None = None, captured_after: str | None = None) -> dict:
         from dataclasses import fields
         from sportsbet.arbitrage.ev import quote_terms
         if sport is not None and sport not in STAT_COLUMNS:
             raise ValueError('Evaluation sport is invalid')
+        cutoff = utc_timestamp(captured_after) if captured_after is not None else None
         with self.connect() as db:
             records = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value,outcome_evidence FROM predictions').fetchall()
         signals = []
@@ -460,6 +461,8 @@ class Ledger:
             if entered >= start or quote_time > entered or generated > entered or p.get('synthetic_price') or str(p.get('sportsbook','')).lower()=='prizepicks':
                 excluded += 1
                 continue
+            if cutoff is not None and entered < cutoff:
+                continue
             parsed.append((entered,prediction_id,start,p,decoded_outcome,selection))
         # UTC chronology, not lexical ISO strings with different offsets.
         parsed.sort(key=lambda row: (row[0], row[1]))
@@ -520,7 +523,8 @@ class Ledger:
                 'model_version':model_version, 'available_model_versions':sorted(versions),
                 'unverified_settlements':unverified_settlements,
                 'selection_policy':'Earliest eligible prediction per game/player/market/side/line within the selected cohort.',
-                'profit_scope':'Hypothetical recorded-stake replay, not executed bets or realized account profit.'}
+                'profit_scope':'Hypothetical recorded-stake replay, not executed bets or realized account profit.',
+                **({'captured_after':cutoff.isoformat()} if cutoff is not None else {})}
 
 
 def main():

@@ -15,7 +15,7 @@ def row(*, prediction_id, direction, odds, captured, quote, sportsbook="book-a",
 
 
 def test_exact_quote_pair_and_earliest_selection(monkeypatch):
-    monkeypatch.setattr(audit, "_settled_outcome", lambda value: value["outcome"])
+    monkeypatch.setattr(audit, "_verified_outcome", lambda value: value["outcome"])
     rows = [
         row(prediction_id="early-over", direction="over", odds=-110,
             captured="2026-09-20T10:00:00+00:00", quote="2026-09-20T09:59:00+00:00"),
@@ -39,7 +39,7 @@ def test_exact_quote_pair_and_earliest_selection(monkeypatch):
 
 
 def test_opposite_quote_requires_exact_timestamp(monkeypatch):
-    monkeypatch.setattr(audit, "_settled_outcome", lambda value: value["outcome"])
+    monkeypatch.setattr(audit, "_verified_outcome", lambda value: value["outcome"])
     rows = [
         row(prediction_id="over", direction="over", odds=-110,
             captured="2026-09-20T10:00:00+00:00", quote="2026-09-20T09:59:00+00:00"),
@@ -54,7 +54,7 @@ def test_opposite_quote_requires_exact_timestamp(monkeypatch):
 
 
 def test_leave_one_game_out_blend_scores_unseen_games(monkeypatch):
-    monkeypatch.setattr(audit, "_settled_outcome", lambda value: value["outcome"])
+    monkeypatch.setattr(audit, "_verified_outcome", lambda value: value["outcome"])
     rows = []
     for game_id, over_won in (("good-game", True), ("bad-game", False)):
         rows.extend([
@@ -72,3 +72,90 @@ def test_leave_one_game_out_blend_scores_unseen_games(monkeypatch):
     assert result["market_model_leave_one_game_out_brier"] == pytest.approx(.37)
     assert result["leave_one_game_out_weight_range"] == pytest.approx([0, 1])
     assert result["leave_one_game_out_positive_weights"] == 1
+
+
+def test_prospective_recommendations_are_separate_from_all_time():
+    rejected = row(prediction_id="rejected", game_id="game-old", direction="over",
+                   odds=-110, captured="2026-09-20T10:00:00+00:00",
+                   quote="2026-09-20T09:59:00+00:00", outcome=None)
+    accepted = row(prediction_id="accepted", game_id="game-new", direction="over",
+                   odds=-110, captured="2026-09-21T10:00:00+00:00",
+                   quote="2026-09-21T09:59:00+00:00", outcome=None)
+    for value in (rejected, accepted):
+        value.update(sport="nfl", game_start_time="2026-09-22T10:00:00+00:00",
+                     push_probability=0)
+    rejected.update(accepted=False, stake_fraction=0)
+    accepted.update(accepted=True, stake_fraction=.01)
+
+    class FakeLedger:
+        def report(self, recommendations_only=False, **_kwargs):
+            assert recommendations_only
+            return dict(sample_size=1, settled_count=0, decided_count=0, duplicate_predictions=0,
+                        selection_policy="earliest", profit_scope="hypothetical")
+
+        def predictions(self):
+            return [rejected, accepted]
+
+    result = audit.audit_ledger(FakeLedger(), recommendations_only=True,
+                                captured_after="2026-09-21T00:00:00+00:00",
+                                bootstrap_samples=0)
+    assert result["cohort"] == "recommendations"
+    assert result["earliest_selections"] == 1
+    assert result["prospective"]["earliest_selections"] == 1
+    assert result["prospective"]["decided"] == 0
+    accepted["stake_fraction"] = .06
+    assert audit._eligible(accepted, "nfl", None, True) is None
+
+
+def test_integer_line_scores_decided_conditional_on_no_push(monkeypatch):
+    monkeypatch.setattr(audit, "_verified_outcome", lambda value: value["outcome"])
+    over = row(prediction_id="over", direction="over", odds=-110,
+               captured="2026-09-20T10:00:00+00:00",
+               quote="2026-09-20T09:59:00+00:00", outcome=True, probability=.4)
+    under = row(prediction_id="under", direction="under", odds=-110,
+                captured="2026-09-20T10:00:01+00:00",
+                quote="2026-09-20T09:59:00+00:00", outcome=False, probability=.4)
+    pushed = row(prediction_id="push", game_id="game-2", direction="over", odds=-110,
+                 captured="2026-09-20T10:00:02+00:00",
+                 quote="2026-09-20T09:59:00+00:00", outcome="push", probability=.4)
+    for value in (over, under, pushed):
+        value["push_probability"] = .2
+    result = audit.compare_eligible_rows([over, under, pushed], bootstrap_samples=0)
+    assert result["decided"] == 2
+    assert result["pushes"] == 1
+    assert result["pending"] == 0
+    assert result["model_brier"] == pytest.approx(.25)
+    assert result["hypothetical_flat_stake_roi"] == pytest.approx((100/110-1)/3)
+
+
+def test_all_push_model_mass_keeps_result_without_undefined_brier(monkeypatch):
+    monkeypatch.setattr(audit, "_verified_outcome", lambda value: value["outcome"])
+    value = row(prediction_id="degenerate", direction="over", odds=-110,
+                captured="2026-09-20T10:00:00+00:00",
+                quote="2026-09-20T09:59:00+00:00", outcome=False, probability=0)
+    value["push_probability"] = 1
+    result = audit.compare_eligible_rows([value], bootstrap_samples=0)
+    assert result["decided"] == 1
+    assert result["scored_decided"] == 0
+    assert result["model_brier"] is None
+    assert result["hypothetical_flat_stake_roi"] == -1
+
+
+def test_frozen_shadow_prior_is_scored_without_changing_selected_rows(monkeypatch):
+    monkeypatch.setattr(audit, "_verified_outcome", lambda value: value["outcome"])
+    over = row(prediction_id="over-shadow", direction="over", odds=-110,
+               captured="2026-09-20T10:00:00+00:00",
+               quote="2026-09-20T09:59:00+00:00", outcome=True,
+               probability=.738095)
+    under = row(prediction_id="under-shadow", direction="under", odds=-110,
+                captured="2026-09-20T10:00:01+00:00",
+                quote="2026-09-20T09:59:00+00:00", outcome=False,
+                probability=.261905)
+    for value in (over, under):
+        value.update(model_version="empirical-jeffreys-v4", model_sample_size=20,
+                     push_probability=0)
+    result = audit.compare_eligible_rows([over, under], bootstrap_samples=0)
+    assert result["earliest_selections"] == 2
+    assert result["paired_shadow_prior80_count"] == 2
+    assert result["paired_shadow_prior80_brier"] == pytest.approx(.2025)
+    assert result["paired_shadow_prior80_minus_market_brier"] == pytest.approx(-.0475)

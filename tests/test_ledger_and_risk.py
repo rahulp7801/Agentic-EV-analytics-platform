@@ -153,3 +153,22 @@ async def test_scanner_routes_both_sides_through_shared_agent():
         assert row['ev'].direction==row['direction']
         assert row['ev'].game_id
         assert row['quote'].side.lower()==row['direction']
+
+
+def test_report_filters_prospective_entry_time_before_deduplication(tmp_path):
+    ledger = Ledger(tmp_path / 'prospective.sqlite')
+    now = datetime(2026, 9, 23, 12, tzinfo=timezone.utc)
+    base = dict(game_id='g', player='P', prop_type='points', direction='over',
+                line=20.5, sportsbook='book', american_odds=-110,
+                model_probability=.6, accepted=False, stake_fraction=0,
+                game_start_time=(now+timedelta(hours=2)).isoformat())
+    ledger.record_many('scan', [base | {'player':'Old', 'captured_at':now.isoformat()},
+                                base | {'player':'New',
+                                        'captured_at':(now+timedelta(minutes=10)).isoformat()}])
+    assert ledger.report()['sample_size'] == 2
+    result = ledger.report(captured_after=(now+timedelta(minutes=5)).isoformat())
+    assert result['sample_size'] == 1
+    assert result['pending_count'] == 1
+    assert result['captured_after'] == (now+timedelta(minutes=5)).isoformat()
+    with pytest.raises(ValueError):
+        ledger.report(captured_after='2026-09-23T12:05:00')
