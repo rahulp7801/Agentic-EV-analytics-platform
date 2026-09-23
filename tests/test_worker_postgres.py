@@ -491,13 +491,17 @@ def test_postgres_shadow_retry_is_immutable_and_batch_conflicts_roll_back():
 
 
 
-def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_path,monkeypatch):
+@pytest.mark.parametrize('row_count',[2,2048])
+def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_path,monkeypatch,row_count):
     import json
     from sportsbet.db.models import NBAPlayerGameLog
     from sportsbet.ingestion.nba_provenance import official_rows,recover_response,value_digest
     from tests.test_nba_provenance import response
     monkeypatch.chdir(tmp_path)
-    body=response();text=json.dumps(body);observed=datetime.now(timezone.utc)
+    body=response()
+    template=body['resultSets'][0]['rowSet']
+    body['resultSets'][0]['rowSet']=[[101+i,*template[i%2][1:]] for i in range(row_count)]
+    text=json.dumps(body);observed=datetime.now(timezone.utc)
     rows=official_rows(text,2025,observed);table=NBAPlayerGameLog.__table__
     schema='nba_recovery_'+uuid.uuid4().hex
     engine=sa.create_engine(os.environ['SPORTSBET_TEST_DATABASE_URL'],
@@ -517,10 +521,26 @@ def test_nba_provenance_recovery_uses_postgres_and_preserves_model_values(tmp_pa
             if not definition.endswith(' NOT VALID'):definition+=' NOT VALID'
             conn.exec_driver_sql(f'ALTER TABLE {schema}.nba_player_gamelogs ADD CONSTRAINT '
                 'ck_nba_gamelog_source_evidence '+definition)
+        if row_count>2:
+            with engine.begin() as conn:
+                conn.exec_driver_sql(f'ANALYZE {schema}.nba_player_gamelogs')
+        plans=[]
+        def inspect_recovery_plan(conn,cursor,statement,parameters,context,executemany):
+            if row_count>2 and not plans and statement.startswith('UPDATE nba_player_gamelogs'):
+                plan=conn.exec_driver_sql('EXPLAIN (FORMAT JSON) '+statement,
+                    parameters[0] if executemany else parameters).scalar_one()
+                plans.append(plan)
+        sa.event.listen(engine,'before_cursor_execute',inspect_recovery_plan)
         before=recover_response(engine,text,2025,observed)
-        assert before['counts']['recoverable']==2 and before['updated_rows']==0
+        assert before['counts']['recoverable']==row_count and before['updated_rows']==0
         applied=recover_response(engine,text,2025,observed,apply=True)
-        assert applied['updated_rows']==2
+        assert applied['updated_rows']==row_count
+        if row_count>2:
+            def index_conditions(node):
+                return [node.get('Index Cond','')]+[value for child in node.get('Plans',[])
+                    for value in index_conditions(child)]
+            assert any('player_id =' in value and 'game_id' in value
+                for value in index_conditions(plans[0][0]['Plan']))
         with engine.begin() as conn:
             retained=[dict(row) for row in conn.execute(sa.select(table)).mappings()]
             conn.exec_driver_sql(f'ALTER TABLE {schema}.nba_player_gamelogs '
