@@ -21,7 +21,9 @@ function record(value:unknown,sport:Sport,profileValues:unknown,now:number,histo
   if(!stamp(raw.captured_at) || !stamp(raw.lock_at) || raw.selection_policy_version!=='pregame-t60-v1'
     || raw.prediction_id!==raw.id || typeof raw.id!=='string' || raw.id.length!==64
     || !/^[a-f0-9]{64}$/.test(raw.id) || lock!==start-3600000 || captured>lock
-    || captured>snapshotTime || !['recorded','locked','final'].includes(String(raw.board_state))) return null;
+    || captured>snapshotTime || Date.parse(String(raw.snapped_at))>captured
+    || typeof raw.kelly_fraction!=='number' || raw.kelly_fraction>0.05
+    || !['recorded','locked','final'].includes(String(raw.board_state))) return null;
   const signal=publicSignal(raw,captured);
   if(!signal || signal.sport!==sport || signal.gated || signal.kelly_fraction<=0) return null;
   let playerProfile=signal.player_profile;
@@ -31,15 +33,15 @@ function record(value:unknown,sport:Sport,profileValues:unknown,now:number,histo
   }
   const result=raw.result;
   if(history) {
-    if(raw.board_state!=='final' || start>now+60000 || !['win','loss','push','void','pending'].includes(String(result))
+    if(raw.board_state!=='final' || start>snapshotTime || !['win','loss','push','void','pending'].includes(String(result))
       || typeof raw.result_verified!=='boolean' || (raw.result_verified!==(result!=='pending'))
-      || (raw.result_verified && (!Number.isFinite(Number(raw.actual_value)) || !stamp(raw.settled_at)))
+      || (raw.result_verified && (typeof raw.actual_value!=='number' || !Number.isFinite(raw.actual_value) || !stamp(raw.settled_at)))
       || (!raw.result_verified && (raw.actual_value!==null || raw.settled_at!==null))) return null;
     if(raw.result_verified) {
       const actual=Number(raw.actual_value),settled=Date.parse(String(raw.settled_at));
       const reproduced=actual===signal.line ? 'push'
         : ((actual>signal.line)===(signal.direction==='over') ? 'win' : 'loss');
-      if(result!==reproduced || settled<start || settled>now+60000) return null;
+      if(result!==reproduced || settled<start || settled>snapshotTime) return null;
     }
   } else if(!['recorded','locked'].includes(String(raw.board_state)) || start<=snapshotTime
     || (raw.board_state==='recorded')!==(snapshotTime<lock)) return null;

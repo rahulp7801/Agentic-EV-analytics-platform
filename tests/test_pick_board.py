@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from sportsbet.picks import build_pick_board
 
 
@@ -94,3 +96,76 @@ def test_board_totals_describe_only_bounded_public_records(monkeypatch):
     assert len(board['history'])==200
     assert board['summary']['settled']==200
     assert board['summary']['wins']+board['summary']['losses']==200
+
+
+@pytest.mark.parametrize('change',[
+    {'prediction_id':None}, {'model_sample_size':None}, {'model_sample_size':'40'},
+    {'model_sample_size':19}, {'model_sample_size':True}, {'push_probability':-.1},
+    {'quote_time':'2026-09-20T17:00:00+00:00'},
+    {'model_generated_at':'2026-09-20T19:00:00+00:00'},
+    {'trade_plan':['x'*301]}, {'trade_plan':None},
+])
+def test_malformed_retained_pick_cannot_hide_valid_neighbor(monkeypatch,change):
+    start=datetime(2026,9,20,20,tzinfo=timezone.utc)
+    valid=row('a',start-timedelta(hours=2),start)
+    malformed=row('b',start-timedelta(hours=2),start)|change|{'game_id':'other'}
+    monkeypatch.setattr('sportsbet.picks.quote_evidence_valid',lambda value:True)
+    monkeypatch.setattr('sportsbet.picks.settlement_identity_valid',lambda value:True)
+    board=build_pick_board([malformed,valid],'nfl',start-timedelta(minutes=90))
+    assert [item['prediction_id'] for item in board['current']]==['a'*64]
+    assert board['summary']['current']==1
+
+
+def test_future_settlement_is_pending_until_it_was_observed(monkeypatch):
+    start=datetime(2026,9,20,20,tzinfo=timezone.utc)
+    value=row('a',start-timedelta(minutes=70),start,outcome=True)
+    monkeypatch.setattr('sportsbet.picks.quote_evidence_valid',lambda value:True)
+    monkeypatch.setattr('sportsbet.picks.settlement_identity_valid',lambda value:True)
+    monkeypatch.setattr('sportsbet.picks.verified_settlement_evidence',lambda *args:True)
+    pending=build_pick_board([value],'nfl',start+timedelta(hours=3))
+    assert pending['history'][0]['result']=='pending'
+    assert pending['summary']['settled']==0
+    known=build_pick_board([value],'nfl',start+timedelta(hours=4))
+    assert known['history'][0]['result']=='win'
+    assert known['summary']['settled']==1
+
+
+def test_naive_publication_time_is_rejected():
+    with pytest.raises(ValueError,match='timezone'):
+        build_pick_board([],'nfl',datetime(2026,9,20,20))
+
+
+@pytest.mark.parametrize('actual',[None,True,'300',float('nan'),float('inf')])
+def test_malformed_result_stays_pending_without_hiding_the_pick(monkeypatch,actual):
+    start=datetime(2026,9,20,20,tzinfo=timezone.utc)
+    value=row('a',start-timedelta(minutes=70),start,outcome=True)|{'actual_value':actual}
+    monkeypatch.setattr('sportsbet.picks.quote_evidence_valid',lambda value:True)
+    monkeypatch.setattr('sportsbet.picks.settlement_identity_valid',lambda value:True)
+    monkeypatch.setattr('sportsbet.picks.verified_settlement_evidence',lambda *args:True)
+    board=build_pick_board([value],'nfl',start+timedelta(hours=5))
+    assert board['history'][0]['result']=='pending'
+    assert board['history'][0]['actual_value'] is None
+    assert board['summary']['settled']==0
+
+
+def test_future_capture_cannot_change_an_earlier_board(monkeypatch):
+    start=datetime(2026,9,20,20,tzinfo=timezone.utc)
+    valid=row('a',start-timedelta(hours=3),start)
+    future=row('b',start-timedelta(hours=1),start+timedelta(minutes=30))
+    monkeypatch.setattr('sportsbet.picks.quote_evidence_valid',lambda value:True)
+    monkeypatch.setattr('sportsbet.picks.settlement_identity_valid',lambda value:True)
+    observed=start-timedelta(hours=2)
+    assert build_pick_board([valid,future,None,[]],'nfl',observed)==build_pick_board([valid],'nfl',observed)
+
+
+def test_published_fixture_matches_the_frontend_contract():
+    import json
+    from pathlib import Path
+    from sportsbet.ledger import quote_evidence_valid, verified_settlement_evidence
+    fixture=json.loads(Path('tests/fixtures/pick_board_contract.json').read_text())
+    record=fixture['record'];board=fixture['board']
+    assert quote_evidence_valid(record)
+    assert verified_settlement_evidence(record,record['outcome'],record['outcome_source'],
+        record['outcome_ref'],record['outcome_observed_at'],record['actual_value'],record['outcome_evidence'])
+    assert build_pick_board([record],record['sport'],datetime.fromisoformat(board['generated_at']))==board
+    assert board['history'][0]['actual_value']==0
