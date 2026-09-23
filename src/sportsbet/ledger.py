@@ -351,8 +351,9 @@ class Ledger:
                 batch=items[offset:offset+250]
                 keys=[key for key,_ in batch]
                 placeholders=','.join('?' for _ in keys)
-                rows=dict(db.execute(
-                    f'SELECT id,payload FROM predictions WHERE id IN ({placeholders})',keys).fetchall())
+                # Only literal parameter markers enter the SQL text; IDs remain bound values.
+                query=f'SELECT id,payload FROM predictions WHERE id IN ({placeholders})'
+                rows=dict(db.execute(query,keys).fetchall())
                 updates=[]
                 for key,outcome in batch:
                     if outcome is not None and type(outcome) is not bool and outcome not in ('push','void'):
