@@ -266,7 +266,9 @@ def test_settlement_rejects_stat_observation_before_game_or_in_future(tmp_path):
 
 def test_pending_schedule_catchup_is_bounded_oldest_first(monkeypatch):
     now=datetime(2026,9,30,16,tzinfo=timezone.utc)
-    rows=[dict(sport='nba',prop_type='points',game_date=f'2026-09-{day:02}',outcome=None)
+    terms=dict(direction='over',line=20.5,home_team='Home',away_team='Away',
+        captured_at='2026-08-30T12:00:00Z',game_start_time='2026-08-30T15:00:00Z')
+    rows=[dict(terms,sport='nba',prop_type='points',game_date=f'2026-09-{day:02}',outcome=None)
         for day in range(1,23)]
     status_rows=[
         dict(sport='nba',prop_type='points',game_date='2026-09-10',outcome=True,
@@ -283,7 +285,7 @@ def test_pending_schedule_catchup_is_bounded_oldest_first(monkeypatch):
         def predictions(self): return rows
     assert pending_schedule_offsets(Audit(),'nba',now)==tuple(range(-29,-22))
     class StatusAudit:
-        def predictions(self): return status_rows
+        def predictions(self): return [{**terms,**row} for row in status_rows]
     assert pending_schedule_offsets(StatusAudit(),'nba',now)==(-20,)
     with pytest.raises(ValueError,match='scope'):
         pending_schedule_offsets(Audit(),'nba',datetime(2026,9,30))
@@ -368,3 +370,29 @@ def test_settlement_reuses_exact_stat_and_batches_duplicate_price_captures(tmp_p
     assert result['settled']==12 and result['pending']==0
     assert len(reads)==1 and writes==[12]
     assert ledger.report(sport='nba')['settled_count']==12
+
+
+@pytest.mark.parametrize('invalid_terms',[
+    {'home_team':None}, {'away_team':''}, {'away_team':'Home'},
+    {'direction':'unknown'}, {'line':'NaN'}, {'line':-1}, {'game_date':'invalid'},
+    {'captured_at':'2026-09-01T16:00:00Z'},
+    {'captured_at':'2026-09-01T15:00:00Z'},
+    {'game_start_time':'2026-09-01T15:00:00'},
+])
+def test_invalid_forecasts_cannot_starve_settlement_catchup(invalid_terms):
+    now=datetime(2026,9,30,16,tzinfo=timezone.utc)
+    base=dict(sport='nfl',prop_type='receptions',direction='under',line=2.5,
+        home_team='Home',away_team='Away',player_id='gsis-1',outcome=None,
+        captured_at='2026-09-01T12:00:00Z',game_start_time='2026-09-01T15:00:00Z')
+    invalid=[dict(base,game_date=f'2026-09-{day:02}') | invalid_terms
+        for day in range(1,8)]
+    # Valid immutable terms stay retryable even with no final stat evidence.
+    retryable=dict(base,game_date='2026-09-22')
+    class Audit:
+        def predictions(self): return invalid+[retryable]
+    before=json.dumps(Audit().predictions(),sort_keys=True)
+    assert pending_schedule_offsets(Audit(),'nfl',now)==(-8,)
+    assert json.dumps(Audit().predictions(),sort_keys=True)==before
+    class InvalidOnly:
+        def predictions(self): return invalid
+    assert pending_schedule_offsets(InvalidOnly(),'nfl',now)==()

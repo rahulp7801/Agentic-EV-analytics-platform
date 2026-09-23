@@ -43,7 +43,12 @@ def _canonical_date(value) -> str:
 
 
 def pending_schedule_offsets(ledger: Ledger, sport: str, now: datetime) -> tuple[int, ...]:
-    """Return a bounded oldest-first set of unresolved dates beyond the normal week."""
+    """Retry valid recorded predictions, oldest first, beyond the normal week.
+
+    A new schedule cannot repair missing immutable forecast identity or invalid
+    capture chronology. Such records must not consume the seven-date allowance.
+    Missing final stats and unverified automatic outcomes remain retryable.
+    """
     if sport not in STAT_COLUMNS or now.tzinfo is None or now.utcoffset() is None:
         raise ValueError('Invalid settlement catch-up scope')
     today=now.astimezone(ZoneInfo('America/New_York')).date()
@@ -59,15 +64,17 @@ def pending_schedule_offsets(ledger: Ledger, sport: str, now: datetime) -> tuple
                     row.get('outcome_observed_at'),row.get('actual_value'),row.get('outcome_evidence')):
                 continue
         try:
-            offset=(date.fromisoformat(_canonical_date(row['game_date']))-today).days
-        except (KeyError,TypeError,ValueError):
+            day,_,_,_=_prediction_terms(row,sport)
+            offset=(date.fromisoformat(day)-today).days
+        except (KeyError,TypeError,ValueError,ArithmeticError):
             continue
         if -MAX_CATCHUP_DAYS <= offset < -7:
             offsets.add(offset)
     return tuple(sorted(offsets)[:MAX_EXTRA_SCHEDULE_DATES])
 
 
-def _candidate(prediction: dict, sport: str, games: list[dict]):
+def _prediction_terms(prediction: dict, sport: str):
+    """Validate retained forecast terms without needing new external evidence."""
     if prediction.get('sport') != sport or prediction.get('prop_type') not in STAT_COLUMNS[sport]:
         raise ValueError('Unsupported prediction')
     if prediction.get('direction') not in ('over','under'):
@@ -85,6 +92,11 @@ def _candidate(prediction: dict, sport: str, games: list[dict]):
     captured=utc_timestamp(prediction['captured_at'])
     if captured >= start:
         raise ValueError('Invalid prediction chronology')
+    return day,line,home,away
+
+
+def _candidate(prediction: dict, sport: str, games: list[dict]):
+    day,line,home,away=_prediction_terms(prediction,sport)
     matches=[]
     for game in games:
         try:
