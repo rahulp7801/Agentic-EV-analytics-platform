@@ -459,3 +459,32 @@ async def test_shadow_history_loader_matches_real_postgres_schema(sport):
                 for game in game_ids:
                     conn.execute(sa.text('DELETE FROM games WHERE game_id=:id'),{'id':game})
         engine.dispose()
+
+
+
+def test_postgres_shadow_retry_is_immutable_and_batch_conflicts_roll_back():
+    ledger=Ledger(database_url=os.environ['SPORTSBET_TEST_DATABASE_URL'])
+    scan_id=uuid.uuid4().hex;now=datetime.now(timezone.utc)
+    value=dict(game_id=scan_id,player='Retry Fixture',prop_type='points',direction='over',
+        line=20.5,sportsbook='book',american_odds=100,model_probability=.6,model_version=scan_id,
+        captured_at=now.isoformat(),game_start_time=(now+timedelta(hours=2)).isoformat(),
+        history_shadow={'status':'predicted','probability':.7})
+    fresh=value|{'player':'Fresh Fixture'}
+    try:
+        key=ledger.record(scan_id,value)
+        retained=next(row for row in ledger.predictions() if row['prediction_id']==key)
+        assert retained['history_shadow']['reason']=='invalid_or_late_recording'
+        assert ledger.record(scan_id,value)==key
+        changed=value|{'history_shadow':{'status':'predicted','probability':.8}}
+        with pytest.raises(ValueError,match='immutable'):
+            ledger.record_many(scan_id,[fresh,changed])
+        with ledger.connect() as db:
+            assert db.execute('SELECT count(*) FROM predictions WHERE scan_id=?',(scan_id,)).fetchone()[0]==1
+            assert db.execute('SELECT count(*) FROM quotes WHERE identity=?',
+                (ledger.quote_identity(fresh),)).fetchone()[0]==0
+        assert next(row for row in ledger.predictions() if row['prediction_id']==key)==retained
+    finally:
+        with ledger.connect() as db:
+            db.execute('DELETE FROM predictions WHERE scan_id=?',(scan_id,))
+            for item in (value,fresh):
+                db.execute('DELETE FROM quotes WHERE identity=?',(ledger.quote_identity(item),))

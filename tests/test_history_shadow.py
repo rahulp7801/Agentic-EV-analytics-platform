@@ -278,3 +278,26 @@ def test_malformed_feature_arrays_cannot_break_record_verification(features):
     else:
         record['record_sha256']=shadow.digest({k:v for k,v in record.items() if k!='record_sha256'})
     assert shadow.verified_shadow_probability(p|{'history_shadow':record}) is None
+
+
+@pytest.mark.parametrize('delay',[301,90000])
+def test_identical_late_shadow_retry_keeps_original_receipt(tmp_path,monkeypatch,delay):
+    p,rows,_=fixture();p['history_shadow']=shadow.shadow_record(p,rows)
+    assert p['history_shadow']['status']=='predicted'
+    captured=datetime.fromisoformat(p['captured_at'])
+    class Late(datetime):
+        @classmethod
+        def now(cls,tz=None):return captured+timedelta(seconds=delay)
+    monkeypatch.setattr('sportsbet.ledger.datetime',Late)
+    ledger=Ledger(tmp_path/'late.sqlite')
+    original=deepcopy(p);key=ledger.record('same',p)
+    retained=ledger.predictions()[0]
+    assert retained['history_shadow']['reason']=='invalid_or_late_recording'
+    assert shadow.verified_recorded_shadow_probability(retained) is None
+    assert ledger.record('same',p)==key
+    assert ledger.predictions()==[retained]
+    assert p==original
+    for change in ({'model_probability':.1},{'history_shadow':p['history_shadow']|{'probability':.123}}):
+        with pytest.raises(ValueError,match='immutable'):
+            ledger.record('same',p|change)
+    assert ledger.predictions()==[retained]
