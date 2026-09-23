@@ -183,6 +183,8 @@ def create_daily_graph():
                 publish_snapshot(f'metrics:recommendations:{sport}',
                     ledger.report(True,model_version=MODEL_VERSION,sport=sport))
                 publish_snapshot(f'picks:{sport}',build_pick_board(prediction_rows,sport))
+                from sportsbet.quant.history_shadow_audit import publish_history_shadow
+                publish_history_shadow(prediction_rows,sport,publish_snapshot)
         except Exception as exc:
             for result in results.values():
                 if result['status']=='complete':

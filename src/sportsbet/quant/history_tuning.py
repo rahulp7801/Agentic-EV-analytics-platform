@@ -25,9 +25,7 @@ from scipy.special import expit
 from sportsbet.ingestion.provenance import stat_row_sha256
 from sportsbet.quant.backtest import _game_cluster_ratio_interval, calibration_metrics
 
-FEATURES = ('base_logit', 'recent5_logit_delta', 'recent10_logit_delta',
-            'recent_mean_delta', 'workload_log_ratio', 'log_days_since_game',
-            'other_team_history_share')
+from sportsbet.quant.history_features import FEATURES, history_estimates, logit
 BASE = 'rolling40_jeffreys'
 CANDIDATES = (BASE, 'prior80', 'half_life16', 'logistic_l2_0.01', 'logistic_l2_0.1')
 PROPS = {
@@ -66,10 +64,6 @@ def partition(sport: str, day: date, season: int) -> str | None:
     else:
         raise ValueError('Unsupported sport')
     return None
-
-
-def logit(p: float) -> float:
-    return math.log(p / (1 - p))
 
 
 @dataclass(frozen=True)
@@ -129,24 +123,11 @@ def build_examples(rows: list[dict], sport: str, prop: str) -> tuple[list[Exampl
                 raise ValueError('Nonfinite historical value')
             lines = sorted({max(0.5, math.floor(float(np.quantile(values[-10:], q))) + 0.5)
                             for q in (.25, .5, .75)})
-            weights = np.exp2(-np.arange(len(values)-1, -1, -1) / 16)
-            workload_ratio = (math.log((statistics.fmean(float(r[workload]) for r in history[-5:]) + 1)
-                             / (statistics.fmean(float(r[workload]) for r in history) + 1))
-                              if workload else 0.0)
-            mean_delta = (float(values[-5:].mean()) - float(values.mean())) / max(1, float(values.std()))
-            other_team = statistics.fmean(r['team'] != history[-1]['team'] for r in history)
             for line in lines:
-                hits = values > line
-                base = (float(hits.sum()) + .5) / (len(values) + 1)
-                recent5 = (float(hits[-5:].sum()) + .5) / 6
-                recent10 = (float(hits[-10:].sum()) + .5) / 11
-                features = (logit(base), logit(recent5)-logit(base), logit(recent10)-logit(base),
-                            mean_delta, max(-2, min(2, workload_ratio)),
-                            math.log1p((target['day']-history[-1]['day']).days), other_team)
+                estimate = history_estimates(history, stat, workload, target['day'], line)
                 examples.append(Example(split, str(target['game']), player, target['day'], line,
-                    int(actual > line), base, (float(hits.sum()) + 40) / (len(values) + 80),
-                    (float(np.dot(weights, hits)) + .5) / (float(weights.sum()) + 1),
-                    features, len(values), abs(workload_ratio) >= math.log(1.5) or abs(mean_delta) >= .5))
+                    int(actual > line), estimate['base'], estimate['prior80'], estimate['recency'],
+                    estimate['features'], len(values), estimate['role_drift']))
     examples.sort(key=lambda e: (e.day, e.game, e.player, e.line))
     return examples, {'excluded': dict(sorted(excluded.items())),
                      'definition': 'Observed stat-category outcomes, conditional on prior-history coverage and workload'}

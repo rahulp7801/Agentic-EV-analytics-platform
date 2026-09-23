@@ -48,3 +48,9 @@ async def check():
 
 asyncio.run(check())
 print('Worker image verified: non-root, read-only code, writable evidence, native solver, no network. Fixture is not market performance.')
+
+# Frozen shadow inference ships inside the default-deny image with no artifact downloads.
+from sportsbet.quant.history_shadow import parameters,ARTIFACT_SHA256,implementation_sha256
+assert len(ARTIFACT_SHA256)==len(implementation_sha256())==64
+assert parameters('nfl','receptions')['candidate']=='logistic_l2_0.1'
+subprocess.run([sys.executable,'-m','sportsbet.quant.history_shadow_audit','--help'],check=True)

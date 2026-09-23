@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     bankroll_usd: float = Field(default=10000.0, gt=0)
     max_kelly_fraction: float = Field(default=0.25, ge=0, le=1)
     experimental_probability_adjustments: bool = False
+    # Untraded frozen candidate; reuses existing quotes and never changes live picks.
+    history_shadow_enabled: bool = True
 
     # Vig removal method for devigging market odds (Phase 15 — QUANT-02)
     # "multiplicative": proportional normalization (standard, default)

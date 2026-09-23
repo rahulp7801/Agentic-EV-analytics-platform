@@ -268,3 +268,10 @@ async def test_one_failed_model_does_not_discard_valid_neighbor(sport,failure,tm
     assert coverage['model_status']=='partial'
     assert coverage['counts']['model_evaluation_failed']==1
     assert 'private driver details' not in str(result)
+
+
+@pytest.fixture(autouse=True)
+def isolate_shadow_history_lookup(monkeypatch):
+    # The primary graph tests mock aggregate SQL, not the separate history rows.
+    # Dedicated shadow integration tests exercise that read-only query contract.
+    monkeypatch.setattr('sportsbet.scan.load_histories',AsyncMock(return_value={}))

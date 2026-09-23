@@ -400,3 +400,62 @@ def test_cfb_final_settlement_preserves_varchar_event_and_numeric_stat_commitmen
             conn.execute(sa.text('DELETE FROM analytics.predictions WHERE scan_id=:id'),{'id':identity})
             conn.execute(sa.text('DELETE FROM analytics.quotes WHERE identity=:id'),{'id':ledger.quote_identity(payload)})
         engine.dispose()
+
+
+@pytest.mark.parametrize('sport',['nba','nfl'])
+async def test_shadow_history_loader_matches_real_postgres_schema(sport):
+    from sportsbet.quant.history_shadow import load_histories
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];identity=uuid.uuid4().hex[:12]
+    player=str(uuid.uuid4().int%900000000+1) if sport=='nba' else 'p-'+identity
+    team='Q'+identity[:2];now=datetime.now(timezone.utc);cutoff=now.date()
+    engine=sa.create_engine(url);game_ids=[];expected=[]
+    try:
+        with engine.begin() as conn:
+            for i in range(42):
+                game='sh-'+identity+f'-{i:02}';game_ids.append(game)
+                day=cutoff-timedelta(days=(42-i)*7)
+                season=2025 if i<21 else 2026;week=i%21+1
+                if sport=='nba':
+                    stat=dict(player_id=int(player),game_id=game,game_date=day,
+                        team_abbreviation=team,points=10+i%9,rebounds=3,assists=2)
+                    conn.execute(sa.text('''INSERT INTO nba_player_gamelogs
+                        (player_id,player_name,game_id,game_date,season,team_abbreviation,
+                         points,rebounds,assists,minutes,source_provider,source_sha256,source_record_sha256,source_observed_at)
+                        VALUES (:player_id,'Shadow Fixture',:game_id,:game_date,:season,:team_abbreviation,
+                         :points,:rebounds,:assists,25,'nba',:source,:record,:observed)'''),
+                        stat|dict(season=season,source='a'*64,record=stat_row_sha256('nba',stat),observed=now))
+                    expected.append(stat['points'])
+                else:
+                    stat=dict(player_id=player,season=season,week=week,team=team,
+                        passing_yards=0,rushing_yards=0,receiving_yards=30+i,receptions=5)
+                    conn.execute(sa.text('''INSERT INTO player_stats
+                        (player_id,player_name,season,week,team,passing_yards,rushing_yards,receiving_yards,receptions,
+                         targets,source_provider,source_sha256,source_record_sha256,source_observed_at)
+                        VALUES (:player_id,'Shadow Fixture',:season,:week,:team,0,0,:receiving_yards,5,
+                         7,'nflverse',:source,:record,:observed)'''),
+                        stat|dict(source='a'*64,record=stat_row_sha256('nfl',stat),observed=now))
+                    conn.execute(sa.text('''INSERT INTO games(game_id,season,week,home_team,away_team,game_date)
+                        VALUES (:game,:season,:week,:team,'OTH',:day)'''),
+                        dict(game=game,season=season,week=week,team=team,day=day))
+                    expected.append(stat['receiving_yards'])
+        pool=await asyncpg.create_pool(url.replace('postgresql+psycopg://','postgresql://'),min_size=1,max_size=2)
+        prop='points' if sport=='nba' else 'rec_yds';stat='points' if sport=='nba' else 'receiving_yards'
+        try:
+            histories=await load_histories(pool,sport,2026,cutoff,{(player,prop)})
+            selected=histories[player,prop]
+            assert len(selected)==40 and [r[stat] for r in selected]==expected[-40:]
+            assert all(r['day']<cutoff and str(r['player'])==player for r in selected)
+            assert all(stat_row_sha256(sport,r)==r['source_record_sha256'] for r in selected)
+            earlier=await load_histories(pool,sport,2026,selected[-1]['day'],{(player,prop)})
+            assert [r[stat] for r in earlier[player,prop]]==expected[-41:-1]
+        finally:
+            await pool.close()
+    finally:
+        with engine.begin() as conn:
+            if sport=='nba':
+                conn.execute(sa.text('DELETE FROM nba_player_gamelogs WHERE player_id=:id'),{'id':int(player)})
+            else:
+                conn.execute(sa.text('DELETE FROM player_stats WHERE player_id=:id'),{'id':player})
+                for game in game_ids:
+                    conn.execute(sa.text('DELETE FROM games WHERE game_id=:id'),{'id':game})
+        engine.dispose()

@@ -300,6 +300,8 @@ class Ledger:
             if (not stake.is_finite() or stake < 0 or stake > MAX_RECOMMENDATION_FRACTION
                     or (accepted and stake == 0) or (not accepted and stake != 0)):
                 raise ValueError('Prediction acceptance and stake are inconsistent')
+        # The persistence timestamp is assigned only by record_many at insertion.
+        payload.pop('history_shadow_recorded_at',None)
         for field in ('captured_at','quote_time','game_start_time','model_generated_at'):
             if payload.get(field) is not None:
                 payload[field] = utc_timestamp(payload[field]).isoformat()
@@ -318,9 +320,22 @@ class Ledger:
             for key,payload in prepared:
                 existing = db.execute('SELECT payload FROM predictions WHERE id=?', (key,)).fetchone()
                 if existing:
-                    if json.loads(existing[0]) != payload:
+                    retained=json.loads(existing[0])
+                    retained.pop('history_shadow_recorded_at',None)
+                    if retained != payload:
                         raise ValueError('Prediction identity already has different immutable evidence')
                     continue
+                if isinstance(payload.get('history_shadow'),dict):
+                    from sportsbet.quant.history_shadow import verified_shadow_probability
+                    receipt=datetime.now(timezone.utc)
+                    payload['history_shadow_recorded_at']=receipt.isoformat()
+                    if payload['history_shadow'].get('status')=='predicted' and (
+                            verified_shadow_probability(payload) is None
+                            or not utc_timestamp(payload['captured_at'])<=receipt<utc_timestamp(payload['game_start_time'])
+                            or (receipt-utc_timestamp(payload['quote_time'])).total_seconds()>300):
+                        payload['history_shadow']={k:v for k,v in payload['history_shadow'].items()
+                            if k in ('model_version','policy_version','artifact_sha256','implementation_sha256','generated_at')}
+                        payload['history_shadow'].update(status='unavailable',reason='invalid_or_late_recording')
                 if type(payload.get('american_odds')) is int and abs(payload['american_odds']) >= 100 and not payload.get('synthetic_price') and str(payload.get('sportsbook','')).lower() != 'prizepicks':
                     from sportsbet.arbitrage.ev import quote_terms
                     captured = payload.get('quote_time') or payload.get('captured_at')
