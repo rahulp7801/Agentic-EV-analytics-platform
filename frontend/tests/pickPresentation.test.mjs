@@ -5,10 +5,10 @@ import {pickCardPresentation,pickDisplayState,shortlistPresentation} from '../li
 test('only an unretained signal is presented as an actionable live price',()=>{
   assert.equal(pickDisplayState({}),'live');
   assert.deepEqual(pickCardPresentation({},1),{
-    state:'live',actionable:true,rankLabel:'Top qualified pick',status:'Live price',
-    priceLabel:'Current price',returnLabel:'Expected net per $100',
+    state:'live',actionable:true,rankLabel:'Top suggested pick',status:'Live price',
+    priceLabel:'Current price',returnLabel:'Model-estimated net per $100',
   });
-  assert.equal(pickCardPresentation({},2).rankLabel,'Qualified pick #2');
+  assert.equal(pickCardPresentation({},2).rankLabel,'Suggested pick #2');
 });
 
 test('recorded and locked picks never expose the actionable presentation',()=>{
@@ -22,13 +22,13 @@ test('recorded and locked picks never expose the actionable presentation',()=>{
 
 test('shortlist copy states exactly whether prices are live or historical',()=>{
   assert.deepEqual(shortlistPresentation(3,0),{
-    state:'live',eyebrow:'Qualified now',title:'Picks you can check now',
-    description:'One primary line per player, ranked by the conservative probability edge.',count:'3 live',
+    state:'live',eyebrow:'Suggested picks',title:'Suggested picks you can check now',
+    description:'Player-history estimates screened against the captured price, roster, injury reports and risk limits. One line per player.',count:'3 live',
   });
   assert.deepEqual(shortlistPresentation(0,2),{
     state:'recorded',eyebrow:'Recorded board',title:'Last approved picks',
     description:'These exact captures passed every gate earlier. Prices shown are historical.',
     count:'0 live · 2 to reprice',
   });
-  assert.equal(shortlistPresentation(0,0).title,'No approved pick yet');
+  assert.equal(shortlistPresentation(0,0).title,'No suggested pick passes now');
 });

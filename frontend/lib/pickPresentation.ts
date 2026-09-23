@@ -9,8 +9,8 @@ export function pickDisplayState(value:BoardLike):PickDisplayState {
 export function pickCardPresentation(value:BoardLike,rank:number) {
   const state=pickDisplayState(value),safeRank=Number.isSafeInteger(rank) && rank>0 ? rank : 1;
   if(state==='live') return {
-    state,actionable:true,rankLabel:safeRank===1 ? 'Top qualified pick' : `Qualified pick #${safeRank}`,
-    status:'Live price',priceLabel:'Current price',returnLabel:'Expected net per $100',
+    state,actionable:true,rankLabel:safeRank===1 ? 'Top suggested pick' : `Suggested pick #${safeRank}`,
+    status:'Live price',priceLabel:'Current price',returnLabel:'Model-estimated net per $100',
   } as const;
   if(state==='locked') return {
     state,actionable:false,rankLabel:safeRank===1 ? 'Top locked pick' : `Locked pick #${safeRank}`,
@@ -24,8 +24,8 @@ export function pickCardPresentation(value:BoardLike,rank:number) {
 
 export function shortlistPresentation(liveCount:number,retainedCount:number) {
   if(liveCount>0) return {
-    state:'live' as const,eyebrow:'Qualified now',title:'Picks you can check now',
-    description:'One primary line per player, ranked by the conservative probability edge.',
+    state:'live' as const,eyebrow:'Suggested picks',title:'Suggested picks you can check now',
+    description:'Player-history estimates screened against the captured price, roster, injury reports and risk limits. One line per player.',
     count:`${liveCount} live`,
   };
   if(retainedCount>0) return {
@@ -34,7 +34,7 @@ export function shortlistPresentation(liveCount:number,retainedCount:number) {
     count:`0 live · ${retainedCount} to reprice`,
   };
   return {
-    state:'empty' as const,eyebrow:'Qualified now',title:'No approved pick yet',
+    state:'empty' as const,eyebrow:'Suggested picks',title:'No suggested pick passes now',
     description:'The board stays empty until a line clears every evidence and price gate.',count:'0 live',
   };
 }
