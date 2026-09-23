@@ -106,3 +106,17 @@ test('nonobject coverage cannot crash the league status endpoint',()=>{
     assert.equal(scanStatus({...completed,coverage},now).state,'unknown');
   }
 });
+
+
+test('budget reasons distinguish protected credits from hard allowance limits',()=>{
+  const limited={...completed,status:'degraded',completed_events:0,budget_skipped_events:2,coverage:{}};
+  for(const [reason,label] of Object.entries({
+    pregame_credit_reserve:'Credits reserved for pregame checks',
+    daily_credit_limit:'Waiting for daily API allowance',
+    rolling_credit_limit:'Waiting for rolling API allowance',
+  })) assert.equal(scanStatus({...limited,budget_reasons:{[reason]:2}},now).label,label);
+  for(const reasons of [null,[],{private_error:2},{pregame_credit_reserve:1},{pregame_credit_reserve:'2'},
+    {pregame_credit_reserve:1,daily_credit_limit:1}]) {
+    assert.equal(scanStatus({...limited,budget_reasons:reasons},now).label,'Scan paused: API budget');
+  }
+});

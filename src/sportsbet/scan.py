@@ -548,7 +548,7 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
             for sport in sports:
                 previous=load_snapshot('scan:'+sport) or {}
                 report=dict(scan_id=scan_id,sport=sport,started_at=now.isoformat(),finished_at=None,status='running',
-                    eligible_events=None,attempted_events=0,completed_events=0,budget_skipped_events=0,
+                    eligible_events=None,attempted_events=0,completed_events=0,budget_skipped_events=0,budget_reasons={},
                     cadence_deferred_events=0,cache_hits=0,coalesced_events=0,next_refresh_at=None,
                     failures=[],coverage={},attempts=previous.get('attempts',{}),
                     model_complete_events=0,model_partial_events=0,model_unavailable_events=0,
@@ -616,11 +616,14 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                         continue
                     cache_owned=True
                     close=timestamp(event['commence_time'])-datetime.now(timezone.utc)<=timedelta(hours=1)
-                    if not ledger.reserve_api_credits(len(MARKETS[sport]),daily_credit_limit,holdback=0 if close else held):
+                    reserved,budget_reason=ledger.reserve_api_credits_with_reason(
+                        len(MARKETS[sport]),daily_credit_limit,holdback=0 if close else held)
+                    if not reserved:
                         cache.release(quote_key,'the_odds_api',sport,scan_id)
                         cache_owned=False
-                        event_state['state']='api_budget'
+                        event_state.update(state='api_budget',budget_reason=budget_reason)
                         report['budget_skipped_events']+=1
+                        report['budget_reasons'][budget_reason]=report['budget_reasons'].get(budget_reason,0)+1
                         continue
                     report['attempted_events']+=1
                 event_state['state']='evaluating'

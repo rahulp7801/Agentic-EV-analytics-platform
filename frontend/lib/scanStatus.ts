@@ -33,6 +33,12 @@ export function scanStatus(value: unknown, now = Date.now()) {
   // A report can finish after a check became due during its bounded 20-minute run.
   const boundedDue=Number.isFinite(age) && nextTime>=Date.parse(stamp as string)-20*60000
     && nextTime<=Date.parse(stamp as string)+48*3600000;
+  const reasons=object(data.budget_reasons) ? Object.entries(data.budget_reasons) : [];
+  const labels:Record<string,string>={pregame_credit_reserve:'Credits reserved for pregame checks',
+    daily_credit_limit:'Waiting for daily API allowance',rolling_credit_limit:'Waiting for rolling API allowance'};
+  // Only complete, bounded reason counts can refine the existing budget label.
+  const budgetLabel=reasons.length===1 && Object.hasOwn(labels,reasons[0][0])
+    && deferred!==null && count(reasons[0][1])===deferred ? labels[reasons[0][0]] : null;
   const overdue=data.status==='scheduled' && (count(data.cadence_deferred_events) ?? 0)>0 && boundedDue && nextTime<=now;
   let state='unknown',label='Scan status unavailable';
   if(Number.isFinite(age) && age>=-60000) {
@@ -44,7 +50,7 @@ export function scanStatus(value: unknown, now = Date.now()) {
     else if(data.status==='blocked') {state='blocked';label='Waiting for refreshed history';}
     else if(data.status==='failed') {state='failed';label='Scan failed';}
     else if(Array.isArray(data.failures) && data.failures.length) {state='degraded';label='Scan had failures';}
-    else if(deferred && deferred>0) {state='partial';label=completed===0 ? 'Scan paused: API budget' : 'Coverage limited: API budget';}
+    else if(deferred && deferred>0) {state='partial';label=budgetLabel ?? (completed===0 ? 'Scan paused: API budget' : 'Coverage limited: API budget');}
     else if(data.status==='scheduled' && count(data.cadence_deferred_events)) {state='scheduled';label='Waiting for next quote check';}
     else if(data.status==='degraded') {
       state='degraded';label=unresolved_selections ? 'Player history coverage incomplete'

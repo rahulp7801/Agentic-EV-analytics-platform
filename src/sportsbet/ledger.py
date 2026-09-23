@@ -294,22 +294,30 @@ class Ledger:
         return True, 'accepted'
 
     def reserve_api_credits(self, cost: int, limit: int = 25, holdback: int = 0) -> bool:
+        return self.reserve_api_credits_with_reason(cost,limit,holdback)[0]
+
+    def reserve_api_credits_with_reason(self, cost: int, limit: int = 25,
+                                        holdback: int = 0) -> tuple[bool,str]:
+        """Classify a reservation atomically without changing allowance policy."""
         if type(cost) is not int or type(limit) is not int or type(holdback) is not int or cost < 1 or limit < 1 or holdback < 0:
-            return False
+            return False,'invalid_credit_request'
         today = datetime.now(timezone.utc).date()
         day = today.isoformat()
         window_start = (today-timedelta(days=30)).isoformat()
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT credits FROM api_usage WHERE risk_day=?', (day,)).fetchone()
-            if (row[0] if row else 0) + cost + holdback > limit:
-                return False
+            daily=row[0] if row else 0
             rolling = db.execute('SELECT COALESCE(SUM(credits),0) FROM api_usage WHERE risk_day>=? AND risk_day<=?',
                 (window_start,day)).fetchone()[0]
-            if rolling + cost + holdback > settings.odds_rolling_credit_limit:
-                return False
+            if daily+cost > limit:
+                return False,'daily_credit_limit'
+            if rolling+cost > settings.odds_rolling_credit_limit:
+                return False,'rolling_credit_limit'
+            if daily+cost+holdback > limit or rolling+cost+holdback > settings.odds_rolling_credit_limit:
+                return False,'pregame_credit_reserve'
             db.execute('INSERT INTO api_usage VALUES (?,?) ON CONFLICT(risk_day) DO UPDATE SET credits=api_usage.credits+excluded.credits', (day,cost))
-        return True
+        return True,'reserved'
 
     @staticmethod
     def quote_identity(payload):
