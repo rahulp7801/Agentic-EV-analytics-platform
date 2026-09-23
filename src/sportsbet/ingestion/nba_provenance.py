@@ -121,7 +121,11 @@ def apply_plan(conn, updates: list[dict]) -> int:
     statement=update(table).where(table.c.source_provider=='nba',
         *(table.c[key].is_(None) for key in PROVENANCE[:2]),
         table.c.source_observed_at.is_not_distinct_from(bindparam('expected_source_observed_at')),
-        *(table.c[key].is_not_distinct_from(bindparam('expected_'+key)) for key in FIELDS)).values(
+        # These stable identities are non-null and have a unique B-tree index.
+        # Null-safe identity comparisons force a full-table scan for each row.
+        *(table.c[key]==bindparam('expected_'+key) for key in ('player_id','game_id')),
+        *(table.c[key].is_not_distinct_from(bindparam('expected_'+key))
+            for key in FIELDS if key not in ('player_id','game_id'))).values(
         player_name=bindparam('new_player_name'),source_sha256=bindparam('batch_digest'),
         source_record_sha256=bindparam('record_digest'),source_observed_at=bindparam('observed'))
     for offset in range(0,len(updates),500):

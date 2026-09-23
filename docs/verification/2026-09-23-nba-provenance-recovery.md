@@ -59,6 +59,22 @@ protection, mismatched stats/workload/identity,
 malformed sources, and rollback after a concurrent change. A disposable PostgreSQL
 regression is part of the existing CI worker test gate.
 
-Production application is pending full CI. This work makes no provider quote
+PR #204 passed 1,000 backend tests, 9 migration tests, 24 PostgreSQL/storage
+checks, and the frontend/worker/security gates. The production release
+[35908902758](https://github.com/rahulp7801/agentic-sports-forecaster/actions/runs/35908902758)
+completed successfully.
+
+The first production application returned a database OperationalError and rolled
+back. A separate database count confirmed **zero** source hashes in both seasons;
+no partial season was committed. Diagnosis with read-only EXPLAIN found a scaling
+defect: `IS NOT DISTINCT FROM` on the non-null player/game identities produces a
+sequential scan (estimated total cost 2016.75) for every recovery row. Equality on
+those same identities uses the existing unique index (estimated cost 2.51).
+
+The follow-up keeps every optimistic value/provenance comparison and uses equality
+only for the two non-null identities. A 2,048-row PostgreSQL case verifies the
+actual recovery UPDATE has indexed identity conditions, all values survive, the
+source constraint validates, and a repeat application is idempotent. The original
+two-row case remains. Recovery is pending verification of this follow-up. This work makes no provider quote
 requests, changes no credit limits, and involves no purchase, card, subscription,
 bet, model/threshold change, frozen-cohort refit, or synthetic prediction.
