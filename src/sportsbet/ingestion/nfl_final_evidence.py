@@ -15,7 +15,7 @@ import re
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
-from sportsbet.ingestion.provenance import stat_row_sha256
+from sportsbet.ingestion.provenance import stat_row_sha256,row_sha256
 from sportsbet.ledger import utc_timestamp, verified_settlement_evidence, VERIFIED_SETTLEMENT_SOURCE
 from sportsbet.schedules import scheduled_stat_teams
 from sportsbet.settlement import _candidate
@@ -65,7 +65,7 @@ def inspect_bundle(bundle: dict, *, now: datetime | None = None) -> list[dict]:
             continue
         if gsis in mapping or espn in seen_espn:
             raise ValueError('Ambiguous player crosswalk')
-        mapping[gsis]=espn;seen_espn.add(espn)
+        mapping[gsis]=(espn,row.get('pfr_id'));seen_espn.add(espn)
     sources={}
     for source in bundle['sources']:
         if (source['url'] in sources or digest(source['response_text'])!=source['sha256']
@@ -77,7 +77,7 @@ def inspect_bundle(bundle: dict, *, now: datetime | None = None) -> list[dict]:
         return json.loads(source['response_text']),source
     results=[];seen=set()
     for player in bundle['players']:
-        event=player['espn_event_id'];gsis=player['player_id'];espn=mapping[gsis]
+        event=player['espn_event_id'];gsis=player['player_id'];espn,pfr=mapping[gsis]
         if not re.fullmatch(r'[1-9][0-9]*',event) or (event,gsis) in seen:
             raise ValueError('Invalid or duplicate recovery identity')
         seen.add((event,gsis))
@@ -133,14 +133,35 @@ def inspect_bundle(bundle: dict, *, now: datetime | None = None) -> list[dict]:
         if any(not start<=utc_timestamp(r['observed_at'])<=now for r in receipts):
             raise ValueError('Final evidence predates game')
         abbr=team['team']['abbreviation'];abbr={'LAR':'LA','WSH':'WAS'}.get(abbr,abbr)
+        # A separate nflverse participation record corroborates ESPN's explicit
+        # gamesPlayed value. No missing stat category is inferred from snaps.
+        if (not isinstance(pfr,str) or not re.fullmatch('[A-Za-z0-9]{1,20}',pfr)
+                or sum(value[1]==pfr for value in mapping.values())!=1):
+            raise ValueError('Exact PFR identity required')
+        snaps=[r for r in bundle['participation'] if r['row']['pfr_player_id']==pfr
+            and r['row']['season']==season and r['row']['week']==week]
+        snap,=snaps;sr=snap['row']
+        teams=scheduled_stat_teams('nfl',game)
+        home_abbr={'LAR':'LA','WSH':'WAS'}.get(game['home_abbr'],game['home_abbr'])
+        away_abbr={'LAR':'LA','WSH':'WAS'}.get(game['away_abbr'],game['away_abbr'])
+        if (snap['source_provider']!='nflverse'
+                or not re.fullmatch('[0-9a-f]{64}',snap['source_sha256'])
+                or row_sha256(sr)!=snap['source_record_sha256']
+                or not start<=utc_timestamp(snap['source_observed_at'])<=now
+                or sr['team']!=abbr or {sr['team'],sr['opponent']}!=teams
+                or sr['game_id']!=f'{season}_{week:02}_{away_abbr}_{home_abbr}'
+                or snap['game_date']!=day or snap['home_team']!=home_abbr or snap['away_team']!=away_abbr
+                or _integer(sr['offense_snaps'])<=0):
+            raise ValueError('Independent participation evidence is invalid')
         row=dict(player_id=gsis,season=season,week=week,team=abbr,
             passing_yards=None,rushing_yards=None,receiving_yards=yards,receptions=receptions)
         commitments=[{k:r[k] for k in ('url','sha256','observed_at')} for r in receipts]
         result.update(status='verified_explicit_stats',stat_row=row,
-            stat_record_sha256=stat_row_sha256('nfl',row),observed_at=max(utc_timestamp(r['observed_at']) for r in receipts).isoformat(),
+            stat_record_sha256=stat_row_sha256('nfl',row),observed_at=max([utc_timestamp(r['observed_at']) for r in receipts]
+                +[utc_timestamp(snap['source_observed_at'])]).isoformat(),
             source_evidence=dict(version=1,espn_player_id=espn,gsis_player_id=gsis,
                 did_not_play=False,games_played=1,identity_source_sha256=identity['source_sha256'],
-                identity_source_url=IDENTITY_URL,sources=commitments))
+                identity_source_url=IDENTITY_URL,pfr_player_id=pfr,participation=snap,sources=commitments))
         result['source_sha256']=digest(json.dumps(result['source_evidence'],sort_keys=True,separators=(',',':')))
         results.append(result)
     return results
