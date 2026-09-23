@@ -31,6 +31,7 @@ from sportsbet.prop.probability import outcome_interval_for_side
 from sportsbet.picks import build_pick_board
 from sportsbet.provider_cache import CachedResponse, ProviderResponseCache
 from sportsbet.quant.vig import american_to_raw_prob
+from sportsbet.quant.market_baseline import paired_market_baseline
 
 MARKETS = PROP_MARKETS
 SPORT_KEYS = {'nba':'basketball_nba','nfl':'americanfootball_nfl','cfb':'americanfootball_ncaaf'}
@@ -429,7 +430,8 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             quote_source_provider=quote.source_provider,quote_source_sha256=quote.source_sha256,
             quote_source_record_sha256=quote.source_record_sha256,accepted=accepted,gate_reason=reason,
             stake_fraction=float(signal.kelly_fraction) if accepted else 0,model_version=MODEL_VERSION,
-            recommendation_policy_version=RECOMMENDATION_POLICY_VERSION)
+            recommendation_policy_version=RECOMMENDATION_POLICY_VERSION,
+            **paired_market_baseline(quote, quotes))
         counts[reason] += 1
         # Publish every measured forecast, including non-recommended estimates.
         # Availability screens eligibility; v4 remains an unchanged historical baseline.

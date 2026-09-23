@@ -28,3 +28,5 @@ The immediate research priority is to check whether anchoring player-history est
 ## Reproduce
 
 Run `python -m sportsbet.quant.priced_market_audit --sport nfl` with the ledger connection configured through `ANALYTICS_DATABASE_URL`, or set `--database-env` to the name of an existing environment variable containing that URL. The command is read-only. It checks its earliest-selection, decided, and duplicate counts against `Ledger.report` and stops if they differ. Its exact quote pairs are constructed from eligible recorded forecasts; the report above was independently checked against the hosted ledger.
+
+Future scans now record `market_no_vig_probability` when the chosen side has exactly one opposite offer from the same sportsbook, line, quote timestamp, game and provider batch. They also retain the opposite American price and its source-record hash. Missing or ambiguous opposite quotes leave these optional fields absent. This is a contemporaneous benchmark and does not change the model estimate, recommendation gate, or stake.
