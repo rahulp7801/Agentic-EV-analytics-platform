@@ -126,3 +126,16 @@ def test_integer_line_scores_decided_conditional_on_no_push(monkeypatch):
     assert result["pending"] == 0
     assert result["model_brier"] == pytest.approx(.25)
     assert result["hypothetical_flat_stake_roi"] == pytest.approx((100/110-1)/3)
+
+
+def test_all_push_model_mass_keeps_result_without_undefined_brier(monkeypatch):
+    monkeypatch.setattr(audit, "_verified_outcome", lambda value: value["outcome"])
+    value = row(prediction_id="degenerate", direction="over", odds=-110,
+                captured="2026-09-20T10:00:00+00:00",
+                quote="2026-09-20T09:59:00+00:00", outcome=False, probability=0)
+    value["push_probability"] = 1
+    result = audit.compare_eligible_rows([value], bootstrap_samples=0)
+    assert result["decided"] == 1
+    assert result["scored_decided"] == 0
+    assert result["model_brier"] is None
+    assert result["hypothetical_flat_stake_roi"] == -1

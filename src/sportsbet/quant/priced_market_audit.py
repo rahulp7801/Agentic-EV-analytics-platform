@@ -104,7 +104,7 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
     pushes = sum(outcome == "push" for _, outcome in outcomes)
     if not decided:
         return {"source_eligible": len(rows), "earliest_selections": len(selected),
-                "decided": 0, "pushes": pushes,
+                "decided": 0, "scored_decided": 0, "pushes": pushes,
                 "pending": len(selected)-pushes, "paired_decided": 0}
     model_error = []
     raw_error = []
@@ -114,12 +114,14 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
     game_blend_rows: dict[str, list[tuple[float, float, int]]] = defaultdict(list)
     for row in decided:
         y = int(row["outcome"])
+        flat_return.append((row["american_odds"]/100 if row["american_odds"] > 0 else 100/-row["american_odds"]) if y else -1)
         push = float(row.get("push_probability", 0))
+        if push >= 1:
+            continue  # No conditional win probability exists when modeled push mass is one.
         p = float(row["model_probability"]) / (1-push)
         raw = _implied(row["american_odds"])
         model_error.append((p-y)**2)
         raw_error.append((raw-y)**2)
-        flat_return.append((row["american_odds"]/100 if row["american_odds"] > 0 else 100/-row["american_odds"]) if y else -1)
         other = "under" if row["direction"] == "over" else "over"
         opposite_prices = quotes[_quote_key(row)].get(other, set())
         recorded = verified_recorded_market_baseline(row)
@@ -139,10 +141,11 @@ def compare_eligible_rows(rows: list[dict], *, bootstrap_samples: int = 10_000,
         game_blend_rows[game_id].append((p, no_vig, y))
     result = {
         "source_eligible": len(rows), "earliest_selections": len(selected),
-        "decided": len(decided), "pushes": pushes,
+        "decided": len(decided), "scored_decided": len(model_error), "pushes": pushes,
         "pending": len(selected)-len(decided)-pushes,
         "settled_games": len({str(row["game_id"]) for row in decided}),
-        "model_brier": mean(model_error), "raw_implied_brier": mean(raw_error),
+        "model_brier": mean(model_error) if model_error else None,
+        "raw_implied_brier": mean(raw_error) if raw_error else None,
         "hypothetical_flat_stake_roi": sum(flat_return)/(len(decided)+pushes),
         "paired_decided": len(paired), "paired_games": len(game_deltas),
         "paired_model_brier": mean(x[0] for x in paired) if paired else None,
