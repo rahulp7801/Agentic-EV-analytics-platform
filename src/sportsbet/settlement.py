@@ -19,6 +19,8 @@ STAT_COLUMNS={
     'nba':{'points':'points','rebounds':'rebounds','assists':'assists'},
     'nfl':{'pass_yds':'passing_yards','rush_yds':'rushing_yards',
         'rec_yds':'receiving_yards','receptions':'receptions'},
+    'cfb':{'pass_yds':'passing_yards','rush_yds':'rushing_yards',
+        'rec_yds':'receiving_yards','receptions':'receptions'},
 }
 AUTO_SOURCE=VERIFIED_SETTLEMENT_SOURCE
 AUTO_SOURCES={AUTO_SOURCE,'espn_final_stats'}
@@ -114,6 +116,17 @@ def _actual(db, prediction: dict, sport: str, day: str, game: dict):
             source_record_sha256,source_observed_at
             FROM nba_player_gamelogs WHERE player_id=? AND game_date=?'''
         rows=db.execute(query,(int(player_id),day)).fetchall()
+    elif sport=='cfb':
+        if not player_id.isdigit() or int(player_id)<=0 or str(int(player_id))!=player_id:
+            raise ValueError('Invalid player identity')
+        event_id=game['provider_event_id']
+        if not event_id.isdigit() or int(event_id)<=0:
+            raise ValueError('Invalid CFB game identity')
+        fields=STAT_FIELDS['cfb']
+        query=f'''SELECT {','.join(fields)},source_provider,source_sha256,
+            source_record_sha256,source_observed_at FROM cfb_player_gamelogs
+            WHERE athlete_id=? AND game_id=? AND game_date=?'''
+        rows=db.execute(query,(int(player_id),int(event_id),day)).fetchall()
     else:
         if not player_id.strip() or len(player_id)>20:
             raise ValueError('Invalid player identity')
@@ -129,7 +142,9 @@ def _actual(db, prediction: dict, sport: str, day: str, game: dict):
     if len(rows)!=1:
         return None
     record=dict(zip(fields,rows[0][:len(fields)],strict=True))
-    team_field='team_abbreviation' if sport=='nba' else 'team'
+    if sport=='cfb' and type(record['is_home']) is int and record['is_home'] in (0,1):
+        record['is_home']=bool(record['is_home'])
+    team_field='team_abbreviation' if sport in ('nba','cfb') else 'team'
     if record[team_field] not in scheduled_stat_teams(sport,game):
         return None
     if record[column] is None or type(record[column]) is bool:
@@ -138,7 +153,7 @@ def _actual(db, prediction: dict, sport: str, day: str, game: dict):
     if not value.is_finite() or (sport=='nba' and value < 0):
         raise ValueError('Invalid observed stat')
     provider,digest,record_digest,observed=rows[0][len(fields):]
-    expected={'nba':{'nba','espn'},'nfl':{'nflverse'}}[sport]
+    expected={'nba':{'nba','espn'},'nfl':{'nflverse'},'cfb':{'sportsdataverse_espn'}}[sport]
     if (provider not in expected or not isinstance(digest,str) or not re.fullmatch('[0-9a-f]{64}',digest)
             or not isinstance(record_digest,str) or not re.fullmatch('[0-9a-f]{64}',record_digest)):
         raise StatProvenanceError('Invalid stat source')
