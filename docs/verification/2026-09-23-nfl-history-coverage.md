@@ -27,11 +27,17 @@ An input can reuse the previously retained identity bundle with `--identity-bund
 
 Fourteen focused tests passed locally before the workspace outage. Tests cover exact identity, source tampering, duplicate rows, future observations, exclusive cutoff, zero-offense exclusion, unknown outcomes, immutable inputs and rolling-window boundaries.
 
-## Source retention and workspace outage
+## Retained and reproduced source snapshot
 
-The full read-only input and detailed report were written to `.local/nfl-history-participation-input.json` and `.local/nfl-history-participation-report.json` on the original workspace. The input SHA-256 is recorded in `2026-09-23-nfl-history-coverage.json`.
+The workspace drive returned. The original read-only input SHA-256 was verified as `61a91836b77beae78229582b65f855b53239ccdc6aa31b023017927e63c6e84c`. The full snapshot is now archived as `2026-09-23-nfl-history-coverage-input.json.gz`, reusing the exact identity crosswalk from the final-source archive through its SHA-256 commitment.
 
-The D: workspace drive became unavailable after the audit code/tests had been committed and pushed. Work continued from a temporary checkout of that pushed branch. The committed aggregate report preserves the verified tool output, but the full input is not yet archived remotely. Do not describe these aggregates as independently reproduced from a retained repository input until the workspace returns and the committed digest is checked, or a new hosted snapshot is collected.
+Replaying the retained input with the command below reproduced the entire original detailed report (apart from the input-file digest, because the archive is compressed). The committed JSON now contains that full reproduced report.
+
+```powershell
+python -m sportsbet.quant.nfl_history_coverage --input docs/verification/2026-09-23-nfl-history-coverage-input.json.gz --identity-bundle docs/verification/2026-09-23-nfl-final-sources.json.gz
+```
+
+The transient workspace outage did not lose the audit or change any production data.
 
 ## Collection and next checkpoints
 
@@ -41,7 +47,7 @@ The intended fresh ledger/budget/shadow check was prevented by the workspace out
 
 Next useful work:
 
-1. Restore access to the original workspace or configured hosted read-only database, retain/reproduce the full audit input, and refresh scan/budget/frozen-shadow counts.
+1. Refresh scan/budget/frozen-shadow counts at the next scheduled collection checkpoint. Source retention and independent reproduction are complete.
 2. Obtain explicit final stats for the 12 missing games affecting the four current quoted players, using exact archived GSIS/ESPN/PFR bindings and independently verified participation. Do not infer zeroes from snaps.
 3. Measure the effect in a separately versioned research/shadow dataset before proposing a history-policy change. Existing frozen inputs and prospective gates remain unchanged.
 
