@@ -172,3 +172,20 @@ def test_report_filters_prospective_entry_time_before_deduplication(tmp_path):
     assert result['captured_after'] == (now+timedelta(minutes=5)).isoformat()
     with pytest.raises(ValueError):
         ledger.report(captured_after='2026-09-23T12:05:00')
+
+
+def test_settlement_batches_large_cohort_atomically(tmp_path):
+    ledger=Ledger(tmp_path/'settlement-batches.sqlite')
+    now=datetime.now(timezone.utc)
+    base=dict(game_id='batch-game',player='Player',player_id='7',sport='nba',
+        game_date=(now+timedelta(days=1)).date().isoformat(),home_team='Home',away_team='Away',
+        prop_type='points',direction='over',sportsbook='book',american_odds=100,
+        model_probability=.6,captured_at=now.isoformat(),
+        game_start_time=(now+timedelta(days=1)).isoformat())
+    keys=ledger.record_many('batch-scan',[base|{'line':i+.5} for i in range(260)])
+    with pytest.raises(ValueError,match='Unknown prediction ID'):
+        ledger.settle({**{key:True for key in keys},'missing-id':True})
+    assert all(row['outcome'] is None for row in ledger.predictions())
+    ledger.settle({key:True for key in keys})
+    assert len(ledger.predictions())==260
+    assert all(row['outcome'] is True for row in ledger.predictions())

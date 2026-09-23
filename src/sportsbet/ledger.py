@@ -210,6 +210,10 @@ class Ledger:
                     if sql == 'BEGIN IMMEDIATE':
                         return conn.execute('SELECT pg_advisory_xact_lock(739201)')
                     return conn.execute(sql.replace('?', '%s'), args)
+
+                def executemany(self, sql, args):
+                    with conn.cursor() as cursor:
+                        cursor.executemany(sql.replace('?', '%s'), args)
             try:
                 with conn:
                     conn.execute('SET LOCAL search_path TO analytics, public')
@@ -341,26 +345,36 @@ class Ledger:
         if stamp.tzinfo is None or stamp.utcoffset() is None:
             raise ValueError('Settlement observation time requires a timezone')
         stamp=stamp.astimezone(timezone.utc)
+        items=list(outcomes.items())
         with self.connect() as db:
-            for key, outcome in outcomes.items():
-                if outcome is not None and type(outcome) is not bool and outcome not in ('push','void'):
-                    raise ValueError('Settlement must be true/false/push/void/null')
-                actual=(actual_values or {}).get(key)
-                if actual is not None:
-                    actual=Decimal(str(actual))
-                    if not actual.is_finite():
-                        raise ValueError('Settlement actual value is invalid')
-                    actual=int(actual) if actual==actual.to_integral_value() else str(actual)
-                row=db.execute('SELECT payload FROM predictions WHERE id=?',(key,)).fetchone()
-                if row is None:
-                    raise ValueError(f'Unknown prediction ID: {key}')
-                proof=(evidence or {}).get(key)
-                encoded=json.dumps(proof,sort_keys=True,separators=(',',':'),allow_nan=False) if proof is not None else None
-                if source == VERIFIED_SETTLEMENT_SOURCE and not verified_settlement_evidence(
-                        json.loads(row[0]),outcome,source,source_ref,stamp,actual,encoded):
-                    raise ValueError('Verified settlement evidence is invalid')
-                db.execute('UPDATE predictions SET outcome=?,outcome_source=?,outcome_ref=?,outcome_observed_at=?,actual_value=?,outcome_evidence=? WHERE id=?',
-                    (json.dumps(outcome),source,source_ref,stamp.isoformat(),actual,encoded,key))
+            for offset in range(0,len(items),250):
+                batch=items[offset:offset+250]
+                keys=[key for key,_ in batch]
+                placeholders=','.join('?' for _ in keys)
+                # Only literal parameter markers enter the SQL text; IDs remain bound values.
+                query=f'SELECT id,payload FROM predictions WHERE id IN ({placeholders})'
+                rows=dict(db.execute(query,keys).fetchall())
+                updates=[]
+                for key,outcome in batch:
+                    if outcome is not None and type(outcome) is not bool and outcome not in ('push','void'):
+                        raise ValueError('Settlement must be true/false/push/void/null')
+                    actual=(actual_values or {}).get(key)
+                    if actual is not None:
+                        actual=Decimal(str(actual))
+                        if not actual.is_finite():
+                            raise ValueError('Settlement actual value is invalid')
+                        actual=int(actual) if actual==actual.to_integral_value() else str(actual)
+                    payload=rows.get(key)
+                    if payload is None:
+                        raise ValueError(f'Unknown prediction ID: {key}')
+                    proof=(evidence or {}).get(key)
+                    encoded=json.dumps(proof,sort_keys=True,separators=(',',':'),allow_nan=False) if proof is not None else None
+                    if source == VERIFIED_SETTLEMENT_SOURCE and not verified_settlement_evidence(
+                            json.loads(payload),outcome,source,source_ref,stamp,actual,encoded):
+                        raise ValueError('Verified settlement evidence is invalid')
+                    updates.append((json.dumps(outcome),source,source_ref,stamp.isoformat(),actual,encoded,key))
+                db.executemany('''UPDATE predictions SET outcome=?,outcome_source=?,outcome_ref=?,
+                    outcome_observed_at=?,actual_value=?,outcome_evidence=? WHERE id=?''',updates)
 
     def predictions(self) -> list[dict]:
         with self.connect() as db:
