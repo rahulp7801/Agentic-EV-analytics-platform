@@ -24,3 +24,7 @@ On the full earliest cohort, Over forecasts returned -15.50% at recorded prices,
 Treat the sportsbook's contemporaneous no-vig probability as the benchmark for probability scoring. Any model change should be frozen before a later game slate and evaluated on exact pregame quotes, verified settlements, and deduplicated picks. Report paired Brier improvement, recorded-price return, closing-line value, number of games, and uncertainty by game. Do not promote a profitable-looking filter selected from these 16 games as a validated edge.
 
 The immediate research priority is to check whether anchoring player-history estimates to the market improves calibration on later games. A better Brier score alone would improve forecasting but would not prove positive expected betting return after vig; that requires a separately frozen selection rule and prospective priced outcomes.
+
+## Reproduce
+
+Run `python -m sportsbet.quant.priced_market_audit --sport nfl` with the ledger connection configured through `ANALYTICS_DATABASE_URL`, or set `--database-env` to the name of an existing environment variable containing that URL. The command is read-only. It checks its earliest-selection, decided, and duplicate counts against `Ledger.report` and stops if they differ. Its exact quote pairs are constructed from eligible recorded forecasts; the report above was independently checked against the hosted ledger.
