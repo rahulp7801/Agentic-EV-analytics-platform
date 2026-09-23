@@ -1,0 +1,206 @@
+{
+  "scope": "Retrospective fixed-4.5 reception replay; provider event match is candidate-only.",
+  "input_sha256": {
+    "replays": {
+      "nfl-week1-2025-receptions.json": "85b593bb833da9f93ae5c85d1c0edc8db39e7a099c45d86bb8343342f93911eb",
+      "nfl-week2-2025-receptions.json": "5628b1eccc305f347b2f35d34918390ea0d182ae42488c415894bc5aca6d724c",
+      "nfl-week1-2026.json": "a956ba2c21a9697794b9c2bba7116238b025b4289bafc7169e740dc881b4c509"
+    },
+    "quotes": "cd1eb7492f43fd41e36519b6a8e450d291ab564e1ec44c68c4276198924b19bd"
+  },
+  "cohorts": [
+    {
+      "cohort": "nfl-week-1-2025-receptions",
+      "evaluated": 122,
+      "selected": 103,
+      "model_correct": 89,
+      "always_under_correct": 91,
+      "candidate_exact_offers": 0,
+      "selected_offer_statuses": {
+        "no_event_quotes": 103
+      }
+    },
+    {
+      "cohort": "nfl-week-2-2025-receptions",
+      "evaluated": 128,
+      "selected": 110,
+      "model_correct": 91,
+      "always_under_correct": 90,
+      "candidate_exact_offers": 0,
+      "selected_offer_statuses": {
+        "no_event_quotes": 110
+      }
+    },
+    {
+      "cohort": "nfl-week1-2026",
+      "evaluated": 146,
+      "selected": 122,
+      "model_correct": 100,
+      "always_under_correct": 94,
+      "candidate_exact_offers": 1,
+      "selected_offer_statuses": {
+        "candidate_exact_offer": 1,
+        "different_line": 5,
+        "no_event_quotes": 115,
+        "no_player_quotes": 1
+      }
+    }
+  ],
+  "total": {
+    "evaluated": 396,
+    "selected": 335,
+    "model_correct": 280,
+    "always_under_correct": 275,
+    "candidate_exact_offers": 1,
+    "all_evaluated_candidate_exact_offers": 2,
+    "selected_offer_statuses": {
+      "candidate_exact_offer": 1,
+      "different_line": 5,
+      "no_event_quotes": 328,
+      "no_player_quotes": 1
+    },
+    "valid_quote_rows": 403,
+    "rejected_quote_rows": 0
+  },
+  "priced_strategy": {
+    "verified_pregame_model_and_event_matches": 0,
+    "roi": null,
+    "calibration_against_offers": null,
+    "clv": null,
+    "game_cluster_interval": null,
+    "player_cluster_interval": null,
+    "reason": "Replay predictions lack pregame generation timestamps; provider event crosswalk, fill, and settlement rules are unverified."
+  },
+  "candidate_rows": [
+    {
+      "cohort": "nfl-week1-2026",
+      "replay_id": "401872931-receptions-15847",
+      "espn_event_id": "401872931",
+      "player_name": "Travis Kelce",
+      "game_start_time": "2026-09-15T00:15:00+00:00",
+      "model_side": "Over",
+      "selected_at_60_percent": false,
+      "actual_receptions": 3,
+      "model_correct": false,
+      "always_under_correct": true,
+      "market_comparison": {
+        "candidate_entry": {
+          "id": 18204,
+          "game_id": "5ad8135dc2b5f27de0b777acd317855a",
+          "player_name": "Travis Kelce",
+          "sportsbook": "betonlineag",
+          "side": "Over",
+          "line": "4.50",
+          "price": 124,
+          "snapped_at": "2026-09-14T21:00:36+00:00",
+          "game_start_time": "2026-09-15T00:15:00+00:00",
+          "source_provider": "the_odds_api",
+          "source_sha256": "28a3cc8916c746ddf4cce20bb60b862e5b2d23f68a69ca0c21e1efa9b7b961de",
+          "source_record_sha256": "710e121b65500e90373224904e4cc9056f483e321d42861bd3b582d674f094be"
+        },
+        "model_side_probability": 0.544118,
+        "raw_break_even_probability": 0.44642857142857145,
+        "paired_opposite_price": -161,
+        "market_no_vig_probability": 0.41985715204941765,
+        "illustrative_expected_net_per_unit": 0.21882431999999996,
+        "illustrative_model_profit_per_unit": -1.0,
+        "always_under_same_book_quote": {
+          "id": 18205,
+          "game_id": "5ad8135dc2b5f27de0b777acd317855a",
+          "player_name": "Travis Kelce",
+          "sportsbook": "betonlineag",
+          "side": "Under",
+          "line": "4.50",
+          "price": -161,
+          "snapped_at": "2026-09-14T21:00:36+00:00",
+          "game_start_time": "2026-09-15T00:15:00+00:00",
+          "source_provider": "the_odds_api",
+          "source_sha256": "28a3cc8916c746ddf4cce20bb60b862e5b2d23f68a69ca0c21e1efa9b7b961de",
+          "source_record_sha256": "83e97fd757c96f109ced794792264d04ef404daa147ef39554fe6ef24121a6f2"
+        },
+        "illustrative_always_under_profit_per_unit": 0.6211180124223602,
+        "last_observed_same_book_quote": {
+          "id": 19126,
+          "game_id": "5ad8135dc2b5f27de0b777acd317855a",
+          "player_name": "Travis Kelce",
+          "sportsbook": "betonlineag",
+          "side": "Over",
+          "line": "4.50",
+          "price": 124,
+          "snapped_at": "2026-09-14T21:52:47+00:00",
+          "game_start_time": "2026-09-15T00:15:00+00:00",
+          "source_provider": "the_odds_api",
+          "source_sha256": "0cb300705557166f66c00b93c0cb213c3cdfbeb32a3584eb6a536d9a177a6982",
+          "source_record_sha256": "a6601110accf246033cf9c9627161db333f9c96d861a099ce2193f61dd053b3b"
+        },
+        "raw_implied_movement_to_last_observed": 0.0,
+        "scenario_note": "Half-line has no push. Returns assume the archived price was fillable and the book settled the player as active; neither is verified. Last observed quote is not a closing quote."
+      }
+    },
+    {
+      "cohort": "nfl-week1-2026",
+      "replay_id": "401872931-receptions-4372016",
+      "espn_event_id": "401872931",
+      "player_name": "Jaylen Waddle",
+      "game_start_time": "2026-09-15T00:15:00+00:00",
+      "model_side": "Under",
+      "selected_at_60_percent": true,
+      "actual_receptions": 1,
+      "model_correct": true,
+      "always_under_correct": true,
+      "market_comparison": {
+        "candidate_entry": {
+          "id": 18341,
+          "game_id": "5ad8135dc2b5f27de0b777acd317855a",
+          "player_name": "Jaylen Waddle",
+          "sportsbook": "bovada",
+          "side": "Under",
+          "line": "4.50",
+          "price": 105,
+          "snapped_at": "2026-09-14T20:59:33+00:00",
+          "game_start_time": "2026-09-15T00:15:00+00:00",
+          "source_provider": "the_odds_api",
+          "source_sha256": "28a3cc8916c746ddf4cce20bb60b862e5b2d23f68a69ca0c21e1efa9b7b961de",
+          "source_record_sha256": "03e53ee56f6f9582f17034280929284c8a19c149e4468680fda70cbb831ed1b9"
+        },
+        "model_side_probability": 0.609375,
+        "raw_break_even_probability": 0.4878048780487805,
+        "paired_opposite_price": -135,
+        "market_no_vig_probability": 0.4592085979482169,
+        "illustrative_expected_net_per_unit": 0.24921875000000004,
+        "illustrative_model_profit_per_unit": 1.05,
+        "always_under_same_book_quote": {
+          "id": 18341,
+          "game_id": "5ad8135dc2b5f27de0b777acd317855a",
+          "player_name": "Jaylen Waddle",
+          "sportsbook": "bovada",
+          "side": "Under",
+          "line": "4.50",
+          "price": 105,
+          "snapped_at": "2026-09-14T20:59:33+00:00",
+          "game_start_time": "2026-09-15T00:15:00+00:00",
+          "source_provider": "the_odds_api",
+          "source_sha256": "28a3cc8916c746ddf4cce20bb60b862e5b2d23f68a69ca0c21e1efa9b7b961de",
+          "source_record_sha256": "03e53ee56f6f9582f17034280929284c8a19c149e4468680fda70cbb831ed1b9"
+        },
+        "illustrative_always_under_profit_per_unit": 1.05,
+        "last_observed_same_book_quote": {
+          "id": 19317,
+          "game_id": "5ad8135dc2b5f27de0b777acd317855a",
+          "player_name": "Jaylen Waddle",
+          "sportsbook": "bovada",
+          "side": "Under",
+          "line": "4.50",
+          "price": -105,
+          "snapped_at": "2026-09-14T21:52:43+00:00",
+          "game_start_time": "2026-09-15T00:15:00+00:00",
+          "source_provider": "the_odds_api",
+          "source_sha256": "0cb300705557166f66c00b93c0cb213c3cdfbeb32a3584eb6a536d9a177a6982",
+          "source_record_sha256": "e4a3eb9e17ec890362a5ea67f1186f9edd9fe80268f8c070372281a820a5e1d0"
+        },
+        "raw_implied_movement_to_last_observed": 0.024390243902439046,
+        "scenario_note": "Half-line has no push. Returns assume the archived price was fillable and the book settled the player as active; neither is verified. Last observed quote is not a closing quote."
+      }
+    }
+  ]
+}
