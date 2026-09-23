@@ -78,6 +78,9 @@ async def test_exact_team_rosters_and_archived_response_hashes(sport,missing_tea
         result=await fetch_event_availability(dict(id='event',home_team='Wrong',away_team='Away'),sport)
         assert result['status']=='unavailable'
     assert len(requests)==6
+    directories=[url for url in requests if url.split('?')[0].endswith('/teams')]
+    assert len(directories)==2
+    assert all(('limit=1000' in url)==(sport=='cfb') for url in directories)
 
 
 async def test_provider_denial_is_unknown_not_empty_healthy_report():

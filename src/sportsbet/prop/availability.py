@@ -92,6 +92,8 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
     """Fetch both exact teams and rosters, preserving raw source commitments."""
     now = datetime.now(timezone.utc)
     base = BASES[sport]
+    # ESPN defaults the college directory to 50 schools, omitting many FBS teams.
+    directory_url = base+'/teams?limit=1000' if sport=='cfb' else base+'/teams'
     sources = []
     async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
         async def read(url):
@@ -102,7 +104,7 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
             data = response.json()
             # The team directory has no status/timestamp envelope. Injury and
             # roster feeds must have recent provider timestamps, not just HTTP 200.
-            if url != base+'/teams':
+            if url != directory_url:
                 if data.get('status') != 'success':
                     raise ValueError('Availability source failed')
                 fresh_timestamp(data['timestamp'], now)
@@ -111,7 +113,7 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
             return data
         try:
             directory, injuries = await asyncio.gather(
-                read(base+'/teams'), read(base+'/injuries'), return_exceptions=True)
+                read(directory_url), read(base+'/injuries'), return_exceptions=True)
             if isinstance(directory, Exception):
                 raise ValueError('Team directory unavailable')
             teams = [entry['team'] for entry in directory['sports'][0]['leagues'][0]['teams']]
