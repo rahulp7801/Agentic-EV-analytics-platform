@@ -36,6 +36,44 @@ def json_object(value):
         return None
 
 
+
+def _unavailable_shadow(shadow: dict) -> dict:
+    return {key:value for key,value in shadow.items() if key in (
+        'model_version','policy_version','artifact_sha256','implementation_sha256','generated_at')} | {
+        'status':'unavailable','reason':'invalid_or_late_recording'}
+
+
+def _shadow_input_sha256(shadow) -> str | None:
+    try:
+        # Nonfinite values can occur in rejected shadow inputs. Commit their
+        # encoding for retry comparison only; never retain them as predictions.
+        encoded=json.dumps(shadow,sort_keys=True,separators=(',',':'),allow_nan=True)
+        return hashlib.sha256(encoded.encode()).hexdigest()
+    except (TypeError,ValueError):
+        return None
+
+
+def _same_prediction(retained: dict | None, requested: dict) -> bool:
+    if retained is None:
+        return False
+    retained=dict(retained)
+    retained.pop('history_shadow_recorded_at',None)
+    commitment=retained.pop('history_shadow_input_sha256',None)
+    try:
+        encoded=json.dumps(retained,sort_keys=True,separators=(',',':'),allow_nan=False)
+        shadow=requested.get('history_shadow')
+        if (isinstance(shadow,dict) and commitment is not None
+                and commitment==_shadow_input_sha256(shadow)):
+            projected=requested|{'history_shadow':_unavailable_shadow(shadow)}
+            if encoded==json.dumps(projected,sort_keys=True,separators=(',',':'),allow_nan=False):
+                return True
+        # JSON comparison distinguishes true from 1 (Python dict equality does
+        # not), while ignoring key order. No receipt or evidence is rewritten.
+        return encoded==json.dumps(requested,sort_keys=True,separators=(',',':'),allow_nan=False)
+    except (TypeError,ValueError):
+        return False
+
+
 def normalized_model_version(payload: dict) -> str:
     value=payload.get('model_version')
     if value in (None,''):
@@ -300,8 +338,10 @@ class Ledger:
             if (not stake.is_finite() or stake < 0 or stake > MAX_RECOMMENDATION_FRACTION
                     or (accepted and stake == 0) or (not accepted and stake != 0)):
                 raise ValueError('Prediction acceptance and stake are inconsistent')
-        # The persistence timestamp is assigned only by record_many at insertion.
+        # Server-owned receipt and original-input commitment cannot be supplied
+        # by a caller to refresh a receipt or authorize different retry evidence.
         payload.pop('history_shadow_recorded_at',None)
+        payload.pop('history_shadow_input_sha256',None)
         for field in ('captured_at','quote_time','game_start_time','model_generated_at'):
             if payload.get(field) is not None:
                 payload[field] = utc_timestamp(payload[field]).isoformat()
@@ -320,9 +360,7 @@ class Ledger:
             for key,payload in prepared:
                 existing = db.execute('SELECT payload FROM predictions WHERE id=?', (key,)).fetchone()
                 if existing:
-                    retained=json.loads(existing[0])
-                    retained.pop('history_shadow_recorded_at',None)
-                    if retained != payload:
+                    if not _same_prediction(json_object(existing[0]),payload):
                         raise ValueError('Prediction identity already has different immutable evidence')
                     continue
                 if isinstance(payload.get('history_shadow'),dict):
@@ -333,9 +371,10 @@ class Ledger:
                             verified_shadow_probability(payload) is None
                             or not utc_timestamp(payload['captured_at'])<=receipt<utc_timestamp(payload['game_start_time'])
                             or (receipt-utc_timestamp(payload['quote_time'])).total_seconds()>300):
-                        payload['history_shadow']={k:v for k,v in payload['history_shadow'].items()
-                            if k in ('model_version','policy_version','artifact_sha256','implementation_sha256','generated_at')}
-                        payload['history_shadow'].update(status='unavailable',reason='invalid_or_late_recording')
+                        commitment=_shadow_input_sha256(payload['history_shadow'])
+                        if commitment is not None:
+                            payload['history_shadow_input_sha256']=commitment
+                        payload['history_shadow']=_unavailable_shadow(payload['history_shadow'])
                 if type(payload.get('american_odds')) is int and abs(payload['american_odds']) >= 100 and not payload.get('synthetic_price') and str(payload.get('sportsbook','')).lower() != 'prizepicks':
                     from sportsbet.arbitrage.ev import quote_terms
                     captured = payload.get('quote_time') or payload.get('captured_at')
@@ -407,7 +446,7 @@ class Ledger:
                 decoded_actual=float(actual) if actual is not None else None
             except (TypeError,ValueError):
                 decoded_actual=None
-            result.append({'prediction_id':key,**decoded,'outcome':decoded_outcome,
+            result.append({**decoded,'prediction_id':key,'outcome':decoded_outcome,
                 'outcome_source':source,'outcome_ref':ref,
                 'outcome_observed_at':observed.isoformat() if isinstance(observed,datetime) else observed,
                 'actual_value':decoded_actual,

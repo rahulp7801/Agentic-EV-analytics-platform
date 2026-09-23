@@ -208,3 +208,98 @@ def test_record_rejects_invalid_selection_identity(scan_id,change,tmp_path):
     with pytest.raises(ValueError,match='identity|direction|line'):
         ledger.record(scan_id,payload(**change))
     assert ledger.predictions()==[]
+
+
+
+def test_identical_invalid_shadow_retry_preserves_primary_and_rolls_back_conflicts(tmp_path):
+    ledger=Ledger(tmp_path/'retry.sqlite')
+    value=payload(history_shadow={'status':'predicted','model_version':'bad-candidate','probability':.7})
+    key=ledger.record('same',value)
+    retained=ledger.predictions()[0]
+    assert retained['history_shadow']['reason']=='invalid_or_late_recording'
+    assert ledger.record('same',value)==key
+    assert ledger.predictions()==[retained]
+    fresh=payload(player='Fresh',captured_at='2026-01-01T15:01:00+00:00')
+    changed=value|{'history_shadow':value['history_shadow']|{'probability':.8}}
+    with pytest.raises(ValueError,match='immutable'):
+        ledger.record_many('same',[fresh,changed])
+    assert ledger.predictions()==[retained]
+    with ledger.connect() as db:
+        assert db.execute('SELECT count(*) FROM quotes').fetchone()[0]==1
+
+
+def test_nested_boolean_is_not_equal_to_numeric_evidence_on_retry(tmp_path):
+    ledger=Ledger(tmp_path/'types.sqlite')
+    value=payload(context={'observed':True})
+    key=ledger.record('same',value)
+    assert ledger.record('same',dict(reversed(list(value.items()))))==key
+    with pytest.raises(ValueError,match='immutable'):
+        ledger.record('same',value|{'context':{'observed':1}})
+
+
+def test_prediction_primary_key_overrides_embedded_payload_id(tmp_path):
+    ledger=Ledger(tmp_path/'identity.sqlite')
+    key=ledger.record('same',payload(prediction_id='forged'))
+    assert ledger.predictions()[0]['prediction_id']==key
+
+
+@pytest.mark.parametrize('bad',[float('nan'),float('inf'),float('-inf')])
+def test_rejected_nonfinite_shadow_can_retry_without_contaminating_primary(tmp_path,bad):
+    ledger=Ledger(tmp_path/'nonfinite.sqlite')
+    value=payload(history_shadow={'status':'predicted','probability':bad})
+    key=ledger.record('same',value)
+    retained=ledger.predictions()[0]
+    assert retained['model_probability']==.6
+    assert retained['history_shadow']=={'status':'unavailable','reason':'invalid_or_late_recording'}
+    assert ledger.record('same',value)==key
+    assert ledger.predictions()==[retained]
+    json.dumps(retained,allow_nan=False)
+
+
+def test_caller_cannot_forge_retry_commitment_or_refresh_receipt(tmp_path):
+    ledger=Ledger(tmp_path/'receipt.sqlite')
+    value=payload(history_shadow={'status':'predicted','probability':.7},
+        history_shadow_recorded_at='2000-01-01T00:00:00+00:00',history_shadow_input_sha256='caller')
+    key=ledger.record('same',value)
+    retained=ledger.predictions()[0]
+    assert retained['history_shadow_recorded_at']!=value['history_shadow_recorded_at']
+    assert retained['history_shadow_input_sha256']!='caller'
+    assert ledger.record('same',value|{'history_shadow_recorded_at':'2099-01-01T00:00:00+00:00'})==key
+    forged=value|{'history_shadow':{'status':'predicted','probability':.8},
+        'history_shadow_input_sha256':retained['history_shadow_input_sha256']}
+    with pytest.raises(ValueError,match='immutable'):
+        ledger.record('same',forged)
+    assert ledger.predictions()==[retained]
+
+
+def test_concurrent_identical_retries_insert_once(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    ledger=Ledger(tmp_path/'concurrent.sqlite')
+    value=payload(history_shadow={'status':'predicted','probability':.7})
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        keys=list(executor.map(lambda _:ledger.record('same',value),range(8)))
+    assert len(set(keys))==1 and len(ledger.predictions())==1
+    with ledger.connect() as db:
+        assert db.execute('SELECT count(*) FROM quotes').fetchone()[0]==1
+
+
+def test_legacy_downgrade_without_commitment_cannot_authenticate_original_input(tmp_path):
+    ledger=Ledger(tmp_path/'legacy.sqlite')
+    value=payload(history_shadow={'status':'predicted','probability':.7})
+    key=ledger.record('same',value)
+    with ledger.connect() as db:
+        retained=json.loads(db.execute('SELECT payload FROM predictions WHERE id=?',(key,)).fetchone()[0])
+        retained.pop('history_shadow_input_sha256')
+        db.execute('UPDATE predictions SET payload=? WHERE id=?',(json.dumps(retained),key))
+    with pytest.raises(ValueError,match='immutable'):
+        ledger.record('same',value)
+    assert ledger.record('same',retained)==key
+
+
+def test_unserializable_shadow_does_not_drop_primary_prediction(tmp_path):
+    ledger=Ledger(tmp_path/'unserializable.sqlite')
+    ledger.record('same',payload(history_shadow={'status':'predicted','features':{object()}}))
+    retained=ledger.predictions()[0]
+    assert retained['model_probability']==.6
+    assert retained['history_shadow']['reason']=='invalid_or_late_recording'
+    assert 'history_shadow_input_sha256' not in retained
