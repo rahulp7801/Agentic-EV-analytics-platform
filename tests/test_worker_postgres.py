@@ -62,6 +62,30 @@ def test_final_prop_settlement_uses_real_postgres_and_retains_provenance():
         engine.dispose()
 
 
+
+def test_postgres_settlement_writes_multiple_predictions_in_one_batch():
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];ledger=Ledger(database_url=url)
+    scan_id=uuid.uuid4().hex[:16];now=datetime.now(timezone.utc)
+    base=dict(game_id=scan_id,player='Batch Fixture',player_id='7',sport='nba',
+        game_date=(now+timedelta(days=1)).date().isoformat(),home_team='Home',away_team='Away',
+        prop_type='points',direction='over',sportsbook='book',american_odds=100,
+        model_probability=.6,captured_at=now.isoformat(),
+        game_start_time=(now+timedelta(days=1)).isoformat(),model_version=scan_id)
+    payloads=[base|{'line':i+.5} for i in range(12)]
+    engine=sa.create_engine(url)
+    try:
+        keys=ledger.record_many(scan_id,payloads)
+        ledger.settle({key:True for key in keys},source='manual')
+        rows={row['prediction_id']:row for row in ledger.predictions() if row['prediction_id'] in keys}
+        assert len(rows)==12 and all(row['outcome'] is True for row in rows.values())
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text('DELETE FROM analytics.predictions WHERE scan_id=:id'),{'id':scan_id})
+            for payload in payloads:
+                conn.execute(sa.text('DELETE FROM analytics.quotes WHERE identity=:identity'),
+                    {'identity':ledger.quote_identity(payload)})
+        engine.dispose()
+
 def test_nfl_receptions_settle_with_real_postgres_and_committed_stat():
     url=os.environ['SPORTSBET_TEST_DATABASE_URL'];ledger=Ledger(database_url=url)
     identity=uuid.uuid4().hex[:16];player_id='p-'+uuid.uuid4().hex[:12]
