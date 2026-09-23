@@ -300,6 +300,17 @@ class Ledger:
             if (not stake.is_finite() or stake < 0 or stake > MAX_RECOMMENDATION_FRACTION
                     or (accepted and stake == 0) or (not accepted and stake != 0)):
                 raise ValueError('Prediction acceptance and stake are inconsistent')
+        # A delayed write must not acquire a prospective shadow label. Preserve
+        # the primary model record and record the shadow's unavailable denominator.
+        if isinstance(payload.get('history_shadow'),dict) and payload['history_shadow'].get('status')=='predicted':
+            from sportsbet.quant.history_shadow import verified_shadow_probability
+            receipt=datetime.now(timezone.utc)
+            if (verified_shadow_probability(payload) is None
+                    or not utc_timestamp(payload['captured_at'])<=receipt<utc_timestamp(payload['game_start_time'])
+                    or (receipt-utc_timestamp(payload['quote_time'])).total_seconds()>300):
+                payload['history_shadow']={k:v for k,v in payload['history_shadow'].items()
+                    if k in ('model_version','policy_version','artifact_sha256','implementation_sha256','generated_at')}
+                payload['history_shadow'].update(status='unavailable',reason='invalid_or_late_recording')
         for field in ('captured_at','quote_time','game_start_time','model_generated_at'):
             if payload.get(field) is not None:
                 payload[field] = utc_timestamp(payload[field]).isoformat()
