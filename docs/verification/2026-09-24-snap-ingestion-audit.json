@@ -1,0 +1,85 @@
+{
+  "observed_at": "2026-09-24T17:02:51.630575+00:00",
+  "seasons": [
+    {
+      "season": 2024,
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/snap_counts/snap_counts_2024.parquet",
+      "observed_at": "2026-09-24T17:02:48.120659+00:00",
+      "source_asset_sha256": "9ec66a0c755939b329d4eba3f90e716bb874b5a6544f325ba220f003991ff99f",
+      "source_bytes": 240862,
+      "source_rows": 26615,
+      "regular_identified_rows": 25398,
+      "source_count_types": {
+        "offense_snaps": "Float64",
+        "defense_snaps": "Float64"
+      },
+      "null_counts": {
+        "offense_snaps": 0,
+        "defense_snaps": 0
+      },
+      "zero_counts": {
+        "offense_snaps": 15342,
+        "defense_snaps": 14812
+      },
+      "validation": "passed",
+      "normalized_rows": 25398,
+      "all_row_commitments_unchanged": true,
+      "batch_sha256": "805f42fd3d7284094d1b9fb6b4ec8e2c25fcccaace82bb1d201093563fdd969a",
+      "retained_asset": "2026-09-24-snap-counts-2024.parquet"
+    },
+    {
+      "season": 2025,
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/snap_counts/snap_counts_2025.parquet",
+      "observed_at": "2026-09-24T17:02:48.025373+00:00",
+      "source_asset_sha256": "47220218fecda7af7ee5b0272a8ecce7c1bfb1f4e1f0a2c8c90047571728ce20",
+      "source_bytes": 242046,
+      "source_rows": 26613,
+      "regular_identified_rows": 25396,
+      "source_count_types": {
+        "offense_snaps": "Float64",
+        "defense_snaps": "Float64"
+      },
+      "null_counts": {
+        "offense_snaps": 0,
+        "defense_snaps": 0
+      },
+      "zero_counts": {
+        "offense_snaps": 15302,
+        "defense_snaps": 14857
+      },
+      "validation": "passed",
+      "normalized_rows": 25396,
+      "all_row_commitments_unchanged": true,
+      "batch_sha256": "cd80f1526880d046309005b2a9ab6e064fe81e0db43a2933701077805f9e4537",
+      "retained_asset": "2026-09-24-snap-counts-2025.parquet"
+    },
+    {
+      "season": 2026,
+      "source_url": "https://github.com/nflverse/nflverse-data/releases/download/snap_counts/snap_counts_2026.parquet",
+      "observed_at": "2026-09-24T17:02:48.025373+00:00",
+      "source_asset_sha256": "e83cf1f204fd80c81d7bc2bcb0b9cf3bbb45c7022bdf7fcd081cca6bbe234d63",
+      "source_bytes": 60234,
+      "source_rows": 2994,
+      "regular_identified_rows": 2994,
+      "source_count_types": {
+        "offense_snaps": "Float64",
+        "defense_snaps": "Float64"
+      },
+      "null_counts": {
+        "offense_snaps": 0,
+        "defense_snaps": 0
+      },
+      "zero_counts": {
+        "offense_snaps": 1805,
+        "defense_snaps": 1769
+      },
+      "validation": "passed",
+      "normalized_rows": 2994,
+      "all_row_commitments_unchanged": true,
+      "batch_sha256": "b9878983090c28206edf613eb5e67b20dd18dd652f74b3da128b518f2a17fb5a",
+      "retained_asset": "2026-09-24-snap-counts-2026.parquet"
+    }
+  ],
+  "database_writes": 0,
+  "quote_requests": 0
+}
