@@ -1,0 +1,471 @@
+{
+  "roster_source": {
+    "observed_at": "2026-09-24T23:27:13.556389+00:00",
+    "url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/324/roster",
+    "source_sha256": "ffaab0cdde800635c8dacbded0df5c7a82732eb5931db381dcfa051b400e291f",
+    "team": [
+      324,
+      "Coastal Carolina Chanticleers"
+    ],
+    "athletes": 100,
+    "matches": [
+      {
+        "id": "5203477",
+        "displayName": "Dominic Lee-Knicely",
+        "fullName": "Dominic Lee-Knicely",
+        "status": {
+          "id": "1",
+          "name": "Active",
+          "type": "active",
+          "abbreviation": "Active"
+        },
+        "injuries": []
+      }
+    ]
+  },
+  "cfb_sample_audit": {
+    "observed_at": "2026-09-24T23:20:39.647063+00:00",
+    "stored_player_game_rows": 162,
+    "retained_source_player_game_rows": 158,
+    "retained_source_missing_in_database": [],
+    "changed_core_stats": [],
+    "checks": [
+      {
+        "player": "Karmello English",
+        "athlete_id": 4870699,
+        "market": "rec_yds",
+        "by_season": {
+          "2025": 10,
+          "2026": 3
+        },
+        "usable_samples": 13,
+        "forecast_samples": 13,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Karmello English",
+        "athlete_id": 4870699,
+        "market": "receptions",
+        "by_season": {
+          "2025": 10,
+          "2026": 3
+        },
+        "usable_samples": 13,
+        "forecast_samples": 13,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Peyton Jones",
+        "athlete_id": 4923298,
+        "market": "rush_yds",
+        "by_season": {
+          "2024": 12,
+          "2025": 3,
+          "2026": 3
+        },
+        "usable_samples": 18,
+        "forecast_samples": 18,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Makai Jackson",
+        "athlete_id": 5088336,
+        "market": "rec_yds",
+        "by_season": {
+          "2024": 11,
+          "2025": 1,
+          "2026": 3
+        },
+        "usable_samples": 15,
+        "forecast_samples": 15,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Makai Jackson",
+        "athlete_id": 5088336,
+        "market": "receptions",
+        "by_season": {
+          "2024": 11,
+          "2025": 1,
+          "2026": 3
+        },
+        "usable_samples": 15,
+        "forecast_samples": 15,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Jamari Person",
+        "athlete_id": 5117836,
+        "market": "rec_yds",
+        "by_season": {
+          "2024": 11,
+          "2025": 11,
+          "2026": 3
+        },
+        "usable_samples": 25,
+        "forecast_samples": 25,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Jamari Person",
+        "athlete_id": 5117836,
+        "market": "receptions",
+        "by_season": {
+          "2024": 11,
+          "2025": 11,
+          "2026": 3
+        },
+        "usable_samples": 25,
+        "forecast_samples": 25,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Deshawn Purdie",
+        "athlete_id": 5138131,
+        "market": "pass_yds",
+        "by_season": {
+          "2024": 9,
+          "2025": 8,
+          "2026": 1
+        },
+        "usable_samples": 18,
+        "forecast_samples": 18,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Deshawn Purdie",
+        "athlete_id": 5138131,
+        "market": "rush_yds",
+        "by_season": {
+          "2024": 9,
+          "2025": 3,
+          "2026": 3
+        },
+        "usable_samples": 15,
+        "forecast_samples": 15,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Colton Hinton",
+        "athlete_id": 5153389,
+        "market": "rec_yds",
+        "by_season": {
+          "2024": 1,
+          "2025": 2,
+          "2026": 3
+        },
+        "usable_samples": 6,
+        "forecast_samples": 6,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Dominic Knicely",
+        "athlete_id": 5203477,
+        "market": "rec_yds",
+        "by_season": {
+          "2025": 6,
+          "2026": 2
+        },
+        "usable_samples": 8,
+        "forecast_samples": 8,
+        "samples_match": true,
+        "availability_status": "unavailable"
+      },
+      {
+        "player": "Dominic Knicely",
+        "athlete_id": 5203477,
+        "market": "rush_yds",
+        "by_season": {
+          "2025": 13,
+          "2026": 3
+        },
+        "usable_samples": 16,
+        "forecast_samples": 16,
+        "samples_match": true,
+        "availability_status": "unavailable"
+      },
+      {
+        "player": "Jevon Edwards",
+        "athlete_id": 5265325,
+        "market": "rush_yds",
+        "by_season": {
+          "2025": 13,
+          "2026": 3
+        },
+        "usable_samples": 16,
+        "forecast_samples": 16,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Clayton Coppock Jr.",
+        "athlete_id": 5265446,
+        "market": "rec_yds",
+        "by_season": {
+          "2025": 9,
+          "2026": 3
+        },
+        "usable_samples": 12,
+        "forecast_samples": 12,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Clayton Coppock Jr.",
+        "athlete_id": 5265446,
+        "market": "receptions",
+        "by_season": {
+          "2025": 9,
+          "2026": 3
+        },
+        "usable_samples": 12,
+        "forecast_samples": 12,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Tristian Gardner",
+        "athlete_id": 5296438,
+        "market": "rec_yds",
+        "by_season": {
+          "2025": 12,
+          "2026": 3
+        },
+        "usable_samples": 15,
+        "forecast_samples": 15,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Deuce Bailey",
+        "athlete_id": 5296439,
+        "market": "pass_yds",
+        "by_season": {
+          "2025": 2,
+          "2026": 2
+        },
+        "usable_samples": 4,
+        "forecast_samples": 4,
+        "samples_match": true,
+        "availability_status": "observed"
+      },
+      {
+        "player": "Deuce Bailey",
+        "athlete_id": 5296439,
+        "market": "rush_yds",
+        "by_season": {
+          "2025": 3,
+          "2026": 3
+        },
+        "usable_samples": 6,
+        "forecast_samples": 6,
+        "samples_match": true,
+        "availability_status": "observed"
+      }
+    ]
+  },
+  "nfl_recovery": {
+    "workflow": 36072080795,
+    "scan_id": "84cde3a3cb834d93b022a268f89cf745",
+    "added_forecasts": 234,
+    "daily_credits": 20,
+    "rolling_credits": 330,
+    "accepted_after_board_lock": {
+      "player": "Skyy Moore",
+      "player_id": "00-0038090",
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "prop_type": "rec_yds",
+      "line": 10.5,
+      "direction": "under",
+      "sportsbook": "draftkings",
+      "american_odds": -109,
+      "captured_at": "2026-09-24T23:19:41.054171+00:00",
+      "quote_time": "2026-09-24T23:19:15+00:00",
+      "game_start_time": "2026-09-25T00:15:00+00:00",
+      "model_version": "empirical-jeffreys-v4",
+      "model_probability": 0.804348,
+      "model_sample_size": 22,
+      "model_confidence_interval": [
+        0.614834,
+        0.926931
+      ],
+      "quote_source_sha256": "1064e2e3ac3b6b7d678c306046537b88de3cb4d44c2eafcce47a9cb1f54533f1",
+      "quote_source_record_sha256": "7e2222930d00453337df590f7085fa3c0182139b7d1a23cc319710c3cdba9587",
+      "market_no_vig_probability": 0.49368021908573834,
+      "market_opposite_american_odds": -115,
+      "market_opposite_quote_source_record_sha256": "20693a45670fc33aee6c072803ae514258228ac937ac8291afdd8d8d67a17335"
+    },
+    "current_board_picks": 0,
+    "authenticated_new_outcomes": 0,
+    "workload_markets": {
+      "pass_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 23,
+          "unavailable": 23,
+          "valid_predictions": 0,
+          "unpaired": 0,
+          "paired_predictions": 0,
+          "pending": 0,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "unsupported_market": 23
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "rec_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 72,
+          "unavailable": 38,
+          "valid_predictions": 34,
+          "unpaired": 0,
+          "paired_predictions": 34,
+          "pending": 34,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "invalid_shadow_input": 25,
+          "insufficient_history": 11,
+          "low_prior_workload": 2
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "receptions": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 16,
+          "unavailable": 14,
+          "valid_predictions": 2,
+          "unpaired": 0,
+          "paired_predictions": 2,
+          "pending": 2,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "invalid_shadow_input": 11,
+          "insufficient_history": 3
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "rush_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 30,
+          "unavailable": 30,
+          "valid_predictions": 0,
+          "unpaired": 0,
+          "paired_predictions": 0,
+          "pending": 0,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "unsupported_market": 30
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      }
+    },
+    "role_markets": {
+      "pass_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 23,
+          "unavailable": 23,
+          "valid_predictions": 0,
+          "unpaired": 0,
+          "paired_predictions": 0,
+          "pending": 0,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "unsupported_market": 23
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "rec_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 72,
+          "unavailable": 54,
+          "valid_predictions": 18,
+          "unpaired": 0,
+          "paired_predictions": 18,
+          "pending": 18,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "outside_source_scope": 54
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "receptions": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 16,
+          "unavailable": 11,
+          "valid_predictions": 5,
+          "unpaired": 0,
+          "paired_predictions": 5,
+          "pending": 5,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "outside_source_scope": 11
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "rush_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 30,
+          "unavailable": 30,
+          "valid_predictions": 0,
+          "unpaired": 0,
+          "paired_predictions": 0,
+          "pending": 0,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "unsupported_market": 30
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      }
+    }
+  },
+  "free_refresh_workflow": 36072417807
+}

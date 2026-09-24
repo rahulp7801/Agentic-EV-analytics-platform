@@ -171,3 +171,49 @@ async def test_roster_fallback_rejects_incomplete_or_conflicting_evidence(defect
         result=await fetch_event_availability(dict(id='event',home_team='Home',away_team='Away'),'nfl')
     assert result['status'] in ('partial','unavailable')
     assert player_availability(result,'Player',now)[1]=='availability_unavailable'
+
+
+def cfb_identity_context():
+    data=context()
+    roster='https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/324/roster'
+    data['source_url']='https://site.api.espn.com/apis/site/v2/sports/football/college-football/injuries'
+    data['teams']=[dict(abbreviation='CCU',roster_names=['Dominic Lee-Knicely'],
+        roster_ids={'5203477':'Dominic Lee-Knicely'},roster_statuses={'Dominic Lee-Knicely':'Active'},
+        reports=[],injury_coverage='observed',roster_source_url=roster,roster_source_sha256='b'*64,
+        injury_source_url=roster,injury_source_sha256='b'*64)]
+    return data
+
+
+def test_cfb_shared_espn_id_binds_roster_alias_without_probability_adjustment():
+    data=cfb_identity_context();now=datetime.now(timezone.utc)
+    evidence,reason=player_availability(data,'Dominic Knicely',now,player_id='5203477',sport='cfb')
+    assert reason is None and evidence['status']=='observed'
+    assert evidence['player_id']=='5203477' and evidence['roster_player_name']=='Dominic Lee-Knicely'
+    assert evidence['identity_source_url']==evidence['roster_source_url']
+    assert evidence['identity_source_sha256']==evidence['roster_source_sha256']
+    assert evidence['probability_adjusted'] is False
+    data['teams'][0]['reports']=[dict(player='Dominic Lee-Knicely',status='Out',position='RB',reported_at=now.isoformat())]
+    assert player_availability(data,'Dominic Knicely',now,player_id='5203477',sport='cfb')[1]=='player_availability_risk'
+    assert player_availability(cfb_identity_context(),'Dominic Knicely',now,player_id='5203477')[0]['status']=='unavailable'
+
+
+@pytest.mark.parametrize('mutation',['missing_id','duplicate_id','wrong_sport_source','untrusted_source','bad_hash','missing_name','incomplete_injury','stale'])
+def test_cfb_roster_id_binding_rejects_incomplete_or_conflicting_evidence(mutation):
+    data=cfb_identity_context();team=data['teams'][0];now=datetime.now(timezone.utc)
+    if mutation=='missing_id':team['roster_ids']={}
+    elif mutation=='duplicate_id':data['teams'].append(dict(team))
+    elif mutation=='wrong_sport_source':team['roster_source_url']=team['roster_source_url'].replace('college-football','nfl')
+    elif mutation=='untrusted_source':team['roster_source_url']+='?unverified=1'
+    elif mutation=='bad_hash':team['roster_source_sha256']='bad'
+    elif mutation=='missing_name':team['roster_names']=[]
+    elif mutation=='incomplete_injury':team['injury_coverage']='unavailable'
+    else:data['captured_at']=(now-timedelta(hours=2)).isoformat()
+    # Even the exact current display name cannot rescue missing/conflicting ID evidence.
+    evidence,reason=player_availability(data,'Dominic Lee-Knicely',now,player_id='5203477',sport='cfb')
+    assert evidence['status']=='unavailable' and reason in ('roster_unconfirmed','availability_unavailable')
+
+
+@pytest.mark.parametrize('identity',['', '05203477', 'abc', 5203477])
+def test_cfb_history_ids_are_explicit_canonical_strings(identity):
+    assert player_availability(cfb_identity_context(),'Dominic Lee-Knicely',datetime.now(timezone.utc),
+        player_id=identity,sport='cfb')[1]=='availability_unavailable'

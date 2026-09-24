@@ -319,3 +319,21 @@ test('obsolete generated on/off claims are withheld without rewriting stored exp
   assert.equal(result.availability.roster_confirmed,true);
   assert.deepEqual(publicSignals([{...publicQuote,trade_plan:[history,current]}],now).signals[0].trade_plan,[history,current]);
 });
+
+test('CFB roster aliases require the same committed roster and exact history athlete ID',()=>{
+  const roster='https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/324/roster';
+  const availability={...quote.availability,team:'CCU',player_id:'5203477',roster_player_name:'Dominic Lee-Knicely',
+    source_url:roster,source_sha256:'b'.repeat(64),roster_source_url:roster,roster_source_sha256:'b'.repeat(64),
+    identity_source_url:roster,identity_source_sha256:'b'.repeat(64)};
+  const project=(patch={},history='5203477')=>publicSignals([{...publicQuote,sport:'cfb',player:'Dominic Knicely',
+    player_id:history,availability:{...availability,...patch}}],now).signals[0];
+  const result=project();assert.equal(result.availability.roster_player_name,'Dominic Lee-Knicely');
+  assert.equal(result.true_prob,quote.true_prob);assert.equal(result.availability.probability_adjusted,false);
+  for(const patch of [{identity_source_url:roster+'?secret=1'}, {identity_source_sha256:'c'.repeat(64)},
+    {player_id:'999'}, {roster_player_name:undefined}, {identity_source_sha256:undefined},
+    {roster_source_url:roster.replace('college-football','nfl')}]) {
+    assert.equal(project(patch).availability,undefined);assert.equal(project(patch).gated,true);
+  }
+  assert.equal(project({},'999').availability,undefined);
+  assert.equal(project({},null).availability,undefined);
+});
