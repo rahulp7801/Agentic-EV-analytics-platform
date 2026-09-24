@@ -274,7 +274,10 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
     expected_return:metrics.expected_return as number|null,push_probability:s.push_probability,
     confidence_interval:interval,model_version:s.model_version,game_start_time:s.game_start_time,
     kelly_fraction:metrics.kelly_fraction as number,american_odds:s.american_odds,
-    sportsbook:s.sportsbook,trade_plan:[...tradePlan],injury_flags:{...flags} as Record<string,string>,
+    sportsbook:s.sportsbook,
+    // Preserve stored forecasts, but withhold the obsolete generated claim of exact on/off evidence.
+    trade_plan:tradePlan.filter(bullet=>!(bullet.startsWith('Availability: ')
+      && bullet.includes(' exact historical on/off comparison'))),injury_flags:{...flags} as Record<string,string>,
     market_type:s.market_type,snapped_at:s.snapped_at,strength:'unrated',
     gated:metrics.gated as boolean,...(gateReason ? {gate_reason:gateReason} : {}),
     sample_size:s.sample_size,mean_stat:mean as number|null,game_id:s.game_id,
