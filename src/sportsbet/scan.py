@@ -527,7 +527,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 split_count=len(availability_evidence.get('context_splits',[]))
                 trade_plan[-1]=(f"Availability: {availability_evidence['subject_status']}; "
                     f"{len(relevant_reports)} relevant current report{'s' if len(relevant_reports) != 1 else ''}; "
-                    f"{split_count} exact historical on/off comparison{'s' if split_count != 1 else ''} retained. "
+                    f"{split_count} historical participation summar{'ies' if split_count != 1 else 'y'} retained. "
                     'Current reports screen eligibility; descriptive splits do not change the probability.')
             public_signal=dict(player=player,sport=sport,
                 game_id=event['id'],prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),

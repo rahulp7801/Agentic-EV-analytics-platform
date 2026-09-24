@@ -305,3 +305,17 @@ test('NBA explicit zero minutes and unknown participation remain separate',()=>{
   assert.deepEqual(result.availability.context_splits,[split]);
   assert.equal(result.true_prob,.6);
 });
+
+
+test('obsolete generated on/off claims are withheld without rewriting stored explanations',()=>{
+  const legacy='Availability: Not listed; 2 relevant current reports; 2 exact historical on/off comparisons retained. Current reports screen eligibility; descriptive splits do not change the probability.';
+  const current='Availability: Not listed; 2 relevant current reports; 2 historical participation summaries retained. Current reports screen eligibility; descriptive splits do not change the probability.';
+  const history='Historical baseline: 30 prior games.';
+  const trade_plan=[history,legacy];
+  const result=publicSignals([{...publicQuote,trade_plan}],now).signals[0];
+  assert.deepEqual(result.trade_plan,[history]);
+  assert.deepEqual(trade_plan,[history,legacy]);
+  assert.equal(result.true_prob,publicQuote.true_prob);
+  assert.equal(result.availability.roster_confirmed,true);
+  assert.deepEqual(publicSignals([{...publicQuote,trade_plan:[history,current]}],now).signals[0].trade_plan,[history,current]);
+});

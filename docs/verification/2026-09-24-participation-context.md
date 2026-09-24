@@ -22,3 +22,10 @@ Model probabilities, qualification thresholds, injury gates, frozen shadow code/
 Regression coverage executes the real PostgreSQL SQL for NFL/NBA and teammate/opponent contexts, including cutoff exclusion, missing rows despite team coverage, null/zero counts, invalid source records, wrong-team records, duplicates, and all-unknown samples. Frontend regressions cover legacy suppression, retained injury evidence, finite cohort statistics, bounded unknown counts, and NBA zero-minute separation.
 
 Next evidence checkpoint: ordinary reserved pregame stages beginning CFB 2026-09-24 21:30 UTC and NFL 22:15 UTC. Verify newly captured context version and unknown counts, and the PR217 timestamp adapter on fresh shadow attempts. Do not request extra quotes to exercise either fix. ATL/GB starts 2026-09-25 00:15 UTC; authenticate final results before scoring the ten pending distinct role-shadow thresholds. Fifty distinct paired games are required before that protocol can support predictive evidence.
+
+
+## Explanation-copy follow-up
+
+PR221 merged as `8db8e95` after CI36020473631 passed (1,116 backend, 174 frontend, 36 PostgreSQL integration, 9 migration tests; CodeQL36020467965). Local 1440px/390px browser checks covered NFL, NBA zero minutes, and legacy context without page errors, horizontal overflow, or targeted WCAG A/AA violations. The mobile participation card was visually inspected.
+
+The scanner also had an availability explanation bullet claiming an exact on/off comparison. Future captures now describe participation summaries. The public projection withholds that obsolete generated bullet on retained forecasts; other explanation bullets and independently verified current injury evidence remain visible. The immutable payload itself is not rewritten. A regression verifies source-array immutability and unchanged probability.
