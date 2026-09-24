@@ -18,7 +18,7 @@ export function pickContext(signal:EVSignal) {
       : 'No relevant teammate or opposing defender report in the capture';
   const splits=availability.context_splits?.length ?? 0;
   const tracking=signal.next_gen_stats?.sample_weeks ?? 0;
-  const parts=[`${splits} historical on/off comparison${splits===1?'':'s'}`];
+  const parts=[`${splits} historical participation comparison${splits===1?'':'s'}`];
   if(tracking) parts.push(`${tracking} prior tracking week${tracking===1?'':'s'}`);
   return {
     player:`${availability.subject_status} · ${availability.team} roster confirmed`,

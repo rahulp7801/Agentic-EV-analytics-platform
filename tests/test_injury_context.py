@@ -49,15 +49,16 @@ async def test_nfl_split_requires_tenure_source_coverage_and_strips_internal_id(
         async def fetchrow(self,sql,*args):
             self.sql,self.args=sql,args
             return {'active_games':8,'active_mean':241.25,'active_hits':5,
-                    'absent_games':2,'absent_mean':278,'absent_hits':2}
+                    'absent_games':0,'absent_mean':None,'absent_hits':0,'unknown_games':2}
     conn=Connection()
     result=await _nfl_split(conn,'target',2024,date(2026,9,20),'pass_yds',225.5,'over',
         {'player':'Defender','status':'Out','position':'CB','team':'WSH','stat_team':'WAS',
          'relationship':'opponent','unit':'defense','participant_id':'DefeDa00'})
-    assert 'MIN(season*100+week)' in conn.sql and 'CASE WHEN EXISTS' in conn.sql
+    assert 'MIN(season*100+week)' in conn.sql and 'CASE WHEN COUNT(*)=1' in conn.sql
     assert 'defense_snaps>0' in conn.sql and conn.args[-2:]==('WAS','DefeDa00')
     assert result['active']=={'games':8,'mean':241.25,'hit_rate':.625}
-    assert result['absent']=={'games':2,'mean':278.0,'hit_rate':1.0}
+    assert result['absent']=={'games':0,'mean':None,'hit_rate':None}
+    assert result['unknown_games']==2 and result['evidence_version']=='recorded-participation-v2'
     assert 'participant_id' not in result and result['team']=='WSH'
 
 
@@ -70,7 +71,7 @@ async def test_nba_split_uses_canonical_team_and_integer_subject_identity():
         async def fetchrow(self,sql,*args):
             self.sql,self.args=sql,args
             return {'active_games':10,'active_mean':25,'active_hits':7,
-                    'absent_games':5,'absent_mean':29,'absent_hits':4}
+                    'absent_games':5,'absent_mean':29,'absent_hits':4,'unknown_games':3}
     conn=Connection()
     result=await _nba_split(conn,'123',2024,date(2026,9,20),'points',22.5,'over',
         {'player':'Injured Teammate','status':'Out','position':'SG','team':'LA',

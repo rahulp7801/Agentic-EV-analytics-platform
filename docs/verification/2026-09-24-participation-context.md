@@ -1,0 +1,24 @@
+# Recorded participation context correction
+
+## Read-only production evidence
+
+At 2026-09-24 15:26 UTC, replayed scan `87af054136f74059b72a0fe4d205585e` from one repeatable-read, read-only database transaction. The scan retained 19 NFL selections across seven players blocked by `teammate_availability_unmodeled`.
+
+For 19 retained descriptive comparisons whose participants resolve uniquely through the frozen public nflverse identity archive, the old SQL labeled 37 comparison memberships as absent: 36 missing participant rows and one stored zero snap count. The new SQL reports all 37 as unknown. These counts are overlapping comparison memberships, not distinct games, accepted picks, or outcomes. One additional comparison for A.J. Terrell Jr. was not replayed because the display name did not uniquely resolve through the archived identity source; no identity was guessed. Per-comparison inputs and results are in `2026-09-24-participation-context-audit.json`.
+
+## Correction
+
+- Team-level coverage no longer turns a missing participant into an absent player. Exact participant identity, team, source fields, and a single matching participation row are required.
+- NFL source ingestion historically used `fillna(0)`. Existing zero counts cannot distinguish source zeros from missing values, so they remain unknown. Positive unit snap counts remain descriptive participation evidence. No original-source zero reconstruction is attempted in this release.
+- NBA zero-minute comparisons require an explicit, valid participant row. Missing, null, invalid, wrong-team, and ambiguous evidence is unknown. Zero minutes do not prove injury absence.
+- New evidence uses `recorded-participation-v2` and includes `unknown_games`. Unknown games are excluded from cohort hit rates. All-unknown samples remain visible as coverage gaps.
+- The public projection withholds unversioned legacy comparisons without discarding their independently valid current injury/roster reports. Frozen prediction payloads remain untouched. Unsupported new versions or malformed cohorts are rejected.
+- The evidence panel uses participation labels and unknown counts; it no longer says “When absent.” A cohort with games must have both a finite mean and hit rate.
+
+## Invariants and checkpoint
+
+Model probabilities, qualification thresholds, injury gates, frozen shadow code/versions, source ingestion, settlements, API limits, and collection scheduling are unchanged. This does not qualify the 19 blocked selections or demonstrate an edge. No quote collection, purchases, or production data writes are part of the audit or fix.
+
+Regression coverage executes the real PostgreSQL SQL for NFL/NBA and teammate/opponent contexts, including cutoff exclusion, missing rows despite team coverage, null/zero counts, invalid source records, wrong-team records, duplicates, and all-unknown samples. Frontend regressions cover legacy suppression, retained injury evidence, finite cohort statistics, bounded unknown counts, and NBA zero-minute separation.
+
+Next evidence checkpoint: ordinary reserved pregame stages beginning CFB 2026-09-24 21:30 UTC and NFL 22:15 UTC. Verify newly captured context version and unknown counts, and the PR217 timestamp adapter on fresh shadow attempts. Do not request extra quotes to exercise either fix. ATL/GB starts 2026-09-25 00:15 UTC; authenticate final results before scoring the ten pending distinct role-shadow thresholds. Fifty distinct paired games are required before that protocol can support predictive evidence.

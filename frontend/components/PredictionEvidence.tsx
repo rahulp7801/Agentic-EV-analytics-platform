@@ -81,16 +81,17 @@ export default function PredictionEvidence({signal,onClose}:{signal:EVSignal;onC
           <p><a href={availability.source_url} target="_blank" rel="noreferrer">{availability.source_url===availability.roster_source_url ? 'Roster injury report' : 'ESPN injury report'}</a> · <a href={availability.roster_source_url} target="_blank" rel="noreferrer">Roster source</a><br />Captured {time(availability.captured_at)}</p>
           {availability.teammates.length ? <ul tabIndex={0} aria-label="Relevant injury context" className={styles.teammateReports}>{[...availability.teammates].sort((a,b)=>Number(a.status==='Active')-Number(b.status==='Active')).map(row=><li key={`${row.relationship ?? 'legacy'}-${row.player}`}><strong>{row.player}</strong><span>{row.team ? `${row.team} · ` : ''}{row.position} · {row.status}</span><small>{row.relationship ? `${row.relationship} ${row.unit} · ` : ''}Reported {time(row.reported_at)}{row.source_url ? <> · <a href={row.source_url} target="_blank" rel="noreferrer">source</a></> : null}</small></li>)}</ul> : <p>No relevant offensive teammate or opposing defender risk was found in the captured reports.</p>}
           {availability.context_splits?.length ? <div className={styles.contextSplits}>
-            <h4>Historical availability comparisons</h4>
+            <h4>Historical participation evidence</h4>
             <p>For this exact side and line, using only games before the forecast cutoff.</p>
             {availability.context_splits.map(split=><article key={`${split.relationship}-${split.player}`}>
               <header><strong>{split.player}</strong><span>{split.team} {split.position} · {split.relationship} {split.unit} · {split.status}</span></header>
-              <dl>{cohort('When active',split.active)}{cohort('When absent',split.absent)}</dl>
+              <dl>{cohort(split.source==='nflverse_snap_counts' ? `Recorded ${split.unit} snaps` : 'Recorded minutes above zero',split.active)}{split.source==='nba_final_box_scores' && cohort('Recorded zero minutes',split.absent)}</dl>
+              <p>{split.unknown_games} game{split.unknown_games===1?'':'s'} with unknown participation, excluded from the hit rates. Missing rows{split.source==='nflverse_snap_counts' ? ' and unverified zero snap counts' : ''} do not establish absence.</p>
               <small>{split.participation}. Descriptive comparison; roster changes, role and matchup can confound the difference.</small>
             </article>)}
-          </div> : <p>No exact pre-cutoff on/off comparison is available for a relevant reported offensive teammate or opposing defender.</p>}
+          </div> : <p>No supported pre-cutoff participation comparison is available for a relevant reported offensive teammate or opposing defender.</p>}
         </>}
-        <p className={styles.evidenceLimitation}>The probability remains the historical baseline. Verified on/off splits explain the availability context and reports screen recommendations; they do not become a causal probability boost without walk-forward validation.</p>
+        <p className={styles.evidenceLimitation}>The probability remains the historical baseline. Recorded participation describes historical context and reports screen recommendations; they do not become a causal probability boost without walk-forward validation.</p>
       </div>
     </div>
     <PlayerHistory key={signal.id} signal={signal} />

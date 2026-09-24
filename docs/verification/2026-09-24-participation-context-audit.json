@@ -1,0 +1,1072 @@
+{
+  "observed_at": "2026-09-24T15:26:11.715282+00:00",
+  "scan_id": "87af054136f74059b72a0fe4d205585e",
+  "blocked_selections": 19,
+  "blocked_players": [
+    "Chris Brooks",
+    "Christian Watson",
+    "Jahan Dotson",
+    "Jonnu Smith",
+    "Olamide Zaccheaus",
+    "Skyy Moore",
+    "Tucker Kraft"
+  ],
+  "comparisons": [
+    {
+      "subject": "Christian Watson",
+      "participant": "Aaron Banks",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 4.5,
+      "direction": "under",
+      "retained_absent": 1,
+      "replayed_before": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 11,
+          "mean": 3.55,
+          "hit_rate": 0.8182
+        },
+        "absent": {
+          "games": 1,
+          "mean": 6.0,
+          "hit_rate": 0.0
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 11,
+          "mean": 3.55,
+          "hit_rate": 0.8182
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 1,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 1,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Christian Watson",
+      "participant": "Jayden Reed",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 4.5,
+      "direction": "under",
+      "retained_absent": 6,
+      "replayed_before": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 20,
+          "mean": 2.65,
+          "hit_rate": 0.9
+        },
+        "absent": {
+          "games": 6,
+          "mean": 3.5,
+          "hit_rate": 0.8333
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 20,
+          "mean": 2.65,
+          "hit_rate": 0.9
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 6,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 6,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Jonnu Smith",
+      "participant": "Aaron Banks",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "over",
+      "retained_absent": 1,
+      "replayed_before": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "absent": {
+          "games": 1,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 1,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 1,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Jonnu Smith",
+      "participant": "Jayden Reed",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "over",
+      "retained_absent": 0,
+      "replayed_before": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 1,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 1,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 0,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 0,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Skyy Moore",
+      "participant": "DeAngelo Malone",
+      "relationship": "opponent",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "under",
+      "retained_absent": 0,
+      "replayed_before": {
+        "player": "DeAngelo Malone",
+        "status": "Out",
+        "position": "LB",
+        "team": "ATL",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 1.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "DeAngelo Malone",
+        "status": "Out",
+        "position": "LB",
+        "team": "ATL",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 1.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 0,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 0,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Skyy Moore",
+      "participant": "JD Bertrand",
+      "relationship": "opponent",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "under",
+      "retained_absent": 0,
+      "replayed_before": {
+        "player": "JD Bertrand",
+        "status": "Injured Reserve",
+        "position": "LB",
+        "team": "ATL",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 1.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "JD Bertrand",
+        "status": "Injured Reserve",
+        "position": "LB",
+        "team": "ATL",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 1.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 0,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 0,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Skyy Moore",
+      "participant": "Aaron Banks",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "under",
+      "retained_absent": 1,
+      "replayed_before": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 1,
+          "mean": 2.0,
+          "hit_rate": 0.0
+        },
+        "absent": {
+          "games": 1,
+          "mean": 0.0,
+          "hit_rate": 1.0
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 1,
+          "mean": 2.0,
+          "hit_rate": 0.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 1,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 1,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Skyy Moore",
+      "participant": "Jayden Reed",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "under",
+      "retained_absent": 0,
+      "replayed_before": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 2,
+          "mean": 1.0,
+          "hit_rate": 0.5
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 2,
+          "mean": 1.0,
+          "hit_rate": 0.5
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 0,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 0,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Jahan Dotson",
+      "participant": "Micah Parsons",
+      "relationship": "opponent",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "under",
+      "retained_absent": 0,
+      "replayed_before": {
+        "player": "Micah Parsons",
+        "status": "Out",
+        "position": "DE",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 0.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Micah Parsons",
+        "status": "Out",
+        "position": "DE",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 0.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 0,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 0,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Jahan Dotson",
+      "participant": "Warren Brinson",
+      "relationship": "opponent",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "under",
+      "retained_absent": 0,
+      "replayed_before": {
+        "player": "Warren Brinson",
+        "status": "Out",
+        "position": "DT",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 0.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Warren Brinson",
+        "status": "Out",
+        "position": "DT",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 0.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 0,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 0,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Jahan Dotson",
+      "participant": "Storm Norton",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "under",
+      "retained_absent": 2,
+      "replayed_before": {
+        "player": "Storm Norton",
+        "status": "Out",
+        "position": "OT",
+        "team": "ATL",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "absent": {
+          "games": 2,
+          "mean": 1.5,
+          "hit_rate": 0.5
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Storm Norton",
+        "status": "Out",
+        "position": "OT",
+        "team": "ATL",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 2,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 2,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Olamide Zaccheaus",
+      "participant": "Jordon Riley",
+      "relationship": "opponent",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "over",
+      "retained_absent": 0,
+      "replayed_before": {
+        "player": "Jordon Riley",
+        "status": "Out",
+        "position": "DT",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 2,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Jordon Riley",
+        "status": "Out",
+        "position": "DT",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 2,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 0,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 0,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Olamide Zaccheaus",
+      "participant": "Micah Parsons",
+      "relationship": "opponent",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "over",
+      "retained_absent": 1,
+      "replayed_before": {
+        "player": "Micah Parsons",
+        "status": "Out",
+        "position": "DE",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 1,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Micah Parsons",
+        "status": "Out",
+        "position": "DE",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 1,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 1,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 1,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Olamide Zaccheaus",
+      "participant": "Warren Brinson",
+      "relationship": "opponent",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "over",
+      "retained_absent": 0,
+      "replayed_before": {
+        "player": "Warren Brinson",
+        "status": "Out",
+        "position": "DT",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 2,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Warren Brinson",
+        "status": "Out",
+        "position": "DT",
+        "team": "GB",
+        "relationship": "opponent",
+        "unit": "defense",
+        "active": {
+          "games": 2,
+          "mean": 2.0,
+          "hit_rate": 1.0
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 0,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 0,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Olamide Zaccheaus",
+      "participant": "Storm Norton",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 1.5,
+      "direction": "over",
+      "retained_absent": 2,
+      "replayed_before": {
+        "player": "Storm Norton",
+        "status": "Out",
+        "position": "OT",
+        "team": "ATL",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "absent": {
+          "games": 2,
+          "mean": 1.0,
+          "hit_rate": 0.0
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Storm Norton",
+        "status": "Out",
+        "position": "OT",
+        "team": "ATL",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 2,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 2,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Chris Brooks",
+      "participant": "Aaron Banks",
+      "relationship": "teammate",
+      "market": "rush_yds",
+      "line": 16.5,
+      "direction": "under",
+      "retained_absent": 4,
+      "replayed_before": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 15,
+          "mean": 3.73,
+          "hit_rate": 0.9333
+        },
+        "absent": {
+          "games": 4,
+          "mean": 22.5,
+          "hit_rate": 0.5
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 15,
+          "mean": 3.73,
+          "hit_rate": 0.9333
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 4,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 3,
+        "stored_zero_rows": 1
+      }
+    },
+    {
+      "subject": "Chris Brooks",
+      "participant": "Jayden Reed",
+      "relationship": "teammate",
+      "market": "rush_yds",
+      "line": 16.5,
+      "direction": "under",
+      "retained_absent": 10,
+      "replayed_before": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 20,
+          "mean": 14.95,
+          "hit_rate": 0.7
+        },
+        "absent": {
+          "games": 10,
+          "mean": 3.0,
+          "hit_rate": 0.9
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 20,
+          "mean": 14.95,
+          "hit_rate": 0.7
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 10,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 10,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Tucker Kraft",
+      "participant": "Aaron Banks",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 3.5,
+      "direction": "under",
+      "retained_absent": 3,
+      "replayed_before": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 7,
+          "mean": 3.29,
+          "hit_rate": 0.7143
+        },
+        "absent": {
+          "games": 3,
+          "mean": 4.67,
+          "hit_rate": 0.3333
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Aaron Banks",
+        "status": "Out",
+        "position": "G",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 7,
+          "mean": 3.29,
+          "hit_rate": 0.7143
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 3,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 3,
+        "stored_zero_rows": 0
+      }
+    },
+    {
+      "subject": "Tucker Kraft",
+      "participant": "Jayden Reed",
+      "relationship": "teammate",
+      "market": "receptions",
+      "line": 3.5,
+      "direction": "under",
+      "retained_absent": 6,
+      "replayed_before": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 21,
+          "mean": 3.0,
+          "hit_rate": 0.7143
+        },
+        "absent": {
+          "games": 6,
+          "mean": 4.0,
+          "hit_rate": 0.5
+        },
+        "source": "nflverse_snap_counts",
+        "participation": "verified game snaps"
+      },
+      "replayed_after": {
+        "player": "Jayden Reed",
+        "status": "Out",
+        "position": "WR",
+        "team": "GB",
+        "relationship": "teammate",
+        "unit": "offense",
+        "active": {
+          "games": 21,
+          "mean": 3.0,
+          "hit_rate": 0.7143
+        },
+        "absent": {
+          "games": 0,
+          "mean": null,
+          "hit_rate": null
+        },
+        "unknown_games": 6,
+        "evidence_version": "recorded-participation-v2",
+        "source": "nflverse_snap_counts",
+        "participation": "recorded unit snaps"
+      },
+      "coverage": {
+        "missing_rows": 6,
+        "stored_zero_rows": 0
+      }
+    }
+  ],
+  "unresolved": [
+    "A.J. Terrell Jr."
+  ],
+  "summary": {
+    "comparisons": 19,
+    "retained_absent_observations": 37,
+    "missing_rows": 36,
+    "stored_zero_rows": 1,
+    "new_unknown_observations": 37,
+    "note": "Counts are comparison memberships, not distinct games or outcomes."
+  }
+}

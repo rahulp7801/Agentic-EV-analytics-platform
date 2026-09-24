@@ -14,7 +14,9 @@ export interface AvailabilityContextSplit {
   relationship: 'teammate' | 'opponent';
   unit: 'offense' | 'defense';
   source: 'nflverse_snap_counts' | 'nba_final_box_scores';
-  participation: 'verified game snaps' | 'verified minutes played';
+  participation: 'recorded unit snaps' | 'recorded minutes';
+  evidence_version: 'recorded-participation-v2';
+  unknown_games: number;
   active: {games:number; mean:number|null; hit_rate:number|null};
   absent: {games:number; mean:number|null; hit_rate:number|null};
 }

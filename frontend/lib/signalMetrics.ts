@@ -130,23 +130,30 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
     for(const value of a.context_splits) {
       if(!value || typeof value!=='object' || Array.isArray(value)) return undefined;
       const row=value as Record<string,unknown>;
+      // Older snapshots inferred absence from missing rows. Keep their current
+      // injury report, but do not publish those descriptive cohorts.
+      if(row.evidence_version===undefined) continue;
       const active=row.active as Record<string,unknown>|undefined;
       const absent=row.absent as Record<string,unknown>|undefined;
       const cohort=(item:Record<string,unknown>|undefined)=>!!item
         && typeof item.games==='number' && Number.isSafeInteger(item.games) && item.games>=0 && item.games<=40
         && (item.mean===null || (finite(item.mean) && Math.abs(Number(item.mean))<=10000))
         && (item.hit_rate===null || (finite(item.hit_rate) && Number(item.hit_rate)>=0 && Number(item.hit_rate)<=1))
-        && ((item.games===0)===(item.mean===null && item.hit_rate===null));
+        && (item.games===0 ? item.mean===null && item.hit_rate===null : finite(item.mean) && finite(item.hit_rate));
       const source=sport==='nfl' ? 'nflverse_snap_counts' : 'nba_final_box_scores';
-      const participation=sport==='nfl' ? 'verified game snaps' : 'verified minutes played';
+      const participation=sport==='nfl' ? 'recorded unit snaps' : 'recorded minutes';
       if(!bounded(row.player,100) || !bounded(row.status,100) || !bounded(row.position,10)
         || !bounded(row.team,5) || !['teammate','opponent'].includes(String(row.relationship))
         || !['offense','defense'].includes(String(row.unit)) || row.source!==source
+        || row.evidence_version!=='recorded-participation-v2'
+        || typeof row.unknown_games!=='number' || !Number.isSafeInteger(row.unknown_games) || row.unknown_games<0
         || row.participation!==participation || !cohort(active) || !cohort(absent)
-        || Number(active!.games)+Number(absent!.games)<1) return undefined;
+        || Number(active!.games)+Number(absent!.games)+row.unknown_games<1
+        || Number(active!.games)+Number(absent!.games)+row.unknown_games>40
+        || (sport==='nfl' && absent!.games!==0)) return undefined;
       contextSplits.push({player:row.player,status:row.status,position:row.position,team:row.team,
         relationship:row.relationship as 'teammate'|'opponent',unit:row.unit as 'offense'|'defense',
-        source,participation,active:active as AvailabilityContextSplit['active'],
+        source,participation,evidence_version:'recorded-participation-v2',unknown_games:row.unknown_games,active:active as AvailabilityContextSplit['active'],
         absent:absent as AvailabilityContextSplit['absent']});
     }
   }

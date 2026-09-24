@@ -666,3 +666,61 @@ async def test_shadow_source_adapter_handles_real_postgres_timestamptz():
         assert normalize_source_timestamps({'test':[row]})['test'][0]['source_observed_at']==stamp.isoformat()
     finally:
         await conn.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('sport,relationship', [('nfl','teammate'),('nfl','opponent'),('nba','teammate'),('nba','opponent')])
+async def test_participation_cohorts_do_not_infer_absence_from_team_coverage(sport,relationship):
+    """Execute production cohort SQL with missing, zero, invalid and ambiguous evidence."""
+    from datetime import date
+    from sportsbet.prop.injury_context import _nfl_split, _nba_split
+    conn=await asyncpg.connect(os.environ['SPORTSBET_TEST_DATABASE_URL'].replace(
+        'postgresql+psycopg://','postgresql://'))
+    try:
+        # Temporary tables shadow the migrated tables only on this isolated connection.
+        # No fixture writes can affect another test or real source rows.
+        await conn.execute("""CREATE TEMP TABLE nfl_snap_counts (season int,week int,team text,
+            pfr_player_id text,offense_snaps int,defense_snaps int,source_provider text,
+            source_sha256 text,source_record_sha256 text);
+            CREATE TEMP TABLE player_stats (player_id text,season int,week int,team text,
+            opponent_team text,passing_yards int,source_provider text,source_sha256 text,source_record_sha256 text);
+            CREATE TEMP TABLE games (season int,week int,home_team text,away_team text,game_date date);
+            CREATE TEMP TABLE nba_player_gamelogs (player_id int,player_name text,game_id text,
+            game_date date,season int,team_abbreviation text,opponent_team text,points int,
+            minutes numeric,source_provider text,source_sha256 text,source_record_sha256 text);""")
+        team='HOM' if relationship=='teammate' else 'AWY'
+        candidate=dict(player='Context',status='Out',position='G',team=team,stat_team=team,
+            relationship=relationship,unit='offense' if relationship=='teammate' else 'defense',participant_id='context')
+        for week in range(1,9):
+            # Week 8 is on the exclusive cutoff and must not enter any cohort.
+            day=date(2026,9,week)
+            await conn.execute("INSERT INTO games VALUES (2026,$1,'HOM','AWY',$2)",week,day)
+            await conn.execute("INSERT INTO player_stats VALUES ('subject',2026,$1,'HOM','AWY',$2,'nflverse',$3,$3)",week,week*10,'a'*64)
+            await conn.execute("INSERT INTO nba_player_gamelogs VALUES (1,'Subject',$1,$2,2026,'HOM','AWY',$3,30,'nba',$4,$4)",str(week),day,week*10,'a'*64)
+            # Unrelated team coverage always exists, even when Context is missing.
+            await conn.execute("INSERT INTO nfl_snap_counts VALUES (2026,$1,$2,'other',20,20,'nflverse',$3,$3)",week,team,'a'*64)
+            await conn.execute("INSERT INTO nba_player_gamelogs VALUES (3,'Other',$1,$2,2026,$3,'OTH',1,20,'nba',$4,$4)",str(week),day,team,'a'*64)
+            if week==3:continue  # missing participant
+            count={1:10,2:0,4:None,5:10,6:10,7:10,8:10}[week]
+            record='invalid' if week==5 else 'a'*64
+            recorded_team='OTH' if week==7 else team
+            for _ in range(2 if week==6 else 1):
+                await conn.execute("INSERT INTO nfl_snap_counts VALUES (2026,$1,$2,'context',$3,$3,'nflverse',$4,$5)",week,recorded_team,count,'a'*64,record)
+                await conn.execute("INSERT INTO nba_player_gamelogs VALUES (2,'Context',$1,$2,2026,$3,'OTH',1,$4,'nba',$5,$6)",str(week),day,recorded_team,count,'a'*64,record)
+        split=await (_nfl_split(conn,'subject',2024,date(2026,9,8),'pass_yds',15.5,'over',candidate)
+            if sport=='nfl' else _nba_split(conn,'1',2024,date(2026,9,8),'points',15.5,'over',candidate))
+        assert split['active']==dict(games=1,mean=10.0,hit_rate=0.0)
+        # Historical NFL zero values may have been filled from null. NBA requires an explicit zero row.
+        assert split['absent']==(dict(games=0,mean=None,hit_rate=None) if sport=='nfl'
+            else dict(games=1,mean=20.0,hit_rate=1.0))
+        assert split['unknown_games']==(6 if sport=='nfl' else 5)
+        assert split['evidence_version']=='recorded-participation-v2'
+        # A selection with only unknown participation still explains its coverage gap.
+        await conn.execute("UPDATE player_stats SET passing_yards=NULL WHERE week=1")
+        await conn.execute("UPDATE nba_player_gamelogs SET points=NULL WHERE player_id=1 AND game_id IN ('1','2')")
+        unknown=await (_nfl_split(conn,'subject',2024,date(2026,9,8),'pass_yds',15.5,'over',candidate)
+            if sport=='nfl' else _nba_split(conn,'1',2024,date(2026,9,8),'points',15.5,'over',candidate))
+        assert unknown['active']['games']==unknown['absent']['games']==0
+        assert unknown['unknown_games']==(6 if sport=='nfl' else 5)
+    finally:
+        await conn.close()
