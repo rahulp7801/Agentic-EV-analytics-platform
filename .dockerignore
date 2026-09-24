@@ -26,3 +26,6 @@ src/sportsbet/quant/**
 !certs/
 certs/**
 !certs/supabase-prod-ca-2021.crt
+
+# Pinned public final-stat evidence for the untraded role-history candidate.
+!src/sportsbet/quant/nfl_role_sources.json.gz

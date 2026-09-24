@@ -407,8 +407,17 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             return {},'history_read_failed'
 
     # Read once alongside the existing model work, with a bounded research budget.
-    modeled,(shadow_histories,shadow_unavailable)=await asyncio.gather(
-        asyncio.gather(*(model(selection) for selection in prepared)),capture_shadow_history())
+    async def capture_role_history():
+        if not settings.role_history_shadow_enabled or sport!='nfl':return {},None
+        try:
+            from sportsbet.quant.nfl_role_shadow import load_inputs
+            async with asyncio.timeout(5):
+                return await load_inputs(pool,sport,season,game_date,{s[5] for s in prepared}),None
+        except Exception as exc:
+            log.warning('role_history_unavailable',error_type=type(exc).__name__)
+            return {},'history_read_failed'
+    modeled,(shadow_histories,shadow_unavailable),(role_inputs,role_unavailable)=await asyncio.gather(
+        asyncio.gather(*(model(selection) for selection in prepared)),capture_shadow_history(),capture_role_history())
     failures=sum(bool(state.get('error')) for _,state in modeled)
     if failures and failures==len(modeled):
         raise RuntimeError('Model evaluation failed')
@@ -420,7 +429,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
     # Alphabetical/line order must not consume a player's risk slot ahead of a
     # stronger qualified estimate. Keep all forecasts; retain every existing gate.
     modeled.sort(key=lambda candidate:recommendation_quality(candidate[1].get('ev_signal')),reverse=True)
-    shadow_counts=Counter()
+    shadow_counts=Counter();role_counts=Counter()
     explained_contexts=set()
     ngs_contexts={}
     for selection,state in modeled:
@@ -544,6 +553,15 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                 payload['history_shadow']={'model_version':SHADOW_VERSION,'policy_version':SHADOW_POLICY,
                     'status':'unavailable','reason':'shadow_evaluation_failed'}
             shadow_counts[payload['history_shadow'].get('reason','predicted')]+=1
+        if settings.role_history_shadow_enabled and sport=='nfl':
+            from sportsbet.quant.nfl_role_shadow import shadow_record as role_record,VERSION as ROLE_VERSION,POLICY as ROLE_POLICY
+            try:
+                payload['role_history_shadow']=role_record(payload,role_inputs.get(player_id,{}),unavailable=role_unavailable)
+            except Exception as exc:
+                log.warning('role_shadow_evaluation_failed',error_type=type(exc).__name__)
+                payload['role_history_shadow']=dict(model_version=ROLE_VERSION,policy_version=ROLE_POLICY,
+                    status='unavailable',reason='shadow_evaluation_failed')
+            role_counts[payload['role_history_shadow'].get('reason','predicted')]+=1
         audited.append((payload,public_signal))
     prediction_ids=ledger.record_many(scan_id,[payload for payload,_ in audited])
     for prediction_id,(_,public_signal) in zip(prediction_ids,audited,strict=True):
@@ -556,7 +574,8 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         coverage=quote_coverage(quotes)|dict(resolved_players=len(player_ids),model_requests=len(prepared),
             model_estimates=estimates,model_status=model_status,
             model_concurrency_limit=MAX_MODEL_CONCURRENCY,counts=dict(counts),
-            history_shadow=dict(enabled=settings.history_shadow_enabled,inference_counts=dict(shadow_counts))),games=[dict(game_id=event['id'],
+            history_shadow=dict(enabled=settings.history_shadow_enabled,inference_counts=dict(shadow_counts)),
+            role_history_shadow=dict(enabled=settings.role_history_shadow_enabled and sport=='nfl',inference_counts=dict(role_counts))),games=[dict(game_id=event['id'],
         home_team=event['home_team'],away_team=event['away_team'],date=game_date.strftime('%Y%m%d'),sport=sport)])
 
 async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[str] | None = None):
@@ -752,6 +771,8 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
             publish_snapshot(f'picks:{sport}',build_pick_board(prediction_rows,sport))
             from sportsbet.quant.history_shadow_audit import publish_history_shadow
             publish_history_shadow(prediction_rows,sport,publish_snapshot)
+            from sportsbet.quant.nfl_role_shadow_audit import publish_role_history_shadow
+            publish_role_history_shadow(prediction_rows,sport,publish_snapshot)
         return reports
     finally:
         cache.close()

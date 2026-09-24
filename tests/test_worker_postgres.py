@@ -639,3 +639,16 @@ def test_explicit_final_recovery_is_atomic_and_preserves_original_predictions(ch
             for direction in ('over','under'):
                 p=prediction(direction=direction,game_id=scan_id)
                 db.execute('DELETE FROM quotes WHERE identity=?',(ledger.quote_identity(p),))
+
+
+@pytest.mark.asyncio
+async def test_role_history_loader_matches_disposable_postgres_schema():
+    from sportsbet.quant.nfl_role_shadow import load_inputs
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'].replace('postgresql+psycopg://','postgresql://')
+    pool=await asyncpg.create_pool(url,min_size=1,max_size=1)
+    try:
+        result=await load_inputs(pool,'nfl',2026,__import__('datetime').date(2026,9,24),{'00-0032392'})
+        assert result['00-0032392']['players'][0]['pfr_player_id']=='HoopAu00'
+        assert result['00-0032392']['cutoff']=='2026-09-24'
+    finally:
+        await pool.close()

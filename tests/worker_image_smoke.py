@@ -54,3 +54,7 @@ from sportsbet.quant.history_shadow import parameters,ARTIFACT_SHA256,implementa
 assert len(ARTIFACT_SHA256)==len(implementation_sha256())==64
 assert parameters('nfl','receptions')['candidate']=='logistic_l2_0.1'
 subprocess.run([sys.executable,'-m','sportsbet.quant.history_shadow_audit','--help'],check=True)
+
+from sportsbet.quant.nfl_role_shadow import artifact as role_artifact
+assert len(role_artifact()[1])==4 and len(role_artifact()[2])==12
+subprocess.run([sys.executable,"-m","sportsbet.quant.nfl_role_shadow_audit","--help"],check=True)
