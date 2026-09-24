@@ -134,3 +134,25 @@ test('check timestamps require an exact game match and bounded scheduled evidenc
   const future={...scan,finished_at:new Date(now+120000).toISOString(),events:[{...scan.events[0],state:'scheduled',next_refresh_at:due}]};
   assert.equal(slateReadiness([game],future,now)[0].checked_at,null);
 });
+
+test('reserve windows require fresh exact-game evidence and remain distinct from quote checks',()=>{
+  const current=Date.parse('2026-09-20T14:00:00Z');
+  const release='2026-09-20T15:00:00Z';
+  const event={...scan.events[0],state:'api_budget',budget_reason:'pregame_credit_reserve',next_reserve_release_at:release};
+  const recorded={...scan,status:'degraded',finished_at:new Date(current).toISOString(),events:[event]};
+  const result=slateReadiness([game],recorded,current)[0];
+  assert.equal(result.next_reserve_release_at,release);
+  assert.equal(result.state,'Credits reserved for pregame checks');
+  assert.equal(result.next_refresh_at,null);assert.equal(result.overdue_at,null);
+  for(const patch of [{state:'evaluated'},{budget_reason:'daily_credit_limit'},{budget_reason:'rolling_credit_limit'},
+    {next_reserve_release_at:undefined},{next_reserve_release_at:'invalid'},
+    {next_reserve_release_at:'2026-09-20T15:00:00'},
+    {next_reserve_release_at:'2026-09-20T14:00:00Z'},
+    {next_reserve_release_at:game.game_time},{game_start_time:'2026-09-20T18:00:00Z'}]) {
+    assert.equal(slateReadiness([game],{...recorded,events:[{...event,...patch}]},current)[0].next_reserve_release_at,null);
+  }
+  assert.equal(slateReadiness([game],{...recorded,events:[event,event]},current)[0].next_reserve_release_at,null);
+  assert.equal(slateReadiness([game],recorded,current+46*60000)[0].next_reserve_release_at,null);
+  assert.equal(slateReadiness([game],recorded,Date.parse(game.game_time))[0].next_reserve_release_at,null);
+  assert.equal(slateReadiness([game],null,current)[0].next_reserve_release_at,null);
+});

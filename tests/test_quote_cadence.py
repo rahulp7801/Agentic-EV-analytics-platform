@@ -130,3 +130,15 @@ def test_prelock_release_still_enforces_daily_and_rolling_reserves(tmp_path,monk
     assert ledger.reserve_api_credits(4,20,held)==expected
     with ledger.connect() as db:
         assert db.execute('SELECT credits FROM api_usage WHERE risk_day=?',(today.isoformat(),)).fetchone()[0]==11+4*expected
+
+
+@pytest.mark.parametrize('minutes,expected_minutes',[(181,61),(121,1),(120,60),(90,30),(61,1),(60,None),(30,None)])
+def test_reported_reserve_transition_matches_unchanged_holdback_policy(minutes,expected_minutes):
+    from sportsbet.scan import next_reserve_release
+    event={'commence_time':(NOW+timedelta(minutes=minutes)).isoformat()}
+    expected=NOW+timedelta(minutes=expected_minutes) if expected_minutes is not None else None
+    assert next_reserve_release(event,8,NOW)==expected
+    assert next_reserve_release(event,0,NOW) is None
+    if expected:
+        assert event_credit_holdback(event,8,expected)<event_credit_holdback(event,8,NOW)
+        assert event_credit_holdback(event,8,expected-timedelta(microseconds=1))==event_credit_holdback(event,8,NOW)

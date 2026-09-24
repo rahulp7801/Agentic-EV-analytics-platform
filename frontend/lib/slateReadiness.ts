@@ -37,6 +37,12 @@ export function slateReadiness(games:SlateGame[],scan:Record<string,unknown>|nul
     const validDue=!!checked && !!due && Date.parse(due)>=Date.parse(checked)-20*60000
       && Date.parse(due)<=Date.parse(checked)+48*3600000 && Date.parse(due)<Date.parse(game.game_time);
     const overdue=!started && validDue && Date.parse(due!)<=now;
+    const reserve=event?.state==='api_budget' && event.budget_reason==='pregame_credit_reserve'
+      && stamp(event.next_reserve_release_at) ? event.next_reserve_release_at as string : null;
+    // Report a future recorded reserve transition, never a promised quote/pick time.
+    const validReserve=!started && scanFresh && !!checked && !!reserve && Date.parse(reserve)>now
+      && Date.parse(reserve)>=Date.parse(checked) && Date.parse(reserve)<=Date.parse(checked)+48*3600000
+      && Date.parse(reserve)<Date.parse(game.game_time);
     let state=started ? 'Live · picks locked' : Date.parse(game.game_time)-now>48*3600000 ? 'Outside the 48-hour scan window' : 'Waiting for scan';
     if(!started && state==='Waiting for scan' && scanFresh && scan?.status==='blocked') state='Waiting for verified history';
     if(!started && state==='Waiting for scan' && scanFresh && scan?.status==='failed') state='Scan failed';
@@ -59,6 +65,7 @@ export function slateReadiness(games:SlateGame[],scan:Record<string,unknown>|nul
       accepted_at_capture:!started && valid && accepted!==null && accepted<=estimates ? accepted : null,
       reasons:started ? [] : Object.entries(GATES).flatMap(([key,label])=>count(counts[key]) ? [{label,count:count(counts[key])!}] : []),
       checked_at:checked,overdue_at:overdue ? due : null,
+      next_reserve_release_at:validReserve ? reserve : null,
       next_refresh_at:!started && scanFresh && validDue && Date.parse(due!)>now ? due : null};
   }).sort((a,b)=>Date.parse(a.game_time)-Date.parse(b.game_time));
 }
