@@ -34,7 +34,9 @@ export default function SlateReadiness({sport,onOpenPlayers}:{sport:Sport;onOpen
       <h3>{game.away_abbr} <span>at</span> {game.home_abbr}</h3><p>{game.away_name} · {game.home_name}</p>
       <strong>{game.state}</strong>
       {game.model_estimates!==null && <p>{game.model_estimates} of {game.selections} selections modeled{game.accepted_at_capture!==null ? ` · ${game.accepted_at_capture} accepted at capture` : ''}. Freshness is rechecked for the shortlist.</p>}
-      {game.next_refresh_at && <p>Next permitted check: {new Date(game.next_refresh_at).toLocaleString()}. Scheduler timing can vary.</p>}
+      {game.checked_at && <p>Last game check: <time dateTime={game.checked_at}>{new Date(game.checked_at).toLocaleString()}</time>.</p>}
+      {game.overdue_at ? <p>Quote check was due <time dateTime={game.overdue_at}>{new Date(game.overdue_at).toLocaleString()}</time>; no newer game check is recorded.</p>
+        : game.next_refresh_at && <p>Next quote check due: <time dateTime={game.next_refresh_at}>{new Date(game.next_refresh_at).toLocaleString()}</time>. Collection depends on scheduler timing and available credits.</p>}
       {game.reasons.length>0 && <details><summary>Why selections were blocked</summary><ul>{game.reasons.map(reason=><li key={reason.label}>{reason.label}: {reason.count}</li>)}</ul></details>}
       {game.provider_event_id && <a href={`https://www.espn.com/${sport==='cfb'?'college-football':sport}/game/_/gameId/${encodeURIComponent(game.provider_event_id)}`} target="_blank" rel="noreferrer">View source game ↗</a>}
     </article>)}</div>

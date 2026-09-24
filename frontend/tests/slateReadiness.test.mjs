@@ -89,3 +89,48 @@ test('demo explanations reconstruct each retained forecast from actual pregame h
   assert.deepEqual(purdy.recent.map(game=>game.yards),[127,303,295,295,168]);
   assert.ok(purdy.recentAbove/5<purdy.above/purdy.games.length);
 });
+
+
+test('game budget status distinguishes reserve from exhausted allowance and never trusts arbitrary messages',()=>{
+  for(const [reason,label] of Object.entries({pregame_credit_reserve:'Credits reserved for pregame checks',daily_credit_limit:'Waiting for daily API allowance',rolling_credit_limit:'Waiting for rolling API allowance'})) {
+    const report={...scan,events:[{...scan.events[0],state:'api_budget',budget_reason:reason}]};
+    assert.equal(slateReadiness([game],report,now)[0].state,label);
+    assert.equal(slateReadiness([game],report,now+46*60000)[0].state,'Scan evidence is stale');
+    assert.equal(slateReadiness([game],report,Date.parse(game.game_time))[0].state,'Live · picks locked');
+  }
+  for(const reason of ['private provider message','constructor','__proto__',null,{}]) {
+    const report={...scan,events:[{...scan.events[0],state:'api_budget',budget_reason:reason}]};
+    assert.equal(slateReadiness([game],report,now)[0].state,'API budget limited');
+  }
+});
+
+test('game-specific due checks become overdue without claiming a successful refresh',()=>{
+  const due=new Date(now+15*60000).toISOString();
+  const report={...scan,events:[{...scan.events[0],state:'scheduled',next_refresh_at:due}]};
+  const before=slateReadiness([game],report,now)[0];
+  assert.equal(before.next_refresh_at,due);assert.equal(before.overdue_at,null);
+  assert.equal(before.checked_at,scan.finished_at);
+  for(const age of [15,20,46]) {
+    const overdue=slateReadiness([game],report,now+age*60000)[0];
+    assert.equal(overdue.state,'Quote check overdue');assert.equal(overdue.overdue_at,due);assert.equal(overdue.next_refresh_at,null);
+  }
+  const live=slateReadiness([game],report,Date.parse(game.game_time))[0];
+  assert.equal(live.state,'Live · picks locked');assert.equal(live.overdue_at,null);assert.equal(live.next_refresh_at,null);
+});
+
+test('check timestamps require an exact game match and bounded scheduled evidence',()=>{
+  const due=new Date(now+15*60000).toISOString();
+  for(const events of [[],[scan.events[0],scan.events[0]],[{...scan.events[0],home_team:'Another team'}]]) {
+    assert.equal(slateReadiness([game],{...scan,events},now)[0].checked_at,null);
+  }
+  for(const invalid of ['invalid','2026-09-18T16:15:00',new Date(now-21*60000).toISOString(),game.game_time,new Date(now+49*3600000).toISOString()]) {
+    const report={...scan,events:[{...scan.events[0],state:'scheduled',next_refresh_at:invalid}]};
+    const value=slateReadiness([game],report,now)[0];assert.equal(value.next_refresh_at,null);assert.equal(value.overdue_at,null);
+  }
+  for(const state of ['api_budget','evaluated','failed']) {
+    const value=slateReadiness([game],{...scan,events:[{...scan.events[0],state,next_refresh_at:due}]},now)[0];
+    assert.equal(value.next_refresh_at,null);assert.equal(value.overdue_at,null);
+  }
+  const future={...scan,finished_at:new Date(now+120000).toISOString(),events:[{...scan.events[0],state:'scheduled',next_refresh_at:due}]};
+  assert.equal(slateReadiness([game],future,now)[0].checked_at,null);
+});
