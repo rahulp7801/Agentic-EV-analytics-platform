@@ -85,7 +85,7 @@ function rosterSource(value:unknown,sport:Sport):value is string {
   } catch {return false;}
 }
 
-function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|undefined {
+function publicAvailability(value:unknown,sport:Sport,historyPlayerId?:unknown):AvailabilityEvidence|undefined {
   if (!value || typeof value!=='object' || Array.isArray(value)) return undefined;
   const a=value as Record<string,unknown>;
   if(a.status==='unavailable') return {status:'unavailable',roster_confirmed:false,
@@ -105,8 +105,12 @@ function publicAvailability(value:unknown,sport:Sport):AvailabilityEvidence|unde
   const contextSplits:NonNullable<AvailabilityEvidence['context_splits']>=[];
   const identityFields=['roster_player_name','identity_source_url','identity_source_sha256'];
   const identified=identityFields.some(key=>a[key]!==undefined);
-  if(identified && (sport!=='nfl' || !bounded(a.roster_player_name,100)
-    || a.identity_source_url!=='https://github.com/nflverse/nflverse-data/releases/download/players/players.csv'
+  const validIdentity=sport==='nfl'
+    ? a.identity_source_url==='https://github.com/nflverse/nflverse-data/releases/download/players/players.csv'
+    : sport==='cfb' && a.identity_source_url===a.roster_source_url
+      && a.identity_source_sha256===a.roster_source_sha256
+      && bounded(a.player_id,20) && /^[1-9][0-9]*$/.test(a.player_id) && a.player_id===historyPlayerId;
+  if(identified && (!validIdentity || !bounded(a.roster_player_name,100)
     || !bounded(a.identity_source_sha256,64) || !/^[a-f0-9]{64}$/.test(a.identity_source_sha256)))return undefined;
   for(const value of a.teammates) {
     if(!value || typeof value!=='object' || Array.isArray(value)) return undefined;
@@ -260,7 +264,7 @@ export function publicSignal(value:unknown, now=Date.now()):EVSignal|null {
       || Object.entries(flags).length>20 || Object.entries(flags).some(
         ([key,item])=>!bounded(key,64) || !bounded(item,300,true))
       || !bounded(s.market_type,100)) return null;
-  const availability=publicAvailability(s.availability,sport);
+  const availability=publicAvailability(s.availability,sport,s.player_id);
   const nextGenStats=publicNextGenStats(s.next_gen_stats,sport,prop);
   const playerProfile=publicPlayerProfile(s.player_profile,sport,s.player,now);
   const metrics=signalMetrics({...s,availability},now);

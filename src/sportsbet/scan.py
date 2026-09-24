@@ -460,7 +460,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
         reason=state.get('gate_reason') or 'no_positive_edge'
         now=datetime.now(timezone.utc)
         availability_evidence, availability_reason=player_availability(availability,player,now,
-            player_id=player_id if sport=='nfl' else None)
+            player_id=player_id if sport in ('nfl','cfb') else None,sport=sport)
         relevant_reports=[]
         if sport in ('nba','nfl') and availability_evidence['status']=='observed':
             relevant_reports=relevant_availability_reports(availability,
@@ -541,7 +541,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
                     f"{len(relevant_reports)} relevant current report{'s' if len(relevant_reports) != 1 else ''}; "
                     f"{split_count} historical participation summar{'ies' if split_count != 1 else 'y'} retained. "
                     'Current reports screen eligibility; descriptive splits do not change the probability.')
-            public_signal=dict(player=player,sport=sport,
+            public_signal=dict(player=player,player_id=player_id,sport=sport,
                 game_id=event['id'],prop_type=MARKETS[sport][market],direction=side.lower(),line=float(line),
                 team='',opponent='',home_team=event['home_team'],away_team=event['away_team'],
                 true_prob=float(probability),implied_prob=float(implied),ev_pct=float(probability-implied),

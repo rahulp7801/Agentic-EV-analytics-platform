@@ -278,7 +278,7 @@ def nfl_roster_history_bindings(context: dict | None, event: dict, now: datetime
         return {}
 
 
-def player_availability(context: dict | None, player: str, now: datetime, *, player_id: str | None = None) -> tuple[dict, str | None]:
+def player_availability(context: dict | None, player: str, now: datetime, *, player_id: str | None = None, sport: str = 'nfl') -> tuple[dict, str | None]:
     """Never equate an unlisted injury with a confirmed active game-day lineup."""
     unavailable = dict(status='unavailable', roster_confirmed=False, subject_status='Unknown',
                        teammates=[], probability_adjusted=False)
@@ -287,7 +287,23 @@ def player_availability(context: dict | None, player: str, now: datetime, *, pla
     try:
         fresh_timestamp(context['captured_at'], now)
         identity_source = context.get('identity_source') if player_id else None
-        if identity_source:
+        if sport=='cfb' and player_id is not None:
+            # CFB histories and ESPN rosters share the same athlete ID namespace.
+            # Never fall back to a name when an exact history ID is supplied.
+            if not isinstance(player_id,str) or not re.fullmatch(r'[1-9][0-9]{0,19}',player_id):
+                raise ValueError('Invalid CFB athlete identity')
+            matches=[(team,team['roster_ids'][player_id]) for team in context['teams']
+                     if player_id in team.get('roster_ids',{})]
+            if len(matches)==1:
+                team,roster_name=matches[0]
+                url=team['roster_source_url'];digest=team['roster_source_sha256']
+                if (not isinstance(roster_name,str) or not roster_name or len(roster_name)>100
+                        or roster_name not in team['roster_names']
+                        or not re.fullmatch(r'https://site\.api\.espn\.com/apis/site/v2/sports/football/college-football/teams/[1-9][0-9]*/roster',url)
+                        or not re.fullmatch(r'[a-f0-9]{64}',digest)):
+                    raise ValueError('Invalid CFB roster commitment')
+                identity_source=dict(url=url,source_sha256=digest)
+        elif identity_source:
             fresh_timestamp(identity_source['retrieved_at'], now)
             if identity_source['url'] != NFL_PLAYER_IDS_URL or not re.fullmatch(r'[a-f0-9]{64}',identity_source['source_sha256']):
                 raise ValueError('Invalid identity commitment')
@@ -319,6 +335,8 @@ def player_availability(context: dict | None, player: str, now: datetime, *, pla
                         roster_source_url=team['roster_source_url'],roster_source_sha256=team['roster_source_sha256'],
                         teammates=teammates, probability_adjusted=False)
         evidence.update(team.get('portraits',{}).get(roster_name,{}))
+        if sport=='cfb' and player_id is not None:
+            evidence['player_id']=player_id
         if roster_name != player:
             evidence.update(roster_player_name=roster_name,
                 identity_source_url=identity_source['url'],
