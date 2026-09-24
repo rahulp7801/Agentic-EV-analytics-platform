@@ -2,7 +2,7 @@
   "candidate_version": "nfl-role-history-shadow-v1",
   "frozen_at": "2026-09-24T00:42:34.845799+00:00",
   "artifact_sha256": "99ce638daa5a251488890e3618059b5b437773a4f05f6c653844d95c3413a35d",
-  "implementation_sha256": "484518f6644d797091e7aeb8969dd8c15004eb63f57399c72adfc74aed1c635b",
+  "implementation_sha256": "33cd55ee05c8ade01e702fc46939be5e5d00d855889d35ca399c6e8695040ec3",
   "source_sha256": "8fa1995e608405945c2f1a6289a3ac718f35c9b5845344b0c0d4334d480b8750",
   "kind": "read_only_hosted_history_formula_diagnostic",
   "prospective_predictions": 0,

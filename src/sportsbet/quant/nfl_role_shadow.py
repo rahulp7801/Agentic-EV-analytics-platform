@@ -128,7 +128,7 @@ def shadow_record(payload,inputs,*,unavailable=None):
                 or a.get('player_id')!=binding['espn_player_id'] or not re.fullmatch('[A-Z]{2,3}',a.get('team',''))
                 or not 0<=(now-utc_timestamp(a['captured_at'])).total_seconds()<=3600
                 or not re.fullmatch('[0-9a-f]{64}',a.get('roster_source_sha256',''))
-                or not re.fullmatch(r'https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/[1-9][0-9]*/roster',a.get('roster_source_url',''))):raise ValueError('invalid_current_roster')
+                or not re.fullmatch(r'https://site\.api\.espn\.com/apis/site/v2/sports/football/nfl/teams/[1-9][0-9]*/roster',a.get('roster_source_url',''))):raise ValueError('invalid_current_roster')
         base,merged,added=validated_rows(json.dumps(inputs,sort_keys=True,separators=(',',':')))
         stat=MARKETS['nfl'][payload['prop_type']];baseline=sorted([r for r in base if r.get(stat) is not None],key=lambda r:(r['season'],r['week']))[-40:]
         p_base=(sum(r[stat]>line for r in baseline)+.5)/(len(baseline)+1)

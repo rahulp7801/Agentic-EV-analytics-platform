@@ -49,7 +49,7 @@ def test_exact_overlay_role_split_and_replay_preserve_baseline():
     assert role.verified_shadow_probability((p|{'availability':p['availability']|{'team':'GB'},'role_history_shadow':record})) is None
 
 
-@pytest.mark.parametrize('fault',['missing_snap','wrong_player','late_input','early_input','wrong_cutoff','wrong_baseline','roster_id','roster_stale','integer_line','missing_stat'])
+@pytest.mark.parametrize('fault',['missing_snap','wrong_player','late_input','early_input','wrong_cutoff','wrong_baseline','roster_id','roster_stale','roster_hostname','integer_line','missing_stat'])
 def test_incomplete_or_mismatched_inputs_abstain(fault):
     p,data=fixture()
     if fault=='missing_snap':data['snaps']=data['snaps'][1:]
@@ -60,6 +60,7 @@ def test_incomplete_or_mismatched_inputs_abstain(fault):
     elif fault=='wrong_baseline':p['model_probability']=.6
     elif fault=='roster_id':p['availability']['player_id']='999'
     elif fault=='roster_stale':p['availability']['captured_at']=(datetime.fromisoformat(p['captured_at'])-timedelta(hours=2)).isoformat()
+    elif fault=='roster_hostname':p['availability']['roster_source_url']='https://siteXapiXespnXcom/apis/site/v2/sports/football/nfl/teams/1/roster'
     elif fault=='integer_line':p['line']=1
     elif fault=='missing_stat':data['stats']=data['stats'][1:]
     assert role.shadow_record(p,data)['status']=='unavailable'
