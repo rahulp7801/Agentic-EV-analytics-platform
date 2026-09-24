@@ -1,0 +1,64 @@
+{
+  "candidate_version": "nfl-role-history-shadow-v1",
+  "frozen_at": "2026-09-24T00:42:34.845799+00:00",
+  "artifact_sha256": "99ce638daa5a251488890e3618059b5b437773a4f05f6c653844d95c3413a35d",
+  "implementation_sha256": "484518f6644d797091e7aeb8969dd8c15004eb63f57399c72adfc74aed1c635b",
+  "source_sha256": "8fa1995e608405945c2f1a6289a3ac718f35c9b5845344b0c0d4334d480b8750",
+  "kind": "read_only_hosted_history_formula_diagnostic",
+  "prospective_predictions": 0,
+  "promote": false,
+  "results": [
+    {
+      "player": "Austin Hooper",
+      "line": 0.5,
+      "over_probability": 0.8342245989304812,
+      "counts": {
+        "sample_size": 35,
+        "current_role_games": 2,
+        "older_games": 33,
+        "older_over_probability": 0.8676470588235294,
+        "augmented_over_probability": 0.8472222222222222
+      },
+      "recovered": 4
+    },
+    {
+      "player": "Jahan Dotson",
+      "line": 1.5,
+      "over_probability": 0.24025974025974026,
+      "counts": {
+        "sample_size": 36,
+        "current_role_games": 2,
+        "older_games": 34,
+        "older_over_probability": 0.21428571428571427,
+        "augmented_over_probability": 0.22972972972972974
+      },
+      "recovered": 5
+    },
+    {
+      "player": "Christian Watson",
+      "line": 4.5,
+      "over_probability": 0.1328671328671329,
+      "counts": {
+        "sample_size": 27,
+        "current_role_games": 2,
+        "older_games": 25,
+        "older_over_probability": 0.09615384615384616,
+        "augmented_over_probability": 0.125
+      },
+      "recovered": 1
+    },
+    {
+      "player": "Chris Brooks",
+      "line": 0.5,
+      "over_probability": 0.5293255131964809,
+      "counts": {
+        "sample_size": 32,
+        "current_role_games": 2,
+        "older_games": 30,
+        "older_over_probability": 0.532258064516129,
+        "augmented_over_probability": 0.5303030303030303
+      },
+      "recovered": 2
+    }
+  ]
+}

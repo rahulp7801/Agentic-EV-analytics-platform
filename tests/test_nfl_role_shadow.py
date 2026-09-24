@@ -2,7 +2,7 @@ from copy import deepcopy
 from datetime import datetime,timedelta,timezone
 import gzip,json
 from pathlib import Path
-from unittest.mock import AsyncMock,MagicMock
+from unittest.mock import AsyncMock,MagicMock,patch
 import pytest
 from sportsbet.quant import nfl_role_shadow as role
 from sportsbet.scan import quotes_from_event
@@ -12,7 +12,7 @@ from sportsbet.ledger import Ledger
 ROOT=Path(__file__).resolve().parents[1]
 
 def fixture():
-    now=datetime.now(timezone.utc);day='2026-09-24';start=datetime(2026,9,25,0,15,tzinfo=timezone.utc)
+    day='2026-09-24';start=datetime(2026,9,25,0,15,tzinfo=timezone.utc)
     # This retained-data fixture is evaluated at a fixed pregame instant after freeze.
     now=datetime.fromisoformat(role.FROZEN_AT)+timedelta(seconds=30)
     gsis='00-0032392';player=role.artifact()[1][gsis]
@@ -91,9 +91,14 @@ def test_curve_is_monotone_and_side_probability_complements():
 
 def test_late_ledger_receipt_is_owned_idempotent_and_atomic(tmp_path):
     p,data=fixture();p['role_history_shadow']=role.shadow_record(p,data)
-    # Intentionally stale quote relative to the real ledger clock.
     ledger=Ledger(tmp_path/'role.sqlite',database_url='')
-    key=ledger.record('role-test',p);row=next(r for r in ledger.predictions() if r['prediction_id']==key)
+    receipt=datetime.fromisoformat(p['captured_at'])+timedelta(minutes=6)
+    class LateClock(datetime):
+        @classmethod
+        def now(cls,tz=None):return receipt
+    with patch('sportsbet.ledger.datetime',LateClock):
+        key=ledger.record('role-test',p)
+    row=next(r for r in ledger.predictions() if r['prediction_id']==key)
     assert row['role_history_shadow']['reason']=='invalid_or_late_recording'
     assert role.verified_recorded_shadow_probability(row) is None
     assert ledger.record('role-test',p)==key
@@ -123,4 +128,80 @@ def test_audit_retains_unavailable_denominator_and_never_promotes():
     assert report['earliest_attempts']==1
     assert report['markets']['receptions']['counts']['valid_predictions']==1
     assert report['markets']['receptions']['status']=='insufficient_data'
+    assert report['promote'] is False
+
+
+def test_valid_receipt_coexists_with_old_shadow_retries(tmp_path):
+    p,data=fixture();p['role_history_shadow']=role.shadow_record(p,data)
+    p['history_shadow']={'status':'predicted','probability':.8}
+    ledger=Ledger(tmp_path/'coexist.sqlite',database_url='')
+    receipt=datetime.fromisoformat(p['captured_at'])+timedelta(seconds=1)
+    class ReceiptClock(datetime):
+        @classmethod
+        def now(cls,tz=None):return receipt
+    with patch('sportsbet.ledger.datetime',ReceiptClock):
+        key=ledger.record('coexist',p)
+    row=next(r for r in ledger.predictions() if r['prediction_id']==key)
+    assert row['history_shadow']['reason']=='invalid_or_late_recording'
+    assert role.verified_recorded_shadow_probability(row)==p['role_history_shadow']['probability']
+    assert ledger.record('coexist',p)==key
+    changed=deepcopy(p);changed['model_probability']=.8
+    with pytest.raises(ValueError,match='immutable'):ledger.record('coexist',changed)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('failed_read',[False,True])
+async def test_scan_role_shadow_preserves_public_forecasts_and_exposure(tmp_path,monkeypatch,failed_read):
+    from decimal import Decimal
+    from sportsbet import scan
+    from sportsbet.config import settings
+    from sportsbet.graph.models import PropResult
+    p,data=fixture();now=datetime.fromisoformat(p['captured_at'])
+    class Clock(datetime):
+        @classmethod
+        def now(cls,tz=None):return now
+    monkeypatch.setattr(scan,'datetime',Clock)
+    monkeypatch.setattr('sportsbet.ledger.datetime',Clock)
+    event=dict(id=p['game_id'],home_team=p['home_team'],away_team=p['away_team'],commence_time=p['game_start_time'],bookmakers=[dict(key='book',markets=[dict(key='player_receptions',last_update=p['quote_time'],outcomes=[dict(name=side,point=.5,price=-110,description=p['player']) for side in ('Over','Under')])])])
+    conn=MagicMock();conn.fetch=AsyncMock(return_value=[{'normalized_name':p['player'].lower(),'player_id':p['player_id']}])
+    pool=MagicMock();pool.acquire.return_value.__aenter__=AsyncMock(return_value=conn)
+    monkeypatch.setattr(scan,'write_player_prop_snapshots',AsyncMock())
+    graph=MagicMock();graph.ainvoke=AsyncMock(return_value={'prop_result':PropResult(true_probability=Decimal(str(p['model_probability'])),sample_size=31,mean_stat=Decimal('2.19'),confidence_interval=(Decimal('.83'),Decimal('.99')))})
+    monkeypatch.setattr(scan,'create_graph',lambda **kwargs:graph)
+    monkeypatch.setattr(scan,'player_availability',lambda *args,**kwargs:(p['availability']|{'subject_status':'available'},None))
+    monkeypatch.setattr(scan,'relevant_availability_reports',lambda *args:[])
+    monkeypatch.setattr(scan,'historical_availability_splits',AsyncMock(return_value=[]))
+    monkeypatch.setattr(scan,'load_ngs_evidence',AsyncMock(return_value=None))
+    monkeypatch.setattr(settings,'history_shadow_enabled',False)
+    loader=AsyncMock(side_effect=RuntimeError('private detail')) if failed_read else AsyncMock(return_value={p['player_id']:data})
+    monkeypatch.setattr(role,'load_inputs',loader)
+    baseline_ledger=Ledger(tmp_path/'plain.sqlite',database_url='');candidate_ledger=Ledger(tmp_path/'candidate.sqlite',database_url='')
+    monkeypatch.setattr(settings,'role_history_shadow_enabled',False)
+    baseline=await scan.evaluate_event(pool,event,'nfl',baseline_ledger,'same')
+    loader.assert_not_awaited()
+    monkeypatch.setattr(settings,'role_history_shadow_enabled',True)
+    candidate=await scan.evaluate_event(pool,event,'nfl',candidate_ledger,'same')
+    loader.assert_awaited_once()
+    assert baseline['signals']==candidate['signals']
+    assert baseline['coverage']['counts']==candidate['coverage']['counts']
+    for row in candidate_ledger.predictions():
+        if failed_read:assert row['role_history_shadow']['reason']=='history_read_failed'
+        else:assert role.verified_recorded_shadow_probability(row) is not None
+        assert row['accepted'] is False and row['stake_fraction']==0
+        assert 'private detail' not in str(row)
+    assert len(candidate_ledger.predictions())==2
+    assert all('role_history_shadow' not in item for item in candidate['signals'])
+    with candidate_ledger.connect() as db:assert db.execute('SELECT count(*) FROM exposure').fetchone()[0]==0
+
+
+def test_audit_earliest_unavailable_attempt_cannot_be_replaced_by_later_success():
+    from sportsbet.quant.nfl_role_shadow_audit import report_role_history_shadow
+    p,data=fixture();p['prediction_id']='first';p['role_history_shadow']=role.shadow_record(p,data)
+    p['role_history_shadow_recorded_at']=p['captured_at']
+    early=p|{'role_history_shadow':{'model_version':role.VERSION,'status':'unavailable','reason':'history_read_failed'}}
+    later=p|{'prediction_id':'later','captured_at':(datetime.fromisoformat(p['captured_at'])+timedelta(seconds=1)).isoformat()}
+    report=report_role_history_shadow([later,early],'nfl')
+    assert report['earliest_attempts']==1 and report['duplicate_attempts']==1
+    assert report['markets']['receptions']['counts']['unavailable']==1
+    assert report['markets']['receptions']['counts']['valid_predictions']==0
     assert report['promote'] is False
