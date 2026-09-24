@@ -31,6 +31,7 @@ from sportsbet.prop.cross_venue import PROP_MARKETS, screen as screen_cross_venu
 from sportsbet.prop.probability import outcome_interval_for_side
 from sportsbet.picks import LOCK_BEFORE_START, build_pick_board
 from sportsbet.provider_cache import CachedResponse, ProviderResponseCache
+from sportsbet.quant.shadow_inputs import normalize_source_timestamps
 from sportsbet.quant.vig import american_to_raw_prob
 from sportsbet.quant.market_baseline import paired_market_baseline
 from sportsbet.quant.history_shadow import VERSION as SHADOW_VERSION, POLICY as SHADOW_POLICY, load_histories, shadow_record
@@ -401,7 +402,7 @@ async def evaluate_event(pool, event: dict, sport: str, ledger: Ledger, scan_id:
             async with asyncio.timeout(5):
                 rows=await load_histories(pool,sport,season,game_date,
                     {(selection[5],MARKETS[sport][selection[1]]) for selection in prepared})
-            return rows,None
+            return normalize_source_timestamps(rows),None
         except Exception as exc:
             log.warning('shadow_history_unavailable',sport=sport,error_type=type(exc).__name__)
             return {},'history_read_failed'
