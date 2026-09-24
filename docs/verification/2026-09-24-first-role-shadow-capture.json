@@ -1,0 +1,582 @@
+{
+  "observed_at": "2026-09-24T02:10:39.030312+00:00",
+  "recovery_workflow": 35945889336,
+  "scans": {
+    "scan:nba": {
+      "sport": "nba",
+      "events": [],
+      "status": "complete",
+      "scan_id": "87af054136f74059b72a0fe4d205585e",
+      "attempts": {},
+      "coverage": {},
+      "failures": [],
+      "cache_hits": 0,
+      "started_at": "2026-09-24T02:07:38.950387+00:00",
+      "finished_at": "2026-09-24T02:08:57.272175+00:00",
+      "budget_reasons": {},
+      "eligible_events": 0,
+      "execution_ready": false,
+      "next_refresh_at": null,
+      "attempted_events": 0,
+      "coalesced_events": 0,
+      "completed_events": 0,
+      "model_partial_events": 0,
+      "budget_skipped_events": 0,
+      "model_complete_events": 0,
+      "cadence_deferred_events": 0,
+      "model_unavailable_events": 0
+    },
+    "scan:cfb": {
+      "sport": "cfb",
+      "events": [
+        {
+          "state": "api_budget",
+          "game_id": "9e0eaa3fed3125ec9629a777bf077185",
+          "away_team": "Liberty Flames",
+          "home_team": "Coastal Carolina Chanticleers",
+          "budget_reason": "pregame_credit_reserve",
+          "game_start_time": "2026-09-24T23:30:00Z"
+        },
+        {
+          "state": "evaluated",
+          "game_id": "d9a781a64fc2c4b45290db32b5ec3f20",
+          "away_team": "Army Black Knights",
+          "home_team": "Temple Owls",
+          "game_start_time": "2026-09-25T20:00:00Z"
+        },
+        {
+          "state": "api_budget",
+          "game_id": "36f0cf10805eed69c78f80697f766cc0",
+          "away_team": "Howard Bison",
+          "home_team": "Rutgers Scarlet Knights",
+          "budget_reason": "pregame_credit_reserve",
+          "game_start_time": "2026-09-25T23:00:00Z"
+        },
+        {
+          "state": "evaluated",
+          "game_id": "2e454a12c5301843ab7ec1a1eaf4f237",
+          "away_team": "Navy Midshipmen",
+          "home_team": "UAB Blazers",
+          "game_start_time": "2026-09-25T23:00:00Z"
+        },
+        {
+          "state": "api_budget",
+          "game_id": "775ad63a769838c1e1da423293c9c60d",
+          "away_team": "Northwestern Wildcats",
+          "home_team": "Indiana Hoosiers",
+          "budget_reason": "pregame_credit_reserve",
+          "game_start_time": "2026-09-26T00:00:00Z"
+        }
+      ],
+      "status": "degraded",
+      "scan_id": "87af054136f74059b72a0fe4d205585e",
+      "attempts": {
+        "2e454a12c5301843ab7ec1a1eaf4f237": "2026-09-24T02:08:46.548125+00:00",
+        "9e0eaa3fed3125ec9629a777bf077185": "2026-09-23T05:07:51.898241+00:00",
+        "d9a781a64fc2c4b45290db32b5ec3f20": "2026-09-24T02:08:40.286156+00:00"
+      },
+      "coverage": {
+        "2e454a12c5301843ab7ec1a1eaf4f237": {
+          "counts": {},
+          "quotes": 0,
+          "selections": 0,
+          "cross_venue": {},
+          "model_status": "no_quotes",
+          "history_shadow": {
+            "enabled": true,
+            "inference_counts": {}
+          },
+          "model_requests": 0,
+          "unique_players": 0,
+          "model_estimates": 0,
+          "resolved_players": 0,
+          "role_history_shadow": {
+            "enabled": false,
+            "inference_counts": {}
+          },
+          "model_concurrency_limit": 8,
+          "source_committed_quotes": 0
+        },
+        "d9a781a64fc2c4b45290db32b5ec3f20": {
+          "counts": {},
+          "quotes": 0,
+          "selections": 0,
+          "cross_venue": {},
+          "model_status": "no_quotes",
+          "history_shadow": {
+            "enabled": true,
+            "inference_counts": {}
+          },
+          "model_requests": 0,
+          "unique_players": 0,
+          "model_estimates": 0,
+          "resolved_players": 0,
+          "role_history_shadow": {
+            "enabled": false,
+            "inference_counts": {}
+          },
+          "model_concurrency_limit": 8,
+          "source_committed_quotes": 0
+        }
+      },
+      "failures": [],
+      "cache_hits": 0,
+      "started_at": "2026-09-24T02:07:38.950387+00:00",
+      "finished_at": "2026-09-24T02:08:59.223561+00:00",
+      "budget_reasons": {
+        "pregame_credit_reserve": 3
+      },
+      "eligible_events": 5,
+      "execution_ready": false,
+      "next_refresh_at": null,
+      "attempted_events": 2,
+      "coalesced_events": 0,
+      "completed_events": 2,
+      "model_partial_events": 0,
+      "budget_skipped_events": 3,
+      "model_complete_events": 0,
+      "cadence_deferred_events": 0,
+      "model_unavailable_events": 0
+    },
+    "scan:nfl": {
+      "sport": "nfl",
+      "events": [
+        {
+          "state": "evaluated",
+          "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+          "away_team": "Atlanta Falcons",
+          "home_team": "Green Bay Packers",
+          "game_start_time": "2026-09-25T00:15:00Z"
+        }
+      ],
+      "status": "complete",
+      "scan_id": "87af054136f74059b72a0fe4d205585e",
+      "attempts": {
+        "e5fbd3b3953b896b1bf897ddadb3cc4b": "2026-09-24T02:07:49.983925+00:00"
+      },
+      "coverage": {
+        "e5fbd3b3953b896b1bf897ddadb3cc4b": {
+          "counts": {
+            "no_positive_edge": 56,
+            "edge_not_confident": 25,
+            "insufficient_sample": 34,
+            "evaluated_selections": 134,
+            "teammate_availability_unmodeled": 19
+          },
+          "quotes": 371,
+          "selections": 134,
+          "cross_venue": {},
+          "model_status": "complete",
+          "history_shadow": {
+            "enabled": true,
+            "inference_counts": {
+              "unsupported_market": 48,
+              "insufficient_history": 14,
+              "invalid_shadow_input": 72
+            }
+          },
+          "model_requests": 134,
+          "unique_players": 16,
+          "model_estimates": 134,
+          "resolved_players": 16,
+          "role_history_shadow": {
+            "enabled": true,
+            "inference_counts": {
+              "predicted": 20,
+              "unsupported_market": 48,
+              "outside_source_scope": 66
+            }
+          },
+          "model_concurrency_limit": 8,
+          "source_committed_quotes": 371
+        }
+      },
+      "failures": [],
+      "cache_hits": 0,
+      "started_at": "2026-09-24T02:07:38.950387+00:00",
+      "finished_at": "2026-09-24T02:08:55.357342+00:00",
+      "budget_reasons": {},
+      "eligible_events": 1,
+      "execution_ready": false,
+      "next_refresh_at": null,
+      "attempted_events": 1,
+      "coalesced_events": 0,
+      "completed_events": 1,
+      "model_partial_events": 0,
+      "budget_skipped_events": 0,
+      "model_complete_events": 1,
+      "cadence_deferred_events": 0,
+      "model_unavailable_events": 0
+    }
+  },
+  "picks": {
+    "picks:nfl": {
+      "generated_at": "2026-09-24T02:09:29.787291+00:00",
+      "current_count": 0,
+      "history_count": 3
+    },
+    "picks:nba": {
+      "generated_at": "2026-09-24T02:09:40.410282+00:00",
+      "current_count": 0,
+      "history_count": 0
+    },
+    "picks:cfb": {
+      "generated_at": "2026-09-24T02:09:50.724693+00:00",
+      "current_count": 0,
+      "history_count": 0
+    }
+  },
+  "new_forecasts": {
+    "nba": {
+      "raw_count": 0,
+      "gates": {},
+      "players": 0
+    },
+    "nfl": {
+      "raw_count": 134,
+      "gates": {
+        "no_positive_edge": 56,
+        "teammate_availability_unmodeled": 19,
+        "insufficient_sample": 34,
+        "edge_not_confident": 25
+      },
+      "players": 16
+    },
+    "cfb": {
+      "raw_count": 0,
+      "gates": {},
+      "players": 0
+    }
+  },
+  "role_shadow": {
+    "model_version": "nfl-role-history-shadow-v1",
+    "policy_version": "explicit-receiving-role-prior20-v1",
+    "artifact_sha256": "99ce638daa5a251488890e3618059b5b437773a4f05f6c653844d95c3413a35d",
+    "implementation_sha256": "33cd55ee05c8ade01e702fc46939be5e5d00d855889d35ca399c6e8695040ec3",
+    "frozen_at": "2026-09-24T00:42:34.845799+00:00",
+    "sport": "nfl",
+    "generated_at": "2026-09-24T02:10:56.136611+00:00",
+    "status": "collecting",
+    "promote": false,
+    "scope": "Untraded prospective probability comparison; no candidate acceptance policy or ROI.",
+    "minimum_paired_games": 50,
+    "markets": {
+      "pass_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 7,
+          "unavailable": 7,
+          "valid_predictions": 0,
+          "unpaired": 0,
+          "paired_predictions": 0,
+          "pending": 0,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "unsupported_market": 7
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "rec_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 30,
+          "unavailable": 23,
+          "valid_predictions": 7,
+          "unpaired": 0,
+          "paired_predictions": 7,
+          "pending": 7,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "outside_source_scope": 23
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "receptions": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 13,
+          "unavailable": 10,
+          "valid_predictions": 3,
+          "unpaired": 0,
+          "paired_predictions": 3,
+          "pending": 3,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "outside_source_scope": 10
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      },
+      "rush_yds": {
+        "status": "insufficient_data",
+        "counts": {
+          "attempts": 17,
+          "unavailable": 17,
+          "valid_predictions": 0,
+          "unpaired": 0,
+          "paired_predictions": 0,
+          "pending": 0,
+          "verified_decided": 0,
+          "paired_decided": 0
+        },
+        "unavailable_reasons": {
+          "unsupported_market": 17
+        },
+        "promote": false,
+        "paired_games": 0,
+        "paired_players": 0
+      }
+    },
+    "excluded": 0,
+    "recorded_attempts": 134,
+    "earliest_attempts": 67,
+    "duplicate_attempts": 67
+  },
+  "workload_shadow": {
+    "nba": {
+      "model_version": "history-workload-shadow-v1",
+      "policy_version": "half-line-prior40-z8-v1",
+      "artifact_sha256": "0e31303402ec07c361e7906a6447f8d1e0e5a1d5643d5d59ad4b4399e445f7bc",
+      "implementation_sha256": "26cb92de2e1ece980dcbb80d43e3954544fc991cc61dd1eb4b256e94e0ecfbed",
+      "frozen_at": "2026-09-23T15:36:55+00:00",
+      "sport": "nba",
+      "generated_at": "2026-09-24T02:10:57.964633+00:00",
+      "status": "collecting",
+      "promote": false,
+      "scope": "Untraded prospective probability comparison; no candidate acceptance policy or ROI.",
+      "minimum_paired_games": 50,
+      "markets": {
+        "assists": {
+          "status": "insufficient_data",
+          "counts": {
+            "attempts": 0,
+            "unavailable": 0,
+            "valid_predictions": 0,
+            "unpaired": 0,
+            "paired_predictions": 0,
+            "pending": 0,
+            "verified_decided": 0,
+            "paired_decided": 0
+          },
+          "unavailable_reasons": {},
+          "promote": false,
+          "paired_games": 0,
+          "paired_players": 0
+        },
+        "points": {
+          "status": "insufficient_data",
+          "counts": {
+            "attempts": 0,
+            "unavailable": 0,
+            "valid_predictions": 0,
+            "unpaired": 0,
+            "paired_predictions": 0,
+            "pending": 0,
+            "verified_decided": 0,
+            "paired_decided": 0
+          },
+          "unavailable_reasons": {},
+          "promote": false,
+          "paired_games": 0,
+          "paired_players": 0
+        },
+        "rebounds": {
+          "status": "insufficient_data",
+          "counts": {
+            "attempts": 0,
+            "unavailable": 0,
+            "valid_predictions": 0,
+            "unpaired": 0,
+            "paired_predictions": 0,
+            "pending": 0,
+            "verified_decided": 0,
+            "paired_decided": 0
+          },
+          "unavailable_reasons": {},
+          "promote": false,
+          "paired_games": 0,
+          "paired_players": 0
+        }
+      },
+      "excluded": 0,
+      "recorded_attempts": 0,
+      "earliest_attempts": 0,
+      "duplicate_attempts": 0
+    },
+    "nfl": {
+      "model_version": "history-workload-shadow-v1",
+      "policy_version": "half-line-prior40-z8-v1",
+      "artifact_sha256": "0e31303402ec07c361e7906a6447f8d1e0e5a1d5643d5d59ad4b4399e445f7bc",
+      "implementation_sha256": "26cb92de2e1ece980dcbb80d43e3954544fc991cc61dd1eb4b256e94e0ecfbed",
+      "frozen_at": "2026-09-23T15:36:55+00:00",
+      "sport": "nfl",
+      "generated_at": "2026-09-24T02:10:57.970160+00:00",
+      "status": "collecting",
+      "promote": false,
+      "scope": "Untraded prospective probability comparison; no candidate acceptance policy or ROI.",
+      "minimum_paired_games": 50,
+      "markets": {
+        "pass_yds": {
+          "status": "insufficient_data",
+          "counts": {
+            "attempts": 7,
+            "unavailable": 7,
+            "valid_predictions": 0,
+            "unpaired": 0,
+            "paired_predictions": 0,
+            "pending": 0,
+            "verified_decided": 0,
+            "paired_decided": 0
+          },
+          "unavailable_reasons": {
+            "unsupported_market": 7
+          },
+          "promote": false,
+          "paired_games": 0,
+          "paired_players": 0
+        },
+        "rec_yds": {
+          "status": "insufficient_data",
+          "counts": {
+            "attempts": 30,
+            "unavailable": 30,
+            "valid_predictions": 0,
+            "unpaired": 0,
+            "paired_predictions": 0,
+            "pending": 0,
+            "verified_decided": 0,
+            "paired_decided": 0
+          },
+          "unavailable_reasons": {
+            "invalid_shadow_input": 25,
+            "insufficient_history": 5
+          },
+          "promote": false,
+          "paired_games": 0,
+          "paired_players": 0
+        },
+        "receptions": {
+          "status": "insufficient_data",
+          "counts": {
+            "attempts": 13,
+            "unavailable": 13,
+            "valid_predictions": 0,
+            "unpaired": 0,
+            "paired_predictions": 0,
+            "pending": 0,
+            "verified_decided": 0,
+            "paired_decided": 0
+          },
+          "unavailable_reasons": {
+            "invalid_shadow_input": 11,
+            "insufficient_history": 2
+          },
+          "promote": false,
+          "paired_games": 0,
+          "paired_players": 0
+        },
+        "rush_yds": {
+          "status": "insufficient_data",
+          "counts": {
+            "attempts": 17,
+            "unavailable": 17,
+            "valid_predictions": 0,
+            "unpaired": 0,
+            "paired_predictions": 0,
+            "pending": 0,
+            "verified_decided": 0,
+            "paired_decided": 0
+          },
+          "unavailable_reasons": {
+            "unsupported_market": 17
+          },
+          "promote": false,
+          "paired_games": 0,
+          "paired_players": 0
+        }
+      },
+      "excluded": 0,
+      "recorded_attempts": 134,
+      "earliest_attempts": 67,
+      "duplicate_attempts": 67
+    },
+    "cfb": {
+      "model_version": "history-workload-shadow-v1",
+      "policy_version": "half-line-prior40-z8-v1",
+      "artifact_sha256": "0e31303402ec07c361e7906a6447f8d1e0e5a1d5643d5d59ad4b4399e445f7bc",
+      "implementation_sha256": "26cb92de2e1ece980dcbb80d43e3954544fc991cc61dd1eb4b256e94e0ecfbed",
+      "frozen_at": "2026-09-23T15:36:55+00:00",
+      "sport": "cfb",
+      "generated_at": "2026-09-24T02:10:57.988227+00:00",
+      "status": "no_frozen_candidate",
+      "promote": false,
+      "scope": "Untraded prospective probability comparison; no candidate acceptance policy or ROI.",
+      "minimum_paired_games": 50,
+      "markets": {},
+      "excluded": 0,
+      "recorded_attempts": 0,
+      "earliest_attempts": 0,
+      "duplicate_attempts": 0
+    }
+  },
+  "quota": {
+    "daily_reserved": 12,
+    "daily_limit": 20,
+    "rolling_reserved": 322,
+    "rolling_limit": 450,
+    "pregame_reserved_remaining": 8
+  },
+  "diagnostic_only": {
+    "attempts": 72,
+    "source_types": {
+      "datetime": 612
+    },
+    "before": {
+      "invalid_shadow_input": 72
+    },
+    "after": {
+      "predicted": 60,
+      "low_prior_workload": 12
+    },
+    "exception_classes": {
+      "TypeError: fromisoformat: argument must be str": 72
+    },
+    "examples": [
+      {
+        "player": "Christian Watson",
+        "market": "receptions",
+        "before": "invalid_shadow_input",
+        "after": "predicted"
+      },
+      {
+        "player": "Jonnu Smith",
+        "market": "receptions",
+        "before": "invalid_shadow_input",
+        "after": "predicted"
+      },
+      {
+        "player": "Skyy Moore",
+        "market": "receptions",
+        "before": "invalid_shadow_input",
+        "after": "low_prior_workload"
+      },
+      {
+        "player": "Jahan Dotson",
+        "market": "receptions",
+        "before": "invalid_shadow_input",
+        "after": "predicted"
+      }
+    ]
+  }
+}

@@ -231,6 +231,8 @@ async def test_scan_shadow_has_no_effect_on_primary_forecasts_or_exposure(tmp_pa
     from sportsbet.config import settings
     from sportsbet.graph.models import PropResult
     p,rows,event=fixture();now=datetime.fromisoformat(p['captured_at'])
+    # asyncpg returns timestamptz columns as aware datetimes in production.
+    for row in rows:row['source_observed_at']=now-timedelta(minutes=1)
     class Clock(datetime):
         @classmethod
         def now(cls,tz=None):return now
@@ -301,3 +303,34 @@ def test_identical_late_shadow_retry_keeps_original_receipt(tmp_path,monkeypatch
         with pytest.raises(ValueError,match='immutable'):
             ledger.record('same',p|change)
     assert ledger.predictions()==[retained]
+
+
+@pytest.mark.parametrize(('sport','prop'),[(s,p) for s,markets in shadow.MARKETS.items() for p in markets])
+def test_driver_timestamp_conversion_matches_existing_frozen_string_contract(sport,prop):
+    from sportsbet.quant.shadow_inputs import normalize_source_timestamps
+    p,rows,_=fixture(sport,prop)
+    observed=datetime.fromisoformat(p['captured_at'])-timedelta(minutes=1)
+    for row in rows:row['source_observed_at']=observed.isoformat()
+    expected=shadow.shadow_record(p,rows)
+    assert expected['status']=='predicted'
+    native=[row|{'source_observed_at':observed.astimezone(timezone(timedelta(hours=-7)))} for row in rows]
+    original=deepcopy(native);key=(p['player_id'],prop)
+    adapted=normalize_source_timestamps({key:native})[key]
+    assert native==original and all(a is not b for a,b in zip(native,adapted))
+    assert all(type(row['day']) is date for row in adapted)
+    assert shadow.shadow_record(p,adapted)==expected
+    assert shadow.shadow_record(p,native)['reason']=='invalid_shadow_input'
+
+
+def test_driver_timestamp_conversion_keeps_chronology_and_rejects_naive_datetimes():
+    from sportsbet.quant.shadow_inputs import normalize_source_timestamps
+    p,rows,_=fixture();key=(p['player_id'],p['prop_type'])
+    rows[-1]['source_observed_at']=datetime.fromisoformat(p['captured_at'])+timedelta(seconds=1)
+    adapted=normalize_source_timestamps({key:rows})[key]
+    assert shadow.shadow_record(p,adapted)['reason']=='future_source_observation'
+    rows[-1]['source_observed_at']=datetime(2026,9,23)
+    with pytest.raises(ValueError,match='timezone'):normalize_source_timestamps({key:rows})
+    # Existing strings and missing values stay exactly as supplied for the frozen validator.
+    rows[-1]['source_observed_at']='2026-09-23T00:00:00'
+    assert normalize_source_timestamps({key:rows})[key][-1]['source_observed_at']=='2026-09-23T00:00:00'
+    assert shadow.shadow_record(p,normalize_source_timestamps({key:rows})[key])['status']=='unavailable'

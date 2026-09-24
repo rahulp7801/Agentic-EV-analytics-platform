@@ -652,3 +652,17 @@ async def test_role_history_loader_matches_disposable_postgres_schema():
         assert result['00-0032392']['cutoff']=='2026-09-24'
     finally:
         await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_shadow_source_adapter_handles_real_postgres_timestamptz():
+    from sportsbet.quant.shadow_inputs import normalize_source_timestamps
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'].replace('postgresql+psycopg://','postgresql://')
+    conn=await asyncpg.connect(url)
+    try:
+        stamp=datetime(2026,9,24,2,7,tzinfo=timezone.utc)
+        row=await conn.fetchrow('SELECT $1::timestamptz AS source_observed_at',stamp)
+        assert isinstance(row['source_observed_at'],datetime)
+        assert normalize_source_timestamps({'test':[row]})['test'][0]['source_observed_at']==stamp.isoformat()
+    finally:
+        await conn.close()
