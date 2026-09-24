@@ -21,6 +21,10 @@ Hooper's mean receptions changes from 2.19 to 1.94; the lower Wilson probability
 
 The full report contains 60 book/line/side comparisons across four players. These are correlated selections, not sixty independent evaluation games. The selected cohort does not establish league-wide missingness or model accuracy. Evidence was recovered after the retained quote capture, so these are **retrospective sensitivity estimates**, never prospective forecasts or new qualified picks. Rushing/passing overlays are not supplied by the receiving-result validator and remain outside this analysis.
 
+## Role and season composition
+
+The augmented Hooper history contains 33 New England games and only two Atlanta games (2026 mean 1.0 receptions). Watson's verified reception mean is 1.93 in 2024 (15 games), 3.50 in 2025 (10 games), and 5.0 in 2026 (two games). These are descriptive cohort counts, not role-adjusted predictions or evidence of a trend. They show why recovery alone does not validate pooling older roles/seasons unchanged. The full report retains season/team composition for all four players; the two current-season games per player are insufficient to validate a replacement probability.
+
 ## Reproduction
 
 ```powershell

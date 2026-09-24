@@ -36,6 +36,9 @@ def test_retained_sources_reproduce_material_sensitivity_without_mutating_inputs
     assert row['baseline']['probability']==0.953125
     assert row['augmented_history']['probability']==0.847222
     assert row['probability_change_pp']==-10.5903
+    hooper=next(p for p in report['history_composition'] if p['player']=='Austin Hooper')
+    assert sum(c['games'] for c in hooper['cohorts'] if c['team']=='NE')==33
+    assert next(c for c in hooper['cohorts'] if c['team']=='ATL')['games']==2
     assert report['mode']=='retrospective_sensitivity_only'
     assert report['production_writes']==report['published_forecasts']==report['provider_quote_requests']==0
 

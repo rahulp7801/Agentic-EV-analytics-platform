@@ -106,12 +106,24 @@ def sensitivity(history:dict,recovery:dict,offers:dict,*,now:datetime|None=None)
                     probability_change_pp=None if before['probability'] is None or after['probability'] is None
                         else round(100*(after['probability']-before['probability']),6)))
     if not comparisons:raise ValueError('No matching receiving offers')
+    composition=[]
+    for gsis in sorted(added):
+        if not added[gsis]:continue
+        cohorts={}
+        for row in baseline[gsis]+added[gsis]:
+            if row['season']<history['season_floor'] or row['date']>=history['cutoff'] or row['receptions'] is None:continue
+            cohorts.setdefault((row['season'],row['team']),[]).append(row['receptions'])
+        composition.append(dict(player=scope[gsis]['player'],player_id=gsis,
+            scope='All verified prior games in the audit scope, including explicit recovery; descriptive only.',
+            cohorts=[dict(season=season,team=team,games=len(values),mean_receptions=sum(values)/len(values),
+                zero_reception_games=sum(value==0 for value in values)) for (season,team),values in sorted(cohorts.items())]))
     return dict(version=VERSION,mode='retrospective_sensitivity_only',cutoff=history['cutoff'],season_floor=history['season_floor'],
         quote_captured_at=captured.isoformat(),quote_payload_sha256=event_hash,
         source_evidence_observed_at=max(e['observed_at'] for e in evidence),
         interpretation='Source evidence recovered after capture. These comparisons are not prospective forecasts, qualified picks, or proof of an edge.',
         verified_missing_games=len(recovered),players_with_recovery=sum(bool(v) for v in added.values()),
         receiving_offer_comparisons=len(comparisons),recovered_games=recovered,comparisons=comparisons,
+        history_composition=composition,
         production_writes=0,published_forecasts=0,provider_quote_requests=0)
 
 
