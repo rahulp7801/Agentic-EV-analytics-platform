@@ -37,6 +37,7 @@ export default function SlateReadiness({sport,onOpenPlayers}:{sport:Sport;onOpen
       {game.checked_at && <p>Last game check: <time dateTime={game.checked_at}>{new Date(game.checked_at).toLocaleString()}</time>.</p>}
       {game.overdue_at ? <p>Quote check was due <time dateTime={game.overdue_at}>{new Date(game.overdue_at).toLocaleString()}</time>; no newer game check is recorded.</p>
         : game.next_refresh_at && <p>Next quote check due: <time dateTime={game.next_refresh_at}>{new Date(game.next_refresh_at).toLocaleString()}</time>. Collection depends on scheduler timing and available credits.</p>}
+      {game.next_reserve_release_at && <p>Next reserve window: <time dateTime={game.next_reserve_release_at}>{new Date(game.next_reserve_release_at).toLocaleString()}</time>. Quote collection still depends on worker timing and available credits.</p>}
       {game.reasons.length>0 && <details><summary>Why selections were blocked</summary><ul>{game.reasons.map(reason=><li key={reason.label}>{reason.label}: {reason.count}</li>)}</ul></details>}
       {game.provider_event_id && <a href={`https://www.espn.com/${sport==='cfb'?'college-football':sport}/game/_/gameId/${encodeURIComponent(game.provider_event_id)}`} target="_blank" rel="noreferrer">View source game ↗</a>}
     </article>)}</div>

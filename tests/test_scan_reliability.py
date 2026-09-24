@@ -375,12 +375,17 @@ async def test_scan_splits_reserved_checks_before_board_lock_and_final_hour(monk
     assert distant['budget_skipped_events']==2 and not evaluated
     assert distant['budget_reasons']=={'pregame_credit_reserve':2}
     assert all(event['budget_reason']=='pregame_credit_reserve' for event in distant['events'])
+    for event in distant['events']:
+        assert scan.timestamp(event['next_reserve_release_at'])==scan.timestamp(event['game_start_time'])-scan.PRELOCK_QUOTE_WINDOW
+    assert distant['attempted_events']==0
     for event in events['nfl']:
         event['commence_time']=(datetime.now(timezone.utc)+timedelta(minutes=90)).isoformat()
     pool.provider_cache.records.pop('odds:events:nfl')
     prelock=(await scan.run(['nfl'],25))['nfl']
     assert prelock['completed_events']==1 and prelock['budget_skipped_events']==1
     assert prelock['budget_reasons']=={'pregame_credit_reserve':1}
+    deferred=next(event for event in prelock['events'] if event['state']=='api_budget')
+    assert scan.timestamp(deferred['next_reserve_release_at'])==scan.timestamp(deferred['game_start_time'])-scan.LOCK_BEFORE_START
     assert evaluated==['nfl0']
     repeated=(await scan.run(['nfl'],25))['nfl']
     assert repeated['attempted_events']==0 and evaluated==['nfl0']
@@ -427,6 +432,7 @@ async def test_prelock_event_precedes_distant_candidate_within_league(monkeypatc
     assert evaluated==['nfl1']
     assert report['completed_events']==report['budget_skipped_events']==1
     assert report['budget_reasons']=={'daily_credit_limit':1}
+    assert all('next_reserve_release_at' not in event for event in report['events'])
 
 
 @pytest.mark.asyncio

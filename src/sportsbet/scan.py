@@ -210,6 +210,18 @@ def event_credit_holdback(event: dict, reserved: int, now: datetime) -> int:
     return reserved
 
 
+def next_reserve_release(event: dict, reserved: int, now: datetime) -> datetime | None:
+    """Report the next existing reserve transition, without authorizing collection."""
+    if reserved <= 0:
+        return None
+    start=timestamp(event['commence_time'])
+    for window in (PRELOCK_QUOTE_WINDOW, LOCK_BEFORE_START):
+        release=start-window
+        if release>now and event_credit_holdback(event,reserved,release)<event_credit_holdback(event,reserved,now):
+            return release
+    return None
+
+
 def next_quote_check(event: dict, attempted_at: str | None, now: datetime) -> datetime:
     """Cadence controls collection only, never extends quote eligibility."""
     start=timestamp(event['commence_time'])
@@ -676,6 +688,10 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
                         cache.release(quote_key,'the_odds_api',sport,scan_id)
                         cache_owned=False
                         event_state.update(state='api_budget',budget_reason=budget_reason)
+                        if budget_reason=='pregame_credit_reserve':
+                            release=next_reserve_release(event,held,datetime.now(timezone.utc))
+                            if release is not None:
+                                event_state['next_reserve_release_at']=release.isoformat()
                         report['budget_skipped_events']+=1
                         report['budget_reasons'][budget_reason]=report['budget_reasons'].get(budget_reason,0)+1
                         continue
