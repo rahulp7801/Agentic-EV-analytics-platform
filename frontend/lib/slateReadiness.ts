@@ -3,6 +3,8 @@ export type SlateGame={home_name:string;away_name:string;home_abbr:string;away_a
   game_time:string;date:string;provider_event_id?:string;completed?:boolean};
 const STATES:Record<string,string>={waiting_quotes:'Waiting for odds',scheduled:'Waiting for next quote check',
   api_budget:'API budget limited',evaluating:'Evaluating props',failed:'Evaluation failed',evaluated:'Evaluated'};
+const BUDGET_STATES:Record<string,string>={pregame_credit_reserve:'Credits reserved for pregame checks',
+  daily_credit_limit:'Waiting for daily API allowance',rolling_credit_limit:'Waiting for rolling API allowance'};
 const GATES:Record<string,string>={unknown_or_ambiguous_player:'Player history identity not resolved',
   missing_model_estimate:'Model estimate unavailable',insufficient_sample:'Too few prior games',
   availability_unavailable:'Injury evidence unavailable',roster_unconfirmed:'Roster identity not confirmed',
@@ -29,11 +31,20 @@ export function slateReadiness(games:SlateGame[],scan:Record<string,unknown>|nul
       && value.home_team===game.home_name && value.away_team===game.away_name
       && Date.parse(value.game_start_time)===Date.parse(game.game_time));
     const event=matches.length===1 ? matches[0] as Record<string,unknown> : null;
+    const checked=event && stamp(finished) && Date.parse(finished as string)<=now+60000 ? finished as string : null;
+    const due=event?.state==='scheduled' && stamp(event.next_refresh_at) ? event.next_refresh_at as string : null;
+    // A check may become due during the worker's bounded 20-minute run.
+    const validDue=!!checked && !!due && Date.parse(due)>=Date.parse(checked)-20*60000
+      && Date.parse(due)<=Date.parse(checked)+48*3600000 && Date.parse(due)<Date.parse(game.game_time);
+    const overdue=!started && validDue && Date.parse(due!)<=now;
     let state=started ? 'Live · picks locked' : Date.parse(game.game_time)-now>48*3600000 ? 'Outside the 48-hour scan window' : 'Waiting for scan';
     if(!started && state==='Waiting for scan' && scanFresh && scan?.status==='blocked') state='Waiting for verified history';
     if(!started && state==='Waiting for scan' && scanFresh && scan?.status==='failed') state='Scan failed';
     if(!started && event && scanFresh) state=STATES[String(event.state)] ?? 'Coverage unavailable';
     else if(!started && event && !scanFresh) state='Scan evidence is stale';
+    if(!started && event?.state==='api_budget' && scanFresh && typeof event.budget_reason==='string'
+      && Object.hasOwn(BUDGET_STATES,event.budget_reason)) state=BUDGET_STATES[event.budget_reason];
+    if(overdue) state='Quote check overdue';
     const coverage=event && scanFresh && scan?.coverage && typeof scan.coverage==='object'
       ? (scan.coverage as Record<string,unknown>)[String(event.game_id)] : null;
     const c=coverage && typeof coverage==='object' && !Array.isArray(coverage) ? coverage as Record<string,unknown> : {};
@@ -47,9 +58,8 @@ export function slateReadiness(games:SlateGame[],scan:Record<string,unknown>|nul
       unresolved_selections:valid ? selections-requests : null,
       accepted_at_capture:!started && valid && accepted!==null && accepted<=estimates ? accepted : null,
       reasons:started ? [] : Object.entries(GATES).flatMap(([key,label])=>count(counts[key]) ? [{label,count:count(counts[key])!}] : []),
-      checked_at:stamp(finished) ? finished as string : null,
-      next_refresh_at:event && stamp(event.next_refresh_at) && Date.parse(event.next_refresh_at as string)>now
-        && Date.parse(event.next_refresh_at as string)<=now+48*3600000 ? event.next_refresh_at as string : null};
+      checked_at:checked,overdue_at:overdue ? due : null,
+      next_refresh_at:!started && scanFresh && validDue && Date.parse(due!)>now ? due : null};
   }).sort((a,b)=>Date.parse(a.game_time)-Date.parse(b.game_time));
 }
 
