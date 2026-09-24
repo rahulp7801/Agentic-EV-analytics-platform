@@ -17,7 +17,7 @@ test('reported absences and available historical comparisons are descriptive',()
   ],context_splits:[{player:'Receiver'}]},next_gen_stats:{sample_weeks:3}};
   const context=pickContext(signal);
   assert.match(context.reports,/Receiver \(Out\), Defender \(Questionable\)/);
-  assert.match(context.detail,/1 historical on\/off comparison/);
+  assert.match(context.detail,/1 historical participation comparison/);
   assert.match(context.detail,/3 prior tracking weeks/);
 });
 

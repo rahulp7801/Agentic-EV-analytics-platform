@@ -150,17 +150,30 @@ test('availability screens recommendations without changing model probabilities'
   }
 });
 
-test('verified injury context retains exact on off cohorts and strips internal identities',()=>{
+test('recorded injury context retains explicit participation cohorts and strips internal identities',()=>{
   const split={player:'Defender',status:'Out',position:'CB',team:'LV',relationship:'opponent',unit:'defense',
-    source:'nflverse_snap_counts',participation:'verified game snaps',participant_id:'private-pfr-id',
-    active:{games:8,mean:241.25,hit_rate:.625},absent:{games:2,mean:278,hit_rate:1}};
+    source:'nflverse_snap_counts',participation:'recorded unit snaps',evidence_version:'recorded-participation-v2',unknown_games:2,participant_id:'private-pfr-id',
+    active:{games:8,mean:241.25,hit_rate:.625},absent:{games:0,mean:null,hit_rate:null}};
   const result=publicSignals([{...publicQuote,availability:{...quote.availability,context_splits:[split]}}],now).signals[0];
   assert.deepEqual(result.availability.context_splits,[{player:'Defender',status:'Out',position:'CB',team:'LV',
-    relationship:'opponent',unit:'defense',source:'nflverse_snap_counts',participation:'verified game snaps',
+    relationship:'opponent',unit:'defense',source:'nflverse_snap_counts',participation:'recorded unit snaps',evidence_version:'recorded-participation-v2',unknown_games:2,
     active:split.active,absent:split.absent}]);
   assert.equal(result.true_prob,.6);assert.equal(result.availability.probability_adjusted,false);
+  const legacy={...split};delete legacy.evidence_version;
+  const retained=publicSignals([{...publicQuote,availability:{...quote.availability,context_splits:[legacy]}}],now).signals[0];
+  assert.equal(retained.availability.context_splits,undefined);
+  assert.equal(retained.availability.roster_confirmed,true);assert.equal(retained.true_prob,.6);
+  assert.deepEqual(retained.availability.teammates,quote.availability.teammates);
+  const unknown={...split,active:{games:0,mean:null,hit_rate:null},unknown_games:8};
+  const partial=publicSignals([{...publicQuote,availability:{...quote.availability,context_splits:[unknown]}}],now).signals[0];
+  assert.equal(partial.availability.context_splits[0].unknown_games,8);
   for(const broken of [{...split,source:'private_feed'},{...split,active:{games:41,mean:1,hit_rate:.5}},
-    {...split,absent:{games:0,mean:0,hit_rate:null}}]) {
+    {...split,absent:{games:0,mean:0,hit_rate:null}},
+    {...split,active:{games:8,mean:null,hit_rate:.5}},
+    {...split,active:{games:8,mean:1,hit_rate:null}},
+    {...split,unknown_games:-1},{...split,unknown_games:33},{...split,unknown_games:1.5},
+    {...split,evidence_version:'future-unsupported'},
+    {...split,absent:{games:1,mean:2,hit_rate:1}}]) {
     const projected=publicSignals([{...publicQuote,availability:{...quote.availability,context_splits:[broken]}}],now).signals[0];
     assert.equal(projected.availability,undefined);assert.equal(projected.gated,true);
   }
@@ -278,4 +291,17 @@ test('parlay scenario reports dependence bounds, not an optimized joint forecast
   assert.ok(Math.abs(s.lower-.2)<1e-8); assert.equal(s.upper,.6);
   assert.equal(s.independent,.36); assert.ok(Math.abs(s.expectedReturn-.08)<1e-8);
   assert.equal(parlayScenario([.6],3),null); assert.equal(parlayScenario([.6,NaN],3),null);
+});
+
+
+test('NBA explicit zero minutes and unknown participation remain separate',()=>{
+  const split={player:'Guard',status:'Out',position:'SG',team:'KC',relationship:'teammate',unit:'offense',
+    source:'nba_final_box_scores',participation:'recorded minutes',evidence_version:'recorded-participation-v2',
+    unknown_games:3,active:{games:10,mean:25,hit_rate:.7},absent:{games:5,mean:29,hit_rate:.8}};
+  const availability={...quote.availability,context_splits:[split],
+    source_url:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries',
+    roster_source_url:'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/12/roster'};
+  const result=publicSignals([{...publicQuote,sport:'nba',prop_type:'points',availability}],now).signals[0];
+  assert.deepEqual(result.availability.context_splits,[split]);
+  assert.equal(result.true_prob,.6);
 });
