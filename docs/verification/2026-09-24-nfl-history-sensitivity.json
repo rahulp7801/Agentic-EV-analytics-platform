@@ -1,0 +1,2486 @@
+{
+  "comparisons": [
+    {
+      "american_odds": -112,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.215325,
+          0.557708
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.224286,
+          0.574651
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.388889,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "over",
+      "line": 66.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -112,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.442292,
+          0.784675
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.425349,
+          0.775714
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.611111,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "under",
+      "line": 66.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -111,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.137505,
+          0.410705
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.256757,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.160958,
+          0.465923
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.296875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 18.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -4.0118,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -113,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.589295,
+          0.862495
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.743243,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.534077,
+          0.839042
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.703125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 18.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 4.0118,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -105,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.155646,
+          0.453745
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.287879,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.166647,
+          0.478758
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.306452,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": -1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -119,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.546255,
+          0.844354
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.712121,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.521242,
+          0.833353
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.693548,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": 1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -123,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.03852,
+          0.280578
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.040032,
+          0.289759
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.12963,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "over",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -104,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.719422,
+          0.96148
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.710241,
+          0.959968
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.87037,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "under",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -146,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.117163,
+          0.380847
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.22973,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.137017,
+          0.432461
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.265625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "over",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": 115,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.619153,
+          0.882837
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.77027,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.567539,
+          0.862983
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.734375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "under",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:55Z",
+      "sportsbook": "draftkings"
+    },
+    {
+      "american_odds": -114,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.155646,
+          0.453745
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.287879,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.166647,
+          0.478758
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.306452,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": -1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -114,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.546255,
+          0.844354
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.712121,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.521242,
+          0.833353
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.693548,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": 1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -114,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.117163,
+          0.380847
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.22973,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.137017,
+          0.432461
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.265625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "over",
+      "line": 19.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -3.5895,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -114,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.619153,
+          0.882837
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.77027,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.567539,
+          0.862983
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.734375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "under",
+      "line": 19.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 3.5895,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -114,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.215325,
+          0.557708
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.224286,
+          0.574651
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.388889,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "over",
+      "line": 66.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -114,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.442292,
+          0.784675
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.425349,
+          0.775714
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.611111,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "under",
+      "line": 66.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -162,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.117163,
+          0.380847
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.22973,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.137017,
+          0.432461
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.265625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "over",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": 122,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.619153,
+          0.882837
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.77027,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.567539,
+          0.862983
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.734375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "under",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -122,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.03852,
+          0.280578
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.040032,
+          0.289759
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.12963,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "over",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -108,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.719422,
+          0.96148
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.710241,
+          0.959968
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.87037,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "under",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:31Z",
+      "sportsbook": "fanduel"
+    },
+    {
+      "american_odds": -112,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.117163,
+          0.380847
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.22973,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.137017,
+          0.432461
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.265625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "over",
+      "line": 19.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -3.5895,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:09Z",
+      "sportsbook": "betrivers"
+    },
+    {
+      "american_odds": -120,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.619153,
+          0.882837
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.77027,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.567539,
+          0.862983
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.734375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "under",
+      "line": 19.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 3.5895,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:09Z",
+      "sportsbook": "betrivers"
+    },
+    {
+      "american_odds": -108,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.155646,
+          0.453745
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.287879,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.166647,
+          0.478758
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.306452,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": -1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:09Z",
+      "sportsbook": "betrivers"
+    },
+    {
+      "american_odds": -124,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.546255,
+          0.844354
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.712121,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.521242,
+          0.833353
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.693548,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": 1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:09Z",
+      "sportsbook": "betrivers"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.215325,
+          0.557708
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.224286,
+          0.574651
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.388889,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "over",
+      "line": 62.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:09Z",
+      "sportsbook": "betrivers"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.442292,
+          0.784675
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.425349,
+          0.775714
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.611111,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "under",
+      "line": 62.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:09Z",
+      "sportsbook": "betrivers"
+    },
+    {
+      "american_odds": -121,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.03852,
+          0.280578
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.040032,
+          0.289759
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.12963,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "over",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:09Z",
+      "sportsbook": "betrivers"
+    },
+    {
+      "american_odds": -162,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.117163,
+          0.380847
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.22973,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.137017,
+          0.432461
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.265625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "over",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:09Z",
+      "sportsbook": "betrivers"
+    },
+    {
+      "american_odds": -112,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.137505,
+          0.410705
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.256757,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.160958,
+          0.465923
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.296875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 18.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -4.0118,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.589295,
+          0.862495
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.743243,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.534077,
+          0.839042
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.703125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 18.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 4.0118,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -110,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.155646,
+          0.453745
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.287879,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.166647,
+          0.478758
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.306452,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": -1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -118,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.546255,
+          0.844354
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.712121,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.521242,
+          0.833353
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.693548,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": 1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -114,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.215325,
+          0.557708
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.224286,
+          0.574651
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.388889,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "over",
+      "line": 66.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -114,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.442292,
+          0.784675
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.425349,
+          0.775714
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.611111,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "under",
+      "line": 66.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -123,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.03852,
+          0.280578
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.040032,
+          0.289759
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.12963,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "over",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -105,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.719422,
+          0.96148
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.710241,
+          0.959968
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.87037,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "under",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -154,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.117163,
+          0.380847
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.22973,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.137017,
+          0.432461
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.265625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "over",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": 119,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.619153,
+          0.882837
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.77027,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.567539,
+          0.862983
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.734375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "under",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:42:01Z",
+      "sportsbook": "betonlineag"
+    },
+    {
+      "american_odds": -111,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.155646,
+          0.453745
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.287879,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.166647,
+          0.478758
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.306452,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": -1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -120,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.546255,
+          0.844354
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.712121,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.521242,
+          0.833353
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.693548,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": 1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.215325,
+          0.557708
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.224286,
+          0.574651
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.388889,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "over",
+      "line": 64.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.442292,
+          0.784675
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.425349,
+          0.775714
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.611111,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "under",
+      "line": 64.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.137505,
+          0.410705
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.256757,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.160958,
+          0.465923
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.296875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 18.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -4.0118,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.589295,
+          0.862495
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.743243,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.534077,
+          0.839042
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.703125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 18.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 4.0118,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -140,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.117163,
+          0.380847
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.22973,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.137017,
+          0.432461
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.265625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "over",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": 105,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.619153,
+          0.882837
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.77027,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.567539,
+          0.862983
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.734375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "under",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -130,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.03852,
+          0.280578
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.040032,
+          0.289759
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.12963,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "over",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -105,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.719422,
+          0.96148
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.710241,
+          0.959968
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.87037,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "under",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": 130,
+      "augmented_history": {
+        "added_games_in_window": 4,
+        "confidence_interval": [
+          0.706244,
+          0.937398
+        ],
+        "mean": 1.9428571428571428,
+        "meets_sample_floor": true,
+        "probability": 0.847222,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 35,
+        "successes_over": 30
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.838059,
+          0.994283
+        ],
+        "mean": 2.193548387096774,
+        "meets_sample_floor": true,
+        "probability": 0.953125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 30
+      },
+      "direction": "over",
+      "line": 0.5,
+      "player": "Austin Hooper",
+      "player_id": "00-0032392",
+      "probability_change_pp": -10.5903,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -175,
+      "augmented_history": {
+        "added_games_in_window": 4,
+        "confidence_interval": [
+          0.062602,
+          0.293756
+        ],
+        "mean": 1.9428571428571428,
+        "meets_sample_floor": true,
+        "probability": 0.152778,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 35,
+        "successes_over": 30
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.005717,
+          0.161941
+        ],
+        "mean": 2.193548387096774,
+        "meets_sample_floor": true,
+        "probability": 0.046875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 30
+      },
+      "direction": "under",
+      "line": 0.5,
+      "player": "Austin Hooper",
+      "player_id": "00-0032392",
+      "probability_change_pp": 10.5903,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:22Z",
+      "sportsbook": "betmgm"
+    },
+    {
+      "american_odds": -110,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.155646,
+          0.453745
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.287879,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.166647,
+          0.478758
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.306452,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": -1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": -120,
+      "augmented_history": {
+        "added_games_in_window": 2,
+        "confidence_interval": [
+          0.546255,
+          0.844354
+        ],
+        "mean": 5.46875,
+        "meets_sample_floor": true,
+        "probability": 0.712121,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 32,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.521242,
+          0.833353
+        ],
+        "mean": 5.833333333333333,
+        "meets_sample_floor": true,
+        "probability": 0.693548,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 30,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 7.5,
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "probability_change_pp": 1.8573,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.215325,
+          0.557708
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.224286,
+          0.574651
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.388889,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "over",
+      "line": 66.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.442292,
+          0.784675
+        ],
+        "mean": 52.55555555555556,
+        "meets_sample_floor": true,
+        "probability": 0.625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 10
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.425349,
+          0.775714
+        ],
+        "mean": 54.57692307692308,
+        "meets_sample_floor": true,
+        "probability": 0.611111,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 10
+      },
+      "direction": "under",
+      "line": 66.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 1.3889,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.137505,
+          0.410705
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.256757,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.160958,
+          0.465923
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.296875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 9
+      },
+      "direction": "over",
+      "line": 18.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -4.0118,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": -115,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.589295,
+          0.862495
+        ],
+        "mean": 14.11111111111111,
+        "meets_sample_floor": true,
+        "probability": 0.743243,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 9
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.534077,
+          0.839042
+        ],
+        "mean": 16.387096774193548,
+        "meets_sample_floor": true,
+        "probability": 0.703125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 9
+      },
+      "direction": "under",
+      "line": 18.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 4.0118,
+      "prop_type": "rec_yds",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": -125,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.03852,
+          0.280578
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.125,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.040032,
+          0.289759
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.12963,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "over",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": -0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": -105,
+      "augmented_history": {
+        "added_games_in_window": 1,
+        "confidence_interval": [
+          0.719422,
+          0.96148
+        ],
+        "mean": 2.740740740740741,
+        "meets_sample_floor": true,
+        "probability": 0.875,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 27,
+        "successes_over": 3
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.710241,
+          0.959968
+        ],
+        "mean": 2.8461538461538463,
+        "meets_sample_floor": true,
+        "probability": 0.87037,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 26,
+        "successes_over": 3
+      },
+      "direction": "under",
+      "line": 4.5,
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "probability_change_pp": 0.463,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": -150,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.117163,
+          0.380847
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.22973,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.137017,
+          0.432461
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.265625,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "over",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": -3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    },
+    {
+      "american_odds": 115,
+      "augmented_history": {
+        "added_games_in_window": 5,
+        "confidence_interval": [
+          0.619153,
+          0.882837
+        ],
+        "mean": 1.1111111111111112,
+        "meets_sample_floor": true,
+        "probability": 0.77027,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 36,
+        "successes_over": 8
+      },
+      "baseline": {
+        "added_games_in_window": 0,
+        "confidence_interval": [
+          0.567539,
+          0.862983
+        ],
+        "mean": 1.2903225806451613,
+        "meets_sample_floor": true,
+        "probability": 0.734375,
+        "push_probability": 0.0,
+        "pushes": 0,
+        "sample_size": 31,
+        "successes_over": 8
+      },
+      "direction": "under",
+      "line": 1.5,
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "probability_change_pp": 3.5895,
+      "prop_type": "receptions",
+      "quote_time": "2026-09-23T01:41:37Z",
+      "sportsbook": "bovada"
+    }
+  ],
+  "cutoff": "2026-09-24",
+  "input_sha256": {
+    "history": "f0e739cc67ba990d4b1a8115d0ab2ff3c7a1cbce124f64ed96bc01893904926e",
+    "identity_bundle": "2bcdd084008be90e4e6197b55bd6b9df85555ee49bcfe82b9ef8c26200250f5a",
+    "quotes": "c152ddb05fd58ed0d7716485f209f6bb06a66e682431f09f504db94d8d0de93a",
+    "recovery": "53fe3fafdf0f9bef11229ae63a2026d5672634d8d7643fe081eb792c1597346e"
+  },
+  "interpretation": "Source evidence recovered after capture. These comparisons are not prospective forecasts, qualified picks, or proof of an edge.",
+  "mode": "retrospective_sensitivity_only",
+  "players_with_recovery": 4,
+  "production_writes": 0,
+  "provider_quote_requests": 0,
+  "published_forecasts": 0,
+  "quote_captured_at": "2026-09-23T01:43:06.027840+00:00",
+  "quote_payload_sha256": "9283b50a8379b55286e3291e8b398d02afe72424518f9bd7d7ca20ebaeb442be",
+  "receiving_offer_comparisons": 60,
+  "recovered_games": [
+    {
+      "date": "2025-10-05",
+      "espn_event_id": "401772922",
+      "game_id": "2025_05_NE_BUF",
+      "player": "Austin Hooper",
+      "player_id": "00-0032392",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "bdb11731439f0fe64be02accd044cf33b752389ed6bd55369546065535b30bce"
+    },
+    {
+      "date": "2025-12-01",
+      "espn_event_id": "401772821",
+      "game_id": "2025_13_NYG_NE",
+      "player": "Austin Hooper",
+      "player_id": "00-0032392",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "6ce2280d53d9f9210ba50973e8baffcba743bd5f4665ccba33378931b323b91c"
+    },
+    {
+      "date": "2025-12-14",
+      "espn_event_id": "401772795",
+      "game_id": "2025_15_BUF_NE",
+      "player": "Austin Hooper",
+      "player_id": "00-0032392",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "d409bc609f8e77154dd6431aa94f3066bc5515deafbd546cf73a86277e6fb216"
+    },
+    {
+      "date": "2026-09-13",
+      "espn_event_id": "401872658",
+      "game_id": "2026_01_ATL_PIT",
+      "player": "Austin Hooper",
+      "player_id": "00-0032392",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "f962280b48cb1dead9c2b80245f907704da4618faf3350ec32b625f0c152fc20"
+    },
+    {
+      "date": "2024-10-20",
+      "espn_event_id": "401671644",
+      "game_id": "2024_07_HOU_GB",
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "f37b205a8b6da77f10501bd31182e246e1f3ce96aa32dfe63dcc7fe033c1a466"
+    },
+    {
+      "date": "2024-12-29",
+      "espn_event_id": "401671725",
+      "game_id": "2024_17_GB_MIN",
+      "player": "Chris Brooks",
+      "player_id": "00-0038685",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "316108f57b40e825966296fc5c69de0d17644c86b76746b57712d89876b68c1b"
+    },
+    {
+      "date": "2024-09-15",
+      "espn_event_id": "401671723",
+      "game_id": "2024_02_IND_GB",
+      "player": "Christian Watson",
+      "player_id": "00-0038124",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "46bb684b13c4396c08d4bddd6a4f37c00184c33ce24db14bf1c03a9116b438ef"
+    },
+    {
+      "date": "2024-10-27",
+      "espn_event_id": "401671667",
+      "game_id": "2024_08_PHI_CIN",
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "ac59f4305fc06f29f439c8e234724588e16e0db97c0e9d159eed9c492add7af5"
+    },
+    {
+      "date": "2024-12-22",
+      "espn_event_id": "401671717",
+      "game_id": "2024_16_PHI_WAS",
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "12eebcd3170381e301ba7fecc491fa37450015faf70262c1aa120240bebf96d4"
+    },
+    {
+      "date": "2024-12-29",
+      "espn_event_id": "401671765",
+      "game_id": "2024_17_DAL_PHI",
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "6f79cfb9e7f0bb5e1ecc8346e6ca13b877ecb88ae3d685a43abb1616bac7852c"
+    },
+    {
+      "date": "2025-10-19",
+      "espn_event_id": "401772862",
+      "game_id": "2025_07_PHI_MIN",
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "adb013a9b8737e9b84e4da7869d86845622ad68cdbbc769b6bae3d161a975bb7"
+    },
+    {
+      "date": "2025-12-14",
+      "espn_event_id": "401772906",
+      "game_id": "2025_15_LV_PHI",
+      "player": "Jahan Dotson",
+      "player_id": "00-0037741",
+      "receiving_yards": 0,
+      "receptions": 0,
+      "source_sha256": "1d1a78dd27dab834224427dc652a75a26c7b2e204bf5917b50f006cbec4a9d79"
+    }
+  ],
+  "season_floor": 2024,
+  "source_evidence_observed_at": "2026-09-24T00:17:36.091067+00:00",
+  "verified_missing_games": 12,
+  "version": "nfl-explicit-history-sensitivity-v1"
+}
