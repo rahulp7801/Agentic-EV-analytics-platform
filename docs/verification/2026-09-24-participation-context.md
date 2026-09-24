@@ -29,3 +29,12 @@ Next evidence checkpoint: ordinary reserved pregame stages beginning CFB 2026-09
 PR221 merged as `8db8e95` after CI36020473631 passed (1,116 backend, 174 frontend, 36 PostgreSQL integration, 9 migration tests; CodeQL36020467965). Local 1440px/390px browser checks covered NFL, NBA zero minutes, and legacy context without page errors, horizontal overflow, or targeted WCAG A/AA violations. The mobile participation card was visually inspected.
 
 The scanner also had an availability explanation bullet claiming an exact on/off comparison. Future captures now describe participation summaries. The public projection withholds that obsolete generated bullet on retained forecasts; other explanation bullets and independently verified current injury evidence remain visible. The immutable payload itself is not rewritten. A regression verifies source-array immutability and unchanged probability.
+
+
+## Production verification and release retry
+
+PR221 release `36021021459` passed hosted schema, deployment, and public access/readiness checks. A direct production API check at 2026-09-24 15:42:32 UTC returned 100 NFL library forecasts, zero invalid signals, 100 retained observed availability reports, and zero exposed legacy comparison objects. All 19 replayed positive-participation cohorts in the archived audit equal their original values; all original absent counts were reproduced before correction.
+
+PR222 merged as `313491aa7ce35f0785a952f53a468c1946af3055` after CI `36021314405` (1,116 backend, 175 frontend, 36 PostgreSQL integration, 9 migration tests) and CodeQL `36021311032` passed. Its merge did not start a master workflow within repeated checks over six minutes, despite the workflow remaining active. The live API consequently still returned the old explanation bullet in those 100 records. This verification commit provides a new normal protected-master push through the reviewed PR path to retry release. Do not claim the wording correction is deployed until an exact-head release and public verification pass.
+
+Quota checkpoint at 15:33 UTC remained 12/20 daily and 322/450 rolling credits; all remaining daily credits are reserved. No additional quote collection or data writes were triggered. The next fresh prediction must retain participation evidence version `recorded-participation-v2`, explicit unknown counts, and the corrected participation-summary wording. Existing frozen rows remain immutable.
