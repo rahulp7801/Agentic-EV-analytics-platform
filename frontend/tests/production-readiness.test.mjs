@@ -163,3 +163,50 @@ test('production verification retries a transient deployment propagation mismatc
   assert.equal(stylesheetRequests, 2);
   assert.deepEqual(waits, [25]);
 });
+
+
+test('capture retries wait for exact identity without repeating security or healthy endpoints', async () => {
+  const expected='2026-09-24T18:05:50.066420+00:00';
+  const counts=new Map();let waited=0;
+  const fetchImpl=async(url,options={})=>{
+    const parsed=new URL(url),path=parsed.pathname+parsed.search;
+    counts.set(path,(counts.get(path)??0)+1);
+    if(path==='/app.css')return {status:200,text:async()=>deploymentCss};
+    if(path==='/api/markets?sport=nfl') {
+      assert.equal(options.cache,'no-store');assert.equal(options.headers['cache-control'],'no-cache');
+    }
+    return {status:securityProbeStatus(path,options)??(['/.env','/signals_cache.json'].includes(path)?404:200),
+      headers:securityHeaders,text:async()=>deploymentHtml,
+      json:async()=>({captured_at:path==='/api/markets?sport=nfl' && waited===0 ? '2026-09-24T17:52:17Z' : expected})};
+  };
+  await verifyProduction({base:'https://example.test',fetchImpl,paidEnabled:false,publicEnabled:true,
+    expectedPublicReport:{markets:{nfl:{captured_at:expected}},schedules:{nba:{captured_at:expected}}},
+    captureAttempts:3,captureDelayMs:5000,captureWait:async delay=>{assert.equal(delay,5000);waited++;}});
+  assert.equal(waited,1);assert.equal(counts.get('/api/markets?sport=nfl'),2);
+  assert.equal(counts.get('/api/games?sport=nba'),1);
+  assert.equal(counts.get('/api/scan'),1);assert.equal(counts.get('/app.css'),1);
+});
+
+for(const observed of ['2026-09-24T17:00:00Z','2026-09-24T19:00:00Z',undefined]) {
+  test(`capture retries fail closed for persistently different identity: ${observed}`,async()=>{
+    let reads=0,waits=0;
+    const fetchImpl=async(url,options={})=>{
+      const parsed=new URL(url),path=parsed.pathname+parsed.search;
+      if(path==='/app.css')return {status:200,text:async()=>deploymentCss};
+      if(path==='/api/markets?sport=nfl')reads++;
+      return {status:securityProbeStatus(path,options)??(['/.env','/signals_cache.json'].includes(path)?404:200),
+        headers:securityHeaders,text:async()=>deploymentHtml,json:async()=>({captured_at:observed})};
+    };
+    await assert.rejects(verifyProduction({base:'https://example.test',fetchImpl,
+      expectedPublicReport:{markets:{nfl:{captured_at:'2026-09-24T18:05:50.066420+00:00'}}},
+      captureAttempts:3,captureDelayMs:0,captureWait:async()=>{waits++;}}),/deployed capture does not match/);
+    assert.equal(reads,3);assert.equal(waits,2);
+  });
+}
+
+test('public capture retry settings are bounded before any requests',async()=>{
+  for(const patch of [{captureAttempts:0},{captureAttempts:38},{captureAttempts:1.5},
+    {captureDelayMs:-1},{captureDelayMs:5001},{captureDelayMs:NaN}]) {
+    await assert.rejects(verifyProduction({...patch,fetchImpl:async()=>{assert.fail('must not request');}}),/retry bounds/);
+  }
+});

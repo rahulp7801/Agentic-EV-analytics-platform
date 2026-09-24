@@ -1,0 +1,108 @@
+{
+  "public_capture_probe": {
+    "observed_at": "2026-09-24T19:19:16.210316+00:00",
+    "checks": [
+      {
+        "path": "/api/markets?sport=nfl",
+        "expected": "2026-09-24T18:05:50.066420+00:00",
+        "observed": [
+          {
+            "status": 200,
+            "bypass": false,
+            "captured_at": "2026-09-24T18:05:50.066420+00:00",
+            "age": "13",
+            "cache": "HIT",
+            "matches": true
+          },
+          {
+            "status": 400,
+            "bypass": true,
+            "captured_at": null,
+            "age": null,
+            "cache": null,
+            "matches": false
+          }
+        ]
+      },
+      {
+        "path": "/api/games?sport=nba",
+        "expected": "2026-09-24T18:05:39.666322+00:00",
+        "observed": [
+          {
+            "status": 200,
+            "bypass": false,
+            "captured_at": "2026-09-24T18:05:39.666322+00:00",
+            "age": "13",
+            "cache": "HIT",
+            "matches": true
+          },
+          {
+            "status": 400,
+            "bypass": true,
+            "captured_at": null,
+            "age": null,
+            "cache": null,
+            "matches": false
+          }
+        ]
+      },
+      {
+        "path": "/api/markets?sport=nba",
+        "expected": "2026-09-24T18:05:52.560971+00:00",
+        "observed": [
+          {
+            "status": 200,
+            "bypass": false,
+            "captured_at": "2026-09-24T18:05:52.560971+00:00",
+            "age": "13",
+            "cache": "HIT",
+            "matches": true
+          },
+          {
+            "status": 400,
+            "bypass": true,
+            "captured_at": null,
+            "age": null,
+            "cache": null,
+            "matches": false
+          }
+        ]
+      },
+      {
+        "path": "/api/games?sport=nfl",
+        "expected": "2026-09-24T18:05:32.288253+00:00",
+        "observed": [
+          {
+            "status": 200,
+            "bypass": false,
+            "captured_at": "2026-09-24T18:05:32.288253+00:00",
+            "age": "13",
+            "cache": "HIT",
+            "matches": true
+          },
+          {
+            "status": 400,
+            "bypass": true,
+            "captured_at": null,
+            "age": null,
+            "cache": null,
+            "matches": false
+          }
+        ]
+      }
+    ]
+  },
+  "strict_snap_refresh": {
+    "observed_at": "2026-09-24T19:15:34.401725+00:00",
+    "refresh_workflow": 36037939015,
+    "release_commit": "9bfadb6aaefe8bb98ec4775e32c8c3ecb7f29a6e",
+    "rows": 2994,
+    "row_commitments_verified": true,
+    "batch_matches_retained_source": true,
+    "source_observed_at": [
+      "2026-09-24T18:05:37.259388+00:00"
+    ],
+    "batch_sha256": "b9878983090c28206edf613eb5e67b20dd18dd652f74b3da128b518f2a17fb5a",
+    "additional_successful_daily_workflow": 36037187315
+  }
+}

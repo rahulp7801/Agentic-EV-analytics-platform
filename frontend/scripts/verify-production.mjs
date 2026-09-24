@@ -105,7 +105,14 @@ export async function verifyProduction({
   paidEnabled = process.env.DATA_PIPELINE_ENABLED === 'true',
   publicEnabled = process.env.PUBLIC_DATA_PIPELINE_ENABLED === 'true',
   expectedPublicReport,
+  captureAttempts = 1,
+  captureDelayMs = 5000,
+  captureWait = delay => new Promise(resolve => setTimeout(resolve, delay)),
 } = {}) {
+  if (!Number.isInteger(captureAttempts) || captureAttempts < 1 || captureAttempts > 37
+      || !Number.isInteger(captureDelayMs) || captureDelayMs < 0 || captureDelayMs > 5000) {
+    throw new Error('Invalid public capture retry bounds');
+  }
   base = base.replace(/\/$/, '');
   async function check(path, expected, options = {}) {
     const response = await fetchImpl(base + path, {
@@ -149,8 +156,10 @@ export async function verifyProduction({
   await check('/.env', [404]);
   await check('/signals_cache.json', [404]);
 
+  let pendingCaptures = [];
+  const captureOptions = {cache: 'no-store', headers: {'cache-control': 'no-cache'}};
   for (const path of [...paidPipelinePaths, ...publicPipelinePaths]) {
-    const response = await check(path, readinessStatuses(path, { paidEnabled, publicEnabled }));
+    const response = await check(path, readinessStatuses(path, { paidEnabled, publicEnabled }), captureOptions);
     if (response.status === 503) {
       console.log(`::warning::${path} unavailable; its data pipeline is disabled`);
     }
@@ -158,9 +167,24 @@ export async function verifyProduction({
     if (capturedAt !== undefined) {
       const body = await response.json();
       if (body?.captured_at !== capturedAt) {
-        throw new Error(`${path}: deployed capture does not match this collection run`);
+        pendingCaptures.push({path, capturedAt});
       }
     }
+  }
+  // CDN and server data caches can each serve one stale response while refreshing.
+  // Retry only unmatched public captures; retain the exact run identity requirement.
+  for (let attempt = 1; pendingCaptures.length && attempt < captureAttempts; attempt++) {
+    console.log(`::warning::${pendingCaptures.length} public capture(s) awaiting cache refresh (${attempt}/${captureAttempts})`);
+    await captureWait(captureDelayMs);
+    const results = await Promise.all(pendingCaptures.map(async capture => {
+      const response = await check(capture.path, [200], captureOptions);
+      const body = await response.json();
+      return body?.captured_at === capture.capturedAt ? null : capture;
+    }));
+    pendingCaptures = results.filter(Boolean);
+  }
+  if (pendingCaptures.length) {
+    throw new Error(`${pendingCaptures[0].path}: deployed capture does not match this collection run`);
   }
 }
 
@@ -195,7 +219,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const attempts = Number.parseInt(process.env.PRODUCTION_VERIFY_ATTEMPTS || '1', 10);
   const delayMs = Number.parseInt(process.env.PRODUCTION_VERIFY_DELAY_MS || '0', 10);
   await verifyProductionWithRetry(
-    { expectedPublicReport },
+    { expectedPublicReport,
+      captureAttempts: Number(process.env.PUBLIC_CAPTURE_VERIFY_ATTEMPTS || '1'),
+      captureDelayMs: Number(process.env.PUBLIC_CAPTURE_VERIFY_DELAY_MS || '5000') },
     { attempts: Number.isInteger(attempts) && attempts > 0 ? attempts : 1,
       delayMs: Number.isInteger(delayMs) && delayMs >= 0 ? delayMs : 0 },
   );

@@ -80,6 +80,10 @@ jobs:
           DATA_PIPELINE_ENABLED: 'false'
           PUBLIC_DATA_PIPELINE_ENABLED: 'true'
           PUBLIC_DATA_REPORT_PATH: ${{ runner.temp }}/public-report.json
+          # Preserve exact capture identity while bounded CDN/server caches refresh.
+          # Retry only mismatched public captures, without repeating collection.
+          PUBLIC_CAPTURE_VERIFY_ATTEMPTS: '37'
+          PUBLIC_CAPTURE_VERIFY_DELAY_MS: '5000'
         run: node frontend/scripts/verify-production.mjs
       - name: Stage public evidence without configured provider credentials
         if: always()
