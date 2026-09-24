@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     experimental_probability_adjustments: bool = False
     # Untraded frozen candidate; reuses existing quotes and never changes live picks.
     history_shadow_enabled: bool = True
+    role_history_shadow_enabled: bool = True
 
     # Vig removal method for devigging market odds (Phase 15 — QUANT-02)
     # "multiplicative": proportional normalization (standard, default)

@@ -56,20 +56,17 @@ def _shadow_input_sha256(shadow) -> str | None:
 def _same_prediction(retained: dict | None, requested: dict) -> bool:
     if retained is None:
         return False
-    retained=dict(retained)
-    retained.pop('history_shadow_recorded_at',None)
-    commitment=retained.pop('history_shadow_input_sha256',None)
+    retained=dict(retained);projected=dict(requested)
     try:
+        for field in ('history_shadow','role_history_shadow'):
+            retained.pop(field+'_recorded_at',None)
+            commitment=retained.pop(field+'_input_sha256',None)
+            shadow=requested.get(field)
+            if isinstance(shadow,dict) and commitment is not None and commitment==_shadow_input_sha256(shadow):
+                projected[field]=_unavailable_shadow(shadow)
         encoded=json.dumps(retained,sort_keys=True,separators=(',',':'),allow_nan=False)
-        shadow=requested.get('history_shadow')
-        if (isinstance(shadow,dict) and commitment is not None
-                and commitment==_shadow_input_sha256(shadow)):
-            projected=requested|{'history_shadow':_unavailable_shadow(shadow)}
-            if encoded==json.dumps(projected,sort_keys=True,separators=(',',':'),allow_nan=False):
-                return True
-        # JSON comparison distinguishes true from 1 (Python dict equality does
-        # not), while ignoring key order. No receipt or evidence is rewritten.
-        return encoded==json.dumps(requested,sort_keys=True,separators=(',',':'),allow_nan=False)
+        return any(encoded==json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False)
+                   for value in (projected,requested))
     except (TypeError,ValueError):
         return False
 
@@ -350,6 +347,8 @@ class Ledger:
         # by a caller to refresh a receipt or authorize different retry evidence.
         payload.pop('history_shadow_recorded_at',None)
         payload.pop('history_shadow_input_sha256',None)
+        payload.pop('role_history_shadow_recorded_at',None)
+        payload.pop('role_history_shadow_input_sha256',None)
         for field in ('captured_at','quote_time','game_start_time','model_generated_at'):
             if payload.get(field) is not None:
                 payload[field] = utc_timestamp(payload[field]).isoformat()
@@ -383,6 +382,17 @@ class Ledger:
                         if commitment is not None:
                             payload['history_shadow_input_sha256']=commitment
                         payload['history_shadow']=_unavailable_shadow(payload['history_shadow'])
+                if isinstance(payload.get('role_history_shadow'),dict):
+                    from sportsbet.quant.nfl_role_shadow import verified_shadow_probability as verified_role
+                    receipt=datetime.now(timezone.utc)
+                    payload['role_history_shadow_recorded_at']=receipt.isoformat()
+                    if payload['role_history_shadow'].get('status')=='predicted' and (
+                            verified_role(payload) is None
+                            or not utc_timestamp(payload['captured_at'])<=receipt<utc_timestamp(payload['game_start_time'])
+                            or (receipt-utc_timestamp(payload['quote_time'])).total_seconds()>300):
+                        commitment=_shadow_input_sha256(payload['role_history_shadow'])
+                        if commitment is not None:payload['role_history_shadow_input_sha256']=commitment
+                        payload['role_history_shadow']=_unavailable_shadow(payload['role_history_shadow'])
                 if type(payload.get('american_odds')) is int and abs(payload['american_odds']) >= 100 and not payload.get('synthetic_price') and str(payload.get('sportsbook','')).lower() != 'prizepicks':
                     from sportsbet.arbitrage.ev import quote_terms
                     captured = payload.get('quote_time') or payload.get('captured_at')
