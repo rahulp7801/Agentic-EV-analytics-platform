@@ -396,3 +396,43 @@ def test_invalid_forecasts_cannot_starve_settlement_catchup(invalid_terms):
     class InvalidOnly:
         def predictions(self): return invalid
     assert pending_schedule_offsets(InvalidOnly(),'nfl',now)==()
+
+
+@pytest.mark.parametrize('failure',['missing','tampered_stat','unfinished_schedule'])
+def test_verified_results_are_retained_when_source_recheck_fails(tmp_path,failure):
+    ledger=Ledger(tmp_path/'retained.sqlite');key,payload=prediction(ledger)
+    with ledger.connect() as db:
+        create_nba_stats(db);add_nba_stat(db,payload,21)
+    settle_final_props(ledger,'nba',schedule(payload))
+    before=ledger.predictions()
+    with ledger.connect() as db:
+        if failure=='missing':db.execute('DELETE FROM nba_player_gamelogs')
+        elif failure=='tampered_stat':db.execute('UPDATE nba_player_gamelogs SET points=0')
+    result=settle_final_props(ledger,'nba',schedule(payload,completed=failure!='unfinished_schedule'))
+    assert result['candidates']==1 and result['settled']==0
+    assert result['pending']==0 and result['retained_verified']==1 and result['reasons']=={}
+    reason={'missing':'stat_not_found_or_ambiguous','tampered_stat':'stat_provenance_invalid',
+            'unfinished_schedule':'final_game_not_matched'}[failure]
+    assert result['retained_recheck_reasons']=={reason:1}
+    assert ledger.predictions()==before
+    # A later authenticated correction remains able to replace the original result.
+    with ledger.connect() as db:
+        db.execute('DELETE FROM nba_player_gamelogs');add_nba_stat(db,payload,19)
+    corrected=settle_final_props(ledger,'nba',schedule(payload))
+    assert corrected['settled']==1 and corrected['retained_verified']==0
+    assert ledger.predictions()[0]['outcome'] is False
+
+
+def test_invalid_stored_result_remains_pending_on_missing_source(tmp_path):
+    ledger=Ledger(tmp_path/'invalid-retained.sqlite');key,payload=prediction(ledger)
+    with ledger.connect() as db:
+        create_nba_stats(db);add_nba_stat(db,payload,21)
+    settle_final_props(ledger,'nba',schedule(payload))
+    with ledger.connect() as db:
+        db.execute('DELETE FROM nba_player_gamelogs')
+        db.execute('UPDATE predictions SET actual_value=99 WHERE id=?',(key,))
+    before=ledger.predictions()
+    result=settle_final_props(ledger,'nba',schedule(payload))
+    assert result['pending']==1 and result['retained_verified']==0
+    assert result['reasons']=={'stat_not_found_or_ambiguous':1}
+    assert result['retained_recheck_reasons']=={} and ledger.predictions()==before

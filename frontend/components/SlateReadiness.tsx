@@ -45,7 +45,9 @@ export default function SlateReadiness({sport,onOpenPlayers}:{sport:Sport;onOpen
     {onOpenPlayers && data && data.games.length>0 && <button type="button" className={styles.reviewForecasts} onClick={onOpenPlayers}>Browse {sport.toUpperCase()} player forecasts</button>}</div>
     <details className={styles.settlementDetails}><summary>How results get verified</summary><p>After final whistle, exact game and player identities must match a source-backed final stat. Missing or ambiguous evidence stays pending. All eligible forecasts and accepted recommendations are evaluated separately in Backtest lab; demo replays never enter those totals.</p>
       {data?.settlements ? <><p>Last check: {new Date(data.settlements.checked_at).toLocaleString()} · {data.settlements.stale ? 'Stale' : data.settlements.status}. {data.settlements.blocked}</p>
-      {data.settlements.candidates!==null && <p>{data.settlements.candidates} records checked · {data.settlements.settled} verified in this pass · {data.settlements.pending} pending · {data.settlements.outside_schedule ?? 'Unknown count'} outside the checked schedule.</p>}
+      {data.settlements.candidates!==null && <p>{data.settlements.candidates} records checked · {data.settlements.settled} verified in this pass · {data.settlements.retained_verified ?? 0} previously verified ? {data.settlements.pending} pending · {data.settlements.outside_schedule ?? 'Unknown count'} outside the checked schedule.</p>}
+      {(data.settlements.retained_verified ?? 0)>0 && <p>Previously verified results retain their source evidence. Their latest source recheck was incomplete.</p>}
+      <ul>{(data.settlements.retained_recheck_reasons ?? []).map(reason=><li key={reason.label}>Previously verified ? {reason.label.toLowerCase()}: {reason.count}</li>)}</ul>
       <ul>{data.settlements.reasons.map(reason=><li key={reason.label}>{reason.label}: {reason.count}</li>)}</ul></> : <p>No settlement check is available here yet. This is not a zero-loss or zero-pending result.</p>}
     </details>
   </section>;

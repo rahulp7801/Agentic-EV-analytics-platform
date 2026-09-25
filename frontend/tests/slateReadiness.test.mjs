@@ -156,3 +156,20 @@ test('reserve windows require fresh exact-game evidence and remain distinct from
   assert.equal(slateReadiness([game],recorded,Date.parse(game.game_time))[0].next_reserve_release_at,null);
   assert.equal(slateReadiness([game],null,current)[0].next_reserve_release_at,null);
 });
+
+
+test('retained verified outcomes are separate from pending and new settlements',()=>{
+  const current={status:'complete',candidates:10,settled:2,retained_verified:3,pending:5,
+    retained_recheck_reasons:{stat_not_found_or_ambiguous:3,private:'secret'},reasons:{final_game_not_matched:5}};
+  const project=value=>settlementProgress([{finished_at:new Date(now).toISOString(),settlements:{nfl:value}}],'nfl',now);
+  const result=project(current);
+  assert.equal(result.retained_verified,3);assert.equal(result.pending,5);
+  assert.equal(result.retained_recheck_reasons.length,1);
+  assert.equal(JSON.stringify(result).includes('secret'),false);
+  for(const retained_verified of [undefined,null,-1,4,'3']) assert.equal(project({...current,retained_verified}),null);
+  for(const retained_recheck_reasons of [undefined,{}, {stat_not_found_or_ambiguous:4}]) {
+    assert.equal(project({...current,retained_recheck_reasons}),null);
+  }
+  const legacy=project({...current,retained_verified:undefined,pending:8,retained_recheck_reasons:undefined});
+  assert.equal(legacy.retained_verified,0);assert.deepEqual(legacy.retained_recheck_reasons,[]);
+});

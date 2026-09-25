@@ -225,13 +225,21 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
             continue
         recheckable.append((row,row_day))
     candidates=[row for row,row_day in recheckable if row_day in game_dates]
-    reasons=Counter();resolved=[];stat_cache={}
+    reasons=Counter();retained_reasons=Counter();resolved=[];stat_cache={}
+    def unresolved(prediction, reason):
+        # A missing refreshed source cannot erase an independently valid stored
+        # result. Report its failed recheck separately; do not rewrite it.
+        retained = prediction.get('outcome_source')==AUTO_SOURCE and verified_settlement_evidence(
+            prediction,prediction.get('outcome'),prediction.get('outcome_source'),
+            prediction.get('outcome_ref'),prediction.get('outcome_observed_at'),
+            prediction.get('actual_value'),prediction.get('outcome_evidence'))
+        (retained_reasons if retained else reasons)[reason]+=1
     with ledger.connect() as db:
         for prediction in candidates:
             try:
                 matched=_candidate(prediction,sport,schedule['games'])
                 if matched is None:
-                    reasons['final_game_not_matched']+=1
+                    unresolved(prediction,'final_game_not_matched')
                     continue
                 game,day,line=matched
                 stat_key=(day,game['provider_event_id'],game['home_abbr'],game['away_abbr'],
@@ -240,7 +248,7 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
                     stat_cache[stat_key]=_actual(db,prediction,sport,day,game)
                 observed=stat_cache[stat_key]
                 if observed is None:
-                    reasons['stat_not_found_or_ambiguous']+=1
+                    unresolved(prediction,'stat_not_found_or_ambiguous')
                     continue
                 actual,provenance=observed
                 game_time=utc_timestamp(game['game_time'])
@@ -249,9 +257,9 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
                 outcome='push' if actual==line else ((actual>line)==(prediction['direction']=='over'))
                 resolved.append((prediction,game,outcome,actual,provenance))
             except StatProvenanceError:
-                reasons['stat_provenance_invalid']+=1
+                unresolved(prediction,'stat_provenance_invalid')
             except (KeyError,TypeError,ValueError,ArithmeticError):
-                reasons['invalid_prediction_or_evidence']+=1
+                unresolved(prediction,'invalid_prediction_or_evidence')
     schedule_observed=utc_timestamp(schedule['captured_at'])
     batches={}
     for prediction,game,outcome,actual,provenance in resolved:
@@ -279,7 +287,8 @@ def settle_final_props(ledger: Ledger, sport: str, schedule: dict) -> dict:
             evidence=batch['evidence'])
     recheckable_dates=sorted({row_day for _,row_day in recheckable})
     return dict(sport=sport,status='complete' if schedule.get('status')=='complete' else 'degraded',
-        candidates=len(candidates),settled=len(resolved),pending=len(candidates)-len(resolved),
+        candidates=len(candidates),settled=len(resolved),retained_verified=sum(retained_reasons.values()),
+        pending=sum(reasons.values()),retained_recheck_reasons=dict(sorted(retained_reasons.items())),
         recheckable_total=len(recheckable),outside_schedule=len(recheckable)-len(candidates),
         invalid_game_dates=invalid_dates,schedule_dates=len(game_dates),
         oldest_recheckable_date=recheckable_dates[0] if recheckable_dates else None,
