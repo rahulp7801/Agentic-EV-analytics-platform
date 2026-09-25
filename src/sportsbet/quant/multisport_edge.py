@@ -25,6 +25,26 @@ PROTOCOL = {
 }
 
 
+class ProspectiveLedger(ReadOnlyLedger):
+    """Read only this protocol's universe; original ledger validation still applies."""
+
+    def _prediction_records(self, *, ordered: bool = False):
+        # CASE prevents unrelated sports/models with malformed legacy timestamps
+        # from reaching the cast. Invalid in-scope timestamps fail the query closed.
+        # PostgreSQL compares actual instants, including offset timestamps.
+        query = """SELECT id,payload,outcome,outcome_source,outcome_ref,
+            outcome_observed_at,actual_value,outcome_evidence FROM predictions
+            WHERE CASE WHEN payload::jsonb->>'sport'=ANY(?)
+                AND payload::jsonb->>'model_version'=?
+                THEN (payload::jsonb->>'captured_at')::timestamptz>=?::timestamptz
+                ELSE false END"""
+        if ordered:
+            query += " ORDER BY id"
+        with self.connect() as db:
+            return db.execute(query, (PROTOCOL["sports"], PROTOCOL["model_version"],
+                PROTOCOL["captured_after"])).fetchall()
+
+
 def source_digests() -> dict:
     paths = {"runner": Path(__file__)}
     for module in (ledger_module, backtest, priced_market_audit, edge_evidence, market_baseline, shadow_prior):
@@ -80,7 +100,7 @@ def main() -> None:
     from dotenv import load_dotenv
     load_dotenv()
     try:
-        ledger = ReadOnlyLedger(database_url=audit_database_url(args.database_env))
+        ledger = ProspectiveLedger(database_url=audit_database_url(args.database_env))
         sports = PROTOCOL["sports"] if args.sport == "all" else [args.sport]
         with ledger.snapshot():
             now = datetime.now(timezone.utc)

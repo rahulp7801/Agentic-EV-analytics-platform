@@ -80,3 +80,52 @@ def test_provider_cache_coalesces_refresh_and_verifies_payload():
         with engine.begin() as conn:
             conn.execute(sa.text('DELETE FROM provider_response_cache WHERE cache_key=:key'),{'key':key})
         engine.dispose()
+
+
+def test_prospective_database_scope_matches_frozen_in_memory_cohort():
+    import json
+    import psycopg
+    from tests.test_multisport_edge import forecast, NOW
+    from sportsbet.quant.multisport_edge import ProspectiveLedger, audit_sport
+
+    url=os.environ['SPORTSBET_TEST_DATABASE_URL'];group=uuid.uuid4().hex
+    writer=Ledger(database_url=url)
+    records={
+        'before':forecast('nba','2026-09-25T03:59:59+00:00'),
+        'boundary':forecast('nba','2026-09-24T21:00:00-07:00'),
+        'after':forecast('nba','2026-09-25T04:01:00+00:00'),
+        'cfb':forecast('cfb'),
+        'old-model':forecast('nba',model_version='old'),
+        'nfl-malformed':dict(sport='nfl',model_version='empirical-jeffreys-v4',captured_at='not a timestamp'),
+    }
+    class GroupLedger(Ledger):
+        def _prediction_records(self,**kwargs):
+            return [r for r in super()._prediction_records(**kwargs) if r[0].startswith(group)]
+    class GroupProspectiveLedger(ProspectiveLedger):
+        def _prediction_records(self,**kwargs):
+            return [r for r in super()._prediction_records(**kwargs) if r[0].startswith(group)]
+    try:
+        with writer.connect() as db:
+            for key,payload in records.items():
+                db.execute('INSERT INTO predictions(id,scan_id,payload,outcome) VALUES (?,?,?,?)',
+                    (group+key,group,json.dumps(payload),None))
+        full=GroupLedger(database_url=url);scoped=GroupProspectiveLedger(database_url=url)
+        with scoped.snapshot():
+            assert {r['prediction_id'] for r in scoped.predictions()}=={
+                group+'boundary',group+'after',group+'cfb'}
+            for sport in ('nba','cfb'):
+                expected=audit_sport(full,sport,now=NOW)
+                actual=audit_sport(scoped,sport,now=NOW)
+                assert actual==expected
+        with scoped.connect() as db:
+            with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+                db.execute('DELETE FROM predictions WHERE 1=0')
+        bad=forecast('nba');bad['captured_at']='not a timestamp'
+        with writer.connect() as db:
+            db.execute('INSERT INTO predictions(id,scan_id,payload,outcome) VALUES (?,?,?,?)',
+                (group+'bad',group,json.dumps(bad),None))
+        with pytest.raises(psycopg.errors.InvalidDatetimeFormat):
+            scoped.predictions()
+    finally:
+        with writer.connect() as db:
+            db.execute('DELETE FROM predictions WHERE scan_id=?',(group,))
