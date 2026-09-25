@@ -19,3 +19,7 @@ The report includes original per-sport all-forecast and recommendation aggregate
 Implement an opt-in, read-only CLI against one repeatable-read hosted database snapshot. Outputs are local aggregate JSON only, containing no forecast IDs or raw player records. Do not enable new scheduled publication or attach result artifacts without the pending publication approval. The existing NFL workflow, frozen shadow evaluators and source checks remain unchanged. No fetching of prices, paid API requests, purchases, bets, reserve changes or quota changes are needed.
 
 The first cohort checkpoint is the first ordinarily scheduled eligible scan after the cutoff; do not trigger a quote collection to populate it. Audit source coverage and pending outcomes after the next normal history/settlement update. NBA may remain empty until in-season offers and sufficient pregame source evidence exist. Zero valid observations means insufficient evidence, not a performance result.
+
+## Reproduction
+
+Run `python -m sportsbet.quant.multisport_edge --sport all --output <local-report.json>` with the existing hosted audit database environment configured. `--sport nba` or `--sport cfb` runs only that sport. The CLI accepts no cutoff, model, threshold or bootstrap override. A changed policy or future-dated eligible capture fails before a report is written. Evaluator digests cover this runner, the ledger, backtest, priced audit, market baseline, prior-shadow helper and evidence gate; retain these identities with every report so later implementation changes remain visible.
