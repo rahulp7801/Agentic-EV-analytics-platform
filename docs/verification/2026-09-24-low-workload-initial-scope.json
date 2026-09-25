@@ -1,0 +1,973 @@
+{
+  "scope": "Exploratory first pass included players with no positive prior category workload. Superseded, not a candidate selection result.",
+  "input_sha256": "807d2ae1b7607d864188940400985717a3fcc00eb543fd7fe9d6d8e5f423f642",
+  "props": {
+    "pass_yds": {
+      "counts": {
+        "fit": {
+          "examples": 6212,
+          "games": 224
+        },
+        "select": {
+          "examples": 4569,
+          "games": 122
+        },
+        "evaluate": {
+          "examples": 6448,
+          "games": 150
+        }
+      },
+      "selected": "rolling40_jeffreys",
+      "evaluation_baseline": {
+        "examples": 6448,
+        "player_games": 6444,
+        "games": 150,
+        "players": 965,
+        "game_balanced_brier": 0.000991645950483239,
+        "game_balanced_log_loss": 0.01892391951050034,
+        "row_weighted_brier": 0.0011212717056591126,
+        "row_weighted_log_loss": 0.019344537811338876,
+        "row_weighted_calibration_error": 0.016210050464014192,
+        "calibration_bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 6434,
+            "predicted": 0.016120050273153587,
+            "observed": 0.00046627292508548337,
+            "observed_interval": [
+              0.00015858725716967734,
+              0.001370101960116037
+            ]
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 6,
+            "predicted": 0.2851740957439487,
+            "observed": 0.16666666666666666,
+            "observed_interval": [
+              0.030053369748306635,
+              0.5635028221864703
+            ]
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 5,
+            "predicted": 0.3189914720059325,
+            "observed": 0.0,
+            "observed_interval": [
+              0.0,
+              0.43448246478317487
+            ]
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 1,
+            "predicted": 0.5869565217391305,
+            "observed": 0.0,
+            "observed_interval": [
+              0.0,
+              0.7934506856227627
+            ]
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 1,
+            "predicted": 0.7608695652173914,
+            "observed": 0.0,
+            "observed_interval": [
+              0.0,
+              0.7934506856227627
+            ]
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 1,
+            "predicted": 0.8478260869565217,
+            "observed": 1.0,
+            "observed_interval": [
+              0.2065493143772374,
+              1.0
+            ]
+          }
+        ]
+      },
+      "evaluation_candidate": {
+        "examples": 6448,
+        "player_games": 6444,
+        "games": 150,
+        "players": 965,
+        "game_balanced_brier": 0.000991645950483239,
+        "game_balanced_log_loss": 0.01892391951050034,
+        "row_weighted_brier": 0.0011212717056591126,
+        "row_weighted_log_loss": 0.019344537811338876,
+        "row_weighted_calibration_error": 0.016210050464014192,
+        "calibration_bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 6434,
+            "predicted": 0.016120050273153587,
+            "observed": 0.00046627292508548337,
+            "observed_interval": [
+              0.00015858725716967734,
+              0.001370101960116037
+            ]
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 6,
+            "predicted": 0.2851740957439487,
+            "observed": 0.16666666666666666,
+            "observed_interval": [
+              0.030053369748306635,
+              0.5635028221864703
+            ]
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 5,
+            "predicted": 0.3189914720059325,
+            "observed": 0.0,
+            "observed_interval": [
+              0.0,
+              0.43448246478317487
+            ]
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 1,
+            "predicted": 0.5869565217391305,
+            "observed": 0.0,
+            "observed_interval": [
+              0.0,
+              0.7934506856227627
+            ]
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 1,
+            "predicted": 0.7608695652173914,
+            "observed": 0.0,
+            "observed_interval": [
+              0.0,
+              0.7934506856227627
+            ]
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 1,
+            "predicted": 0.8478260869565217,
+            "observed": 1.0,
+            "observed_interval": [
+              0.2065493143772374,
+              1.0
+            ]
+          }
+        ]
+      },
+      "paired_comparison": {
+        "brier_difference": 0.0,
+        "brier_game_95": [
+          0.0,
+          0.0
+        ],
+        "brier_player_95": [
+          0.0,
+          0.0
+        ],
+        "log_loss_difference": 0.0,
+        "log_loss_game_95": [
+          0.0,
+          0.0
+        ],
+        "log_loss_player_95": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "rush_yds": {
+      "counts": {
+        "fit": {
+          "examples": 6400,
+          "games": 224
+        },
+        "select": {
+          "examples": 4696,
+          "games": 122
+        },
+        "evaluate": {
+          "examples": 6654,
+          "games": 150
+        }
+      },
+      "selected": "logistic_l2_0.1",
+      "evaluation_baseline": {
+        "examples": 6654,
+        "player_games": 6101,
+        "games": 150,
+        "players": 932,
+        "game_balanced_brier": 0.023808063275633694,
+        "game_balanced_log_loss": 0.08897083944973971,
+        "row_weighted_brier": 0.040705241505992466,
+        "row_weighted_log_loss": 0.1360184043457439,
+        "row_weighted_calibration_error": 0.023921759916353657,
+        "calibration_bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 5439,
+            "predicted": 0.01883752294704098,
+            "observed": 0.005148005148005148,
+            "observed_interval": [
+              0.003564222377033158,
+              0.007430303051172138
+            ]
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 333,
+            "predicted": 0.15074419203665296,
+            "observed": 0.16216216216216217,
+            "observed_interval": [
+              0.12646370828997455,
+              0.20556625979132698
+            ]
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 214,
+            "predicted": 0.2438686846372604,
+            "observed": 0.17757009345794392,
+            "observed_interval": [
+              0.13219114525851422,
+              0.23432062551700122
+            ]
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 218,
+            "predicted": 0.34455627272526446,
+            "observed": 0.3256880733944954,
+            "observed_interval": [
+              0.26696492588437765,
+              0.3904480734530101
+            ]
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 172,
+            "predicted": 0.44161319483446837,
+            "observed": 0.3372093023255814,
+            "observed_interval": [
+              0.27079962947795994,
+              0.4107316750529964
+            ]
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 121,
+            "predicted": 0.5412688050947095,
+            "observed": 0.4380165289256198,
+            "observed_interval": [
+              0.3528715624981726,
+              0.526976044685399
+            ]
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 83,
+            "predicted": 0.6487847521266059,
+            "observed": 0.4939759036144578,
+            "observed_interval": [
+              0.38908871700058717,
+              0.5993960457661838
+            ]
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 53,
+            "predicted": 0.7495149858150426,
+            "observed": 0.5283018867924528,
+            "observed_interval": [
+              0.39660081278706294,
+              0.6561775652180385
+            ]
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 21,
+            "predicted": 0.8376347406424481,
+            "observed": 0.47619047619047616,
+            "observed_interval": [
+              0.2834400610153417,
+              0.6763046541715557
+            ]
+          }
+        ]
+      },
+      "evaluation_candidate": {
+        "examples": 6654,
+        "player_games": 6101,
+        "games": 150,
+        "players": 932,
+        "game_balanced_brier": 0.02270350994810042,
+        "game_balanced_log_loss": 0.0798962910087779,
+        "row_weighted_brier": 0.038446290259081604,
+        "row_weighted_log_loss": 0.12491888861030044,
+        "row_weighted_calibration_error": 0.01065604181904922,
+        "calibration_bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 5638,
+            "predicted": 0.010361546742225025,
+            "observed": 0.00833628946434906,
+            "observed_interval": [
+              0.006275054901405473,
+              0.01106705928858557
+            ]
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 331,
+            "predicted": 0.1464089891605056,
+            "observed": 0.2084592145015106,
+            "observed_interval": [
+              0.16816687992959098,
+              0.25544093530409406
+            ]
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 268,
+            "predicted": 0.24458808001408924,
+            "observed": 0.30970149253731344,
+            "observed_interval": [
+              0.2573606459545351,
+              0.36742064957522824
+            ]
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 181,
+            "predicted": 0.34248624743384937,
+            "observed": 0.30386740331491713,
+            "observed_interval": [
+              0.24151484708976273,
+              0.3743721922520243
+            ]
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 117,
+            "predicted": 0.44263177854771724,
+            "observed": 0.5213675213675214,
+            "observed_interval": [
+              0.4316194211712356,
+              0.6097571067918954
+            ]
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 66,
+            "predicted": 0.5451620240683794,
+            "observed": 0.5151515151515151,
+            "observed_interval": [
+              0.3971059128571723,
+              0.6315303732939324
+            ]
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 39,
+            "predicted": 0.641368664097676,
+            "observed": 0.5897435897435898,
+            "observed_interval": [
+              0.4341862288289696,
+              0.7292068999927482
+            ]
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 14,
+            "predicted": 0.7358370288161337,
+            "observed": 0.6428571428571429,
+            "observed_interval": [
+              0.38764423103907397,
+              0.8365526824644587
+            ]
+          }
+        ]
+      },
+      "paired_comparison": {
+        "brier_difference": -0.0011045533275332758,
+        "brier_game_95": [
+          -0.001879519578203841,
+          -0.00032958707686271053
+        ],
+        "brier_player_95": [
+          -0.002002797201735451,
+          -0.00020630945333110042
+        ],
+        "log_loss_difference": -0.00907454844096183,
+        "log_loss_game_95": [
+          -0.011602112602968794,
+          -0.006546984278954865
+        ],
+        "log_loss_player_95": [
+          -0.011704375343477815,
+          -0.006444721538445843
+        ]
+      }
+    },
+    "rec_yds": {
+      "counts": {
+        "fit": {
+          "examples": 5521,
+          "games": 224
+        },
+        "select": {
+          "examples": 4194,
+          "games": 122
+        },
+        "evaluate": {
+          "examples": 6140,
+          "games": 150
+        }
+      },
+      "selected": "logistic_l2_0.1",
+      "evaluation_baseline": {
+        "examples": 6140,
+        "player_games": 5299,
+        "games": 150,
+        "players": 851,
+        "game_balanced_brier": 0.02797722172044254,
+        "game_balanced_log_loss": 0.09379983652956492,
+        "row_weighted_brier": 0.05532230740998687,
+        "row_weighted_log_loss": 0.16964321806391933,
+        "row_weighted_calibration_error": 0.024064270733283284,
+        "calibration_bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 4671,
+            "predicted": 0.01601413439145516,
+            "observed": 0.001070434596446157,
+            "observed_interval": [
+              0.0004573096269614239,
+              0.0025035306373811152
+            ]
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 106,
+            "predicted": 0.1597650008148745,
+            "observed": 0.24528301886792453,
+            "observed_interval": [
+              0.1732375678573448,
+              0.33514478084989585
+            ]
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 213,
+            "predicted": 0.2458224814705114,
+            "observed": 0.26291079812206575,
+            "observed_interval": [
+              0.20836822250514192,
+              0.3258536899036068
+            ]
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 248,
+            "predicted": 0.35073802058922954,
+            "observed": 0.32661290322580644,
+            "observed_interval": [
+              0.27127664399213375,
+              0.38723867591303635
+            ]
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 305,
+            "predicted": 0.4423993750332881,
+            "observed": 0.4131147540983607,
+            "observed_interval": [
+              0.35926966633581203,
+              0.4691212491766985
+            ]
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 247,
+            "predicted": 0.5406153796275889,
+            "observed": 0.44534412955465585,
+            "observed_interval": [
+              0.38467077844981695,
+              0.5076915123495677
+            ]
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 178,
+            "predicted": 0.6482134181870215,
+            "observed": 0.5280898876404494,
+            "observed_interval": [
+              0.45493606967927686,
+              0.6000568899287988
+            ]
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 131,
+            "predicted": 0.7493755500008955,
+            "observed": 0.732824427480916,
+            "observed_interval": [
+              0.651212375133185,
+              0.8011707460040237
+            ]
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 41,
+            "predicted": 0.8353867427503547,
+            "observed": 0.7560975609756098,
+            "observed_interval": [
+              0.6065666377742431,
+              0.8617499726190967
+            ]
+          }
+        ]
+      },
+      "evaluation_candidate": {
+        "examples": 6140,
+        "player_games": 5299,
+        "games": 150,
+        "players": 851,
+        "game_balanced_brier": 0.028428897258627,
+        "game_balanced_log_loss": 0.08688792975185229,
+        "row_weighted_brier": 0.056138805364075776,
+        "row_weighted_log_loss": 0.1653529629789718,
+        "row_weighted_calibration_error": 0.01934988441132758,
+        "calibration_bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 4781,
+            "predicted": 0.005704467719442744,
+            "observed": 0.005438192846684794,
+            "observed_interval": [
+              0.003713948912512289,
+              0.007956544101995491
+            ]
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 279,
+            "predicted": 0.14726596149811222,
+            "observed": 0.27956989247311825,
+            "observed_interval": [
+              0.23017616078434422,
+              0.3349512412844762
+            ]
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 338,
+            "predicted": 0.2512909756197637,
+            "observed": 0.35798816568047337,
+            "observed_interval": [
+              0.3087381705093285,
+              0.4104298896458476
+            ]
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 253,
+            "predicted": 0.3469673483952992,
+            "observed": 0.45849802371541504,
+            "observed_interval": [
+              0.3981781371732549,
+              0.5200593619578316
+            ]
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 198,
+            "predicted": 0.4455998863094098,
+            "observed": 0.4444444444444444,
+            "observed_interval": [
+              0.3769423753880107,
+              0.5140611868705057
+            ]
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 130,
+            "predicted": 0.5501978731200079,
+            "observed": 0.6,
+            "observed_interval": [
+              0.5140839982119532,
+              0.6801756895491604
+            ]
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 93,
+            "predicted": 0.648716443498877,
+            "observed": 0.7204301075268817,
+            "observed_interval": [
+              0.6218757830417118,
+              0.8014966082799965
+            ]
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 60,
+            "predicted": 0.7432085514577857,
+            "observed": 0.7666666666666667,
+            "observed_interval": [
+              0.6456372962239805,
+              0.8556043826335717
+            ]
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 8,
+            "predicted": 0.8202013286950378,
+            "observed": 0.625,
+            "observed_interval": [
+              0.3057423946026273,
+              0.8631557141764027
+            ]
+          }
+        ]
+      },
+      "paired_comparison": {
+        "brier_difference": 0.0004516755381844656,
+        "brier_game_95": [
+          -0.0005806178815717939,
+          0.0014839689579407252
+        ],
+        "brier_player_95": [
+          -0.000652243263004243,
+          0.0015555943393731743
+        ],
+        "log_loss_difference": -0.00691190677771263,
+        "log_loss_game_95": [
+          -0.009750660524548435,
+          -0.004073153030876825
+        ],
+        "log_loss_player_95": [
+          -0.010165100092022235,
+          -0.003658713463403025
+        ]
+      }
+    },
+    "receptions": {
+      "counts": {
+        "fit": {
+          "examples": 5244,
+          "games": 224
+        },
+        "select": {
+          "examples": 3985,
+          "games": 122
+        },
+        "evaluate": {
+          "examples": 5785,
+          "games": 150
+        }
+      },
+      "selected": "logistic_l2_0.1",
+      "evaluation_baseline": {
+        "examples": 5785,
+        "player_games": 5299,
+        "games": 150,
+        "players": 851,
+        "game_balanced_brier": 0.0271100894864914,
+        "game_balanced_log_loss": 0.09271286017254766,
+        "row_weighted_brier": 0.04206568449024714,
+        "row_weighted_log_loss": 0.13564491498173203,
+        "row_weighted_calibration_error": 0.021513298829826312,
+        "calibration_bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 4693,
+            "predicted": 0.0162701409711329,
+            "observed": 0.002983166418069465,
+            "observed_interval": [
+              0.001777885457553408,
+              0.005001448931282667
+            ]
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 172,
+            "predicted": 0.15187300191928926,
+            "observed": 0.1686046511627907,
+            "observed_interval": [
+              0.12003447343000727,
+              0.23165425365086828
+            ]
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 214,
+            "predicted": 0.24507043663700337,
+            "observed": 0.2336448598130841,
+            "observed_interval": [
+              0.18195430927229458,
+              0.2947293274553051
+            ]
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 149,
+            "predicted": 0.3491574872559949,
+            "observed": 0.28187919463087246,
+            "observed_interval": [
+              0.21582336716845058,
+              0.3588993520365871
+            ]
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 181,
+            "predicted": 0.44242950542874626,
+            "observed": 0.3701657458563536,
+            "observed_interval": [
+              0.3032036628573991,
+              0.4425243772702627
+            ]
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 173,
+            "predicted": 0.539496327040765,
+            "observed": 0.4508670520231214,
+            "observed_interval": [
+              0.3785902732326384,
+              0.5252784229805221
+            ]
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 74,
+            "predicted": 0.6506928569949206,
+            "observed": 0.5945945945945946,
+            "observed_interval": [
+              0.4807583890640794,
+              0.6990943553744422
+            ]
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 92,
+            "predicted": 0.7519410712930327,
+            "observed": 0.6630434782608695,
+            "observed_interval": [
+              0.5616529840684809,
+              0.7513639542079468
+            ]
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 37,
+            "predicted": 0.8380763352550207,
+            "observed": 0.6756756756756757,
+            "observed_interval": [
+              0.514636672419722,
+              0.8036673347185581
+            ]
+          }
+        ]
+      },
+      "evaluation_candidate": {
+        "examples": 5785,
+        "player_games": 5299,
+        "games": 150,
+        "players": 851,
+        "game_balanced_brier": 0.027061105560663924,
+        "game_balanced_log_loss": 0.0852366379855683,
+        "row_weighted_brier": 0.041618156806026006,
+        "row_weighted_log_loss": 0.12825515309392493,
+        "row_weighted_calibration_error": 0.013105217591542987,
+        "calibration_bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 4838,
+            "predicted": 0.006562671187245865,
+            "observed": 0.005994212484497726,
+            "observed_interval": [
+              0.004176887322192792,
+              0.008595414155798307
+            ]
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 294,
+            "predicted": 0.14468101998538832,
+            "observed": 0.24829931972789115,
+            "observed_interval": [
+              0.20237407348442377,
+              0.30071726717040886
+            ]
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 195,
+            "predicted": 0.2533402047611266,
+            "observed": 0.3230769230769231,
+            "observed_interval": [
+              0.2614045485817075,
+              0.39158532380591693
+            ]
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 168,
+            "predicted": 0.3479441884111318,
+            "observed": 0.44642857142857145,
+            "observed_interval": [
+              0.3732894383665086,
+              0.5219628475281204
+            ]
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 103,
+            "predicted": 0.43825295926332863,
+            "observed": 0.4854368932038835,
+            "observed_interval": [
+              0.39119058323797795,
+              0.5807304291376137
+            ]
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 68,
+            "predicted": 0.5480405372405046,
+            "observed": 0.6029411764705882,
+            "observed_interval": [
+              0.4841605501663212,
+              0.7107129981971937
+            ]
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 63,
+            "predicted": 0.6468088070151927,
+            "observed": 0.6349206349206349,
+            "observed_interval": [
+              0.5114870970152784,
+              0.7428460713496347
+            ]
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 53,
+            "predicted": 0.7478887759600027,
+            "observed": 0.7169811320754716,
+            "observed_interval": [
+              0.5842971358358298,
+              0.8203370955366143
+            ]
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 3,
+            "predicted": 0.8251384630048476,
+            "observed": 0.3333333333333333,
+            "observed_interval": [
+              0.06149194472039626,
+              0.7923403991979523
+            ]
+          }
+        ]
+      },
+      "paired_comparison": {
+        "brier_difference": -4.898392582747132e-05,
+        "brier_game_95": [
+          -0.0010535994108046866,
+          0.000955631559149744
+        ],
+        "brier_player_95": [
+          -0.0010590854878979,
+          0.0009611176362429573
+        ],
+        "log_loss_difference": -0.007476222186979373,
+        "log_loss_game_95": [
+          -0.010296377254424909,
+          -0.0046560671195338375
+        ],
+        "log_loss_player_95": [
+          -0.010568989180977695,
+          -0.004383455192981051
+        ]
+      }
+    }
+  }
+}
