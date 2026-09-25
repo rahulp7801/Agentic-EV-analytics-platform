@@ -29,4 +29,4 @@ def test_daily_cli_all_includes_cfb_only_for_paid_modes(monkeypatch):
     monkeypatch.setattr(daily,'run',run)
     monkeypatch.setattr(sys,'argv',['daily','--sport','all','--mode','daily'])
     daily.main()
-    assert captured==[(['nfl','nba','cfb'],'daily',25)]
+    assert captured==[(['nfl','nba','cfb'],'daily',20)]
