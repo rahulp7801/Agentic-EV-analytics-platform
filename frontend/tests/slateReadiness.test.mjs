@@ -163,7 +163,7 @@ test('retained verified outcomes are separate from pending and new settlements',
     retained_recheck_reasons:{stat_not_found_or_ambiguous:3,private:'secret'},reasons:{final_game_not_matched:5}};
   const project=value=>settlementProgress([{finished_at:new Date(now).toISOString(),settlements:{nfl:value}}],'nfl',now);
   const result=project(current);
-  assert.equal(result.retained_verified,3);assert.equal(result.pending,5);
+  assert.equal(result.retained_accounting,true);assert.equal(result.retained_verified,3);assert.equal(result.pending,5);
   assert.equal(result.retained_recheck_reasons.length,1);
   assert.equal(JSON.stringify(result).includes('secret'),false);
   for(const retained_verified of [undefined,null,-1,4,'3']) assert.equal(project({...current,retained_verified}),null);
@@ -171,5 +171,5 @@ test('retained verified outcomes are separate from pending and new settlements',
     assert.equal(project({...current,retained_recheck_reasons}),null);
   }
   const legacy=project({...current,retained_verified:undefined,pending:8,retained_recheck_reasons:undefined});
-  assert.equal(legacy.retained_verified,0);assert.deepEqual(legacy.retained_recheck_reasons,[]);
+  assert.equal(legacy.retained_accounting,false);assert.equal(legacy.retained_verified,0);assert.deepEqual(legacy.retained_recheck_reasons,[]);
 });

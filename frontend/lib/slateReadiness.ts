@@ -92,7 +92,7 @@ export function settlementProgress(reports:unknown[],sport:Sport,now=Date.now())
   if(['complete','degraded'].includes(String(result.status))
     && retainedReasons.reduce((sum,reason)=>sum+reason.count,0)!==retained_verified) return null;
   return {checked_at:latest.finished_at as string,status:String(result.status),stale:now-Date.parse(latest.finished_at as string)>36*3600000,
-    candidates,settled,pending,retained_verified,
+    candidates,settled,pending,retained_verified,retained_accounting:result.retained_verified!==undefined,
     outside_schedule:count(result.outside_schedule),
     blocked:result.reason==='history_refresh_unavailable' ? 'Waiting for verified player-history refresh' : null,
     retained_recheck_reasons:retainedReasons,

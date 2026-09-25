@@ -10,7 +10,7 @@ When a recheck cannot resolve a candidate, verify the complete retained settleme
 
 This is a reporting correction. Candidate scope, stat lookup, source validation, outcome writes, correction behavior, manual-result exclusion and catch-up policy are unchanged. A missing refreshed source does not erase an existing authenticated result; a later authenticated correction can still replace it. No forecast, price, frozen model, history row or prior outcome is rewritten by this change.
 
-The public projection supports older reports with zero retained results and validates both the total and the retained-reason count. The dashboard separates results verified in this pass, previously verified results, and pending records. It explains incomplete source rechecks without treating them as new settlements. Cached older API responses remain renderable.
+The public projection supports older reports with zero retained results and validates both the total and the retained-reason count. The dashboard separates results verified in this pass, previously verified results, and pending records. It explains incomplete source rechecks without treating them as new settlements. Cached older API responses remain renderable. Older reports label failed rechecks as not reverified in this pass and explain that their counters do not distinguish already verified results from unresolved records. They direct consumers to the existing outcome metrics.
 
 ## Verification and checkpoint
 
