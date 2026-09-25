@@ -448,9 +448,14 @@ class Ledger:
                 db.executemany('''UPDATE predictions SET outcome=?,outcome_source=?,outcome_ref=?,
                     outcome_observed_at=?,actual_value=?,outcome_evidence=? WHERE id=?''',updates)
 
-    def predictions(self) -> list[dict]:
+    def _prediction_records(self, *, ordered: bool = False):
+        """Read raw records; audit subclasses may narrow their registered universe."""
+        query = 'SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value,outcome_evidence FROM predictions'
         with self.connect() as db:
-            rows = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value,outcome_evidence FROM predictions ORDER BY id').fetchall()
+            return db.execute(query + (' ORDER BY id' if ordered else '')).fetchall()
+
+    def predictions(self) -> list[dict]:
+        rows = self._prediction_records(ordered=True)
         result=[]
         for key,payload,outcome,source,ref,observed,actual,proof in rows:
             decoded=json_object(payload)
@@ -478,8 +483,7 @@ class Ledger:
         if sport is not None and sport not in STAT_COLUMNS:
             raise ValueError('Evaluation sport is invalid')
         cutoff = utc_timestamp(captured_after) if captured_after is not None else None
-        with self.connect() as db:
-            records = db.execute('SELECT id,payload,outcome,outcome_source,outcome_ref,outcome_observed_at,actual_value,outcome_evidence FROM predictions').fetchall()
+        records = self._prediction_records()
         signals = []
         excluded = 0
         duplicate = 0
