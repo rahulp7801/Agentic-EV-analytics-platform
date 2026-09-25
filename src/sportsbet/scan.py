@@ -11,7 +11,7 @@ from math import isfinite
 from zoneinfo import ZoneInfo
 import httpx
 import structlog
-from sportsbet.config import settings
+from sportsbet.config import settings, DEFAULT_DAILY_CREDIT_LIMIT
 from sportsbet.dashboard import publish_snapshot, load_snapshot
 from sportsbet.db.connection import create_async_pool
 from sportsbet.graph.graph import create_graph
@@ -798,7 +798,7 @@ async def run(sports: list[str], daily_credit_limit: int, event_ids: frozenset[s
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport',choices=['nba','nfl','cfb','both','all'],default='both')
-    parser.add_argument('--daily-credit-limit',type=int,default=25)
+    parser.add_argument('--daily-credit-limit',type=int,default=DEFAULT_DAILY_CREDIT_LIMIT)
     parser.add_argument('--event-id',action='append',default=[],help='Refresh only this discovered pregame event; repeat at most ten times')
     args=parser.parse_args()
     try:

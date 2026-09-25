@@ -6,7 +6,7 @@ import json
 import re
 import sqlite3
 from contextlib import contextmanager
-from sportsbet.config import settings
+from sportsbet.config import settings, DEFAULT_DAILY_CREDIT_LIMIT
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from decimal import Decimal
@@ -290,10 +290,10 @@ class Ledger:
                        (identity,group,day,amount))
         return True, 'accepted'
 
-    def reserve_api_credits(self, cost: int, limit: int = 25, holdback: int = 0) -> bool:
+    def reserve_api_credits(self, cost: int, limit: int = DEFAULT_DAILY_CREDIT_LIMIT, holdback: int = 0) -> bool:
         return self.reserve_api_credits_with_reason(cost,limit,holdback)[0]
 
-    def reserve_api_credits_with_reason(self, cost: int, limit: int = 25,
+    def reserve_api_credits_with_reason(self, cost: int, limit: int = DEFAULT_DAILY_CREDIT_LIMIT,
                                         holdback: int = 0) -> tuple[bool,str]:
         """Classify a reservation atomically without changing allowance policy."""
         if type(cost) is not int or type(limit) is not int or type(holdback) is not int or cost < 1 or limit < 1 or holdback < 0:

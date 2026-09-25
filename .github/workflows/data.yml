@@ -52,7 +52,7 @@ jobs:
       OPERATION: ${{ inputs.operation || (github.event.schedule == '17 13 * * *' && 'daily' || github.event.schedule == '29 10,22 * * *' && 'refresh' || (vars.DATA_PIPELINE_ENABLED == 'true' && 'scan' || 'monitor')) }}
       PROVIDER: ${{ inputs.provider || 'all' }}
       EVENT_IDS: ${{ inputs.event_ids || '' }}
-      DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '25' }}
+      DAILY_CREDIT_LIMIT: ${{ vars.ODDS_DAILY_CREDIT_LIMIT || '20' }}
       ODDS_ROLLING_CREDIT_LIMIT: ${{ vars.ODDS_ROLLING_CREDIT_LIMIT || '450' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -6,6 +6,10 @@ from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings
 
 
+# Default for every collector entry point; deployment currently uses this allowance.
+DEFAULT_DAILY_CREDIT_LIMIT = 20
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables or .env file."""
 
