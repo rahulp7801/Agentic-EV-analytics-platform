@@ -37,6 +37,19 @@ These are history-generated thresholds, not offered sportsbook prices. Rare tric
 
 61 targeted tests passed, covering original frozen shadow behavior, prior-only eligibility, exact threshold boundary, disjoint scopes, missing/nonfinite workload, future-outcome perturbation, and unsupported-scope rejection. No live model, frozen parameters, qualification gates, collector, quota, database records or customer recommendations changed. This audit made no provider requests and spent no credits or money.
 
-Next model task: determine how many authenticated, pregame, paired **offered** passing/rushing thresholds actually fall in this scope. Reconstruct their prior workload without selecting on settled outcomes, report coverage and baseline agreement, and assess market-relative probabilities before deciding whether to freeze a separate prospective candidate. Do not broaden workload v1 or role v1 in place. Sparse offered-market coverage is a reason to defer a candidate, not to pool irrelevant historical categories.
+The follow-up offered-market coverage audit is also complete: `2026-09-24-low-workload-offers.py` reads no outcome columns and reconstructs history before each offer. It fixes the earliest game/player/market/line before coverage checks, deduplicates complementary sides/books, verifies core history hashes, requires baseline sample/probability/rounded-mean agreement, and checks matching committed or opposite-side prices. Current database history can contain later corrections, so this remains a retrospective coverage diagnostic.
+
+| Category | Earliest offered thresholds | Low-workload thresholds | Baseline-matching paired thresholds | Paired games / players |
+| --- | ---: | ---: | ---: | ---: |
+| Passing yards | 570 | 0 | 0 | 0 / 0 |
+| Rushing yards | 687 | 21 | 2 | 1 / 1 |
+| Receiving yards | 1,302 | 41 | 7 | 2 / 3 |
+| Receptions | 245 | 18 | 2 | 1 / 2 |
+
+The audit considered 11,899 eligible v4 forecasts and 56,645 historical rows through 2026; digests and exclusion counts are retained in `2026-09-24-low-workload-offers.json`. Nineteen rushing, 34 receiving-yards, and 16 receptions thresholds failed baseline reconstruction and are not rescued using later offers. Current history cannot be silently substituted for their original model inputs. No outcomes were used to choose scope or score these offers.
+
+**Decision: defer a low-workload prospective candidate.** The historically improved passing category has no eligible offered thresholds, and rushing has only two paired thresholds from one player/game. Receiving improvements remain inconclusive. This does not justify expanding a frozen experiment or deploying a new recommendation model.
+
+Next model task: audit baseline reconstruction mismatches against retained forecast-time history commitments and quantify which are source corrections versus input-policy differences. Continue the existing broad receiving workload experiment and collect its authenticated prospective outcomes at the checkpoint below. Any further candidate must have adequate offered-market coverage and a separately frozen protocol.
 
 Existing prospective evidence checkpoint remains September 25 at 04:30 UTC, or the first follow-up after authenticated final sources are available. Preserve pending outcomes if exact source identity and statistics cannot be verified. PR #194 remains excluded; quota limits and the staged reserve are unchanged.
