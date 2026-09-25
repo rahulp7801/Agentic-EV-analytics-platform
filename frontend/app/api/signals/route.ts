@@ -11,7 +11,7 @@ export const dynamic='force-dynamic';
 
 const cachedForecastPage=unstable_cache(async(pattern:string,profileKeys:string[],view:string,limit:number,offset:number)=>{
   const result=await databaseQuery<{data:ForecastPageInput}>(FORECAST_PAGE_QUERY,
-    [pattern,profileKeys,view,view==='library' ? limit : 5001,offset]);
+    [pattern,profileKeys,view,view==='library' ? limit : 5001,offset],'forecast_page');
   if(!result.rows[0]?.data) throw new Error('Missing forecast page');
   return result.rows[0].data;
 },['forecast-page-v1'],{revalidate:60});

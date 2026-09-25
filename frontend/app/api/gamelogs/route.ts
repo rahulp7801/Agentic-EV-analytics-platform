@@ -1,3 +1,4 @@
+import {reportGameLogValidationFailure} from '@/lib/databaseFailure';
 import { databaseQuery } from '@/lib/database';
 import { gameLogRequest,publicGameLogs } from '@/lib/publicGameLogs';
 import { NextResponse } from 'next/server';
@@ -11,15 +12,18 @@ export async function GET(request: Request) {
     return NextResponse.json({error:'Invalid game-log request'}, {status:400,headers:NO_STORE_HEADERS});
   }
   const {sport,player,limit,before,exact}=query;
+  let validatingRows=false;
   try {
     const {rows} = await databaseQuery<{payload: unknown}>(
       'SELECT payload FROM dashboard_gamelogs WHERE sport=$1 '
       + 'AND ($2=\'\' OR CASE WHEN $5 THEN lower(player_name)=lower($2) ELSE strpos(lower(player_name),lower($2))>0 END) '
       + 'AND ($4::date IS NULL OR game_date<$4::date) '
-      + 'ORDER BY game_date DESC,player_name,game_key LIMIT $3', [sport,player,limit,before,exact]);
+      + 'ORDER BY game_date DESC,player_name,game_key LIMIT $3', [sport,player,limit,before,exact],'gamelogs');
+    validatingRows=true;
     return NextResponse.json({logs:publicGameLogs(rows.map(row=>row.payload),sport)},
       {headers:PUBLIC_CACHE_HEADERS.archive});
   } catch {
+    if(validatingRows) reportGameLogValidationFailure();
     return NextResponse.json({error:'Game logs are temporarily unavailable.',logs:[]}, {status:503,headers:NO_STORE_HEADERS});
   }
 }
