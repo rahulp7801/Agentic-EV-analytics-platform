@@ -1,8 +1,10 @@
 import type { Client, QueryResult, QueryResultRow } from 'pg';
 import {databaseFailure,type DatabaseOperation,type DatabasePhase,type FailureObserver} from './databaseFailure.ts';
 
+import {QueryAdmission} from './queryAdmission.ts';
+
 type DatabaseClient = Pick<Client, 'connect' | 'query' | 'end'>;
-let activeQueries=0;
+const admission = new QueryAdmission();
 
 export async function queryWithClient<T extends QueryResultRow>(
   client: DatabaseClient,
@@ -13,17 +15,18 @@ export async function queryWithClient<T extends QueryResultRow>(
 ): Promise<QueryResult<T>> {
   const started=performance.now();
   const report=(error:unknown,phase:DatabasePhase)=>{
-    try {observer?.(databaseFailure(error,phase,operation,performance.now()-started,activeQueries));}
+    try {observer?.(databaseFailure(error,phase,operation,performance.now()-started,admission.activeCount));}
     catch { /* A failed observer must not mask a database failure or leak a connection. */ }
   };
-  // Per-isolate backpressure; the reader role also caps global database connections.
-  if(activeQueries>=6) {
-    const error=new Error('Service busy');
+  // Wait briefly before rejecting a burst, retaining the six-connection cap.
+  let release: () => void;
+  try {
+    release = await admission.acquire();
+  } catch (error) {
     report(error,'backpressure');
     await client.end().catch(error=>report(error,'close'));
     throw error;
   }
-  activeQueries++;
   let phase:DatabasePhase='connect';
   try {
     await client.connect();
@@ -34,6 +37,6 @@ export async function queryWithClient<T extends QueryResultRow>(
     throw error;
   } finally {
     try {await client.end().catch(error=>report(error,'close'));}
-    finally {activeQueries--;}
+    finally {release();}
   }
 }

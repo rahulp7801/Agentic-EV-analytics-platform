@@ -44,7 +44,7 @@ test('connect and query failures retain original errors and close clients, even 
 test('capacity diagnostics distinguish local rejection and release slots after work completes',async()=>{
   let release;const blocked=new Promise(resolve=>{release=resolve;}),events=[];
   const client=()=>({async connect(){},async query(){await blocked;return {rows:[]};},async end(){}});
-  const work=Array.from({length:6},()=>queryWithClient(client(),'select 1',[],'snapshot',event=>events.push(event)));
+  const work=Array.from({length:18},()=>queryWithClient(client(),'select 1',[],'snapshot',event=>events.push(event)));
   await assert.rejects(queryWithClient(client(),'select 1',[],'gamelogs',event=>events.push(event)),/Service busy/);
   assert.equal(events.length,1);assert.equal(events[0].phase,'backpressure');
   assert.equal(events[0].category,'local_capacity');assert.equal(events[0].active_queries,6);
