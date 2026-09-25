@@ -88,7 +88,11 @@ def inspect_bundle(bundle: dict, *, now: datetime | None = None) -> list[dict]:
                 or header['season']['type']!=2):
             raise ValueError('Exact completed regular-season game required')
         season=_integer(header['season']['year']);week=_integer(header['week'])
-        start=utc_timestamp(comp['date']);day=start.astimezone(ZoneInfo('America/New_York')).date().isoformat()
+        start=utc_timestamp(comp['date'])
+        final_observed=utc_timestamp(summary_source['observed_at'])
+        if not start<=final_observed<=now:
+            raise ValueError('Final summary observation predates game')
+        day=start.astimezone(ZoneInfo('America/New_York')).date().isoformat()
         if day!=player['date'] or not 1<=week<=18 or season!=(start.year if start.month>=9 else start.year-1):
             raise ValueError('Invalid recovery game date or week')
         teams=comp['competitors']
@@ -103,6 +107,8 @@ def inspect_bundle(bundle: dict, *, now: datetime | None = None) -> list[dict]:
         for team in teams:
             tid=team['id'];path=f'{BASE}/events/{event}/competitions/{event}/competitors/{tid}/roster'
             roster,receipt=read(f'https://{CORE}{path}?limit=100')
+            if utc_timestamp(receipt['observed_at'])<final_observed:
+                raise ValueError('Event roster predates observed final status')
             _reference(roster['$ref'],path);receipts.append(receipt)
             for entry in roster['entries']:
                 if str(entry['playerId'])==espn:
@@ -122,6 +128,8 @@ def inspect_bundle(bundle: dict, *, now: datetime | None = None) -> list[dict]:
         _reference(entry['statistics']['$ref'],stat_path)
         stat_url=entry['statistics']['$ref'].replace('http://','https://',1)
         stats,receipt=read(stat_url);receipts.append(receipt)
+        if utc_timestamp(receipt['observed_at'])<final_observed:
+            raise ValueError('Player stats predate observed final status')
         _reference(stats['$ref'],stat_path)
         _reference(stats['competition']['$ref'],f'{BASE}/events/{event}/competitions/{event}')
         _reference(stats['athlete']['$ref'],f'{BASE}/seasons/{season}/athletes/{espn}')

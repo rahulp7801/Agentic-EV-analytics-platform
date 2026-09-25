@@ -146,3 +146,36 @@ def test_independent_participation_is_required(mutation):
     if mutation=='bad_hash':snap['source_record_sha256']='0'*64
     if mutation=='future':snap['source_observed_at']='2026-09-24T00:00:00Z'
     with pytest.raises(ValueError):inspect_bundle(b,now=NOW)
+
+
+@pytest.mark.parametrize('index', [1, 2, 3])
+def test_in_play_receipt_cannot_be_combined_with_later_final_summary(index):
+    b=bundle()
+    # After kickoff but before the retained observation of completed status.
+    b['sources'][index]['observed_at']='2026-09-20T20:06:00Z'
+    with pytest.raises(ValueError, match='predate'):
+        inspect_bundle(b,now=NOW)
+
+
+def test_dnp_roster_also_requires_observed_final_status():
+    b=bundle();change(b,1,lambda d:d['entries'][0].update(didNotPlay=True,valid=False))
+    b['sources'].pop()
+    b['sources'][1]['observed_at']='2026-09-20T20:06:00Z'
+    with pytest.raises(ValueError, match='predates'):
+        inspect_bundle(b,now=NOW)
+
+
+def test_dnp_cannot_bypass_final_summary_chronology():
+    b=bundle();change(b,1,lambda d:d['entries'][0].update(didNotPlay=True,valid=False))
+    b['sources'].pop()
+    b['sources'][0]['observed_at']='2026-09-19T00:00:00Z'
+    with pytest.raises(ValueError, match='predates game'):
+        inspect_bundle(b,now=NOW)
+
+
+def test_sequential_post_final_collection_is_valid():
+    b=bundle()
+    b['sources'][0]['observed_at']='2026-09-22T23:58:00Z'
+    b['sources'][1]['observed_at']='2026-09-22T23:59:00Z'
+    b['sources'][2]['observed_at']='2026-09-22T23:59:30Z'
+    assert inspect_bundle(b,now=NOW)[0]['status']=='verified_explicit_stats'
