@@ -1,6 +1,8 @@
 """Daily read-only orchestration: refresh histories, collect markets, evaluate props."""
 from __future__ import annotations
 
+from sportsbet.config import DEFAULT_DAILY_CREDIT_LIMIT
+
 import argparse
 import asyncio
 import json
@@ -243,7 +245,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport',choices=['nba','nfl','cfb','both','all'],default='both')
     parser.add_argument('--mode',choices=MODES,default='daily')
-    parser.add_argument('--daily-credit-limit',type=int,default=25)
+    parser.add_argument('--daily-credit-limit',type=int,default=DEFAULT_DAILY_CREDIT_LIMIT)
     parser.add_argument('--report-output',help='Write the final machine-readable report to this file')
     args=parser.parse_args()
     try:

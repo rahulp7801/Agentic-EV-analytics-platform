@@ -12,7 +12,7 @@ from uuid import UUID
 
 import httpx
 
-from sportsbet.config import settings
+from sportsbet.config import settings, DEFAULT_DAILY_CREDIT_LIMIT
 from sportsbet.dashboard import publish_snapshot, load_snapshot
 from sportsbet.ingestion.archive import write_archive
 from sportsbet.ingestion.kalshi import KalshiReader
@@ -762,7 +762,7 @@ async def run(sport: str, daily_credit_limit: int, game_limit: int, publish: boo
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport', choices=['nba','nfl','cfb','both'], default='both')
-    parser.add_argument('--daily-credit-limit', type=int, default=25)
+    parser.add_argument('--daily-credit-limit', type=int, default=DEFAULT_DAILY_CREDIT_LIMIT)
     parser.add_argument('--game-limit', type=int, choices=range(1,MAX_GAME_LIMIT+1), default=DEFAULT_GAME_LIMIT)
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--provider',choices=['all','public','sportsbook','kalshi','prizepicks'],default='all',
