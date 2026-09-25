@@ -126,3 +126,58 @@ def test_cfb_provenance_normalizes_stored_numeric_event_identity():
     assert source_summary([stored],'cfb')['provenance']=={'verified_core_stat_commitment':1}
     stored['receiving_yards']=99
     assert source_summary([stored],'cfb')['provenance']=={'mismatched_core_stat_commitment':1}
+
+
+def test_low_workload_scope_is_disjoint_and_uses_only_prior_workload():
+    rows=histories()
+    for i, row in enumerate(rows):
+        row['minutes']=1 if i < 27 else 20
+    eligible,_=build_examples(rows,'nba','points')
+    explicit,_=build_examples(rows,'nba','points',workload_scope='eligible')
+    low,coverage=build_examples(rows,'nba','points',workload_scope='low')
+    assert eligible == explicit
+    assert eligible and low
+    assert not {e.day for e in eligible} & {e.day for e in low}
+    assert {e.day for e in eligible+low} == {r['day'] for r in rows[20:]}
+    assert coverage['excluded']['fit:eligible_prior_workload'] > 0
+    target=rows[26]['day']
+    changed=[dict(r,minutes=999,points=999) if r['day']>=target else r for r in rows]
+    replay,_=build_examples(changed,'nba','points',workload_scope='low')
+    before=[e for e in low if e.day==target]
+    after=[e for e in replay if e.day==target]
+    assert before and [(e.line,e.features,e.base) for e in before] == [(e.line,e.features,e.base) for e in after]
+
+
+@pytest.mark.parametrize('bad', [None, float('nan'), float('inf'), -1])
+def test_low_workload_scope_does_not_reinterpret_missing_or_invalid_workload(bad):
+    rows=histories()[:21]
+    for row in rows: row['minutes']=0
+    rows[1]['minutes']=bad
+    examples,coverage=build_examples(rows,'nba','points',workload_scope='low')
+    assert not examples
+    assert coverage['excluded']['fit:missing_workload']==1
+
+
+def test_workload_boundary_stays_in_original_scope_and_invalid_scope_fails():
+    rows=histories()[:21]
+    for row in rows: row['minutes']=10
+    assert build_examples(rows,'nba','points')[0]
+    assert not build_examples(rows,'nba','points',workload_scope='low')[0]
+    with pytest.raises(ValueError,match='scope'):
+        build_examples(rows,'nba','points',workload_scope='unknown')
+    with pytest.raises(ValueError,match='scope'):
+        build_examples([],'cfb','rec_yds',workload_scope='low')
+    from sportsbet.quant.history_tuning import run_audit
+    with pytest.raises(ValueError,match='scope'):
+        run_audit('unused',['cfb'],workload_scope='low')
+
+
+def test_low_workload_requires_prior_involvement_not_target_involvement():
+    rows=histories()[:21]
+    for row in rows: row['minutes']=0
+    rows[-1]['minutes']=30
+    examples,coverage=build_examples(rows,'nba','points',workload_scope='low')
+    assert not examples
+    assert coverage['excluded']['fit:no_prior_category_workload']==1
+    rows[0]['minutes']=1
+    assert build_examples(rows,'nba','points',workload_scope='low')[0]

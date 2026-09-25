@@ -82,8 +82,11 @@ class Example:
     role_drift: bool
 
 
-def build_examples(rows: list[dict], sport: str, prop: str) -> tuple[list[Example], dict]:
+def build_examples(rows: list[dict], sport: str, prop: str, *,
+                   workload_scope: str = 'eligible') -> tuple[list[Example], dict]:
     stat, workload, minimum = PROPS[sport][prop]
+    if workload_scope not in ('eligible', 'low') or (workload_scope == 'low' and workload is None):
+        raise ValueError('Unsupported workload scope')
     players = defaultdict(list)
     excluded = Counter()
     for row in rows:
@@ -114,8 +117,13 @@ def build_examples(rows: list[dict], sport: str, prop: str) -> tuple[list[Exampl
                 if any(v is None or not math.isfinite(float(v)) or float(v) < 0 for v in work):
                     excluded[split + ':missing_workload'] += 1
                     continue
-                if statistics.fmean(float(v) for v in work[-5:]) < minimum:
-                    excluded[split + ':low_prior_workload'] += 1
+                if workload_scope == 'low' and not any(float(v) > 0 for v in work):
+                    excluded[split + ':no_prior_category_workload'] += 1
+                    continue
+                low = statistics.fmean(float(v) for v in work[-5:]) < minimum
+                if (workload_scope == 'eligible' and low) or (workload_scope == 'low' and not low):
+                    reason = 'low_prior_workload' if low else 'eligible_prior_workload'
+                    excluded[split + ':' + reason] += 1
                     continue
             values = np.asarray([float(r[stat]) for r in history])
             actual = float(target[stat])
@@ -292,17 +300,23 @@ def source_summary(rows: list[dict], sport: str) -> dict:
             'workload_fields_covered_by_stat_commitment': False}
 
 
-def run_audit(database_url: str, sports: list[str]) -> dict:
+def run_audit(database_url: str, sports: list[str], *, workload_scope: str = 'eligible') -> dict:
     if not sports or len(sports) != len(set(sports)) or any(s not in PROPS for s in sports):
         raise ValueError('Invalid sport scope')
+    if workload_scope not in ('eligible', 'low') or (workload_scope == 'low' and 'cfb' in sports):
+        raise ValueError('Unsupported workload scope')
     report = {'protocol': '2026-09-23-model-audit-protocol', 'read_only': True,
               'generated_at': datetime.now(timezone.utc).isoformat(), 'sports': {},
+              'workload_scope': workload_scope,
               'limitations': ['Retrospective temporal split; some outcomes appeared in prior research.',
                 'Research thresholds are generated from prior history, not historical sportsbook offers.',
                 'Missing stat categories and DNP outcomes are not inferred; participating-row cohort.',
                 'Historical source corrections may postdate games; source hashes do not prove pregame availability.',
                 'Separate game/player clustered intervals do not fully model all cross-cluster dependence.',
                 'No candidate is promoted; no ROI, CLV, calibrated live stake or betting-edge claim.']}
+    if workload_scope == 'low':
+        report['protocol'] = '2026-09-24-low-workload-exploratory-v1'
+        report['limitations'].append('Low-workload scope chosen after inspecting a live forecast; refined to require some positive workload in prior history after a zero-dominated exploratory run. This is not an untouched holdout.')
     dsn = database_url.replace('postgresql+psycopg://', 'postgresql://', 1)
     with psycopg.connect(dsn, row_factory=dict_row, connect_timeout=15,
                         options='-c default_transaction_read_only=on -c statement_timeout=120000') as conn:
@@ -316,7 +330,7 @@ def run_audit(database_url: str, sports: list[str]) -> dict:
                 digest.update(b'\n')
             result = {'history': source_summary(rows, sport), 'input_sha256': digest.hexdigest(), 'props': {}}
             for prop in PROPS[sport]:
-                examples, coverage = build_examples(rows, sport, prop)
+                examples, coverage = build_examples(rows, sport, prop, workload_scope=workload_scope)
                 result['props'][prop] = evaluate_examples(examples) | {'coverage': coverage}
                 print(f'{sport}/{prop}: {result["props"][prop]["status"]}', flush=True)
             report['sports'][sport] = result
@@ -326,6 +340,7 @@ def run_audit(database_url: str, sports: list[str]) -> dict:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sport', choices=tuple(PROPS)+('all',), default='all')
+    parser.add_argument('--workload-scope', choices=('eligible', 'low'), default='eligible')
     parser.add_argument('--database-env', default='DATABASE_URL')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
@@ -333,7 +348,8 @@ def main():
     from dotenv import load_dotenv
     load_dotenv()
     try:
-        report = run_audit(os.environ[args.database_env], list(PROPS) if args.sport == 'all' else [args.sport])
+        report = run_audit(os.environ[args.database_env], list(PROPS) if args.sport == 'all' else [args.sport],
+                           workload_scope=args.workload_scope)
         report['source_sha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2, allow_nan=False), encoding='utf-8')

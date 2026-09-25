@@ -1,0 +1,67 @@
+{
+  "generated_at": "2026-09-25T00:12:40.451300+00:00",
+  "read_only": true,
+  "outcomes_loaded": false,
+  "model_version": "empirical-jeffreys-v4",
+  "promote": false,
+  "eligible_forecasts": 11899,
+  "history_rows": 56645,
+  "history_sha256": "301e5e04cfbbc3e2cbbd24aae951f0764d68c6813119ae00853d6b32ac1407c0",
+  "forecast_sha256": "d7c68464efca6b8b22db0fdac8f7a66cf2e496ef552a9a16b1b7724e0695cb97",
+  "props": {
+    "pass_yds": {
+      "counts": {
+        "earliest_offered_thresholds": 570,
+        "eligible_original_workload_scope": 437,
+        "insufficient_history": 133
+      },
+      "paired_games": 0,
+      "paired_players": 0
+    },
+    "rush_yds": {
+      "counts": {
+        "earliest_offered_thresholds": 687,
+        "eligible_original_workload_scope": 449,
+        "low_workload": 21,
+        "baseline_reconstruction_mismatch": 19,
+        "insufficient_history": 217,
+        "baseline_agreement": 2,
+        "paired_low_workload": 2
+      },
+      "paired_games": 1,
+      "paired_players": 1
+    },
+    "rec_yds": {
+      "counts": {
+        "earliest_offered_thresholds": 1302,
+        "eligible_original_workload_scope": 969,
+        "insufficient_history": 292,
+        "low_workload": 41,
+        "baseline_reconstruction_mismatch": 34,
+        "baseline_agreement": 7,
+        "paired_low_workload": 7
+      },
+      "paired_games": 2,
+      "paired_players": 3
+    },
+    "receptions": {
+      "counts": {
+        "earliest_offered_thresholds": 245,
+        "eligible_original_workload_scope": 166,
+        "insufficient_history": 61,
+        "low_workload": 18,
+        "baseline_reconstruction_mismatch": 16,
+        "baseline_agreement": 2,
+        "paired_low_workload": 2
+      },
+      "paired_games": 1,
+      "paired_players": 2
+    }
+  },
+  "limitations": [
+    "Retrospective reconstruction from current database; source corrections may postdate forecast.",
+    "Core stat hash does not authenticate workload fields.",
+    "Earliest game/player/market/line before coverage; complementary sides and sportsbooks deduplicated.",
+    "No outcome selection, candidate scoring, market-edge or prospective-evidence claim."
+  ]
+}
