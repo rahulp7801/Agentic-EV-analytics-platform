@@ -1,0 +1,34 @@
+{
+  "local_endpoint": [
+    {
+      "query": "sport=nfl",
+      "status": 503,
+      "body": {
+        "error": "Game logs are temporarily unavailable.",
+        "logs": []
+      },
+      "cache_control": "no-store"
+    },
+    {
+      "query": "sport=bad",
+      "status": 400,
+      "body": {
+        "error": "Invalid game-log request"
+      },
+      "cache_control": "no-store"
+    }
+  ],
+  "server_event": {
+    "event": "dashboard_database_failure",
+    "operation": "gamelogs",
+    "phase": "connect",
+    "category": "connection_refused",
+    "elapsed_ms": 5,
+    "active_queries": 1
+  },
+  "tests": 12,
+  "typecheck": "passed",
+  "lint": "passed",
+  "production_build": "passed",
+  "production_fault_injection": false
+}
