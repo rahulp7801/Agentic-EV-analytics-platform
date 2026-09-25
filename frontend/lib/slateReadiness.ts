@@ -79,15 +79,22 @@ export function settlementProgress(reports:unknown[],sport:Sport,now=Date.now())
   const result=(latest?.settlements as Record<string,Record<string,unknown>>|undefined)?.[sport];
   if(!result || !['complete','degraded','blocked','failed'].includes(String(result.status))) return null;
   const candidates=count(result.candidates),settled=count(result.settled),pending=count(result.pending);
+  const retained_verified=result.retained_verified===undefined ? 0 : count(result.retained_verified);
   if(['complete','degraded'].includes(String(result.status)) && (candidates===null || settled===null
-    || pending===null || settled>candidates || settled+pending!==candidates)) return null;
+    || pending===null || retained_verified===null || settled+pending+retained_verified!==candidates)) return null;
   const reasons:Record<string,string>={final_game_not_matched:'Final game not confirmed',
     stat_not_found_or_ambiguous:'Final player stat missing or ambiguous',stat_provenance_invalid:'Stat evidence failed validation',
     invalid_prediction_or_evidence:'Prediction identity or chronology failed validation'};
   const raw=result.reasons && typeof result.reasons==='object' ? result.reasons as Record<string,unknown> : {};
+  const retained=result.retained_recheck_reasons && typeof result.retained_recheck_reasons==='object'
+    ? result.retained_recheck_reasons as Record<string,unknown> : {};
+  const retainedReasons=Object.entries(reasons).flatMap(([key,label])=>count(retained[key]) ? [{label,count:count(retained[key])!}] : []);
+  if(['complete','degraded'].includes(String(result.status))
+    && retainedReasons.reduce((sum,reason)=>sum+reason.count,0)!==retained_verified) return null;
   return {checked_at:latest.finished_at as string,status:String(result.status),stale:now-Date.parse(latest.finished_at as string)>36*3600000,
-    candidates,settled,pending,
+    candidates,settled,pending,retained_verified,retained_accounting:result.retained_verified!==undefined,
     outside_schedule:count(result.outside_schedule),
     blocked:result.reason==='history_refresh_unavailable' ? 'Waiting for verified player-history refresh' : null,
+    retained_recheck_reasons:retainedReasons,
     reasons:Object.entries(reasons).flatMap(([key,label])=>count(raw[key]) ? [{label,count:count(raw[key])!}] : [])};
 }
