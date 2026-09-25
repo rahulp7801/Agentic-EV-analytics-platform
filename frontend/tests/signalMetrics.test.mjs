@@ -337,3 +337,23 @@ test('CFB roster aliases require the same committed roster and exact history ath
   assert.equal(project({},'999').availability,undefined);
   assert.equal(project({},null).availability,undefined);
 });
+
+
+test('CFB complete roster commitments retain exact URL and reject other query variants',()=>{
+  const base='https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/324/roster';
+  const project=url=>publicSignals([{...publicQuote,sport:'cfb',player_id:'5203477',availability:{
+    ...quote.availability,player_id:'5203477',roster_player_name:'Roster alias',
+    source_url:url,source_sha256:'b'.repeat(64),roster_source_url:url,roster_source_sha256:'b'.repeat(64),
+    identity_source_url:url,identity_source_sha256:'b'.repeat(64)}}],now).signals[0];
+  for(const url of [base,base+'?limit=1000']) {
+    const result=project(url);
+    assert.equal(result.availability.roster_source_url,url);
+    assert.equal(result.availability.identity_source_url,url);
+    assert.equal(result.true_prob,quote.true_prob);
+  }
+  for(const query of ['?limit=100','?limit=1000&extra=1','?limit=1000&limit=100','?limit=1000#fragment']) {
+    const result=project(base+query);assert.equal(result.availability,undefined);assert.equal(result.gated,true);
+  }
+  const nfl={...quote.availability,roster_source_url:quote.availability.roster_source_url+'?limit=1000'};
+  assert.equal(publicSignals([{...publicQuote,availability:nfl}],now).signals[0].availability,undefined);
+});

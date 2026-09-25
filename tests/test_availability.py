@@ -81,6 +81,9 @@ async def test_exact_team_rosters_and_archived_response_hashes(sport,missing_tea
     directories=[url for url in requests if url.split('?')[0].endswith('/teams')]
     assert len(directories)==2
     assert all(('limit=1000' in url)==(sport=='cfb') for url in directories)
+    rosters=[url for url in requests if url.split('?')[0].endswith('/roster')]
+    assert len(rosters)==2
+    assert all(url.endswith('?limit=1000')==(sport=='cfb') for url in rosters)
 
 
 async def test_provider_denial_is_unknown_not_empty_healthy_report():
@@ -217,3 +220,56 @@ def test_cfb_roster_id_binding_rejects_incomplete_or_conflicting_evidence(mutati
 def test_cfb_history_ids_are_explicit_canonical_strings(identity):
     assert player_availability(cfb_identity_context(),'Dominic Lee-Knicely',datetime.now(timezone.utc),
         player_id=identity,sport='cfb')[1]=='availability_unavailable'
+
+
+@pytest.mark.parametrize('stale',[False,True])
+async def test_cfb_full_roster_includes_subject_and_injury_after_default_cutoff(tmp_path,monkeypatch,stale):
+    monkeypatch.chdir(tmp_path)
+    now=datetime.now(timezone.utc)
+    requests=[]
+    def handle(request):
+        requests.append(str(request.url))
+        body=dict(status='success',timestamp=now.isoformat())
+        if request.url.path.endswith('/teams'):
+            body['sports']=[dict(leagues=[dict(teams=[dict(team=dict(id=str(i),displayName=n,abbreviation=n))
+                for i,n in enumerate(['Home','Away'],1)])])]
+        elif request.url.path.endswith('/injuries'):
+            body['injuries']=[]
+        else:
+            team=request.url.path.split('/')[-2]
+            if stale:body['timestamp']=(now-timedelta(hours=2)).isoformat()
+            body['team']={'id':team}
+            athletes=[dict(id=str(int(team)*1000+i),displayName=f'Player {team}-{i}',
+                status={'name':'Active'},position={'abbreviation':'WR'},injuries=[]) for i in range(102)]
+            athletes[-1]['injuries']=[dict(status='Out',date=now.isoformat())]
+            # Emulate the observed provider truncation unless the limit is explicit.
+            body['athletes']=[dict(items=athletes[:int(request.url.params.get('limit','100'))])]
+        return httpx.Response(200,json=body)
+    original=httpx.AsyncClient
+    with patch('sportsbet.prop.availability.httpx.AsyncClient',
+        lambda **kwargs:original(**kwargs,transport=httpx.MockTransport(handle))):
+        result=await fetch_event_availability(dict(id='full-roster',home_team='Home',away_team='Away'),'cfb')
+    if stale:
+        assert result['status']=='unavailable'
+        return
+    assert result['status']=='observed'
+    assert len(result['teams'][0]['roster_ids'])==102
+    evidence,reason=player_availability(result,'Player 1-100',now,player_id='1100',sport='cfb')
+    assert evidence['roster_confirmed'] and evidence['player_id']=='1100'
+    assert reason=='teammate_availability_unmodeled'
+    assert evidence['roster_source_url'].endswith('/roster?limit=1000')
+    assert evidence['source_url']==evidence['roster_source_url']
+    assert evidence['source_sha256']==evidence['roster_source_sha256']
+    assert evidence['teammates'][0]['player']=='Player 1-101'
+    assert player_availability(result,'Player 1-101',now,player_id='1101',sport='cfb')[1]=='player_availability_risk'
+    assert len(requests)==4  # Same directory, injury, and two roster requests.
+    import hashlib,json
+    archive=json.loads(next((tmp_path/'.local/availability').glob('*.json')).read_text(encoding='utf-8'))
+    source=next(s for s in archive['sources'] if s['url']==evidence['roster_source_url'])
+    assert hashlib.sha256(source['response_text'].encode()).hexdigest()==evidence['roster_source_sha256']
+
+
+@pytest.mark.parametrize('query',['?limit=100','?limit=1000&extra=1','?limit=1000&limit=100','?limit=1000#fragment'])
+def test_cfb_extended_roster_allows_only_committed_limit(query):
+    data=cfb_identity_context();data['teams'][0]['roster_source_url']+=query
+    assert player_availability(data,'Dominic Knicely',datetime.now(timezone.utc),player_id='5203477',sport='cfb')[0]['status']=='unavailable'
