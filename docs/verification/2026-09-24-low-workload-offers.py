@@ -13,6 +13,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from sportsbet.quant.history_tuning import PROPS, QUERIES
+from sportsbet.quant.baseline_reconstruction import baseline_evidence
 from sportsbet.quant.history_features import history_estimates
 from sportsbet.quant.priced_market_audit import _eligible, _quote_key, _implied
 from sportsbet.quant.market_baseline import verified_recorded_market_baseline
@@ -44,6 +45,8 @@ def audit():
     for values in grouped.values(): values.sort(key=lambda r:(r['day'],r['game']))
     counts={p:Counter() for p in PROPS['nfl']}
     covered={p:[] for p in PROPS['nfl']}
+    partial={p:[] for p in PROPS['nfl']}
+    evidence_details=[]
     seen=set()
     for row in rows:
         prop=row['prop_type']
@@ -69,11 +72,11 @@ def audit():
             c['eligible_original_workload_scope']+=1;continue
         c['low_workload']+=1
         estimate=history_estimates(prior,stat,work,day,line)
-        expected=estimate['base'] if row['direction']=='over' else 1-estimate['base']
-        if (row.get('model_sample_size')!=estimate['sample'] or abs(float(row['model_probability'])-expected)>1e-6
-                or abs(float(row.get('model_mean_stat',-999))-estimate['mean'])>.005001 or float(row.get('push_probability',-1))!=0):
-            c['baseline_reconstruction_mismatch']+=1;continue
-        c['baseline_agreement']+=1
+        evidence=baseline_evidence(row,estimate)
+        status=evidence['status']
+        c[status]+=1
+        evidence_details.append({k:row.get(k) for k in ('prediction_id','player_id','prop_type','line','game_id','captured_at','model_sample_size','model_probability','model_mean_stat')} | {'evidence':evidence,'reconstructed':{'sample':estimate['sample'],'probability':estimate['base'] if row['direction']=='over' else 1-estimate['base'],'mean':estimate['mean']},'direction':row['direction'],'game_date':row['game_date'],'features':list(estimate['features'])})
+        if status not in ('complete_agreement','partial_agreement_missing_mean'): continue
         other='under' if row['direction']=='over' else 'over'
         opposite=quotes[_quote_key(row)].get(other,set())
         raw=_implied(row['american_odds'])
@@ -82,17 +85,27 @@ def audit():
         if paired is not None and committed is not None and abs(paired-committed)>1e-10:
             c['conflicting_market_pair']+=1;continue
         if committed is None and paired is None: c['missing_market_pair']+=1;continue
-        c['paired_low_workload']+=1
-        covered[prop].append(key)
+        market=committed if committed is not None else paired
+        evidence_details[-1]['paired_over_market_probability']=market if row['direction']=='over' else 1-market
+        if status=='complete_agreement':
+            c['paired_low_workload']+=1
+            covered[prop].append(key)
+        else:
+            c['paired_partial_missing_mean']+=1
+            partial[prop].append(key)
     return {'generated_at':datetime.now(timezone.utc).isoformat(),'read_only':True,
-        'outcomes_loaded':False,'model_version':'empirical-jeffreys-v4','promote':False,
+        'audit_version':'low-workload-offer-coverage-v2','outcomes_loaded':False,'model_version':'empirical-jeffreys-v4','promote':False,
         'eligible_forecasts':len(rows),'history_rows':len(histories),
         'history_sha256':hashlib.sha256(json.dumps(histories,sort_keys=True,default=str).encode()).hexdigest(),
         'forecast_sha256':hashlib.sha256(json.dumps(rows,sort_keys=True,default=str).encode()).hexdigest(),
+        'evidence_details':evidence_details,
         'props':{p:{'counts':dict(counts[p]),'paired_games':len({k[0] for k in covered[p]}),
-                   'paired_players':len({k[1] for k in covered[p]})} for p in counts},
+                   'paired_players':len({k[1] for k in covered[p]}),
+                   'partial_paired_games':len({k[0] for k in partial[p]}),
+                   'partial_paired_players':len({k[1] for k in partial[p]})} for p in counts},
         'limitations':['Retrospective reconstruction from current database; source corrections may postdate forecast.',
             'Core stat hash does not authenticate workload fields.',
+            'Missing legacy means remain missing; partial agreement is separate and cannot satisfy prospective checks.',
             'Earliest game/player/market/line before coverage; complementary sides and sportsbooks deduplicated.',
             'No outcome selection, candidate scoring, market-edge or prospective-evidence claim.']}
 

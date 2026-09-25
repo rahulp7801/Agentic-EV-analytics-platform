@@ -1,0 +1,2995 @@
+{
+  "generated_at": "2026-09-25T00:24:15.664347+00:00",
+  "read_only": true,
+  "audit_version": "low-workload-offer-coverage-v2",
+  "outcomes_loaded": false,
+  "model_version": "empirical-jeffreys-v4",
+  "promote": false,
+  "eligible_forecasts": 11899,
+  "history_rows": 56645,
+  "history_sha256": "301e5e04cfbbc3e2cbbd24aae951f0764d68c6813119ae00853d6b32ac1407c0",
+  "forecast_sha256": "d7c68464efca6b8b22db0fdac8f7a66cf2e496ef552a9a16b1b7724e0695cb97",
+  "evidence_details": [
+    {
+      "prediction_id": "6d0588d790153509b169d3543715f8dbc4aaf68afd44ef15d7934e6bb843a395",
+      "player_id": "00-0033106",
+      "prop_type": "rush_yds",
+      "line": 0.5,
+      "game_id": "56e8897681915f7ec92baeee952bb1ae",
+      "captured_at": "2026-09-16T18:48:16.444334+00:00",
+      "model_sample_size": 35,
+      "model_probability": 0.486111,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 35,
+        "probability": 0.4861111111111111,
+        "mean": 2.942857142857143
+      },
+      "direction": "over",
+      "game_date": "2026-09-17",
+      "features": [
+        -0.055569851154810654,
+        -0.28090238546640206,
+        -0.7065702008920862,
+        -0.38503169312331936,
+        -0.1670540846631662,
+        1.6094379124341003,
+        0.0
+      ],
+      "paired_over_market_probability": 0.38763863465058684
+    },
+    {
+      "prediction_id": "dc891a2f51f2e3a039497d980dfeccf959fdbd9ab449cb1b3801380e06eb7093",
+      "player_id": "00-0036275",
+      "prop_type": "rec_yds",
+      "line": 11.5,
+      "game_id": "0283a29e1b38ef78b29b904fd56a16dd",
+      "captured_at": "2026-09-18T17:01:49.507739+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.671429,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.6714285714285714,
+        "mean": 20.441176470588236
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.7146533857809085,
+        -1.0511256224021213,
+        -0.346928605655591,
+        -0.5557763819904763,
+        -0.3492948366411099,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "93f72425494339a1657212d6a37e0ae94ea3d1e8ad9cfffadba1fc9ec05059f3",
+      "player_id": "00-0036275",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "0283a29e1b38ef78b29b904fd56a16dd",
+      "captured_at": "2026-09-18T17:01:49.507797+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.614286,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.6142857142857143,
+        "mean": 2.264705882352941
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.4653632496892335,
+        -0.8018354863104462,
+        -0.8330880298145507,
+        -0.5183484449202669,
+        -0.3492948366411099,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "4291eb3b52757a1dea1af93f7f4637d528860a465c39ba3818066db4768a5059",
+      "player_id": "00-0032764",
+      "prop_type": "rec_yds",
+      "line": 6.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-18T17:03:10.496241+00:00",
+      "model_sample_size": 35,
+      "model_probability": 0.541667,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 35,
+        "probability": 0.5416666666666666,
+        "mean": 10.342857142857143
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.16705408466316607,
+        -1.2656663733312759,
+        0.20067069546215144,
+        -0.5894783231568954,
+        -0.4776275543563949,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "f287fc4264b8a8e577ddb155a70d8e9d2ec8a1679e62959117348ccf0190657e",
+      "player_id": "00-0032764",
+      "prop_type": "receptions",
+      "line": 0.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-18T17:03:10.496307+00:00",
+      "model_sample_size": 35,
+      "model_probability": 0.652778,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 35,
+        "probability": 0.6527777777777778,
+        "mean": 1.0
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.6312717768418579,
+        -1.7298840655099676,
+        -0.26354699671654036,
+        -0.8,
+        -0.4776275543563949,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.6682464454976303
+    },
+    {
+      "prediction_id": "cebfb1bc619dc51c877bc4378f36d7b62f81f1b939c9c70fe3370714e341f9ff",
+      "player_id": "00-0034975",
+      "prop_type": "rec_yds",
+      "line": 12.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-18T17:03:10.497123+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.537037,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.5370370370370371,
+        "mean": 21.615384615384617
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.1484200051182734,
+        -1.2470322937863831,
+        -0.1484200051182734,
+        -0.7002541549708403,
+        -0.702716631576096,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5130795235028978
+    },
+    {
+      "prediction_id": "004fb4eec4a2b8b7c2e10ed83cd3aa0393e5cf62c7564aa50ac87d78ad97c04a",
+      "player_id": "00-0034975",
+      "prop_type": "rec_yds",
+      "line": 13.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-18T17:03:10.497178+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.5,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.5,
+        "mean": 21.615384615384617
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.0,
+        -2.3978952727983707,
+        -0.36772478012531723,
+        -0.7002541549708403,
+        -0.702716631576096,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "c0d26d83e26af4d66e1de4fbb7b7fa3e8368ba36c243a3d19845ca48ae416c22",
+      "player_id": "00-0034975",
+      "prop_type": "rush_yds",
+      "line": 12.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-18T17:03:10.497230+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.425926,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.42592592592592593,
+        "mean": 13.038461538461538
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.29849298855599654,
+        -0.8001193001121132,
+        -0.4636470634909003,
+        -0.45745974088625185,
+        -0.28699502330074267,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5105400733589106
+    },
+    {
+      "prediction_id": "380b6280d8dc7f4d524fdab86fcedac2e3378c4554635db524ee07060aabd294",
+      "player_id": "00-0034975",
+      "prop_type": "rush_yds",
+      "line": 13.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-18T17:03:10.497284+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.388889,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.3888888888888889,
+        "mean": 13.038461538461538
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.45198512374305727,
+        -0.6466271649250526,
+        -0.31015492830383956,
+        -0.45745974088625185,
+        -0.28699502330074267,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "8f640e22a0f3bd8396dda4e487e110cb4c45740dc40d62220f039d3a5051511b",
+      "player_id": "00-0035685",
+      "prop_type": "rec_yds",
+      "line": 11.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-19T00:15:54.319636+00:00",
+      "model_sample_size": 32,
+      "model_probability": 0.651515,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 32,
+        "probability": 0.6515151515151515,
+        "mean": 17.25
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.6257058997644127,
+        -0.2892336631431997,
+        -0.2579811196390952,
+        -0.6118173135902644,
+        -0.2837681731306446,
+        2.0794415416798357,
+        0.96875
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "3c9389b438b0c8eec6304bd4964129493b9b3df5edca6cdeb3865ca8c832f6d7",
+      "player_id": "00-0035685",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-19T00:15:54.319704+00:00",
+      "model_sample_size": 32,
+      "model_probability": 0.530303,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 32,
+        "probability": 0.5303030303030303,
+        "mean": 1.96875
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.12136085700426734,
+        -0.4578330936254801,
+        -0.4890856371295846,
+        -0.5975169860954301,
+        -0.2837681731306446,
+        2.0794415416798357,
+        0.96875
+      ]
+    },
+    {
+      "prediction_id": "e17eaec5f92a6cd159fd7df40a535b86b9d64c087eed72bb5cf8bfa3aaaecf4d",
+      "player_id": "00-0035685",
+      "prop_type": "receptions",
+      "line": 2.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-19T00:15:54.319770+00:00",
+      "model_sample_size": 32,
+      "model_probability": 0.378788,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 32,
+        "probability": 0.3787878787878788,
+        "mean": 1.96875
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.49469624183610705,
+        -0.6039160468320027,
+        -0.7290791897860086,
+        -0.5975169860954301,
+        -0.2837681731306446,
+        2.0794415416798357,
+        0.96875
+      ],
+      "paired_over_market_probability": 0.3933164104995955
+    },
+    {
+      "prediction_id": "3b7edd46e42a9d0359c4a7834cc691b9c6cb57ef16ebb4be6f9f1c7050eb510f",
+      "player_id": "00-0036442",
+      "prop_type": "rush_yds",
+      "line": 8.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-19T00:15:54.321772+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.462963,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.46296296296296297,
+        "mean": 10.076923076923077
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.14842000511827322,
+        -0.1880522315029395,
+        -1.0753554265038425,
+        -0.006295412064573466,
+        0.12718948609923833,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "8f47612e961f044acd5ea421f706b90bfa5ed2ffc6f17c9cdf654adbc5fa2067",
+      "player_id": "00-0036442",
+      "prop_type": "rush_yds",
+      "line": 9.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-19T00:15:54.321832+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.388889,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.3888888888888889,
+        "mean": 10.076923076923077
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.45198512374305727,
+        0.11551288712184454,
+        -0.7717903078790584,
+        -0.006295412064573466,
+        0.12718948609923833,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.4873460435296103
+    },
+    {
+      "prediction_id": "807c497a98b663076cb235fcc8d4c70bced9b8e281435b94b0a7ede254097201",
+      "player_id": "00-0038685",
+      "prop_type": "rec_yds",
+      "line": 6.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T00:16:41.499558+00:00",
+      "model_sample_size": 29,
+      "model_probability": 0.283333,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 29,
+        "probability": 0.2833333333333333,
+        "mean": 5.517241379310345
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.9279867716373464,
+        -0.17062551703076334,
+        -0.2957886599847692,
+        -0.2555097151975163,
+        -0.03390155167568123,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5110619469026548
+    },
+    {
+      "prediction_id": "6f7c6039572cc85074e894aedf4ffbf5ac2616a4781af8c978c250defd9a41eb",
+      "player_id": "00-0038685",
+      "prop_type": "rec_yds",
+      "line": 7.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T00:16:41.499633+00:00",
+      "model_sample_size": 29,
+      "model_probability": 0.283333,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 29,
+        "probability": 0.2833333333333333,
+        "mean": 5.517241379310345
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.9279867716373464,
+        -0.17062551703076334,
+        -0.2957886599847692,
+        -0.2555097151975163,
+        -0.03390155167568123,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "75cbc5786e5d81daece183393678f0a3a7a2208eb041aae61aebc8a317da2e5b",
+      "player_id": "00-0038685",
+      "prop_type": "rec_yds",
+      "line": 8.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T00:16:41.499697+00:00",
+      "model_sample_size": 29,
+      "model_probability": 0.283333,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 29,
+        "probability": 0.2833333333333333,
+        "mean": 5.517241379310345
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.9279867716373464,
+        -0.17062551703076334,
+        -0.2957886599847692,
+        -0.2555097151975163,
+        -0.03390155167568123,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.4796954314720812
+    },
+    {
+      "prediction_id": "0581a9c5c9f7cf606cfb44c9f76bf8027c9f1320cfed2a4e2769c12e9aba44ff",
+      "player_id": "00-0038685",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T00:16:41.499771+00:00",
+      "model_sample_size": 29,
+      "model_probability": 0.216667,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 29,
+        "probability": 0.21666666666666667,
+        "mean": 0.8275862068965517
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -1.285198244248522,
+        -1.1126970285498488,
+        -0.560628446249809,
+        -0.4275862068965517,
+        -0.03390155167568123,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "37143d3b34f078880a835fae9426a81963547228a1d466e773ad36a7ac05621c",
+      "player_id": "00-0030565",
+      "prop_type": "rush_yds",
+      "line": 7.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T00:16:41.501515+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.544118,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.5441176470588235,
+        "mean": 11.757575757575758
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.17693070815907805,
+        -2.5748259809574487,
+        -0.9390707602059749,
+        -0.708962355249859,
+        -0.2952292780871638,
+        2.0794415416798357,
+        0.9696969696969697
+      ]
+    },
+    {
+      "prediction_id": "20f279c8a32f1211833c7c2cad86c4d1004f135c8ba58db6ffdad663f4312f70",
+      "player_id": "00-0030565",
+      "prop_type": "rush_yds",
+      "line": 8.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T00:16:41.501578+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.426471,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.4264705882352941,
+        "mean": 11.757575757575758
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.2962658161431724,
+        -2.101629456655198,
+        -0.9275096154789433,
+        -0.708962355249859,
+        -0.2952292780871638,
+        2.0794415416798357,
+        0.9696969696969697
+      ]
+    },
+    {
+      "prediction_id": "f52674471010cc5eaab6414e23a69f8e6ca202d34f12919c6cd346ae4523ed2d",
+      "player_id": "00-0036264",
+      "prop_type": "rush_yds",
+      "line": 7.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T00:16:41.504115+00:00",
+      "model_sample_size": 31,
+      "model_probability": 0.390625,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 31,
+        "probability": 0.390625,
+        "mean": 9.096774193548388
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.44468582126144557,
+        -0.6539264674066643,
+        -0.31745423078545126,
+        -0.13076369124430617,
+        0.01337173696588924,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "d511241dc48159400524d56026d410e273fba714a05c3a2079d6b755cbcd3f0b",
+      "player_id": "00-0036264",
+      "prop_type": "rush_yds",
+      "line": 8.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T00:16:41.504175+00:00",
+      "model_sample_size": 31,
+      "model_probability": 0.390625,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 31,
+        "probability": 0.390625,
+        "mean": 9.096774193548388
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.44468582126144557,
+        -0.6539264674066643,
+        -0.31745423078545126,
+        -0.13076369124430617,
+        0.01337173696588924,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.4978941161605526
+    },
+    {
+      "prediction_id": "8b9432060ffbf73614ab387769140999a89eea5031460bfb373ac026fc89ec01",
+      "player_id": "00-0023459",
+      "prop_type": "rush_yds",
+      "line": 0.5,
+      "game_id": "9d14f87600f6edc74dbcb5c74edf6246",
+      "captured_at": "2026-09-19T00:17:27.740965+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.471429,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.4714285714285714,
+        "mean": 4.852941176470588
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.11441035117774422,
+        0.45088258779895724,
+        -0.253314428947573,
+        0.16333434709036657,
+        0.01980262729617973,
+        2.0794415416798357,
+        0.5
+      ],
+      "paired_over_market_probability": 0.48945992664108945
+    },
+    {
+      "prediction_id": "398971917e3caa124f229be66725d708f1c9855bee6ac988074eb59267ef46dc",
+      "player_id": "00-0034844",
+      "prop_type": "rec_yds",
+      "line": 10.5,
+      "game_id": "fafc649c455e32a0f2ba1bd06e2039bc",
+      "captured_at": "2026-09-19T19:04:28.411570+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.455882,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.45588235294117646,
+        "mean": 16.606060606060606
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.17693070815907835,
+        -0.9216815805090315,
+        -0.19079407196623888,
+        -0.8148753787181257,
+        -0.32590328527197876,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "1b54f8a26e40f999b643110705e4b3b920f6894ad5f12c2fe4630a339a2bbd9d",
+      "player_id": "00-0034844",
+      "prop_type": "rec_yds",
+      "line": 11.5,
+      "game_id": "fafc649c455e32a0f2ba1bd06e2039bc",
+      "captured_at": "2026-09-19T19:04:28.903588+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.426471,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.4264705882352941,
+        "mean": 16.606060606060606
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.2962658161431724,
+        -0.8023464725249374,
+        -0.07145896398214485,
+        -0.8148753787181257,
+        -0.32590328527197876,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "a09d0d272888a52ae8731c023b38f8e0ccd025bc00d77689c31a2186d49d1083",
+      "player_id": "00-0034844",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "fafc649c455e32a0f2ba1bd06e2039bc",
+      "captured_at": "2026-09-19T19:04:28.903683+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.661765,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.6617647058823529,
+        "mean": 2.1515151515151514
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.67116827384117,
+        -1.7697805625092797,
+        -1.0388930539664871,
+        -0.9710633495179283,
+        -0.32590328527197876,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "a22baeb2ee3289a5cdeee6ed52663d5d8c92989e550c32c8f0375c351499dfe4",
+      "player_id": "00-0035261",
+      "prop_type": "rec_yds",
+      "line": 8.5,
+      "game_id": "fafc649c455e32a0f2ba1bd06e2039bc",
+      "captured_at": "2026-09-19T19:04:28.904314+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.642857,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.6428571428571429,
+        "mean": 13.029411764705882
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.5877866649021192,
+        -0.9242589015233319,
+        -0.9555114450274365,
+        -0.5377280140535684,
+        -0.3418598581535919,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5110619469026548
+    },
+    {
+      "prediction_id": "1bd0299950abf848e3d59c0576aa32f947183ab7b4da6ebc8f755b82a271ebb5",
+      "player_id": "00-0035261",
+      "prop_type": "rec_yds",
+      "line": 9.5,
+      "game_id": "fafc649c455e32a0f2ba1bd06e2039bc",
+      "captured_at": "2026-09-19T19:04:29.385659+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.614286,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.6142857142857143,
+        "mean": 13.029411764705882
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.4653632496892335,
+        -0.8018354863104462,
+        -0.8330880298145507,
+        -0.5377280140535684,
+        -0.3418598581535919,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "6fa0a7e71a875f83e61a95da88a05a5f3d992ec81cd0f2f85c54affbb0191f10",
+      "player_id": "00-0035261",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "fafc649c455e32a0f2ba1bd06e2039bc",
+      "captured_at": "2026-09-19T19:04:29.385753+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.671429,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.6714285714285714,
+        "mean": 2.2058823529411766
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.7146533857809085,
+        -1.0511256224021213,
+        -1.0823781659062257,
+        -0.5554941738936221,
+        -0.3418598581535919,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "34725f72d42519340498385f473b78a27a44df1efe3d2f4b266b8e36ecdd059b",
+      "player_id": "00-0029604",
+      "prop_type": "rush_yds",
+      "line": 0.5,
+      "game_id": "71b3b83747589efdc5baef2c5cf811bf",
+      "captured_at": "2026-09-19T19:05:57.839563+00:00",
+      "model_sample_size": 25,
+      "model_probability": 0.25,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 25,
+        "probability": 0.25,
+        "mean": 0.04
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -1.0986122886681098,
+        0.0,
+        0.7308875085427926,
+        -0.3693244093096362,
+        0.3491842722095748,
+        2.0794415416798357,
+        0.96
+      ],
+      "paired_over_market_probability": 0.3982351592940637
+    },
+    {
+      "prediction_id": "63196e10ca2bd3f69f378896c991bfa2d7c68c0e595d3b2cd7e7e787a048c882",
+      "player_id": "00-0033119",
+      "prop_type": "rush_yds",
+      "line": 9.5,
+      "game_id": "4dd8020192a544385db42374e5555303",
+      "captured_at": "2026-09-19T19:06:42.143760+00:00",
+      "model_sample_size": 22,
+      "model_probability": 0.5,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 22,
+        "probability": 0.5,
+        "mean": 11.090909090909092
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.0,
+        -0.33647223662121273,
+        0.3677247801253175,
+        -0.22101012063957873,
+        -0.022472855852058514,
+        2.0794415416798357,
+        0.3181818181818182
+      ]
+    },
+    {
+      "prediction_id": "5deceb3d0974bedd63dc554e5d3f3dd07822093f4018f8dd17ca07942d099d56",
+      "player_id": "00-0033119",
+      "prop_type": "rush_yds",
+      "line": 10.5,
+      "game_id": "4dd8020192a544385db42374e5555303",
+      "captured_at": "2026-09-19T19:06:42.143837+00:00",
+      "model_sample_size": 22,
+      "model_probability": 0.456522,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 22,
+        "probability": 0.45652173913043476,
+        "mean": 11.090909090909092
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.1743533871447778,
+        -0.16211884947643493,
+        0.5420781672700953,
+        -0.22101012063957873,
+        -0.022472855852058514,
+        2.0794415416798357,
+        0.3181818181818182
+      ],
+      "paired_over_market_probability": 0.4915711395819285
+    },
+    {
+      "prediction_id": "9dd5fe783bd75f4449cb0927b8d92c6bec91d97206bfc72a150a05edca821124",
+      "player_id": "00-0033077",
+      "prop_type": "rush_yds",
+      "line": 7.5,
+      "game_id": "85ef85098ddd22fe4ecf45e7e3c0a9c0",
+      "captured_at": "2026-09-19T19:08:30.912496+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.425926,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.42592592592592593,
+        "mean": 9.423076923076923
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.29849298855599654,
+        0.6349652251772095,
+        0.666217768681314,
+        0.10402087647951408,
+        -0.12204743444284093,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.49095295536791317
+    },
+    {
+      "prediction_id": "3ef89d71ee73ba18b6204e2d41463701eb9f64d6737bf784f0ff62eb0a059dc8",
+      "player_id": "00-0033077",
+      "prop_type": "rush_yds",
+      "line": 8.5,
+      "game_id": "85ef85098ddd22fe4ecf45e7e3c0a9c0",
+      "captured_at": "2026-09-19T19:08:30.912575+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.425926,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.42592592592592593,
+        "mean": 9.423076923076923
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.29849298855599654,
+        0.6349652251772095,
+        0.666217768681314,
+        0.10402087647951408,
+        -0.12204743444284093,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "a4978c106b50b5c03dedb51bf140fed1ad72884bd8c2406989ef69108c4ba78f",
+      "player_id": "00-0038738",
+      "prop_type": "receptions",
+      "line": 0.5,
+      "game_id": "85ef85098ddd22fe4ecf45e7e3c0a9c0",
+      "captured_at": "2026-09-19T19:08:32.080354+00:00",
+      "model_sample_size": 29,
+      "model_probability": 0.583333,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 29,
+        "probability": 0.5833333333333334,
+        "mean": 0.8620689655172413
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.336472236621213,
+        0.7621400520468968,
+        0.0312525435041045,
+        0.13793103448275867,
+        0.061408628128643845,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5346534653465347
+    },
+    {
+      "prediction_id": "5923ce3510dfa4cce8d77399312f96f3f2a032eb43d771e2090511339713cbcf",
+      "player_id": "00-0037256",
+      "prop_type": "rec_yds",
+      "line": 11.5,
+      "game_id": "85ef85098ddd22fe4ecf45e7e3c0a9c0",
+      "captured_at": "2026-09-19T19:08:34.430811+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.544118,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.5441176470588235,
+        "mean": 18.666666666666668
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.17693070815907805,
+        -0.5134029447802908,
+        -0.5446554882843953,
+        -0.44943434844583313,
+        -0.39385394718048655,
+        2.0794415416798357,
+        0.9696969696969697
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "3b8884e6f906633dd44fc487b295fc8742cd707302bde6fa1e11d0a74198467e",
+      "player_id": "00-0037256",
+      "prop_type": "rec_yds",
+      "line": 12.5,
+      "game_id": "85ef85098ddd22fe4ecf45e7e3c0a9c0",
+      "captured_at": "2026-09-19T19:08:35.212834+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.544118,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.5441176470588235,
+        "mean": 18.666666666666668
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.17693070815907805,
+        -0.5134029447802908,
+        -0.5446554882843953,
+        -0.44943434844583313,
+        -0.39385394718048655,
+        2.0794415416798357,
+        0.9696969696969697
+      ],
+      "paired_over_market_probability": 0.5042122999157539
+    },
+    {
+      "prediction_id": "86a157a90017b3edd30be62c1bc8ab8df4ac5cb10e2d9248cf8334e225b86510",
+      "player_id": "00-0037256",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "85ef85098ddd22fe4ecf45e7e3c0a9c0",
+      "captured_at": "2026-09-19T19:08:35.212923+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.720588,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.7205882352941176,
+        "mean": 2.8181818181818183
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.9473813189441862,
+        0.15123096972392358,
+        -0.1852412668972897,
+        -0.5765745073658475,
+        -0.39385394718048655,
+        2.0794415416798357,
+        0.9696969696969697
+      ],
+      "paired_over_market_probability": 0.6103896103896104
+    },
+    {
+      "prediction_id": "c3df5b63c28c7c156e645e3d759a2489126e86233c4a90a12d06092d6e28af19",
+      "player_id": "00-0037256",
+      "prop_type": "receptions",
+      "line": 2.5,
+      "game_id": "85ef85098ddd22fe4ecf45e7e3c0a9c0",
+      "captured_at": "2026-09-19T19:08:35.213008+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.426471,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.4264705882352941,
+        "mean": 2.8181818181818183
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.2962658161431724,
+        -2.101629456655198,
+        -0.9275096154789433,
+        -0.5765745073658475,
+        -0.39385394718048655,
+        2.0794415416798357,
+        0.9696969696969697
+      ]
+    },
+    {
+      "prediction_id": "f9f2ffee56e5bd593bab2dd7b27c8e27f2ef354d921585b0ac6749ce8a3d7b06",
+      "player_id": "00-0035710",
+      "prop_type": "rush_yds",
+      "line": 8.5,
+      "game_id": "50bc247030707d823b9c3581d7eb5760",
+      "captured_at": "2026-09-19T19:09:23.605873+00:00",
+      "model_sample_size": 24,
+      "model_probability": 0.54,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 24,
+        "probability": 0.54,
+        "mean": 18.041666666666668
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.16034265007517948,
+        -0.4968148866963922,
+        -0.9224827021220763,
+        -0.13900508434210065,
+        -0.4609932500181148,
+        2.0794415416798357,
+        0.4166666666666667
+      ]
+    },
+    {
+      "prediction_id": "456477741b363437c53d2084339eead868c648d054aa4b1e093527a36d8fbf2d",
+      "player_id": "00-0036275",
+      "prop_type": "rec_yds",
+      "line": 10.5,
+      "game_id": "0283a29e1b38ef78b29b904fd56a16dd",
+      "captured_at": "2026-09-19T19:10:19.597053+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.671429,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.6714285714285714,
+        "mean": 20.441176470588236
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.7146533857809085,
+        -1.0511256224021213,
+        -0.346928605655591,
+        -0.5557763819904763,
+        -0.3492948366411099,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "094dc200a78fa922aba43f3d7089f1be073f3f504aea49c6247c1a8b269e1928",
+      "player_id": "00-0032764",
+      "prop_type": "rec_yds",
+      "line": 7.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-19T19:12:02.397582+00:00",
+      "model_sample_size": 35,
+      "model_probability": 0.513889,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 35,
+        "probability": 0.5138888888888888,
+        "mean": 10.342857142857143
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.05556985115481057,
+        -1.1541821398229204,
+        0.31215492897050695,
+        -0.5894783231568954,
+        -0.4776275543563949,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "3b54a50345f4302a03234d5bdf8781aae33023fb6502d4f17604cf4f48249958",
+      "player_id": "00-0032764",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-19T19:12:02.397761+00:00",
+      "model_sample_size": 35,
+      "model_probability": 0.263889,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 35,
+        "probability": 0.2638888888888889,
+        "mean": 1.0
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -1.0258529343856815,
+        -1.3720423384126892,
+        0.26371288233878465,
+        -0.8,
+        -0.4776275543563949,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "6e92bac2589db8a4799137cb7d750c95e5e230900e2a2f48cd7de34bcf727835",
+      "player_id": "00-0034975",
+      "prop_type": "rec_yds",
+      "line": 15.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-19T19:12:03.425377+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.425926,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.42592592592592593,
+        "mean": 21.615384615384617
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.29849298855599654,
+        -2.099402284242374,
+        -0.06923179156932069,
+        -0.7002541549708403,
+        -0.702716631576096,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5079872204472844
+    },
+    {
+      "prediction_id": "da3dc637a8eb5ae3feaaa15d96fb869377d1b168e7a696453e84b64bfb47077e",
+      "player_id": "00-0036550",
+      "prop_type": "rec_yds",
+      "line": 36.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-19T19:12:06.049273+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.370968,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3709677419354839,
+        "mean": 32.666666666666664
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.5280674302004967,
+        -1.869827842597874,
+        -1.317759260297834,
+        -0.928852111086955,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "d0326e7e3ac2b379616590ad2af160d8c39898d77e8f3bb4a11b763aca2e4560",
+      "player_id": "00-0036550",
+      "prop_type": "receptions",
+      "line": 2.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-19T19:12:06.536033+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.33871,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3387096774193548,
+        "mean": 2.1333333333333333
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.669049628980885,
+        -1.7288456438174857,
+        -2.375472808742538,
+        -0.9798329425373014,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "aef0476b5c4d4e7a9d90f6a88cb2bcf0c4ee86c5e252435fd16eef6aba1a4fe7",
+      "player_id": "00-0038685",
+      "prop_type": "rec_yds",
+      "line": 9.5,
+      "game_id": "4aeee070bb6ec60bdfae4dede61b9014",
+      "captured_at": "2026-09-19T19:13:50.613543+00:00",
+      "model_sample_size": 29,
+      "model_probability": 0.216667,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 29,
+        "probability": 0.21666666666666667,
+        "mean": 5.517241379310345
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -1.285198244248522,
+        0.18658595558041213,
+        -0.560628446249809,
+        -0.2555097151975163,
+        -0.03390155167568123,
+        2.0794415416798357,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "25b75886c1bf944325bcc31fe98220b01620e4947aa62b2677d162e9eea7815d",
+      "player_id": "00-0035685",
+      "prop_type": "rec_yds",
+      "line": 12.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-20T03:20:33.207610+00:00",
+      "model_sample_size": 32,
+      "model_probability": 0.651515,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 32,
+        "probability": 0.6515151515151515,
+        "mean": 17.25
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.6257058997644127,
+        -0.2892336631431997,
+        -0.2579811196390952,
+        -0.6118173135902644,
+        -0.2837681731306446,
+        2.0794415416798357,
+        0.96875
+      ],
+      "paired_over_market_probability": 0.4915711395819285
+    },
+    {
+      "prediction_id": "3bf0a89b01463810442f07bf86f4ac63a630e48733c0339b819c0a920813518e",
+      "player_id": "00-0032764",
+      "prop_type": "rec_yds",
+      "line": 5.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T03:31:48.115382+00:00",
+      "model_sample_size": 35,
+      "model_probability": 0.541667,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 35,
+        "probability": 0.5416666666666666,
+        "mean": 10.342857142857143
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.16705408466316607,
+        -1.2656663733312759,
+        0.20067069546215144,
+        -0.5894783231568954,
+        -0.4776275543563949,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5199445750755795
+    },
+    {
+      "prediction_id": "6d766b3c8a65a24bbbef4724175c14d764b442ac4025a2724908ad27c98ae436",
+      "player_id": "00-0034975",
+      "prop_type": "rec_yds",
+      "line": 14.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T03:31:50.004165+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.462963,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.46296296296296297,
+        "mean": 21.615384615384617
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.14842000511827322,
+        -2.2494752676800975,
+        -0.219304775007044,
+        -0.7002541549708403,
+        -0.702716631576096,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "b4ada63475f53d53dc62cb9d0ce68c6a7371fcd45295bf30d69cd3f61bf412a4",
+      "player_id": "00-0036550",
+      "prop_type": "rec_yds",
+      "line": 37.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T03:31:53.796931+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.370968,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3709677419354839,
+        "mean": 32.666666666666664
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.5280674302004967,
+        -1.869827842597874,
+        -1.317759260297834,
+        -0.928852111086955,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5051597457277305
+    },
+    {
+      "prediction_id": "cd9bffa390c94e17301a6b62ea1c13cb648d7a7fd59655392b21b16ae9bdaaba",
+      "player_id": "00-0036550",
+      "prop_type": "rec_yds",
+      "line": 38.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T03:31:53.797170+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.370968,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3709677419354839,
+        "mean": 32.666666666666664
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.5280674302004967,
+        -1.869827842597874,
+        -1.317759260297834,
+        -0.928852111086955,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.4978941161605526
+    },
+    {
+      "prediction_id": "3ce4dc70d1f4726a7bb5fb880aae3e7324248a8eff982c6e7b7f0217212adb76",
+      "player_id": "00-0035261",
+      "prop_type": "rec_yds",
+      "line": 7.5,
+      "game_id": "fafc649c455e32a0f2ba1bd06e2039bc",
+      "captured_at": "2026-09-20T03:34:50.259597+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.671429,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.6714285714285714,
+        "mean": 13.029411764705882
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.7146533857809085,
+        -0.37818114915969553,
+        -0.7146533857809085,
+        -0.5377280140535684,
+        -0.3418598581535919,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5203045685279188
+    },
+    {
+      "prediction_id": "d6d52b20cea89f56d60c0fe1c8f4ad64ef7a0646244564e19d543f2f20affdce",
+      "player_id": "00-0033119",
+      "prop_type": "rush_yds",
+      "line": 11.5,
+      "game_id": "4dd8020192a544385db42374e5555303",
+      "captured_at": "2026-09-20T03:38:46.539822+00:00",
+      "model_sample_size": 22,
+      "model_probability": 0.413043,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 22,
+        "probability": 0.41304347826086957,
+        "mean": 11.090909090909092
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.3513978868378884,
+        0.01492565021667569,
+        0.7191226669632059,
+        -0.22101012063957873,
+        -0.022472855852058514,
+        2.0794415416798357,
+        0.3181818181818182
+      ],
+      "paired_over_market_probability": 0.4936802190857384
+    },
+    {
+      "prediction_id": "89291f8e9352d37a7e508ad20f1caad8908c7b0ea1ff931a2a00c6b1812667ed",
+      "player_id": "00-0035685",
+      "prop_type": "rec_yds",
+      "line": 10.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-20T12:15:07.735127+00:00",
+      "model_sample_size": 32,
+      "model_probability": 0.651515,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 32,
+        "probability": 0.6515151515151515,
+        "mean": 17.25
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.6257058997644127,
+        -0.2892336631431997,
+        -0.2579811196390952,
+        -0.6118173135902644,
+        -0.2837681731306446,
+        2.0794415416798357,
+        0.96875
+      ],
+      "paired_over_market_probability": 0.5101214574898786
+    },
+    {
+      "prediction_id": "5608a4e941405b98c39b48bed3d21c6a8e91c1f3f7c4fd43b544c3b0c34ef90f",
+      "player_id": "00-0034981",
+      "prop_type": "rec_yds",
+      "line": 7.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-20T12:15:08.936232+00:00",
+      "model_sample_size": 24,
+      "model_probability": 0.66,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 24,
+        "probability": 0.66,
+        "mean": 20.291666666666668
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        0.6632942174102643,
+        -0.3268219807890513,
+        0.09884583463663221,
+        -0.5850958628135474,
+        -0.31592528476517595,
+        2.0794415416798357,
+        0.9583333333333334
+      ]
+    },
+    {
+      "prediction_id": "11b56d038dfbb298f267ee811a6227edc186ccf7dc41b4597dd6ed60da9a9653",
+      "player_id": "00-0034981",
+      "prop_type": "receptions",
+      "line": 0.5,
+      "game_id": "36ad2fa722f4915ef23d2c81351261de",
+      "captured_at": "2026-09-20T12:15:09.534019+00:00",
+      "model_sample_size": 24,
+      "model_probability": 0.78,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 24,
+        "probability": 0.78,
+        "mean": 1.7083333333333333
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        1.265666373331276,
+        -0.1670540846631663,
+        -0.041890941709160634,
+        -0.4096359095025755,
+        -0.31592528476517595,
+        2.0794415416798357,
+        0.9583333333333334
+      ]
+    },
+    {
+      "prediction_id": "3cf237d3bac77593339ecf855adac6a4ff6384eb96ba696747b2ec2ad945e6b2",
+      "player_id": "00-0034975",
+      "prop_type": "rec_yds",
+      "line": 16.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T12:20:50.314014+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.425926,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.42592592592592593,
+        "mean": 21.615384615384617
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.29849298855599654,
+        -2.099402284242374,
+        -0.06923179156932069,
+        -0.7002541549708403,
+        -0.702716631576096,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "0248ddc899e6febaf46d2152cbf7c726cf99d92a44c3ffa9fbd488b2b8ae50d0",
+      "player_id": "00-0034975",
+      "prop_type": "rush_yds",
+      "line": 11.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T12:20:50.314273+00:00",
+      "model_sample_size": 26,
+      "model_probability": 0.425926,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 26,
+        "probability": 0.42592592592592593,
+        "mean": 13.038461538461538
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.29849298855599654,
+        -0.8001193001121132,
+        -0.4636470634909003,
+        -0.45745974088625185,
+        -0.28699502330074267,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5090470446320868
+    },
+    {
+      "prediction_id": "833b43027c2ab2f085c0c3ca7ab4f41b7e585960f7b0e6bbfbe2c0b3dbce5a46",
+      "player_id": "00-0036550",
+      "prop_type": "rec_yds",
+      "line": 27.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T12:20:53.482076+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.467742,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.46774193548387094,
+        "mean": 32.666666666666664
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.12921173148000623,
+        -2.2686835413183646,
+        -1.7166149590183246,
+        -0.928852111086955,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.6456256921373201
+    },
+    {
+      "prediction_id": "aa33356a9e8393517f823b5e9da4fa001e0a958ad21ef5472a061223f9616d52",
+      "player_id": "00-0036550",
+      "prop_type": "rec_yds",
+      "line": 32.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T12:20:54.099999+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.370968,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3709677419354839,
+        "mean": 32.666666666666664
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.5280674302004967,
+        -1.869827842597874,
+        -1.317759260297834,
+        -0.928852111086955,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5751633986928104
+    },
+    {
+      "prediction_id": "32609c7cfca9840e9771cf43469ec9845f596f72a1ba74095a376841d8723774",
+      "player_id": "00-0036550",
+      "prop_type": "rec_yds",
+      "line": 39.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T12:20:54.100912+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.370968,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3709677419354839,
+        "mean": 32.666666666666664
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.5280674302004967,
+        -1.869827842597874,
+        -1.317759260297834,
+        -0.928852111086955,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "18875774ba4b43191f33a904fb089c921a125d9fe616aed38287bd4519c049db",
+      "player_id": "00-0036550",
+      "prop_type": "rec_yds",
+      "line": 42.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T12:20:54.101113+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.33871,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3387096774193548,
+        "mean": 32.666666666666664
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.669049628980885,
+        -1.7288456438174857,
+        -1.1767770615174458,
+        -0.928852111086955,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.43668122270742354
+    },
+    {
+      "prediction_id": "3b838a76fd8f30dc0274e6c0c36e0b8b44395c57db5fd84eba166f60f79baa13",
+      "player_id": "00-0036550",
+      "prop_type": "rec_yds",
+      "line": 47.5,
+      "game_id": "2143ade9684fd876b68a4e8cbf451f05",
+      "captured_at": "2026-09-20T12:20:54.101327+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.306452,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3064516129032258,
+        "mean": 32.666666666666664
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.8167611365271221,
+        -1.5811341362712485,
+        -1.0290655539712088,
+        -0.928852111086955,
+        -0.5920510636885765,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.375
+    },
+    {
+      "prediction_id": "1823094cc4b5f2ada5c5c56c595aa117a5924a4f8a54d017da9a5101fa2a967a",
+      "player_id": "00-0034844",
+      "prop_type": "receptions",
+      "line": 2.5,
+      "game_id": "fafc649c455e32a0f2ba1bd06e2039bc",
+      "captured_at": "2026-09-20T16:26:44.245698+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.338235,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.3382352941176471,
+        "mean": 2.1515151515151514
+      },
+      "direction": "over",
+      "game_date": "2026-09-20",
+      "features": [
+        -0.67116827384117,
+        -1.7267269989572007,
+        -0.09097177820572688,
+        -0.9710633495179283,
+        -0.32590328527197876,
+        2.0794415416798357,
+        0.0
+      ],
+      "paired_over_market_probability": 0.38873994638069703
+    },
+    {
+      "prediction_id": "833171332ddb988050aaa94ef56ee30f9977a7f41a7d68a33fc8a3deb60b63ee",
+      "player_id": "00-0039738",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "32367f882fac1a0c20a6335619922025",
+      "captured_at": "2026-09-21T15:06:47.638602+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.926471,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.9264705882352942,
+        "mean": 0.45454545454545453
+      },
+      "direction": "under",
+      "game_date": "2026-09-21",
+      "features": [
+        -2.5336968139574325,
+        0.13580154115906184,
+        -0.5108256237659905,
+        -0.05454545454545451,
+        -0.04082199452025494,
+        2.4849066497880004,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "ba156388851f7a767c1157782f4cfa06bcc22254dabb446481c6043015f8030a",
+      "player_id": "00-0039738",
+      "prop_type": "rec_yds",
+      "line": 3.5,
+      "game_id": "32367f882fac1a0c20a6335619922025",
+      "captured_at": "2026-09-21T15:06:59.442414+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.691176,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.6911764705882353,
+        "mean": 2.8484848484848486
+      },
+      "direction": "under",
+      "game_date": "2026-09-21",
+      "features": [
+        -0.8056251639866355,
+        0.4691529273654228,
+        -0.41815026763548013,
+        0.3346019202578109,
+        -0.04082199452025494,
+        2.4849066497880004,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "5f906840626f36e7f4400d2b92437a525e6b83be3b53e55510e3bded1b804d8c",
+      "player_id": "00-0039738",
+      "prop_type": "receptions",
+      "line": 0.5,
+      "game_id": "32367f882fac1a0c20a6335619922025",
+      "captured_at": "2026-09-21T15:07:00.197423+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.397059,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.39705882352941174,
+        "mean": 0.45454545454545453
+      },
+      "direction": "over",
+      "game_date": "2026-09-21",
+      "features": [
+        -0.4177352006999788,
+        0.0812629640787661,
+        0.050010420574661596,
+        -0.05454545454545451,
+        -0.04082199452025494,
+        2.4849066497880004,
+        0.0
+      ]
+    },
+    {
+      "prediction_id": "8f69630e3b95d079e6c2d515fdbfa7f3d7d8bd133fe58bb9300c69a464168fa8",
+      "player_id": "00-0026498",
+      "prop_type": "rush_yds",
+      "line": 0.5,
+      "game_id": "32367f882fac1a0c20a6335619922025",
+      "captured_at": "2026-09-21T15:07:06.657188+00:00",
+      "model_sample_size": 34,
+      "model_probability": 0.3,
+      "model_mean_stat": null,
+      "evidence": {
+        "status": "partial_agreement_missing_mean",
+        "missing_fields": [
+          "model_mean_stat"
+        ],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 34,
+        "probability": 0.3,
+        "mean": 1.2058823529411764
+      },
+      "direction": "over",
+      "game_date": "2026-09-21",
+      "features": [
+        -0.8472978603872036,
+        1.1837700970084166,
+        0.08515780834030673,
+        0.1513870604231647,
+        -0.2390590066201091,
+        2.4849066497880004,
+        0.0
+      ],
+      "paired_over_market_probability": 0.3468516542155817
+    },
+    {
+      "prediction_id": "e9e454c871e83b768f2e0f7a47d37a9ba0838cf6a40ef92fac8c72b1f1d16af4",
+      "player_id": "00-0039738",
+      "prop_type": "rec_yds",
+      "line": 2.5,
+      "game_id": "32367f882fac1a0c20a6335619922025",
+      "captured_at": "2026-09-21T19:15:26.035975+00:00",
+      "model_sample_size": 33,
+      "model_probability": 0.338235,
+      "model_mean_stat": 2.85,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 33,
+        "probability": 0.3382352941176471,
+        "mean": 2.8484848484848486
+      },
+      "direction": "over",
+      "game_date": "2026-09-21",
+      "features": [
+        -0.67116827384117,
+        0.3346960372199572,
+        -0.09097177820572688,
+        0.3346019202578109,
+        -0.04082199452025494,
+        2.4849066497880004,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "9359aa698569b8ea4a51545f6049e90f5c023a78c42571da97ff74e1bd55d6c2",
+      "player_id": "00-0038685",
+      "prop_type": "rec_yds",
+      "line": 7.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-23T01:43:19.280758+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.306452,
+      "model_mean_stat": 5.83,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3064516129032258,
+        "mean": 5.833333333333333
+      },
+      "direction": "over",
+      "game_date": "2026-09-24",
+      "features": [
+        -0.8167611365271221,
+        0.4802888999059094,
+        0.05462108448022529,
+        -0.07609441564944637,
+        -0.048790164169432056,
+        1.6094379124341003,
+        0.0
+      ],
+      "paired_over_market_probability": 0.48522895125553916
+    },
+    {
+      "prediction_id": "5ce3a4022330d239b007d0dc829e0d2a231406f55af85425e47e16cb1d78145c",
+      "player_id": "00-0036264",
+      "prop_type": "rush_yds",
+      "line": 7.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-23T01:43:21.329672+00:00",
+      "model_sample_size": 32,
+      "model_probability": 0.378788,
+      "model_mean_stat": 8.81,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 32,
+        "probability": 0.3787878787878788,
+        "mean": 8.8125
+      },
+      "direction": "over",
+      "game_date": "2026-09-24",
+      "features": [
+        -0.49469624183610705,
+        -0.6039160468320027,
+        -0.2674438102107898,
+        -0.1832984944313635,
+        -0.3127557100038969,
+        1.6094379124341003,
+        0.0
+      ],
+      "paired_over_market_probability": 0.5101214574898786
+    },
+    {
+      "prediction_id": "82cf9d865a48cdb96948d7a79a1ac5e1d730fc22d3befbffe8c2d25fc0e846f7",
+      "player_id": "00-0036264",
+      "prop_type": "rush_yds",
+      "line": 8.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-23T01:43:21.497734+00:00",
+      "model_sample_size": 32,
+      "model_probability": 0.378788,
+      "model_mean_stat": 8.81,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 32,
+        "probability": 0.3787878787878788,
+        "mean": 8.8125
+      },
+      "direction": "over",
+      "game_date": "2026-09-24",
+      "features": [
+        -0.49469624183610705,
+        -0.6039160468320027,
+        -0.2674438102107898,
+        -0.1832984944313635,
+        -0.3127557100038969,
+        1.6094379124341003,
+        0.0
+      ],
+      "paired_over_market_probability": 0.48945992664108945
+    },
+    {
+      "prediction_id": "730586b6c56bdf47272a1de53f62461080d58c151280b421711f1efdf1a27553",
+      "player_id": "00-0038090",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-24T02:08:01.971536+00:00",
+      "model_sample_size": 22,
+      "model_probability": 0.934783,
+      "model_mean_stat": 0.32,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 22,
+        "probability": 0.9347826086956522,
+        "mean": 0.3181818181818182
+      },
+      "direction": "under",
+      "game_date": "2026-09-24",
+      "features": [
+        -2.662587827025453,
+        1.563975538357343,
+        0.8167611365271219,
+        0.2818181818181818,
+        0.20067069546215124,
+        1.6094379124341003,
+        0.9090909090909091
+      ],
+      "paired_over_market_probability": 0.40900106431503724
+    },
+    {
+      "prediction_id": "54dcadd3ee7a5be4c382194267be2808a60dd2f26385a1c78356bdea4aadfa4a",
+      "player_id": "00-0038090",
+      "prop_type": "rec_yds",
+      "line": 10.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-24T02:08:03.669536+00:00",
+      "model_sample_size": 22,
+      "model_probability": 0.804348,
+      "model_mean_stat": 4.23,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 22,
+        "probability": 0.8043478260869565,
+        "mean": 4.2272727272727275
+      },
+      "direction": "under",
+      "game_date": "2026-09-24",
+      "features": [
+        -1.413693335308005,
+        0.3150810466398952,
+        0.18991790368588934,
+        0.20766272361522822,
+        0.20067069546215124,
+        1.6094379124341003,
+        0.9090909090909091
+      ],
+      "paired_over_market_probability": 0.5145711906744379
+    },
+    {
+      "prediction_id": "6c9a74de0ab755bcfafa6e32d963954029a64e0896a842e4c7de2e110be9023f",
+      "player_id": "00-0038090",
+      "prop_type": "rec_yds",
+      "line": 8.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-24T02:08:05.446728+00:00",
+      "model_sample_size": 22,
+      "model_probability": 0.76087,
+      "model_mean_stat": 4.23,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 22,
+        "probability": 0.7608695652173914,
+        "mean": 4.2272727272727275
+      },
+      "direction": "under",
+      "game_date": "2026-09-24",
+      "features": [
+        -1.157452788691043,
+        0.058840500022933284,
+        -0.0663226429310726,
+        0.20766272361522822,
+        0.20067069546215124,
+        1.6094379124341003,
+        0.9090909090909091
+      ],
+      "paired_over_market_probability": 0.5105400733589105
+    },
+    {
+      "prediction_id": "f29563a09673ff7433234a1bcfeef5129ba64f370818e9e0941ff6317389f926",
+      "player_id": "00-0038090",
+      "prop_type": "rec_yds",
+      "line": 9.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-24T02:08:05.447268+00:00",
+      "model_sample_size": 22,
+      "model_probability": 0.76087,
+      "model_mean_stat": 4.23,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 22,
+        "probability": 0.7608695652173914,
+        "mean": 4.2272727272727275
+      },
+      "direction": "under",
+      "game_date": "2026-09-24",
+      "features": [
+        -1.157452788691043,
+        0.058840500022933284,
+        -0.0663226429310726,
+        0.20766272361522822,
+        0.20067069546215124,
+        1.6094379124341003,
+        0.9090909090909091
+      ],
+      "paired_over_market_probability": 0.5102580936358787
+    },
+    {
+      "prediction_id": "05e703dd8f22ca0dbde01c792139e137f0769552d47b82b6e50d26ae4b21a3a5",
+      "player_id": "00-0038685",
+      "prop_type": "receptions",
+      "line": 1.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-24T02:08:06.277199+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.790323,
+      "model_mean_stat": 0.83,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.7903225806451613,
+        "mean": 0.8333333333333334
+      },
+      "direction": "under",
+      "game_date": "2026-09-24",
+      "features": [
+        -1.3268709406490897,
+        -1.071024332149281,
+        -0.5189557498492412,
+        -0.43333333333333335,
+        -0.048790164169432056,
+        1.6094379124341003,
+        0.0
+      ],
+      "paired_over_market_probability": 0.42910447761194026
+    },
+    {
+      "prediction_id": "7ffaaf834e9debc712f49216e797fa82dce9b77810d8699fc93b3563ed9b219d",
+      "player_id": "00-0038090",
+      "prop_type": "rec_yds",
+      "line": 12.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-24T23:19:42.169186+00:00",
+      "model_sample_size": 22,
+      "model_probability": 0.804348,
+      "model_mean_stat": 4.23,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 22,
+        "probability": 0.8043478260869565,
+        "mean": 4.2272727272727275
+      },
+      "direction": "under",
+      "game_date": "2026-09-24",
+      "features": [
+        -1.413693335308005,
+        0.3150810466398952,
+        0.18991790368588934,
+        0.20766272361522822,
+        0.20067069546215124,
+        1.6094379124341003,
+        0.9090909090909091
+      ],
+      "paired_over_market_probability": 0.5
+    },
+    {
+      "prediction_id": "0b9c14c64baa3f152df1b6791c67af7cbbc619f5cd2a45aae1c80cc600dd6ad0",
+      "player_id": "00-0038685",
+      "prop_type": "rec_yds",
+      "line": 6.5,
+      "game_id": "e5fbd3b3953b896b1bf897ddadb3cc4b",
+      "captured_at": "2026-09-24T23:20:00.485093+00:00",
+      "model_sample_size": 30,
+      "model_probability": 0.306452,
+      "model_mean_stat": 5.83,
+      "evidence": {
+        "status": "complete_agreement",
+        "missing_fields": [],
+        "invalid_fields": [],
+        "conflicting_fields": [],
+        "prospective_eligible": false
+      },
+      "reconstructed": {
+        "sample": 30,
+        "probability": 0.3064516129032258,
+        "mean": 5.833333333333333
+      },
+      "direction": "over",
+      "game_date": "2026-09-24",
+      "features": [
+        -0.8167611365271221,
+        0.4802888999059094,
+        0.05462108448022529,
+        -0.07609441564944637,
+        -0.048790164169432056,
+        1.6094379124341003,
+        0.0
+      ],
+      "paired_over_market_probability": 0.48542880932556204
+    }
+  ],
+  "props": {
+    "pass_yds": {
+      "counts": {
+        "earliest_offered_thresholds": 570,
+        "eligible_original_workload_scope": 437,
+        "insufficient_history": 133
+      },
+      "paired_games": 0,
+      "paired_players": 0,
+      "partial_paired_games": 0,
+      "partial_paired_players": 0
+    },
+    "rush_yds": {
+      "counts": {
+        "earliest_offered_thresholds": 687,
+        "eligible_original_workload_scope": 449,
+        "low_workload": 21,
+        "partial_agreement_missing_mean": 19,
+        "paired_partial_missing_mean": 12,
+        "insufficient_history": 217,
+        "missing_market_pair": 7,
+        "complete_agreement": 2,
+        "paired_low_workload": 2
+      },
+      "paired_games": 1,
+      "paired_players": 1,
+      "partial_paired_games": 9,
+      "partial_paired_players": 9
+    },
+    "rec_yds": {
+      "counts": {
+        "earliest_offered_thresholds": 1302,
+        "eligible_original_workload_scope": 969,
+        "insufficient_history": 292,
+        "low_workload": 41,
+        "partial_agreement_missing_mean": 34,
+        "missing_market_pair": 10,
+        "paired_partial_missing_mean": 24,
+        "complete_agreement": 7,
+        "paired_low_workload": 7
+      },
+      "paired_games": 2,
+      "paired_players": 3,
+      "partial_paired_games": 5,
+      "partial_paired_players": 7
+    },
+    "receptions": {
+      "counts": {
+        "earliest_offered_thresholds": 245,
+        "eligible_original_workload_scope": 166,
+        "insufficient_history": 61,
+        "low_workload": 18,
+        "partial_agreement_missing_mean": 16,
+        "missing_market_pair": 11,
+        "paired_partial_missing_mean": 5,
+        "complete_agreement": 2,
+        "paired_low_workload": 2
+      },
+      "paired_games": 1,
+      "paired_players": 2,
+      "partial_paired_games": 4,
+      "partial_paired_players": 5
+    }
+  },
+  "limitations": [
+    "Retrospective reconstruction from current database; source corrections may postdate forecast.",
+    "Core stat hash does not authenticate workload fields.",
+    "Missing legacy means remain missing; partial agreement is separate and cannot satisfy prospective checks.",
+    "Earliest game/player/market/line before coverage; complementary sides and sportsbooks deduplicated.",
+    "No outcome selection, candidate scoring, market-edge or prospective-evidence claim."
+  ]
+}

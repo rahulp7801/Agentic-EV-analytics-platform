@@ -1,4 +1,8 @@
-# Low-workload NFL model research — September 24, 2026
+# Low-workload NFL model research â€” September 24, 2026
+
+## Follow-up correction
+
+The September 25 diagnostic in `2026-09-25-baseline-evidence-diagnostics.md` establishes that all 69 entries labelled reconstruction mismatches below actually match sample counts and probabilities; they lack the legacy mean metadata field. The original report is retained for traceability. Its strict complete-evidence counts are unchanged, but it must not be read as evidence of changed outcomes or conflicting source histories. The v2 audit separately reports partially documented records and evaluates their authenticated outcomes retrospectively.
 
 ## Why this test
 
@@ -10,15 +14,15 @@ Read-only history inspection found 22 recorded games since 2024: three KC games,
 
 `python -m sportsbet.quant.history_tuning --sport nfl --workload-scope low --output REPORT.json`
 
-Default `eligible` behavior is preserved. The new opt-in scope requires 20–40 earlier observed category games, finite nonnegative prior workload, last-five average below the existing category minimum, and at least one positive workload observation in retained prior history. Target workload, target outcome, same-day and future rows cannot determine eligibility or features. Missing workload is excluded. CFB has no workload columns in this audit and rejects this scope before connecting to a database.
+Default `eligible` behavior is preserved. The new opt-in scope requires 20â€“40 earlier observed category games, finite nonnegative prior workload, last-five average below the existing category minimum, and at least one positive workload observation in retained prior history. Target workload, target outcome, same-day and future rows cannot determine eligibility or features. Missing workload is excluded. CFB has no workload columns in this audit and rejects this scope before connecting to a database.
 
-Training remains 2024; selection remains September–October 2025; evaluation remains November 2025–February 14, 2026. Existing prior-only research thresholds, five candidate specifications, equal-game/player/line weighting and separate game/player intervals remain intact. Evaluation-period history can update features only after its game date; coefficients and model selection do not use evaluation outcomes.
+Training remains 2024; selection remains Septemberâ€“October 2025; evaluation remains November 2025â€“February 14, 2026. Existing prior-only research thresholds, five candidate specifications, equal-game/player/line weighting and separate game/player intervals remain intact. Evaluation-period history can update features only after its game date; coefficients and model selection do not use evaluation outcomes.
 
 This is exploratory. The scope was motivated by an observed live forecast, existing evaluation outcomes have been inspected before, and the first pass included players with no prior category involvement. That first pass is retained in `2026-09-24-low-workload-initial-scope.json`. We then excluded players with no prior involvement because irrelevant structural zero outcomes dominated, e.g. non-passers in passing yards. Both attempts are disclosed; no untouched-test or confirmatory significance claim is made.
 
 ## Results
 
-54,422 existing NFL rows (2023–2025); all core stat commitments verified. Historical workload values are **not** covered by those stat commitments. Corpus digest and full scores, fitted coefficients, counts, exclusions and limitations are retained in `2026-09-24-low-workload-nfl.json`.
+54,422 existing NFL rows (2023â€“2025); all core stat commitments verified. Historical workload values are **not** covered by those stat commitments. Corpus digest and full scores, fitted coefficients, counts, exclusions and limitations are retained in `2026-09-24-low-workload-nfl.json`.
 
 Lower Brier is better. The selection period chose logistic correction L2=0.1 for all four categories.
 
