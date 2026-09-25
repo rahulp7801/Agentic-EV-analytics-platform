@@ -81,7 +81,7 @@ function rosterSource(value:unknown,sport:Sport):value is string {
       : sport==='cfb' ? /^\/apis\/site\/v2\/sports\/football\/college-football\/teams\/[0-9]+\/roster$/
       : /^\/apis\/site\/v2\/sports\/basketball\/nba\/teams\/[0-9]+\/roster$/;
     return url.origin==='https://site.api.espn.com' && !url.username && !url.password
-      && !url.search && !url.hash && path.test(url.pathname);
+      && (!url.search || (sport==='cfb' && url.search==='?limit=1000')) && !url.hash && path.test(url.pathname);
   } catch {return false;}
 }
 

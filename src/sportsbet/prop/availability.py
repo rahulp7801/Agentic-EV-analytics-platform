@@ -125,9 +125,12 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
                 if len(matches) != 1 or not str(matches[0]['id']).isdigit():
                     raise ValueError('Ambiguous availability team identity')
                 selected.append(matches[0])
-            rosters = await asyncio.gather(*(read(base+'/teams/'+str(team['id'])+'/roster') for team in selected))
+            # The default college response stops at 100 athletes, before many FBS rosters end.
+            roster_urls = [base+'/teams/'+str(team['id'])+'/roster'
+                           + ('?limit=1000' if sport=='cfb' else '') for team in selected]
+            rosters = await asyncio.gather(*(read(url) for url in roster_urls))
             result = []
-            for team, roster in zip(selected, rosters, strict=True):
+            for team, roster, roster_url in zip(selected, rosters, roster_urls, strict=True):
                 if str(roster['team']['id']) != str(team['id']):
                     raise ValueError('Roster team identity mismatch')
                 groups = [] if isinstance(injuries, Exception) else [
@@ -175,7 +178,6 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
                     flags = list(reports.values())
                 if len(flags) > 64 or len({flag['player'] for flag in flags}) != len(flags):
                     raise ValueError('Ambiguous injury reports')
-                roster_url = base+'/teams/'+str(team['id'])+'/roster'
                 injury_url = base+'/injuries' if groups else roster_url
                 result.append(dict(name=team['displayName'], abbreviation=team['abbreviation'],
                                    portraits={athlete['displayName']:dict(player_id=str(athlete.get('id','')),
@@ -192,7 +194,7 @@ async def fetch_event_availability(event: dict, sport: str, *, player_names: set
                                        if source['url']==injury_url),
                                    roster_source_url=roster_url,
                                    roster_source_sha256=next(source['source_sha256'] for source in sources
-                                       if source['url']==base+'/teams/'+str(team['id'])+'/roster')))
+                                       if source['url']==roster_url)))
             identities = {}
             pfr_identities = {}
             identity_source = None
@@ -299,7 +301,7 @@ def player_availability(context: dict | None, player: str, now: datetime, *, pla
                 url=team['roster_source_url'];digest=team['roster_source_sha256']
                 if (not isinstance(roster_name,str) or not roster_name or len(roster_name)>100
                         or roster_name not in team['roster_names']
-                        or not re.fullmatch(r'https://site\.api\.espn\.com/apis/site/v2/sports/football/college-football/teams/[1-9][0-9]*/roster',url)
+                        or not re.fullmatch(r'https://site\.api\.espn\.com/apis/site/v2/sports/football/college-football/teams/[1-9][0-9]*/roster(?:\?limit=1000)?',url)
                         or not re.fullmatch(r'[a-f0-9]{64}',digest)):
                     raise ValueError('Invalid CFB roster commitment')
                 identity_source=dict(url=url,source_sha256=digest)
